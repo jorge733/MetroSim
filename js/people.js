@@ -21,8 +21,8 @@
 
 import * as THREE from "three";
 import { CONFIG, STATIONS, demandAt } from "./config.js";
-import { ROUTE_A, ROUTE_B, routeForSide } from "./route.js";
-import { TRAIN_LAYOUT } from "./train.js";
+import { routeForSide } from "./engine/route.js";
+import { TRAIN_LAYOUT } from "./engine/consist.js";
 import { clamp } from "./utils.js";
 
 const rand = (a, b) => a + Math.random() * (b - a);

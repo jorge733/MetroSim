@@ -1,5 +1,5 @@
 /* ==========================================================================
-   MetroSim — Alpha 0.6 · schedule.js
+   MetroSim — Motor · schedule.js
    Horario (malla de servicio) de la Línea 3.
 
    · Tiempo de recorrido entre estaciones: estimado con un modelo cinemático
@@ -12,8 +12,8 @@
      sale de Plaza Quilicura a las 08:01:30; la de vuelta (B), desfasada 2 min.
    ========================================================================== */
 
-import { CONFIG, demandAt } from "./config.js";
-import { formatClock } from "./utils.js";
+import { CONFIG, demandAt } from "../config.js";
+import { formatClock } from "./format.js";
 
 const ACCEL = 0.72;          // aceleración media efectiva (m/s²)
 const DECEL = 0.62;          // deceleración media de servicio (m/s²)

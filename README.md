@@ -58,28 +58,58 @@ Three.js se carga desde CDN, así que hace falta conexión a internet.
 
 **Ambos:** M sonido · H ayuda.
 
+## Arquitectura
+
+MetroSim separa el **motor** (el "cerebro" del Metro) del **render** (lo que se ve):
+
+```
+ENTRADA DEL JUGADOR → MOTOR METROSIM → ESTADO DE LA RED → RENDER 3D / INTERFAZ / AUDIO
+```
+
+El motor (`js/engine/`) no usa Three.js ni el navegador: los trenes circulan con su propio reloj de paso fijo,
+los mire el jugador o no. Se puede ejecutar sin gráficos:
+
+```
+node tools/simular.mjs            # 08:00 → 10:00, informe cada 15 min
+node tools/simular.mjs 09:30 5    # hasta las 09:30, informe cada 5 min
+```
+
+(Requiere Node 22 o superior.)
+
 ## Estructura
 
 ```
-index.html      pantallas y HUD
-styles.css      estilos
-js/main.js      punto de entrada: une todos los sistemas
-js/config.js    línea, estaciones, geometría, mando, demanda
-js/route.js     los dos sentidos de circulación
-js/schedule.js  horarios
-js/signals.js   señalización de bloqueo automático
-js/sim.js       física del tren y conducción automática
-js/traffic.js   todos los trenes de la línea
-js/world.js     túnel, vías, catenaria y estaciones con mezanina
-js/train.js     tren de 5 coches y cabina
-js/dmi.js       pantalla de cabina
-js/people.js    viajeros (NPC) instanciados
-js/walker.js    pasajero a pie
-js/audio.js     sonido procedural y megafonía
-js/camera.js    vistas del conductor
-js/hud.js       interfaz (incluye boletería y tótem)
-js/card.js      tarjeta bip! del jugador
-js/utils.js     utilidades y texturas procedurales
+index.html            pantallas y HUD
+styles.css            estilos
+js/engine/            MOTOR (sin Three.js)
+  engine.js           MetroEngine: reloj, horarios, señales y trenes; informe de estado
+  clock.js            reloj de paso fijo
+  route.js            los dos sentidos de circulación
+  schedule.js         horarios
+  signals.js          lógica de señalización de bloqueo automático
+  sim.js              física del tren y conducción automática
+  traffic.js          todos los trenes de la línea, maniobras y retrasos
+  consist.js          composición lógica del tren de 5 coches
+  events.js           bus de eventos del motor
+  format.js           utilidades puras
+js/render/            dibujo del estado del motor
+  trainViews.js       trenes
+  signalViews.js      señales
+js/main.js            punto de entrada: une motor, render, roles, interfaz y audio
+js/config.js          línea, estaciones, geometría, mando, tarifas, demanda
+js/world.js           túnel, vías, catenaria y estaciones con mezanina
+js/train.js           modelo 3D del tren de 5 coches y cabina
+js/dmi.js             pantalla de cabina
+js/people.js          viajeros (NPC) instanciados
+js/walker.js          pasajero a pie
+js/audio.js           sonido procedural y megafonía
+js/announcements.js   frases reales de megafonía del Metro de Santiago
+js/camera.js          vistas del conductor
+js/hud.js             interfaz (incluye boletería y tótem)
+js/card.js            tarjeta bip! del jugador
+js/intro.js           introducción de bienvenida
+js/utils.js           utilidades y texturas procedurales
+tools/simular.mjs     ejecuta el motor sin navegador
 ```
 
 Las distancias entre estaciones son aproximadas; los nombres, el orden y las combinaciones son los reales.

@@ -8,7 +8,7 @@
 
 import { STATIONS, NOTCHES, NOTCH_INDEX, WORLD, FARES, formatCLP, fareBandAt } from "./config.js";
 import { $, clamp, formatClock, formatStopError } from "./utils.js";
-import { formatDelay } from "./schedule.js";
+import { formatDelay } from "./engine/schedule.js";
 
 export class Hud {
   constructor() {

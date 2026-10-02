@@ -23,8 +23,8 @@
 
 import * as THREE from "three";
 import { CONFIG, STATIONS } from "./config.js";
-import { ROUTES, routeForSide } from "./route.js";
-import { TRAIN_LAYOUT } from "./train.js";
+import { ROUTES, routeForSide } from "./engine/route.js";
+import { TRAIN_LAYOUT } from "./engine/consist.js";
 import { clamp } from "./utils.js";
 
 const EYE = 1.62;

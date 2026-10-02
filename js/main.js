@@ -2,14 +2,25 @@
    MetroSim — Alpha 0.6 · main.js
    Punto de entrada: crea la partida y une todos los sistemas.
 
-   Módulos:
-     config.js    Línea 3 de Santiago, geometría, mando, horarios y demanda
+   Arquitectura:  ENTRADA DEL JUGADOR → MOTOR → ESTADO → RENDER / UI / AUDIO
+
+   Motor (js/engine/, sin Three.js; se puede ejecutar en Node):
+     engine.js    MetroEngine: reloj de paso fijo, horarios, señales y trenes
+     clock.js     reloj de la simulación
      route.js     los dos sentidos de circulación (vía 1 y vía 2)
-     utils.js     utilidades, materiales y texturas procedurales
      schedule.js  horarios por sentido y retrasos
-     signals.js   señalización de bloqueo automático (una por vía)
-     sim.js       simulación de un tren y conducción automática
-     traffic.js   todos los trenes de la línea
+     signals.js   lógica de señalización de bloqueo automático
+     sim.js       física de un tren y conducción automática
+     traffic.js   todos los trenes de la línea, maniobras y retrasos
+     consist.js   composición lógica del tren de 5 coches
+     events.js    bus de eventos del motor
+     format.js    utilidades puras
+
+   Render (js/render/ y resto de js/, con Three.js):
+     render/trainViews.js   dibujo de los trenes del motor
+     render/signalViews.js  dibujo de las señales del motor
+     config.js    Línea 3 de Santiago, geometría, mando, horarios y demanda
+     utils.js     utilidades, materiales y texturas procedurales
      world.js     túnel, vías, catenaria, estaciones con mezanina y torniquetes
      train.js     tren de 5 coches, cabina y luces
      dmi.js       pantalla de cabina
@@ -28,14 +39,15 @@
 import * as THREE from "three";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { CONFIG, STATIONS, NOTCH_INDEX, FARES, spokenName, fareBandAt, formatCLP } from "./config.js";
-import { ROUTES, ROUTE_A, ROUTE_B, routeForSide, oppositeRoute } from "./route.js";
+import { ROUTES, ROUTE_A, ROUTE_B, routeForSide, oppositeRoute } from "./engine/route.js";
 import { BipCard } from "./card.js";
 import { PHRASES } from "./announcements.js";
 import { playIntro } from "./intro.js";
 import { $, clamp, formatClock, formatStopError, gradeStop } from "./utils.js";
-import { Timetable, formatDelay, makeTrip } from "./schedule.js";
-import { SignalSystem } from "./signals.js";
-import { TrafficManager } from "./traffic.js";
+import { formatDelay, makeTrip } from "./engine/schedule.js";
+import { MetroEngine } from "./engine/engine.js";
+import { TrainViews } from "./render/trainViews.js";
+import { SignalViews } from "./render/signalViews.js";
 import { World } from "./world.js";
 import { createTrainLights, resetTrainAssets } from "./train.js";
 import { PeopleSystem } from "./people.js";
@@ -121,34 +133,29 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A) {
   pmrem.dispose();
   const camera = new THREE.PerspectiveCamera(mode === "driver" ? 62 : 70, innerWidth / innerHeight, 0.03, 340);
 
-  /* --- Mundo, señales, horarios y tráfico (ambos sentidos) --- */
+  /* --- Motor MetroSim (el "cerebro") y su dibujo --- */
   const world = new World(scene);
-  const signals = new Map(ROUTES.map(r => [r.id, new SignalSystem(r)]));
-  signals.forEach(s => s.build3D(scene));
-  const timetables = new Map([
-    [ROUTE_A.id, new Timetable(ROUTE_A, CONFIG.schedule.playerDeparture)],
-    [ROUTE_B.id, new Timetable(ROUTE_B, CONFIG.schedule.playerDeparture + CONFIG.schedule.reverseOffset)],
-  ]);
-  const traffic = new TrafficManager({ scene, timetables, signals, onUnitEvent: (u, t, d) => onUnitEvent(u, t, d) });
+  const warmStart = CONFIG.startTime - 45 * 60;
+  const engine = new MetroEngine({ startTime: warmStart, onUnitEvent: (u, t, d) => onUnitEvent(u, t, d) });
+  const { traffic, signals, timetables } = engine;
+  const trainViews = new TrainViews(scene, engine.bus);       // dibuja los trenes que crea el motor
+  const signalViews = new SignalViews(scene, signals.values());
   const playerTrip = timetables.get(direction.id).anchorTrip;
 
   game = {
-    mode, renderer, scene, camera, world, signals, timetables, traffic, audio, playerTrip,
-    clock: CONFIG.startTime, elapsed: 0, last: performance.now(), dmiTimer: 0, pidTimer: 0, raf: 0,
+    mode, renderer, scene, camera, world, engine, signals, timetables, traffic, trainViews, signalViews, audio, playerTrip,
+    clock: warmStart, elapsed: 0, last: performance.now(), dmiTimer: 0, pidTimer: 0, raf: 0,
     warming: true,
     stats: { arrivals: [], stops: [], redSignals: 0, overspeeds: 0, emergencies: 0 },
     ride: { origin: null, boardedClock: null },
   };
   if (mode === "driver") traffic.started.add(playerTrip.id);
 
-  /* --- Calentamiento: 45 min de servicio para que la línea ya tenga trenes --- */
-  const warmStart = CONFIG.startTime - 45 * 60;
+  /* --- Calentamiento: el motor simula 45 min de servicio para que la línea ya tenga trenes --- */
   const people = new PeopleSystem(scene, traffic, warmStart);
   game.people = people;
-  for (let t = warmStart, step = 0.25; t < CONFIG.startTime; t += step) {
-    traffic.update(step, t);
-    people.update(step, t, { cameraZ: 1e9, render: false });
-  }
+  engine.runUntil(CONFIG.startTime, { onStep: (step, t) => people.update(step, t, { cameraZ: 1e9, render: false }) });
+  game.clock = engine.time;
   game.warming = false;
 
   /* --- Jugador --- */
@@ -684,24 +691,25 @@ const deckAgents = [];
 
 function loop(now) {
   if (!game) return;
-  const dt = clamp((now - game.last) / 1000, 0, 0.05);
+  const realDt = Math.max(0, (now - game.last) / 1000);
+  const dt = Math.min(realDt, 0.05);                 // paso de animación del fotograma
   game.last = now;
   if (hud.summaryOpen) { game.renderer.render(game.scene, game.camera); game.raf = requestAnimationFrame(loop); return; }
   game.elapsed += dt;
-  game.clock += dt;
-  const { traffic, people, world, signals, audio, walker, player } = game;
+  const { engine, traffic, people, world, audio, walker, player } = game;
 
-  // 1. Trenes y señales
-  traffic.update(dt, game.clock);
+  // 1. Motor: trenes y señales avanzan con su propio reloj de paso fijo
+  engine.update(realDt);
   if (!game) return;
+  game.clock = engine.time;
 
   // 2. Cámara / jugador
   if (player) {
-    traffic.syncVisuals(player.group.position.z);
+    game.trainViews.sync(traffic.units, player.group.position.z);
     game.rig.update(player.sim, game.elapsed);
   } else {
     walker.update(dt);
-    traffic.syncVisuals(walker.worldZ);
+    game.trainViews.sync(traffic.units, walker.worldZ);
     walker.update(0);
   }
   game.camera.updateMatrixWorld(true);
@@ -710,7 +718,7 @@ function loop(now) {
 
   // 3. Mundo, señales, viajeros, torniquetes y pantallas
   world.update(cameraWorld, dt);
-  signals.forEach(s => s.updateVisibility(cameraZ));
+  game.signalViews.update(cameraZ);
   people.update(dt, game.clock, { cameraZ, hideUnit: player && game.rig.view === "cab" ? player : null });
   deckAgents.length = 0;
   people.deckAgents(deckAgents);

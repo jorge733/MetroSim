@@ -1,5 +1,5 @@
 /* ==========================================================================
-   MetroSim — Alpha 0.6 · route.js
+   MetroSim — Motor · route.js
    Rutas: los dos sentidos de circulación de la Línea 3.
 
      Ruta A · vía 1 (x = +2): Plaza Quilicura → Fernando Castillo Velasco
@@ -13,7 +13,7 @@
    sin duplicar código.
    ========================================================================== */
 
-import { CONFIG, STATIONS, WORLD_SPEED_LIMITS } from "./config.js";
+import { CONFIG, STATIONS, WORLD_SPEED_LIMITS } from "../config.js";
 
 const K = STATIONS[0].z + STATIONS.at(-1).z;      // constante del espejo
 

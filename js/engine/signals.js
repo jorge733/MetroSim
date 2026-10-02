@@ -1,5 +1,5 @@
 /* ==========================================================================
-   MetroSim — Alpha 0.6 · signals.js
+   MetroSim — Motor · signals.js
    Señalización lateral con bloqueo automático de 3 aspectos.
 
    · Cada señal protege el cantón (bloque) que empieza en ella y termina en
@@ -14,17 +14,12 @@
    Tipos: "entrada" (antes de cada estación), "salida" (final de andén) e
    "intermedia" (en túnel, separación ≤ CONFIG.signals.maxBlock).
 
-   Hay un SignalSystem por ruta (sentido). La lógica trabaja en coordenadas
-   de la ruta; solo el dibujo 3D las convierte al mundo. Las señales están a
-   la derecha de su vía, mirando al tren que llega.
+   Hay un SignalSystem por ruta (sentido), en coordenadas de la ruta.
+   Este módulo es SOLO lógica: el dibujo de los postes y lámparas está en
+   render/signalViews.js, que lee el aspecto de cada señal.
    ========================================================================== */
 
-import * as THREE from "three";
-import { CONFIG } from "./config.js";
-import { std, glow, toTexture, signalPlateCanvas } from "./utils.js";
-
-const ASPECT_COLORS = { red: 0xff2020, yellow: 0xffb000, green: 0x20ff6a };
-const LAMP_OFF = 0x151515;
+import { CONFIG } from "../config.js";
 
 /** Lista ordenada (z descendente) de señales a lo largo de una ruta. */
 function buildSignalList(route) {
@@ -55,61 +50,6 @@ export class SignalSystem {
   constructor(route) {
     this.route = route;
     this.signals = buildSignalList(route);
-  }
-
-  /* ----- Construcción 3D ----- */
-  build3D(scene) {
-    const post = std(0x3c4146, { metal: 0.6, rough: 0.4 });
-    const head = std(0x0d0f11, { metal: 0.3, rough: 0.6 });
-    const lampGeo = new THREE.CircleGeometry(0.1, 20);
-    const visorGeo = new THREE.CylinderGeometry(0.13, 0.13, 0.14, 16, 1, true, 0, Math.PI);
-
-    for (const s of this.signals) {
-      const g = new THREE.Group();
-      // A la derecha de la vía, sobre el borde del andén de evacuación
-      g.position.set(this.route.trackX + this.route.dir * 1.85, 0, this.route.toWorldZ(s.z));
-      g.rotation.y = this.route.dir === 1 ? 0 : Math.PI;      // mirando al tren que llega
-      scene.add(g);
-
-      const pole = new THREE.Mesh(new THREE.BoxGeometry(0.1, 2.5, 0.1), post);
-      pole.position.y = 1.25;
-      g.add(pole);
-      const box = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.95, 0.22), head);
-      box.position.y = 2.95;
-      g.add(box);
-
-      // Lámparas: rojo arriba, amarillo en medio, verde abajo (mirando al tren que llega, +Z)
-      s.lamps = {};
-      ["red", "yellow", "green"].forEach((aspect, k) => {
-        const mat = new THREE.MeshBasicMaterial({ color: LAMP_OFF, fog: false, toneMapped: false });
-        const lamp = new THREE.Mesh(lampGeo, mat);
-        lamp.position.set(0, 3.25 - k * 0.3, 0.115);
-        g.add(lamp);
-        const visor = new THREE.Mesh(visorGeo, head);
-        visor.rotation.x = Math.PI / 2;
-        visor.rotation.y = Math.PI;
-        visor.position.set(0, 3.27 - k * 0.3, 0.17);
-        g.add(visor);
-        s.lamps[aspect] = mat;
-      });
-
-      // Placa con el número de señal
-      const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.17), glow(0xffffff, { map: toTexture(signalPlateCanvas(s.id)) }));
-      plate.position.set(0, 2.25, 0.06);
-      g.add(plate);
-
-      s.group = g;
-      s.shownAspect = null;
-    }
-    this.applyLamps();
-  }
-
-  applyLamps() {
-    for (const s of this.signals) {
-      if (!s.lamps || s.shownAspect === s.aspect) continue;
-      s.shownAspect = s.aspect;
-      for (const [aspect, mat] of Object.entries(s.lamps)) mat.color.setHex(aspect === s.aspect ? ASPECT_COLORS[aspect] : LAMP_OFF);
-    }
   }
 
   /* ----- Lógica ----- */
@@ -152,7 +92,6 @@ export class SignalSystem {
       else if (next && next.aspect === "red") s.aspect = "yellow";
       else s.aspect = "green";
     }
-    this.applyLamps();
   }
 
   /** Primera señal por delante de la posición z (la próxima que verá el tren). */
@@ -178,8 +117,4 @@ export class SignalSystem {
     return this.signals.find(s => s.type === "salida" && s.station === st);
   }
 
-  updateVisibility(cameraZ) {
-    const R = CONFIG.renderRadius;
-    for (const s of this.signals) if (s.group) s.group.visible = Math.abs(this.route.toWorldZ(s.z) - cameraZ) < R;
-  }
 }

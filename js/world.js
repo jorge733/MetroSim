@@ -19,7 +19,7 @@
 
 import * as THREE from "three";
 import { CONFIG, STATIONS, WORLD, LINE, FARES, formatCLP } from "./config.js";
-import { ROUTE_A, ROUTE_B } from "./route.js";
+import { ROUTE_A, ROUTE_B } from "./engine/route.js";
 import {
   std, glow, addBox, addBoxSpan, addPlane, makeCanvas, toTexture, tunnelTexture, concreteTexture,
   terrazzoTexture, tileTexture, stationNameCanvas, lineMapCanvas, lineMapU, signCanvas, stopBoardCanvas,

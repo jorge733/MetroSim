@@ -1,5 +1,5 @@
 /* ==========================================================================
-   MetroSim — Alpha 0.6 · sim.js
+   MetroSim — Motor · sim.js
    Simulación de un tren (lógica pura, sin gráficos) y conducción automática.
 
    Principio: el tren del jugador y los trenes automáticos usan EXACTAMENTE la
@@ -11,8 +11,8 @@
    Velocidad con signo: velocity > 0 = avanza, velocity < 0 = retrocede.
    ========================================================================== */
 
-import { CONFIG, NOTCHES, NOTCH_INDEX, REVERSER } from "./config.js";
-import { clamp, formatStopError } from "./utils.js";
+import { CONFIG, NOTCHES, NOTCH_INDEX, REVERSER } from "../config.js";
+import { clamp, formatStopError } from "./format.js";
 
 
 /* ==========================================================================

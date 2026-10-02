@@ -1,44 +1,44 @@
 /* ==========================================================================
-   MetroSim — Alpha 0.6 · traffic.js
+   MetroSim — Motor · traffic.js
    Gestor de tráfico: todos los trenes de la Línea 3 en ambos sentidos.
 
    · Cada ruta (sentido) tiene su horario y sus señales. Los servicios entran
      desde las cocheras de su terminal de origen y se retiran tras la de destino.
    · Cada tren es una "unidad": simulación (TrainSim, en coordenadas de su
-     ruta) + conductor (AutoDriver o el jugador) + modelo 3D + plazas.
-   · syncVisuals() convierte la posición de la ruta a coordenadas del mundo:
-     la vía 2 circula hacia +Z, así que su tren va girado 180°.
+     ruta) + conductor (AutoDriver o el jugador).
+   · Este módulo es SOLO lógica. Avisa por el bus de eventos cuando un tren
+     se crea ("train:created"), cambia de vía ("train:rebuilt") o se retira
+     ("train:removed"); render/trainViews.js escucha y dibuja su modelo 3D.
    · Maniobra de retorno: al llegar al fondo de la cola de maniobras tras una
      terminal, el tren cambia de cabina, pasa por el cambio de vía a la vía
      contraria y toma el siguiente servicio del sentido opuesto. Si no hay
      servicio próximo, se retira a cocheras.
    ========================================================================== */
 
-import * as THREE from "three";
-import { CONFIG } from "./config.js";
+import { CONFIG } from "../config.js";
 import { ROUTES, oppositeRoute } from "./route.js";
 import { TrainSim, AutoDriver } from "./sim.js";
-import { buildTrain, buildTrainSlots, TRAIN_LAYOUT } from "./train.js";
+import { TRAIN_LAYOUT } from "./consist.js";
+import { EventBus } from "./events.js";
 
 const L = CONFIG.train.length;
 
 export class TrafficManager {
   /**
    * @param {object} opts
-   * @param {THREE.Scene} opts.scene
    * @param {Map<string, import("./schedule.js").Timetable>} opts.timetables  por id de ruta
    * @param {Map<string, import("./signals.js").SignalSystem>} opts.signals  por id de ruta
+   * @param {EventBus} opts.bus  bus de eventos del motor (ciclo de vida de los trenes)
    * @param {(unit, type:string, data?:object)=>void} opts.onUnitEvent
    */
-  constructor({ scene, timetables, signals, onUnitEvent = () => {} }) {
-    this.scene = scene;
+  constructor({ timetables, signals, bus = new EventBus(), onUnitEvent = () => {} }) {
+    this.bus = bus;
     this.timetables = timetables;
     this.signals = signals;
     this.onUnitEvent = onUnitEvent;
     this.units = [];
     this.started = new Set();          // servicios ya iniciados (o reservados para el jugador)
     this.isBusyFor = () => false;      // lo conecta el sistema de viajeros
-    this.tmp = new THREE.Vector3();
   }
 
   /* ----- Creación y retirada ----- */
@@ -55,7 +55,6 @@ export class TrafficManager {
     const route = trip.route;
     const unit = {
       id: trip.id, trip, route, isPlayer,
-      slots: buildTrainSlots(),
       load: 0,
       materialized: false,
       delay: 0,
@@ -64,20 +63,11 @@ export class TrafficManager {
     };
     unit.sim = new TrainSim(route, (type, data) => this.onUnitEvent(unit, type, data), start ?? route.track.depotZ);
     unit.prevPos = unit.sim.position;
-    this.buildModel(unit);
     unit.ato = isPlayer ? null : this.makeDriver(unit, targetIndex, holdUntil);
     this.started.add(trip.id);
     this.units.push(unit);
+    this.bus.emit("train:created", unit);
     return unit;
-  }
-
-  /** Modelo 3D según la ruta (indicador de destino y orientación). */
-  buildModel(unit) {
-    unit.model = buildTrain({ routeId: unit.route.id, cab: unit.isPlayer });
-    unit.group = unit.model.group;
-    unit.group.rotation.y = unit.route.dir === 1 ? 0 : Math.PI;
-    this.placeGroup(unit);
-    this.scene.add(unit.group);
   }
 
   makeDriver(unit, targetIndex = 0, holdUntil = null) {
@@ -105,11 +95,9 @@ export class TrafficManager {
   turnback(unit, trip) {
     const route = trip.route;
     this.onUnitEvent(unit, "turnbackStart");
-    this.scene.remove(unit.group);
     unit.route = route;
     unit.trip = trip;
     unit.id = trip.id;
-    unit.slots = buildTrainSlots();
     unit.delay = 0;
     unit.dockedIdx = unit.arrivedIdx = null;
     unit.announced = null;
@@ -117,7 +105,7 @@ export class TrafficManager {
     unit.sim.route = route;
     unit.sim.reset(route.track.depotZ);
     unit.prevPos = unit.sim.position;
-    this.buildModel(unit);
+    this.bus.emit("train:rebuilt", unit);          // el dibujo cambia de vía y de cabina
     unit.ato = unit.isPlayer ? null : this.makeDriver(unit, 0, trip.departure - 150);
     this.started.add(trip.id);
     this.onUnitEvent(unit, "turnback", { trip });
@@ -125,9 +113,8 @@ export class TrafficManager {
 
   removeUnit(unit) {
     this.onUnitEvent(unit, "removed");
-    this.scene.remove(unit.group);
-    // Las geometrías y materiales son compartidos por todos los trenes: no se liberan aquí
     this.units = this.units.filter(u => u !== unit);
+    this.bus.emit("train:removed", unit);
   }
 
   /** Inicia los servicios cuya hora ha llegado (si la cochera de su ruta está libre). */
@@ -208,27 +195,10 @@ export class TrafficManager {
     }
   }
 
-  /* ----- Mundo ----- */
-
-  placeGroup(u) {
-    u.group.position.set(u.route.trackX, 0, u.route.toWorldZ(u.sim.position));
-  }
+  /* ----- Mundo (solo matemáticas, sin dibujo) ----- */
 
   /** Centro del tren en coordenadas del mundo. */
   worldCenterZ(u) { return u.route.toWorldZ(u.sim.position + L / 2); }
-
-  /** Posición, puertas y visibilidad de los modelos. */
-  syncVisuals(cameraZ) {
-    for (const u of this.units) {
-      this.placeGroup(u);
-      u.model.setDoors(u.sim.doorProgress);
-      u.group.visible = u.isPlayer || Math.abs(this.worldCenterZ(u) - cameraZ) < CONFIG.renderRadius + L / 2;
-      u.group.updateMatrixWorld(true);
-    }
-  }
-
-  /** Posición de mundo de un punto local del tren. */
-  toWorld(u, local, out = new THREE.Vector3()) { return u.group.localToWorld(out.copy(local)); }
 
   /* ----- Consultas ----- */
 
@@ -255,10 +225,14 @@ export class TrafficManager {
     return list.sort((a, b) => a.eta - b.eta);
   }
 
-  /** ¿Hay un hueco de puerta del tren en esta coordenada z del mundo? */
+  /**
+   * ¿Hay un hueco de puerta del tren en esta coordenada z del mundo?
+   * Una puerta a dz metros del testero está en la coordenada de ruta
+   * (posición + dz), sea cual sea el sentido.
+   */
   doorAtWorldZ(u, z, tolerance = 0.55) {
     for (const dz of TRAIN_LAYOUT.doors) {
-      if (Math.abs(this.toWorld(u, this.tmp.set(0, 0, dz)).z - z) < tolerance) return dz;
+      if (Math.abs(u.route.toWorldZ(u.sim.position + dz) - z) < tolerance) return dz;
     }
     return null;
   }
