@@ -21,6 +21,7 @@
      · llegadas estimadas desde la posición real de los trenes (eta.js)
      · pasajeros lógicos (passengers.js) y transbordos entre líneas
      · regulación de intervalos (regulation.js)
+     · incidentes aleatorios (incidents.js)
      · buzón de órdenes (commands.js)
      · estado legible de toda la red (snapshot / report)
 
@@ -43,6 +44,7 @@ import { estimateArrival } from "./eta.js";
 import { CommandQueue } from "./commands.js";
 import { PassengerFlow } from "./passengers.js";
 import { Regulator } from "./regulation.js";
+import { IncidentManager } from "./incidents.js";
 
 /** Parte de los que bajan en una estación de combinación que siguen viaje por la otra línea. */
 const TRANSFER_SHARE = 0.35;
@@ -71,6 +73,7 @@ class LineSystem {
     this.passengers = new PassengerFlow(line, startTime);
     this.traffic.boardingChecks.push(u => this.passengers.isBusy(u));
     this.regulator = new Regulator(this);
+    this.incidents = new IncidentManager(this, startTime);
   }
 
   get time() { return this.engine.time; }
@@ -80,6 +83,7 @@ class LineSystem {
     this.traffic.update(dt, clock);
     this.passengers.update(dt, clock, this.trains);
     this.regulator.update(clock);
+    this.incidents.update(dt, clock);
   }
 }
 

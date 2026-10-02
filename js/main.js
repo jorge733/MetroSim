@@ -8,6 +8,7 @@
      engine.js    MetroEngine: reloj de paso fijo, horarios, señales y trenes
      state.js     estado explícito de cada tren (arrancando, en andén, ante señal...)
      eta.js       llegadas estimadas desde la posición real de los trenes
+     incidents.js puertas obstruidas, limitaciones temporales y fallas de señal
      commands.js  buzón de órdenes: los roles mandan órdenes al motor
      clock.js     reloj de la simulación
      route.js     los dos sentidos de circulación (vía 1 y vía 2)
@@ -38,6 +39,7 @@
      camera.js    vistas del conductor
      hud.js       interfaz HTML (incluye boletería y tótem)
      card.js      tarjeta bip! del jugador
+     scoring.js   puntaje del conductor: parada, horario, confort, rachas y récord
      announcements.js  frases reales de megafonía del Metro de Santiago
 
    Principio: Conductor y Pasajero comparten el MISMO mundo, el MISMO tráfico
@@ -72,6 +74,7 @@ import { Walker } from "./walker.js";
 import { AudioSystem } from "./audio.js";
 import { CameraRig } from "./camera.js";
 import { Hud } from "./hud.js";
+import { DriverScore } from "./scoring.js";
 
 const startScreen = $("startScreen");
 const loadingScreen = $("loadingScreen");
@@ -201,6 +204,7 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A) {
   engine.bus.on("train:event", ({ unit, type, data }) => onUnitEvent(unit, type, data));
   engine.bus.on("train:state", (change) => onTrainState(change));
   engine.bus.on("command:result", (r) => onCommandResult(r));
+  engine.bus.on("incident", (inc) => onIncident(inc));
   const trainViews = new TrainViews(scene, engine.bus);       // dibuja los trenes que crea el motor
   const signalViews = new SignalViews(scene, signals.values());
   const playerTrip = timetables.get(direction.id).anchorTrip;
@@ -230,6 +234,7 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A) {
     const player = traffic.createUnit(playerTrip, { isPlayer: true, start: direction.first });
     player.arrivedIdx = player.dockedIdx = 0;
     game.player = player;
+    game.score = newScore(direction);
     game.driverRole = new DriverRole(engine, () => game?.player);
     const rig = new CameraRig(camera, player.group);
     rig.setView("cab");
@@ -455,6 +460,30 @@ function onUnitEvent(unit, type, data = {}) {
   }
 }
 
+/** Incidentes aleatorios (engine/incidents.js): avisos al conductor o al viajero afectado. */
+function onIncident(inc) {
+  if (!game || game.warming || inc.line !== ROUTE_A.line) return;
+  const level = inc.phase === "end" ? "ok" : "warn";
+  if (game.player) {
+    if (inc.kind === "doorObstruction") {
+      if (inc.unit === game.player) { game.audio.airHiss(0.4); hud.showMessage(inc.text, "warn", 5000); }
+      return;
+    }
+    if (inc.route !== game.player.route) return;
+    if (inc.phase === "start") game.audio.notchClick();
+    hud.showMessage(`PCC: ${inc.text}`, level, 7000);
+    return;
+  }
+  const riding = game.walker?.unit;
+  if (!riding) return;
+  if (inc.kind === "doorObstruction" ? inc.unit === riding : inc.route === riding.route && inc.phase === "start") {
+    hud.showMessage(inc.kind === "doorObstruction"
+      ? "Por favor, no obstruya el cierre de puertas"
+      : inc.kind === "signalFault" ? "Estimados pasajeros, por una falla de señal podríamos detenernos unos momentos"
+      : "Estimados pasajeros, circularemos a velocidad reducida por trabajos en la vía", "info", 5000);
+  }
+}
+
 /** Cambios de estado de los trenes (state.js): avisos para el viajero a bordo. */
 function onTrainState({ unit, from, to }) {
   if (!game || game.warming || game.walker?.unit !== unit) return;
@@ -470,10 +499,12 @@ function onPlayerEvent(type, data) {
     case "notch": audio.notchClick(); break;
     case "reverser": audio.reverserClunk(); break;
     case "halt": audio.airHiss(0.6); break;
-    case "emergency": audio.emergency(); stats.emergencies++; break;
+    case "emergency": audio.emergency(); stats.emergencies++; game.score.penalty("emergency"); break;
     case "stopped":
       game.lastStop = data;
+      game.score.stopped(game.lastDecel);
       if (Math.abs(data.error) > CONFIG.station.stopTolerance) {
+        game.score.penalty("offPosition");
         hud.showMessage(`${data.station.name} · FUERA DE POSICIÓN (${formatStopError(data.error)}) · usa marcha atrás (E) si te pasaste`, "warn", 4500);
       }
       break;
@@ -482,10 +513,13 @@ function onPlayerEvent(type, data) {
       stats.stops.push(Math.abs(stop));
       stats.arrivals.push(data.delay);
       const p = punctuality(data.delay);
-      hud.showMessage(`${data.station.name} · parada ${gradeStop(stop)} · llegada ${formatDelay(data.delay)} (${p.text})`, p.cls === "ontime" ? "ok" : "warn", 4500);
+      const sc = game.score.arrival(stop, data.delay);
+      const streak = sc.streak >= 2 ? ` · ¡RACHA ${sc.streak}!` : "";
+      hud.showMessage(`${data.station.name} · parada ${gradeStop(stop)} · llegada ${formatDelay(data.delay)} (${p.text}) · +${sc.gained} pts${streak}`, p.cls === "ontime" ? "ok" : "warn", 4500);
       break;
     }
     case "departedStation":
+      if (data.delay < -10) game.score.penalty("earlyDeparture");
       if (data.delay < -10) hud.showMessage(`Salida anticipada de ${data.station.name} (${formatDelay(data.delay)}) · respeta el horario`, "warn", 4000);
       break;
     case "doorsOpen":
@@ -493,20 +527,24 @@ function onPlayerEvent(type, data) {
       break;
     case "overspeed":
       stats.overspeeds++;
+      game.score.penalty("overspeed");
       hud.showMessage(`EXCESO DE VELOCIDAD · límite ${data.limit} km/h`, "alert");
       break;
     case "redSignal":
       stats.redSignals++;
+      game.score.penalty("redSignal");
       game.player.sim.emergencyBrake();
       hud.showMessage(`REBASE DE SEÑAL S${data.signal.id} EN ROJO · frenado de emergencia automático`, "alert", 5000);
       break;
     case "collision":
       audio.impact();
+      game.score.penalty("collision");
       game.player.sim.emergencyBrake();
       hud.showMessage(`ALCANCE CON EL TREN ${data.other.id} a ${Math.round(data.kmh)} km/h`, "alert", 5000);
       break;
     case "bumper":
       audio.impact();
+      game.score.penalty("bumper");
       hud.showMessage(`IMPACTO CONTRA LA TOPERA a ${Math.round(data.kmh)} km/h`, "alert", 4000);
       break;
   }
@@ -518,8 +556,17 @@ function punctuality(delay) {
   return delay > 0 ? { text: "con retraso", cls: "late" } : { text: "adelantado", cls: "early" };
 }
 
+/** Puntaje nuevo para un servicio (récord por línea y sentido). */
+function newScore(route) {
+  const score = new DriverScore(`${route.line}.${route.id}`, (ev) => hud.updateScore(ev));
+  hud.updateScore({ total: 0, streak: 0, multiplier: 1, points: 0, best: score.best?.total });
+  return score;
+}
+
 function showDriverSummary() {
-  const s = game.stats;
+  const s = game.stats, sc = game.score;
+  const prevBest = sc.best?.total ?? 0;
+  const record = sc.finish();
   const w = CONFIG.schedule.punctualWindow;
   const punctual = s.arrivals.filter(d => Math.abs(d) <= w).length;
   const avgStop = s.stops.length ? s.stops.reduce((a, b) => a + b, 0) / s.stops.length : 0;
@@ -534,6 +581,10 @@ function showDriverSummary() {
       ["Señales rebasadas en rojo", String(s.redSignals)],
       ["Excesos de velocidad", String(s.overspeeds)],
       ["Frenos de emergencia", String(s.emergencies)],
+      ["Tirones / paradas bruscas", `${sc.totalJerks} / ${sc.harshStops}`],
+      ["Estaciones perfectas · mejor racha", `${sc.perfects} · ${sc.bestStreak}`],
+      ["PUNTAJE", `${sc.total} pts · nota ${sc.grade()}`],
+      [record ? "★ ¡NUEVO RÉCORD!" : "Récord de este servicio", record ? `antes ${prevBest} pts` : `${prevBest} pts`],
     ],
     continueLabel: "Maniobra de retorno",
     onContinue: () => hud.showMessage("Cierra puertas (D), avanza a la cola de maniobras y detente en el cartel FIN DE MANIOBRA. Luego pulsa T", "info", 9000),
@@ -571,6 +622,7 @@ function changeCab() {
     player.group.add(game.trainLights);
     game.lightsUnit = player;
     game.stats = { arrivals: [], stops: [], redSignals: 0, overspeeds: 0, emergencies: 0 };
+    game.score = newScore(other);
     game.lastStop = null;
     game.dmiTimer = 0;
     hud.fadeIn();
@@ -907,6 +959,8 @@ function loop(now) {
   if (player) {
     const info = getRouteInfo(player);
     updateCabVisuals(dt, player, info);
+    if (player.sim.speed > 0.2) game.lastDecel = -player.sim.accel;
+    game.score.update(dt, player.sim);
     hud.updateDriver(player.sim, info, { clock: game.clock, onboard: people.onboardCount(player), boardingBusy: engine.isBoarding(player) });
   } else {
     hud.updatePassenger(walkerHudData());

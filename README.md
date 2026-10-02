@@ -13,7 +13,14 @@ Los módulos ES necesitan un servidor local (no funciona abriendo `index.html` c
 
 Three.js se carga desde CDN, así que hace falta conexión a internet.
 
-## Qué incluye (Alpha 0.7)
+## Qué incluye (Alpha 0.8)
+
+- **Puntaje del conductor**: cada estación suma puntos por precisión de parada, puntualidad y confort (sin tirones
+  ni paradas bruscas). Las estaciones perfectas seguidas forman una racha (hasta ×2). Las faltas restan. Al final
+  del servicio, nota S/A/B/C/D y récord guardado por línea y sentido.
+- **Incidentes aleatorios**: puertas obstruidas (se reabren y hay que volver a cerrar), limitaciones temporales de
+  velocidad por trabajos o inspección de vía y fallas de señal (queda en rojo un tiempo). Afectan a todos los
+  trenes, avisan al conductor y al viajero, y quedan en el registro del Centro de Control.
 
 - **Elige tu línea** en la pantalla principal (conductor y pasajero): L1, L2, L3, L4, L4A, L5 o L6, cada una con su
   mundo 3D, sus estaciones reales en orden, sus combinaciones, su color y sus carteles. El resto de la red sigue

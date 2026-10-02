@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>MetroSim — Alpha 0.7</title>
+  <title>MetroSim — Alpha 0.8</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="styles.css">
   <!-- Three.js mediante importmap (CDN). es-module-shims da compatibilidad a navegadores antiguos. -->
@@ -80,7 +80,7 @@
       </div>
       <p class="start-note">🔊 Con sonido y anuncios. La carga de la línea completa puede tardar unos segundos.</p>
     </main>
-    <p class="version">METROSIM ALPHA 0.7 · 7 LÍNEAS · CENTRO DE CONTROL · MANIOBRA DE RETORNO · BOLETERÍAS</p>
+    <p class="version">METROSIM ALPHA 0.8 · 7 LÍNEAS · PUNTAJE · INCIDENTES · CENTRO DE CONTROL · MANIOBRA DE RETORNO · BOLETERÍAS</p>
   </section>
 
   <!-- =============================== PANTALLA DE CARGA =============================== -->
@@ -109,6 +109,13 @@
         </div>
         <div class="hud-right">
           <span id="cardPill" class="card-pill hidden">bip! $0</span>
+          <div id="scorePill" class="score-pill hidden">
+            <span class="hud-label">PUNTAJE</span>
+            <strong id="scoreTotal">0</strong>
+            <span id="scoreStreak" class="score-streak"></span>
+            <span id="scoreBest" class="score-best"></span>
+            <span id="scoreFloat" class="score-float"></span>
+          </div>
           <button id="soundButton" class="sound-button">🔊 Sonido</button>
           <div class="hud-clock">
             <span class="hud-label">HORA</span>

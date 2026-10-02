@@ -95,7 +95,7 @@ export class SignalSystem {
     // 3. Aspectos (de la última señal hacia atrás, porque el amarillo depende de la siguiente)
     for (let i = list.length - 1; i >= 0; i--) {
       const s = list[i], next = list[i + 1];
-      if (s.occupied || s.hold) s.aspect = "red";
+      if (s.occupied || s.hold || s.fault) s.aspect = "red";     // fault: falla de señal (incidents.js)
       else if (next && next.aspect === "red") s.aspect = "yellow";
       else s.aspect = "green";
     }

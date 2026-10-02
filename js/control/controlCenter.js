@@ -152,6 +152,10 @@ export class ControlCenter {
     this.unsub.push(bus.on("command:result", ({ type, payload, result }) => {
       if (type.startsWith("control.") && result?.text) this.addLog(result.text, result.ok ? (result.level === "warn" ? "warn" : "ok") : "alert");
     }));
+    this.unsub.push(bus.on("incident", (inc) => {
+      const where = inc.unit ? `${inc.unit.id} · ` : `${inc.line.name} · `;
+      this.addLog(where + inc.text, inc.phase === "end" ? "ok" : inc.kind === "doorObstruction" ? "info" : "warn");
+    }));
     this.unsub.push(bus.on("train:state", ({ unit, to, from }) => {
       if (to === "signalStop") this.addLog(`${unit.id} detenido ante señal en rojo (${describeTrain(unit).location})`, "warn");
       else if (to === "regulating") this.addLog(`${unit.id} regulando intervalo en ${unit.sim.dockedStation()?.name ?? "—"}`, "info");

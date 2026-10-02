@@ -69,11 +69,13 @@ function makeRoute(line, dir) {
     shortLabel: last.short,
     lineLength: first.stopZ - last.stopZ,
     opposite: null,                                // se enlaza abajo
+    restrictions: [],                              // limitaciones temporales (incidents.js)
 
     /** Límite (km/h) en una coordenada de la ruta. */
     speedLimitAt(z) {
       let limit = CONFIG.defaultSpeedLimit;
       for (const l of limits) if (z <= l.from && z >= l.to) limit = Math.min(limit, l.kmh);
+      for (const l of route.restrictions) if (z <= l.from && z >= l.to) limit = Math.min(limit, l.kmh);
       return limit;
     },
     /** Estación de la ruta que corresponde a una estación de la línea (el mismo objeto o el mismo nombre). */

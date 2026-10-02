@@ -26,7 +26,8 @@ export class Hud {
       message: $("message"),
       summary: $("summary"), summaryKicker: $("summaryKicker"), summaryTitle: $("summaryTitle"), summaryList: $("summaryList"),
       summaryContinue: $("summaryContinue"), summaryMenu: $("summaryMenu"), summaryAlt: $("summaryAlt"),
-      cardPill: $("cardPill"), fade: $("fade"), fadeText: $("fadeText"),
+      cardPill: $("cardPill"),
+      scorePill: $("scorePill"), scoreTotal: $("scoreTotal"), scoreStreak: $("scoreStreak"), scoreBest: $("scoreBest"), scoreFloat: $("scoreFloat"), fade: $("fade"), fadeText: $("fadeText"),
       ticket: $("ticketPanel"), ticketKicker: $("ticketKicker"), ticketTitle: $("ticketTitle"),
       ticketBalance: $("ticketBalance"), ticketCardNo: $("ticketCardNo"), ticketFares: $("ticketFares"),
       ticketAmounts: $("ticketAmounts"), ticketPay: $("ticketPay"), ticketStatus: $("ticketStatus"),
@@ -85,6 +86,7 @@ export class Hud {
     const driver = mode === "driver";
     this.setText(this.el.modeLabel, driver ? "CONDUCTOR" : "PASAJERO A PIE");
     this.el.cardPill.classList.toggle("hidden", driver);
+    this.el.scorePill.classList.toggle("hidden", !driver);
     this.el.selector.classList.toggle("hidden", !driver);
     this.el.driver.classList.toggle("hidden", !driver);
     this.el.passenger.classList.toggle("hidden", driver);
@@ -196,6 +198,26 @@ export class Hud {
     this.setText(e.paxStation, data.station);
     this.setText(e.paxSub, data.sub);
     this.setText(e.paxHint, data.hint);
+  }
+
+  /* ---------------------------------------------------------------------
+     Puntaje del conductor (scoring.js)
+     ev: { total, points, streak, multiplier, detail?, important?, best? }
+     --------------------------------------------------------------------- */
+  updateScore(ev) {
+    const e = this.el;
+    this.setText(e.scoreTotal, String(ev.total));
+    this.setText(e.scoreStreak, ev.streak >= 2 ? `RACHA ${ev.streak} · ×${ev.multiplier.toFixed(1)}` : "");
+    if (ev.best !== undefined) this.setText(e.scoreBest, ev.best ? `récord ${ev.best}` : "");
+    if (!ev.points) return;
+    // Cifra flotante (+300 / −150) que sube y se desvanece
+    const f = e.scoreFloat;
+    f.textContent = ev.points > 0 ? `+${ev.points}` : `−${-ev.points}`;
+    f.className = `score-float ${ev.points > 0 ? "gain" : "loss"}`;
+    void f.offsetWidth;                                  // reinicia la animación
+    f.classList.add("show");
+    e.scorePill.classList.toggle("perfect", !!ev.perfect);
+    if (!ev.important && ev.detail) this.showMessage(ev.detail, "warn", 1800);
   }
 
   /* ---------------------------------------------------------------------
