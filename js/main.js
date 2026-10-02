@@ -324,6 +324,7 @@ function onKeyUp(event) {
 
 function onUnitEvent(unit, type, data = {}) {
   if (!game || game.warming || !unit.sim) return;
+  if (unit.route.line.id !== "3") return;                // otras líneas: simuladas sin dibujo ni sonido
   if (type === "removed") { game.people?.clearUnit(unit); return; }
   if (type === "turnbackStart") { game.people?.clearUnit(unit); return; }
   if (type === "turnback") {
@@ -864,13 +865,35 @@ function walkerHudData() {
   const side = w.platformSide();
   if (side) {
     const route = routeForSide(side);
-    return { ...base, title: `ANDÉN · ${route.label.toUpperCase()}${combos}`, station: st.name, sub: `Próximo tren: ${nextTrainText(st, side)} · ~${Math.round(game.engine.passengers.waitingAt(st, side))} personas esperando`, highlight: st };
+    return { ...base, title: `ANDÉN · ${route.label.toUpperCase()}${combos}`, station: st.name, sub: `Próximo tren: ${nextTrainText(st, side)} · ~${Math.round(game.engine.passengers.waitingAt(st, side))} personas esperando${transferText(st)}`, highlight: st };
   }
   return {
     ...base,
     title: `${w.pos.y > CONFIG.mezzanine.y - 0.3 ? "MEZANINA" : "ESCALERA"}${combos}`,
     station: st.name,
-    sub: `F. Castillo V.: ${nextTrainText(st, 1)} · Pza. Quilicura: ${nextTrainText(st, -1)}`,
+    sub: `F. Castillo V.: ${nextTrainText(st, 1)} · Pza. Quilicura: ${nextTrainText(st, -1)}${transferText(st)}`,
     highlight: st,
   };
+}
+
+/**
+ * Combinación con otras líneas simuladas por el motor (por ejemplo la L6 en Ñuñoa):
+ * próximos trenes de cada sentido, calculados igual que los de la L3.
+ */
+function transferText(st) {
+  const parts = [];
+  for (const ls of game.engine.lines.values()) {
+    if (ls === game.engine.main) continue;
+    const other = ls.line.stations.find(s => s.name === st.name);
+    if (!other) continue;
+    const dirs = ls.routes
+      .filter(r => r.stationOf(other) !== r.last)
+      .map(r => {
+        const a = game.engine.arrivalsAt(other, r)[0];
+        const when = !a ? "sin trenes" : a.here ? "en andén" : a.minutes < 1 ? "llegando" : `${a.minutes} min`;
+        return `dir. ${r.last.short} ${when}`;
+      });
+    parts.push(` · Combinación L${ls.line.id}: ${dirs.join(" · ")}`);
+  }
+  return parts.join("");
 }

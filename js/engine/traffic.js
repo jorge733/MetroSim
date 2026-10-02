@@ -20,7 +20,7 @@
    ========================================================================== */
 
 import { CONFIG } from "../config.js";
-import { ROUTES, oppositeRoute } from "./route.js";
+import { oppositeRoute } from "./route.js";
 import { TrainSim, AutoDriver } from "./sim.js";
 import { TRAIN_LAYOUT } from "./consist.js";
 import { EventBus } from "./events.js";
@@ -32,12 +32,14 @@ const L = CONFIG.train.length;
 export class TrafficManager {
   /**
    * @param {object} opts
+   * @param {Array} opts.routes  los dos sentidos de la línea que gestiona
    * @param {Map<string, import("./schedule.js").Timetable>} opts.timetables  por id de ruta
    * @param {Map<string, import("./signals.js").SignalSystem>} opts.signals  por id de ruta
    * @param {EventBus} opts.bus  bus de eventos del motor (ciclo de vida de los trenes)
    * @param {(unit, type:string, data?:object)=>void} opts.onUnitEvent  (opcional; mejor escuchar "train:event")
    */
-  constructor({ timetables, signals, bus = new EventBus(), onUnitEvent = () => {} }) {
+  constructor({ routes, timetables, signals, bus = new EventBus(), onUnitEvent = () => {} }) {
+    this.routes = routes;
     this.bus = bus;
     this.timetables = timetables;
     this.signals = signals;
@@ -140,7 +142,7 @@ export class TrafficManager {
 
   /** Inicia los servicios cuya hora ha llegado (si la cochera de su ruta está libre). */
   spawnDue(clock) {
-    for (const route of ROUTES) {
+    for (const route of this.routes) {
       const depotBusy = this.units.some(u => u.route === route && u.sim.position > route.first.stopZ + 40);
       if (depotBusy) continue;
       const tt = this.timetables.get(route.id);
@@ -160,7 +162,7 @@ export class TrafficManager {
       this.trackSchedule(u, clock);
     }
 
-    for (const route of ROUTES) {
+    for (const route of this.routes) {
       const units = this.units.filter(u => u.route === route);
 
       // Alcance: nadie atraviesa la cola del tren de delante (misma vía)

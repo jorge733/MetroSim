@@ -20,7 +20,6 @@
    ========================================================================== */
 
 import { CONFIG } from "../config.js";
-import { ROUTES } from "./route.js";
 import { estimateArrival } from "./eta.js";
 
 /** Retención máxima en una parada (s). */
@@ -32,10 +31,12 @@ const HURRY_FACTOR = 1.25;
 
 export class Regulator {
   /**
-   * @param {object} engine  MetroEngine (bus, traffic, timetables)
+   * @param {object} engine  sistema de UNA línea (LineSystem de engine.js: bus, time, trains, traffic, timetables, routes)
    */
   constructor(engine) {
     this.engine = engine;
+    const ROUTES = engine.routes;
+    this.routes = ROUTES;
     this.enabled = true;
     // Última salida de cada estación por ruta: lastDeparture[routeId][índice de estación de la ruta]
     this.lastDeparture = Object.fromEntries(ROUTES.map(r => [r.id, []]));
@@ -46,6 +47,7 @@ export class Regulator {
     engine.bus.on("train:event", ({ unit, type, data }) => {
       if (type !== "departedStation") return;
       const list = this.lastDeparture[unit.route.id];
+      if (!list) return;                                   // tren de otra línea
       const prev = list[data.station.index];
       const now = engine.time;
       if (prev) this.headways[unit.route.id][data.station.index].push(now - prev.time);
@@ -56,7 +58,7 @@ export class Regulator {
 
   /** Paso de simulación: decide retenciones y trenes apurados. */
   update(clock) {
-    for (const route of ROUTES) {
+    for (const route of this.routes) {
       const units = this.engine.trains.filter(u => u.route === route);
       for (const u of units) {
         const ato = u.ato;

@@ -39,7 +39,7 @@ function buildSignalList(route) {
   list.sort((a, b) => b.z - a.z);
   list.forEach((s, i) => {
     s.index = i;
-    s.id = `${route.id === "A" ? 1 : 2}${String(i + 1).padStart(2, "0")}`;   // 1xx vía 1 · 2xx vía 2
+    s.id = `${route.signalPrefix}${String(i + 1).padStart(2, "0")}`;   // L3: 1xx vía 1 · 2xx vía 2 · L6: 61xx / 62xx
     s.aspect = "green";
     s.endZ = list[i + 1]?.z ?? route.track.end;    // final de su cantón
   });

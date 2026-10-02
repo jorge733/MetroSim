@@ -2,33 +2,36 @@
    MetroSim — Motor · engine.js
    MetroEngine: el "cerebro" del Metro.
 
-   Reúne el reloj, los horarios, las señales y todos los trenes de la red, y
-   los hace avanzar con PASO FIJO, funcione o no la parte gráfica. No importa
-   Three.js ni usa el navegador: se puede ejecutar en Node
-   (ver tools/simular.mjs).
+   Simula TODA LA RED (varias líneas, network.js) con un único reloj de PASO
+   FIJO, funcione o no la parte gráfica. No importa Three.js ni usa el
+   navegador: se puede ejecutar en Node (ver tools/simular.mjs).
 
      ENTRADA DEL JUGADOR → MetroEngine → estado de la red → render / interfaz / audio
 
-   Envuelve los sistemas del Metro (TrafficManager, SignalSystem, Timetable)
-   y ofrece lo que necesita quien lo mira desde fuera:
-     · bus de eventos (events.js):
+   Cada línea es un LineSystem con sus horarios, señales, trenes, pasajeros
+   y regulación. El motor los hace avanzar juntos y conecta las líneas por
+   sus combinaciones (transbordos de pasajeros).
+
+   Ofrece a quien lo mira desde fuera:
+     · bus de eventos (events.js), común a todas las líneas:
          "train:created" / "train:rebuilt" / "train:removed"  ciclo de vida
          "train:event"  { unit, type, data }   sucesos de cada tren
          "train:state"  { unit, from, to, time } cambio de estado (state.js)
+         "command:result" { type, payload, result } respuesta a una orden
      · llegadas estimadas desde la posición real de los trenes (eta.js)
-     · pasajeros lógicos (passengers.js): gente esperando en cada andén,
-       subidas y bajadas que alargan las paradas
-     · regulación de intervalos (regulation.js): retiene o apura trenes
-       para que no se formen racimos
-     · buzón de órdenes (commands.js): los roles mandan órdenes con
-       engine.command(tipo, datos) y el resultado llega por "command:result"
+     · pasajeros lógicos (passengers.js) y transbordos entre líneas
+     · regulación de intervalos (regulation.js)
+     · buzón de órdenes (commands.js)
      · estado legible de toda la red (snapshot / report)
-   Es la base para las siguientes fases: demanda de pasajeros, regulación,
-   más líneas y el Centro de Control.
+
+   Compatibilidad: engine.traffic, engine.signals, engine.timetables,
+   engine.passengers y engine.regulator son los de la Línea 3 (la que se
+   dibuja y se juega).
    ========================================================================== */
 
-import { CONFIG, STATIONS } from "../config.js";
-import { ROUTES, ROUTE_A, ROUTE_B } from "./route.js";
+import { CONFIG } from "../config.js";
+import { LINES, L3, TRANSFERS } from "./network.js";
+import "./route.js";                                   // crea los sentidos de cada línea (line.routes)
 import { Timetable } from "./schedule.js";
 import { SignalSystem } from "./signals.js";
 import { TrafficManager } from "./traffic.js";
@@ -41,6 +44,45 @@ import { CommandQueue } from "./commands.js";
 import { PassengerFlow } from "./passengers.js";
 import { Regulator } from "./regulation.js";
 
+/** Parte de los que bajan en una estación de combinación que siguen viaje por la otra línea. */
+const TRANSFER_SHARE = 0.35;
+
+/** Una línea de la red con todos sus sistemas. */
+class LineSystem {
+  constructor(engine, line, startTime) {
+    this.engine = engine;
+    this.line = line;
+    this.routes = line.routes;
+    this.bus = engine.bus;
+    this.signals = new Map(this.routes.map(r => [r.id, new SignalSystem(r)]));
+    // Malla de servicio alrededor de la hora de inicio (3 h antes, 8 h después): se puede
+    // empezar a cualquier hora, también de noche (frecuencia de valle).
+    const anchorA = CONFIG.schedule.playerDeparture + line.scheduleOffset;
+    const anchorB = anchorA + CONFIG.schedule.reverseOffset;
+    const [A, B] = this.routes;
+    this.timetables = new Map([
+      [A.id, new Timetable(A, anchorA, anchorA - 3 * 3600, anchorA + 8 * 3600)],
+      [B.id, new Timetable(B, anchorB, anchorB - 3 * 3600, anchorB + 8 * 3600)],
+    ]);
+    this.traffic = new TrafficManager({
+      routes: this.routes, timetables: this.timetables, signals: this.signals, bus: this.bus,
+      onUnitEvent: (u, t, d) => engine.onUnitEvent(u, t, d),
+    });
+    this.passengers = new PassengerFlow(line, startTime);
+    this.traffic.boardingChecks.push(u => this.passengers.isBusy(u));
+    this.regulator = new Regulator(this);
+  }
+
+  get time() { return this.engine.time; }
+  get trains() { return this.traffic.units; }
+
+  update(dt, clock) {
+    this.traffic.update(dt, clock);
+    this.passengers.update(dt, clock, this.trains);
+    this.regulator.update(clock);
+  }
+}
+
 export class MetroEngine {
   /**
    * @param {object} opts
@@ -51,27 +93,41 @@ export class MetroEngine {
   constructor({ startTime = CONFIG.startTime, onUnitEvent = () => {} } = {}) {
     this.bus = new EventBus();
     this.clock = new SimClock(startTime);
-    this.signals = new Map(ROUTES.map(r => [r.id, new SignalSystem(r)]));
-    // Malla de servicio alrededor de la hora de inicio (3 h antes, 8 h después): se puede
-    // empezar a cualquier hora, también de noche (frecuencia de valle).
-    const anchorA = CONFIG.schedule.playerDeparture, anchorB = anchorA + CONFIG.schedule.reverseOffset;
-    this.timetables = new Map([
-      [ROUTE_A.id, new Timetable(ROUTE_A, anchorA, anchorA - 3 * 3600, anchorA + 8 * 3600)],
-      [ROUTE_B.id, new Timetable(ROUTE_B, anchorB, anchorB - 3 * 3600, anchorB + 8 * 3600)],
-    ]);
     this.onUnitEvent = onUnitEvent;
-    this.traffic = new TrafficManager({
-      timetables: this.timetables, signals: this.signals, bus: this.bus,
-      onUnitEvent: (u, t, d) => this.onUnitEvent(u, t, d),
-    });
+    this.lines = new Map(LINES.map(line => [line.id, new LineSystem(this, line, startTime)]));
     this.commands = new CommandQueue(this);
-    this.passengers = new PassengerFlow(startTime);
-    this.traffic.boardingChecks.push(u => this.passengers.isBusy(u));
-    this.regulator = new Regulator(this);
+
+    // Transbordos: parte de los que bajan en una combinación pasa a esperar en la otra línea
+    for (const t of TRANSFERS) {
+      const A = this.lines.get(t.a.line.id), B = this.lines.get(t.b.line.id);
+      const link = (from, to, toStation) => {
+        const prev = from.passengers.onAlight;
+        from.passengers.onAlight = (st, n) => {
+          prev?.(st, n);
+          if (st.name === t.name) to.passengers.addTransfer(toStation, n * TRANSFER_SHARE);
+        };
+      };
+      link(A, B, t.b.station);
+      link(B, A, t.a.station);
+    }
+
+    // Línea 3: la que se dibuja y se juega (nombres de siempre)
+    const main = this.lines.get(L3.id);
+    this.main = main;
+    this.traffic = main.traffic;
+    this.signals = main.signals;
+    this.timetables = main.timetables;
+    this.passengers = main.passengers;
+    this.regulator = main.regulator;
+  }
+
+  /** Sistema de una línea ("3", "6") o de la línea de una ruta. */
+  line(idOrRoute) {
+    return this.lines.get(typeof idOrRoute === "string" ? idOrRoute : idOrRoute.line.id) || null;
   }
 
   /** ¿Está subiendo o bajando gente de este tren (lógica o visible)? */
-  isBoarding(unit) { return this.traffic.isBoarding(unit); }
+  isBoarding(unit) { return this.line(unit.route).traffic.isBoarding(unit); }
 
   /* ----- Órdenes (roles) ----- */
 
@@ -79,27 +135,25 @@ export class MetroEngine {
    * Deja una orden en el buzón del motor; se cumple al comienzo del próximo paso.
    * Ejemplos:
    *   engine.command("driver.notchUp", { trainId: "L3-0801" })
-   *   engine.command("control.hold",   { trainId: "L3-0745" })
+   *   engine.command("control.hold",   { trainId: "L6-0805" })
    */
   command(type, payload = {}) { this.commands.push(type, payload); }
 
-  /** Tren por su id de servicio (o null). */
+  /** Tren por su id de servicio (o null), en cualquier línea. */
   findTrain(id) { return this.trains.find(u => u.id === id) || null; }
 
   /** Hora actual de la simulación (segundos desde medianoche). */
   get time() { return this.clock.time; }
 
-  /** Todos los trenes de la red. */
-  get trains() { return this.traffic.units; }
+  /** Todos los trenes de la red (todas las líneas). */
+  get trains() { return [...this.lines.values()].flatMap(l => l.trains); }
 
   /* ----- Avance del tiempo ----- */
 
   /** Un paso de simulación de duración fija. */
   step() {
     this.commands.process();
-    this.traffic.update(this.clock.step, this.clock.time);
-    this.passengers.update(this.clock.step, this.clock.time, this.trains);
-    this.regulator.update(this.clock.time);
+    for (const l of this.lines.values()) l.update(this.clock.step, this.clock.time);
     this.clock.tick();
   }
 
@@ -125,9 +179,7 @@ export class MetroEngine {
   runUntil(time, { step = 0.25, onStep } = {}) {
     while (this.clock.time < time) {
       this.commands.process();
-      this.traffic.update(step, this.clock.time);
-      this.passengers.update(step, this.clock.time, this.trains);
-      this.regulator.update(this.clock.time);
+      for (const l of this.lines.values()) l.update(step, this.clock.time);
       onStep?.(step, this.clock.time);
       this.clock.time += step;
     }
@@ -136,36 +188,43 @@ export class MetroEngine {
 
   /* ----- Llegadas ----- */
 
-  /** Hora estimada de llegada de un tren a una estación del mundo (o null si ya la pasó). */
-  eta(unit, worldStation) {
-    return estimateArrival(unit, unit.route.stationOf(worldStation), this.time);
+  /** Hora estimada de llegada de un tren a una estación de su línea (o null si ya la pasó). */
+  eta(unit, lineStation) {
+    return estimateArrival(unit, unit.route.stationOf(lineStation), this.time);
   }
 
   /**
    * Próximos trenes a una estación en un sentido (lo que muestran las pantallas del andén).
-   * @param {object|string} station  estación del mundo o su nombre
-   * @param {object} route           ruta (sentido)
+   * @param {object|string} station  estación de la línea o su nombre
+   * @param {object} route           ruta (sentido): indica también la línea
    */
   arrivalsAt(station, route) {
-    const st = typeof station === "string" ? STATIONS.find(s => s.name === station) : station;
-    return this.traffic.arrivalsFor(st, route, this.time);
+    const ls = this.line(route);
+    const st = typeof station === "string" ? ls.line.stations.find(s => s.name === station) : station;
+    if (!st) return [];
+    return ls.traffic.arrivalsFor(st, route, this.time);
   }
 
   /* ----- Estado legible ----- */
 
   /** Descripción de cada tren de la red, en datos simples. */
-  snapshot() {
-    return this.trains.map(u => describeTrain(u)).sort((a, b) => a.id.localeCompare(b.id));
+  snapshot(lineId = null) {
+    return this.trains
+      .filter(u => !lineId || u.route.line.id === lineId)
+      .map(u => describeTrain(u)).sort((a, b) => a.id.localeCompare(b.id));
   }
 
-  /** Estado de la red como texto (útil en la consola o en Node). */
+  /** Estado de la red como texto (útil en la consola o en Node), agrupado por línea. */
   report() {
-    const lines = [`${formatClock(this.time)} · ${this.trains.length} trenes en la red`];
-    for (const t of this.snapshot()) {
-      const delay = t.delay === null ? "" : ` · ${t.delay >= 0 ? "+" : "−"}${Math.abs(Math.round(t.delay))} s`;
-      lines.push(`  ${t.id.padEnd(9)} ${t.direction.padEnd(34)} ${t.location.padEnd(42)} ${String(t.kmh).padStart(3)} km/h · ${String(t.load).padStart(3)} pax · ${t.state}${delay}`);
+    const out = [`${formatClock(this.time)} · ${this.trains.length} trenes en la red`];
+    for (const l of this.lines.values()) {
+      out.push(`  ${l.line.name} · ${l.trains.length} trenes`);
+      for (const t of this.snapshot(l.line.id)) {
+        const delay = t.delay === null ? "" : ` · ${t.delay >= 0 ? "+" : "−"}${Math.abs(Math.round(t.delay))} s`;
+        out.push(`    ${t.id.padEnd(9)} ${t.direction.padEnd(34)} ${t.location.padEnd(42)} ${String(t.kmh).padStart(3)} km/h · ${String(t.load).padStart(3)} pax · ${t.state}${delay}`);
+      }
     }
-    return lines.join("\n");
+    return out.join("\n");
   }
 }
 
@@ -183,6 +242,7 @@ export function describeTrain(u) {
   const label = TRAIN_STATES[u.state] ?? "—";
   return {
     id: u.id,
+    line: route.line.id,
     direction: `${route.first.name} → ${route.last.name}`,
     location,
     kmh: Math.round(sim.speedKmh),

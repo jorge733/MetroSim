@@ -9,6 +9,9 @@
    y en cada fotograma copia la posición y las puertas del estado lógico al
    modelo. El motor nunca toca Three.js.
 
+   Solo se dibujan los trenes de la línea que tiene mundo 3D (la L3); las
+   demás líneas de la red se simulan sin dibujo.
+
    Por compatibilidad con el resto del juego, la vista se cuelga del propio
    tren lógico: unit.model, unit.group (modelo 3D) y unit.slots (asientos y
    sitios de pie para los viajeros dibujados).
@@ -18,6 +21,8 @@ import { CONFIG } from "../config.js";
 import { buildTrain, buildTrainSlots } from "../train.js";
 
 const L = CONFIG.train.length;
+/** Línea que tiene mundo 3D. */
+const DRAWN_LINE = "3";
 
 export class TrainViews {
   /**
@@ -26,9 +31,10 @@ export class TrainViews {
    */
   constructor(scene, bus) {
     this.scene = scene;
-    bus.on("train:created", (u) => this.create(u));
-    bus.on("train:rebuilt", (u) => { this.scene.remove(u.group); this.create(u); });
-    bus.on("train:removed", (u) => this.scene.remove(u.group));
+    const drawn = (u) => u.route.line.id === DRAWN_LINE;
+    bus.on("train:created", (u) => drawn(u) && this.create(u));
+    bus.on("train:rebuilt", (u) => { if (!drawn(u)) return; this.scene.remove(u.group); this.create(u); });
+    bus.on("train:removed", (u) => drawn(u) && this.scene.remove(u.group));
   }
 
   create(u) {

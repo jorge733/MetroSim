@@ -64,7 +64,13 @@ Three.js se carga desde CDN, así que hace falta conexión a internet.
 
 ## Arquitectura
 
-MetroSim separa el **motor** (el "cerebro" del Metro) del **render** (lo que se ve):
+MetroSim separa el **motor** (el "cerebro" del Metro) del **render** (lo que se ve).
+
+El motor simula una **red de varias líneas** con un único reloj: la **L3** (la que se dibuja y se juega) y la
+**L6** (Cerrillos ⇄ Los Leones, simulada sin dibujo). Se conectan en **Ñuñoa**: parte de la gente que baja de una
+línea sigue viaje por la otra, así que un problema en una se nota en la otra. En Ñuñoa, el HUD del pasajero muestra
+los próximos trenes de la L6.
+
 
 ```
 ENTRADA DEL JUGADOR → MOTOR METROSIM → ESTADO DE LA RED → RENDER 3D / INTERFAZ / AUDIO
@@ -103,7 +109,7 @@ Se puede ejecutar sin gráficos:
 ```
 node tools/simular.mjs            # 08:00 → 10:00, informe cada 15 min
 node tools/simular.mjs 09:30 5    # hasta las 09:30, informe cada 5 min
-node tools/simular.mjs 09:00 10 "PLAZA EGAÑA"   # pantallas de andén de otra estación
+node tools/simular.mjs 09:00 10 "ÑUÑOA"         # pantallas de andén de otra estación (L3 y L6)
 ```
 
 (Requiere Node 22 o superior.)
@@ -114,7 +120,8 @@ node tools/simular.mjs 09:00 10 "PLAZA EGAÑA"   # pantallas de andén de otra e
 index.html            pantallas y HUD
 styles.css            estilos
 js/engine/            MOTOR (sin Three.js)
-  engine.js           MetroEngine: reloj, horarios, señales y trenes; informe de estado
+  engine.js           MetroEngine: red de líneas con un reloj común; informe de estado
+  network.js          líneas de la red (L3, L6) y combinaciones
   clock.js            reloj de paso fijo
   route.js            los dos sentidos de circulación
   schedule.js         horarios

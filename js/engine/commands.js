@@ -43,7 +43,7 @@ export const COMMANDS = {
   },
   /** Activar o desactivar la regulación automática de intervalos. */
   "control.regulation": (e, p) => {
-    e.regulator.enabled = !!p.on;
+    for (const l of e.lines.values()) if (!p.line || l.line.id === String(p.line)) l.regulator.enabled = !!p.on;
     return ok(`Regulación de intervalos ${p.on ? "activada" : "desactivada"}`, p.on ? "ok" : "warn");
   },
 

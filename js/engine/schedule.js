@@ -71,7 +71,7 @@ export function makeTrip(route, departure) {
     dep[i] = arr[i] + dwellTime(st[i], arr[i]);
   }
   const hhmm = formatClock(departure).slice(0, 5).replace(":", "");
-  return { id: `${route.id === "A" ? "L3" : "L3V"}-${hhmm}`, route, departure, arr, dep };
+  return { id: `${route.tripPrefix}-${hhmm}`, route, departure, arr, dep };
 }
 
 export class Timetable {

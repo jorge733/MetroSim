@@ -17,8 +17,7 @@
    cifras: el motor no depende de ellos.
    ========================================================================== */
 
-import { CONFIG, STATIONS, demandAt } from "../config.js";
-import { ROUTES } from "./route.js";
+import { CONFIG, demandAt } from "../config.js";
 import { TRAIN_LAYOUT } from "./consist.js";
 import { clamp } from "./format.js";
 
@@ -32,30 +31,46 @@ const PLATFORM_CAPACITY = 450;
 export const TRAIN_CAPACITY = 1000;
 
 export class PassengerFlow {
-  /** @param {number} clock  hora inicial (para repartir la gente que ya espera) */
-  constructor(clock) {
-    // waiting[índice de estación del mundo][lado] = personas esperando en ese andén
-    this.waiting = STATIONS.map(() => ({ 1: 0, "-1": 0 }));
-    this.totals = { boarded: 0, alighted: 0 };
+  /**
+   * @param {object} line   línea (network.js) con sus estaciones y sentidos
+   * @param {number} clock  hora inicial (para repartir la gente que ya espera)
+   */
+  constructor(line, clock) {
+    this.line = line;
+    this.stations = line.stations;
+    // waiting[índice de estación de la línea][lado] = personas esperando en ese andén
+    this.waiting = this.stations.map(() => ({ 1: 0, "-1": 0 }));
+    this.totals = { boarded: 0, alighted: 0, transferIn: 0 };
+    this.onAlight = null;                  // (estación, personas) → transbordos (lo conecta el motor)
     // Al empezar ya hay gente: la que llegó durante medio intervalo
-    for (const st of STATIONS) for (const side of [1, -1]) {
+    for (const st of this.stations) for (const side of [1, -1]) {
       this.waiting[st.index][side] = this.rate(st, side, clock) * CONFIG.schedule.offPeakHeadway / 2;
     }
   }
 
   /** Peso de una estación: las de combinación y las terminales de origen mueven más gente. */
   weight(st) {
-    return 1 + 0.6 * st.combos.length + (st.index === 0 || st.index === STATIONS.length - 1 ? 0.3 : 0);
+    return 1 + 0.6 * st.combos.length + (st.index === 0 || st.index === this.stations.length - 1 ? 0.3 : 0);
   }
 
   /** Personas por segundo que llegan a un andén. Nadie espera en el andén de llegada de una terminal. */
   rate(st, side, clock) {
-    const route = ROUTES.find(r => r.side === side);
+    const route = this.line.routes.find(r => r.side === side);
     if (route.stationOf(st) === route.last) return 0;
     return BASE_RATE * demandAt(clock) * this.weight(st);
   }
 
-  /** Personas esperando en un andén (estación del mundo y lado +1 / −1). */
+  /** Llega gente que hace transbordo desde otra línea: se reparte entre los dos andenes con servicio. */
+  addTransfer(st, n) {
+    const open = [1, -1].filter(side => {
+      const route = this.line.routes.find(r => r.side === side);
+      return route.stationOf(st) !== route.last;          // en una terminal, solo el andén de salida
+    });
+    for (const side of open) this.waiting[st.index][side] += n / open.length;
+    this.totals.transferIn += n;
+  }
+
+  /** Personas esperando en un andén (estación de la línea y lado +1 / −1). */
   waitingAt(st, side) { return this.waiting[st.index][side]; }
 
   /** ¿El tren está en pleno intercambio de viajeros? */
@@ -69,7 +84,7 @@ export class PassengerFlow {
    */
   update(dt, clock, units) {
     // 1. Llegada de gente a los andenes
-    for (const st of STATIONS) for (const side of [1, -1]) {
+    for (const st of this.stations) for (const side of [1, -1]) {
       const w = this.waiting[st.index];
       w[side] = Math.min(PLATFORM_CAPACITY, w[side] + this.rate(st, side, clock) * dt);
     }
@@ -97,6 +112,7 @@ export class PassengerFlow {
       const down = Math.min(flow, p.toAlight, u.load);
       u.load -= down; p.toAlight -= down; p.alighted += down; flow -= down;
       this.totals.alighted += down;
+      if (down > 0) this.onAlight?.(rs.world, down);
 
       // …luego suben (nunca en el andén de llegada de una terminal)
       const w = this.waiting[rs.world.index];
