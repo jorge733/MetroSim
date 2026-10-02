@@ -35,6 +35,7 @@ Three.js se carga desde CDN, así que hace falta conexión a internet.
 ## Modos
 
 - **Conductor:** eliges servicio de ida o de vuelta (sale ~1,5 min después de la hora actual) y conduces respetando señales, límites y horario. Al final recibes un resumen y puedes hacer la maniobra de retorno para seguir con el servicio contrario.
+- **Centro de Control:** supervisas toda la red (L3 y L6) en un esquema en tiempo real: trenes coloreados según su estado, ficha de cada tren, indicadores por línea (puntualidad, retraso máximo, gente esperando), registro de incidencias, botones para retener o liberar trenes y para activar o apagar la regulación de intervalos.
 - **Pasajero a pie:** entras desde la calle a la estación que elijas, cargas tu tarjeta bip! si hace falta, validas en el torniquete, bajas al andén del sentido que quieras, viajas y sales donde quieras.
 
 ## Controles
@@ -140,6 +141,8 @@ js/render/            dibujo del estado del motor
   trainViews.js       trenes
   signalViews.js      señales
   lineMapPanel.js     plano de línea dinámico de los coches
+js/control/           Centro de Control
+  controlCenter.js    esquema de la red, ficha de tren, incidencias y órdenes
 js/roles/             roles del jugador
   driverRole.js       Conductor: teclado → órdenes
 js/stationLayout.js   columnas, bancos y pantallas de los andenes (compartido)

@@ -24,6 +24,7 @@
      render/signalViews.js  dibujo de las señales del motor
      render/lineMapPanel.js plano de línea dinámico de los coches (luz parpadeante)
      roles/driverRole.js    rol de Conductor: teclado → órdenes al motor
+     control/controlCenter.js  rol de Centro de Control: esquema de la red y órdenes
      stationLayout.js       columnas, bancos y pantallas de los andenes (compartido)
      config.js    Línea 3 de Santiago, geometría, mando, horarios y demanda
      utils.js     utilidades, materiales y texturas procedurales
@@ -60,6 +61,7 @@ import { TrainViews } from "./render/trainViews.js";
 import { SignalViews } from "./render/signalViews.js";
 import { LineMapPanel } from "./render/lineMapPanel.js";
 import { DriverRole } from "./roles/driverRole.js";
+import { ControlCenter } from "./control/controlCenter.js";
 import { World } from "./world.js";
 import { createTrainLights, resetTrainAssets, trainLineMapMaterial } from "./train.js";
 import { PeopleSystem } from "./people.js";
@@ -112,6 +114,7 @@ window.MetroSim = { get game() { return game; }, CONFIG, STATIONS, ROUTES };
 
 function startGame(mode) {
   if (game) stopGame();
+  if (mode === "control") return startControl();
   const stationIndex = Number(stationSelect.value) || 0;
   const direction = directionSelect.value === "B" ? ROUTE_B : ROUTE_A;
   startScreen.classList.add("hidden");
@@ -240,6 +243,52 @@ function stopGame() {
   hud.hideSummary();
   gameScreen.classList.add("hidden");
   loadingScreen.classList.add("hidden");
+  startScreen.classList.remove("hidden");
+}
+
+/* ==========================================================================
+   Centro de Control: solo el motor y un esquema 2D (sin mundo 3D ni sonido)
+   ========================================================================== */
+
+let control = null;
+
+function startControl() {
+  startScreen.classList.add("hidden");
+  loadingScreen.classList.remove("hidden");
+  setTimeout(() => {
+    // Hora local, igual que en los otros modos
+    const startClock = localClock(), startEpoch = performance.now();
+    CONFIG.startTime = startClock;
+    CONFIG.schedule.playerDeparture = Math.ceil((startClock + 90) / 30) * 30;
+    const engine = new MetroEngine({ startTime: startClock - 45 * 60 });
+    engine.runUntil(startClock);                     // la red ya tiene trenes al empezar el turno
+    const ui = new ControlCenter({ engine, onExit: stopControl });
+    control = { engine, ui, startClock, startEpoch, last: performance.now(), uiT: 0, raf: 0 };
+    window.MetroSim.control = control;
+    loadingScreen.classList.add("hidden");
+    control.raf = requestAnimationFrame(controlLoop);
+  }, 40);
+}
+
+function controlLoop(now) {
+  if (!control) return;
+  const c = control;
+  const realDt = Math.max(0, (now - c.last) / 1000);
+  c.last = now;
+  c.engine.update(realDt);
+  // Seguir la hora local (recupera pausas y pestañas en segundo plano)
+  const target = c.startClock + (performance.now() - c.startEpoch) / 1000;
+  if (target - c.engine.time > 1) c.engine.runUntil(c.engine.time + Math.min(target - c.engine.time, 120));
+  c.uiT -= realDt;
+  if (c.uiT <= 0) { c.uiT = 0.1; c.ui.update(); }       // el esquema se redibuja 10 veces por segundo
+  c.raf = requestAnimationFrame(controlLoop);
+}
+
+function stopControl() {
+  if (!control) return;
+  cancelAnimationFrame(control.raf);
+  control.ui.destroy();
+  control = null;
   startScreen.classList.remove("hidden");
 }
 
