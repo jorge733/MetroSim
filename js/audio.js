@@ -23,6 +23,30 @@
 
 import { clamp } from "./utils.js";
 
+/**
+ * Elige la voz en español más realista del navegador: primero español de
+ * Chile, luego latinoamericano; las voces neuronales ("Natural", "Online")
+ * suenan mucho mejor; y femenina, como la locución del Metro.
+ */
+export function bestSpanishVoice() {
+  if (!("speechSynthesis" in window)) return null;
+  const female = /catalina|helena|laura|elvira|dalia|paloma|sabina|luc[ií]a|elena|m[oó]nica|paulina|camila|ximena|valentina|female|mujer/i;
+  const score = (v) => {
+    const lang = (v.lang || "").toLowerCase();
+    if (!lang.startsWith("es")) return -1;
+    let s = 10;
+    if (lang === "es-cl") s += 100;                                  // español de Chile
+    else if (/es-(419|us|mx|ar|co|pe)/.test(lang)) s += 60;          // latinoamericano
+    else if (lang === "es-es") s += 35;
+    if (/natural|online|neural/i.test(v.name)) s += 70;              // voces neuronales
+    if (/google/i.test(v.name)) s += 20;
+    if (female.test(v.name)) s += 15;
+    return s;
+  };
+  const ranked = speechSynthesis.getVoices().map(v => ({ v, s: score(v) })).filter(x => x.s >= 0).sort((a, b) => b.s - a.s);
+  return ranked[0]?.v || null;
+}
+
 export class AudioSystem {
   constructor() {
     this.ctx = null;
@@ -336,22 +360,7 @@ export class AudioSystem {
 
   /** Elige la voz más realista disponible (las neuronales "Natural"/"Online" suenan mucho mejor). */
   pickVoice() {
-    if (!("speechSynthesis" in window)) return;
-    const female = /catalina|helena|laura|elvira|dalia|paloma|sabina|luc[ií]a|elena|m[oó]nica|paulina|camila|ximena|valentina|female|mujer/i;
-    const score = (v) => {
-      const lang = (v.lang || "").toLowerCase();
-      if (!lang.startsWith("es")) return -1;
-      let s = 10;
-      if (lang === "es-cl") s += 100;                                  // español de Chile
-      else if (/es-(419|us|mx|ar|co|pe)/.test(lang)) s += 60;          // latinoamericano
-      else if (lang === "es-es") s += 35;
-      if (/natural|online|neural/i.test(v.name)) s += 70;              // voces neuronales
-      if (/google/i.test(v.name)) s += 20;
-      if (female.test(v.name)) s += 15;                                // la voz del Metro es femenina
-      return s;
-    };
-    const ranked = speechSynthesis.getVoices().map(v => ({ v, s: score(v) })).filter(x => x.s >= 0).sort((a, b) => b.s - a.s);
-    this.voice = ranked[0]?.v || null;
+    this.voice = bestSpanishVoice();
   }
 
   /** Lee audio/voz/manifest.json para saber qué grabaciones hay disponibles. */

@@ -31,6 +31,7 @@ import { CONFIG, STATIONS, NOTCH_INDEX, FARES, spokenName, fareBandAt, formatCLP
 import { ROUTES, ROUTE_A, ROUTE_B, routeForSide, oppositeRoute } from "./route.js";
 import { BipCard } from "./card.js";
 import { PHRASES } from "./announcements.js";
+import { playIntro } from "./intro.js";
 import { $, clamp, formatClock, formatStopError, gradeStop } from "./utils.js";
 import { Timetable, formatDelay, makeTrip } from "./schedule.js";
 import { SignalSystem } from "./signals.js";
@@ -55,6 +56,9 @@ hud.setSound(!muted);
 const card = new BipCard();               // la tarjeta bip! del jugador (saldo persistente)
 hud.setCard(card);
 const directionSelect = $("startDirection");
+
+// Introducción de bienvenida (solo al abrir la página)
+playIntro({ isMuted: () => muted });
 const wait = (ms) => new Promise(r => setTimeout(r, ms));
 
 // Selector de estación del modo pasajero (Universidad de Chile por defecto)
