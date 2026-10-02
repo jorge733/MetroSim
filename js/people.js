@@ -13,6 +13,10 @@
        se sientan, se agarran a la barra...).
      · Lejos: solo cifras (esperando en cada andén / a bordo de cada tren).
 
+   Sin atravesar objetos: en el andén caminan por el pasillo libre entre la
+   línea amarilla y las columnas (stationLayout.js) y solo se apartan de él
+   en perpendicular para ir a un banco, a la escalera o a una puerta.
+
    Dibujo: todas las personas se pintan con 3 InstancedMesh (cuerpo, cabeza y
    pelo), así cientos de viajeros cuestan solo 3 llamadas de dibujo.
    Cada persona es un esqueleto de Object3D (sin mallas) que se anima y
@@ -24,6 +28,7 @@ import { CONFIG, STATIONS, demandAt } from "./config.js";
 import { routeForSide } from "./engine/route.js";
 import { TRAIN_LAYOUT } from "./engine/consist.js";
 import { clamp } from "./utils.js";
+import { PLATFORM_BENCHES, PLATFORM_LANE_X, BENCH_X } from "./stationLayout.js";
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const randInt = (a, b) => Math.floor(rand(a, b + 1));
@@ -141,19 +146,17 @@ class PeopleRenderer {
    Geometría de recorridos en una estación
    ========================================================================== */
 
-/** Bancos de un andén (mismas posiciones que world.js). */
+/** Bancos de un andén (mismas posiciones que world.js, en stationLayout.js): dos plazas por banco. */
 function benchSpots(st, side) {
   const spots = [];
-  const inStairs = (zz) => zz > st.z + MZ.stairZ0 - 3 && zz < st.z + MZ.stairZ1 + 2;
-  for (let off = -46; off <= 46; off += 12) {
-    if (inStairs(st.z + off)) continue;
-    const bz = st.z + off + 6;
-    if (off < 46 && !inStairs(bz)) {
-      [-0.45, 0.45].forEach(dz => spots.push({ side, bench: true, occupant: null, pos: V(side * 7.92, S.platformTop, bz + dz), seatY: S.platformTop + 0.48 }));
-    }
+  for (const off of PLATFORM_BENCHES) {
+    [-0.45, 0.45].forEach(dz => spots.push({ side, bench: true, occupant: null, pos: V(side * (BENCH_X - 0.03), S.platformTop, st.z + off + dz), seatY: S.platformTop + 0.48 }));
   }
   return spots;
 }
+
+/** Punto del pasillo libre del andén a la altura z. */
+const lane = (side, z) => V(side * PLATFORM_LANE_X, S.platformTop, z);
 
 const stairX = (MZ.stairX0 + MZ.stairX1) / 2, escX = (MZ.escX0 + MZ.escX1) / 2;
 const stairTop = (st, side) => V(side * stairX, MZ.y, st.z + MZ.stairZ1 + 0.4);
@@ -163,20 +166,22 @@ const streetDoor = (st) => V(rand(-1.2, 1.2), MZ.y, st.z + MZ.z1 - 0.3);
 /** Punto marcado como tramo de escalera mecánica (el viajero va quieto). */
 function onEscalator(v) { v.esc = true; return v; }
 
-/** Recorrido desde la zona no pagada hasta el andén de un lado (torniquete + escalera fija). */
+/** Recorrido desde la zona no pagada hasta el andén de un lado (torniquete + escalera fija + pasillo). */
 function pathFromGates(st, side, spot) {
   const g = pick(MZ.gates);
+  const foot = st.z + MZ.stairZ0 - 2.5;
   return [
     V(g, MZ.y, st.z + MZ.gateZ + 0.9), V(g, MZ.y, st.z + MZ.gateZ - 0.9),
-    stairTop(st, side), stairBottom(st, side), spot.clone(),
+    stairTop(st, side), stairBottom(st, side),
+    lane(side, foot), lane(side, spot.z), spot.clone(),
   ];
 }
 
-/** Recorrido desde el andén hasta la calle (escalera mecánica de subida). */
+/** Recorrido desde el andén hasta la calle (pasillo + escalera mecánica de subida). */
 function pathToStreet(st, side, from) {
   const g = pick(MZ.gates);
   return [
-    V(side * rand(4.0, 4.8), S.platformTop, from.z),
+    lane(side, from.z), lane(side, st.z + MZ.stairZ0 - 2.5),
     V(side * escX, S.platformTop, st.z + MZ.stairZ0 - 1.0),
     onEscalator(V(side * escX, MZ.y, st.z + MZ.stairZ1 + 0.6)),
     V(g, MZ.y, st.z + MZ.gateZ - 0.9), V(g, MZ.y, st.z + MZ.gateZ + 0.9), streetDoor(st),
@@ -250,6 +255,24 @@ export class PeopleSystem {
     return clamp(n / 14, 0, 1);
   }
 
+  /**
+   * ¿Hay un viajero en (x, z) que impida pasar? Solo cuenta si el paso
+   * acerca al jugador a esa persona (así nunca queda atrapado).
+   * @param {object|null} unit  tren (coordenadas locales) o null (mundo)
+   */
+  blocks(x, y, z, fromX, fromZ, unit = null) {
+    const R = 0.42;
+    for (const p of this.people) {
+      if (p.hidden || p.state === "gone" || p.state === "clerk" || p.riding) continue;
+      if (unit ? p.space !== "train" || p.unit !== unit : p.space !== "world") continue;
+      const q = p.root.position;
+      if (!unit && Math.abs(q.y - y) > 0.8) continue;
+      const d = Math.hypot(q.x - x, q.z - z);
+      if (d < R && d < Math.hypot(q.x - fromX, q.z - fromZ)) return true;
+    }
+    return false;
+  }
+
   /** Posiciones de mundo de los viajeros en la mezanina (para los torniquetes). */
   deckAgents(out = []) {
     for (const p of this.people) if (p.space === "world" && p.root.position.y > MZ.y - 0.5) out.push(p.root.position);
@@ -290,7 +313,7 @@ export class PeopleSystem {
       if (free.length) return pick(free);
     }
     const z = Math.random() < 0.85 ? st.z + rand(-45, 15) : st.z + rand(-49, 48);
-    return { side, bench: false, pos: V(side * rand(4.3, 5.7), S.platformTop, z) };
+    return { side, bench: false, pos: V(side * rand(4.3, 5.4), S.platformTop, z) };
   }
 
   spawnWaiting(st, side, instant) {
@@ -444,11 +467,13 @@ export class PeopleSystem {
     const doorLocal = this.nearestDoor(local.z);
     const doorWorld = unit.group.localToWorld(V(1.3, F, doorLocal));
 
-    if (p.spot?.bench) { p.spot.occupant = null; this.standUp(p, S.platformTop); }
+    const fromBench = !!p.spot?.bench;
+    if (fromBench) { p.spot.occupant = null; this.standUp(p, S.platformTop); }
     p.state = "toDoor";
     p.unit = unit;
     p.root.position.y = S.platformTop;
     this.walk(p, [
+      ...(fromBench ? [lane(side, p.root.position.z)] : []),
       V(side * rand(3.95, 4.4), S.platformTop, doorWorld.z + rand(-0.6, 0.6)),
       V(side * 3.7, S.platformTop, doorWorld.z + rand(-0.25, 0.25)),
     ], () => {
@@ -474,7 +499,8 @@ export class PeopleSystem {
     p.spot = spot;
     p.state = "arriving";
     p.root.position.y = S.platformTop;
-    this.walk(p, [spot.pos], () => this.settleWaiting(p));
+    const pts = spot.bench ? [lane(p.side, p.root.position.z), lane(p.side, spot.pos.z), spot.pos] : [spot.pos];
+    this.walk(p, pts, () => this.settleWaiting(p));
   }
 
   /* ----- Bajada ----- */

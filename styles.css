@@ -411,22 +411,22 @@ kbd {
 .lamp.moving { background: var(--warn); box-shadow: 0 0 12px var(--warn); animation: blink .6s steps(2) infinite; }
 
 /* ---------- 7. Pasajero, ayuda y mensajes ---------- */
+/* Abajo a la derecha: no tapa el centro de la vista */
 .passenger-hud {
   position: absolute;
   bottom: 22px;
-  left: 50%;
-  transform: translateX(-50%);
+  right: 18px;
   display: grid;
   gap: 4px;
-  min-width: 300px;
-  padding: 14px 22px;
+  width: min(360px, calc(100% - 36px));
+  padding: 12px 18px;
   border: 1px solid var(--panel-border);
   border-left: 6px solid var(--line);
   border-radius: 12px;
   background: var(--panel);
   backdrop-filter: blur(14px);
 }
-.passenger-hud strong { font-size: 24px; letter-spacing: 1px; }
+.passenger-hud strong { font-size: 20px; letter-spacing: 1px; }
 
 .controls-help {
   position: absolute;

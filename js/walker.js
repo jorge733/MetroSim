@@ -9,8 +9,14 @@
    sales a la calle.
 
    Controles: W A S D / flechas caminar · Shift correr · ratón mirar
-   (clic para capturar, Esc para soltar) · F sentarse · E interactuar
-   (boletería, tótem de carga, salida a la calle).
+   (clic para capturar, Esc para soltar) · F sentarse (en el tren o en un
+   banco del andén mientras esperas) · E interactuar (boletería, tótem de
+   carga, salida a la calle).
+
+   Choques: no se atraviesan columnas, bancos ni a los demás viajeros
+   (stationLayout.js y el sistema de viajeros).
+   Terminales: el andén de llegada es solo de salida; no se puede bajar a
+   él desde la mezanina.
 
    Tarjeta bip!: al cruzar un torniquete desde la zona no pagada se cobra la
    tarifa del tramo horario; sin saldo, el torniquete no se abre.
@@ -26,6 +32,7 @@ import { CONFIG, STATIONS } from "./config.js";
 import { ROUTES, routeForSide } from "./engine/route.js";
 import { TRAIN_LAYOUT } from "./engine/consist.js";
 import { clamp } from "./utils.js";
+import { platformSolidAt, isArrivalOnly } from "./stationLayout.js";
 
 const EYE = 1.62;
 const WALK = 1.45, RUN = 3.1;
@@ -40,8 +47,12 @@ export class Walker {
    * @param {object} opts.station  estación inicial (del mundo)
    * @param {(type:string, data?:object)=>void} opts.onEvent
    * @param {() => {ok:boolean}} opts.onValidate  intenta cobrar el pasaje al cruzar un torniquete
+   * @param {(st, side:number) => Array} opts.benches  bancos de un andén (compartidos con los viajeros)
+   * @param {(x, y, z, fromX, fromZ, unit) => boolean} opts.isCrowded  ¿hay otro viajero en el camino?
    */
-  constructor({ scene, camera, traffic, station, onEvent = () => {}, onValidate = () => ({ ok: true }) }) {
+  constructor({ scene, camera, traffic, station, onEvent = () => {}, onValidate = () => ({ ok: true }), benches = () => [], isCrowded = () => false }) {
+    this.benches = benches;
+    this.isCrowded = isCrowded;
     this.scene = scene;
     this.camera = camera;
     this.traffic = traffic;
@@ -144,7 +155,7 @@ export class Walker {
 
     // Andenes (salvo la huella de la escalera)
     const onStairFoot = ax >= MZ.escX0 - 0.05 && dz >= MZ.stairZ0 && dz <= MZ.stairZ1;
-    if (ax >= S.platformEdgeX + 0.3 && ax <= S.wallX - 0.35 && Math.abs(dz) <= S.platformHalf - 0.3 && !onStairFoot) candidates.push(S.platformTop);
+    if (ax >= S.platformEdgeX + 0.3 && ax <= S.wallX - 0.35 && Math.abs(dz) <= S.platformHalf - 0.3 && !onStairFoot && !platformSolidAt(x, dz)) candidates.push(S.platformTop);
 
     // Hueco de puerta del tren detenido con puertas abiertas
     if (Math.abs(dz) <= S.platformHalf && ax >= S.trackX + 1.0 && ax < S.platformEdgeX + 0.3) {
@@ -155,7 +166,8 @@ export class Walker {
     // Escalera fija y escalera mecánica (rampas del andén a la mezanina)
     const onStairs = ax >= MZ.stairX0 + 0.05 && ax <= MZ.stairX1 - 0.05;
     const onEsc = ax >= MZ.escX0 + 0.2 && ax <= MZ.escX1 - 0.2;
-    if ((onStairs || onEsc) && dz >= MZ.stairZ0 - 0.2 && dz <= MZ.stairZ1 + 0.2) {
+    const goingDown = fromY >= MZ.y - 0.01 && isArrivalOnly(st, side);     // andén de llegada de una terminal: solo se sube
+    if ((onStairs || onEsc) && dz >= MZ.stairZ0 - 0.2 && dz <= MZ.stairZ1 + 0.2 && !goingDown) {
       const t = clamp((dz - MZ.stairZ0) / (MZ.stairZ1 - MZ.stairZ0), 0, 1);
       candidates.push(S.platformTop + t * (MZ.y - S.platformTop));
     }
@@ -205,25 +217,53 @@ export class Walker {
   }
 
   /* ----- Acciones ----- */
+  /**
+   * Sentarse o levantarse. this.seat = { place, seatY, stand }:
+   *   place  plaza ocupada (asiento del tren o sitio de un banco, con .occupant)
+   *   seatY  altura del asiento · stand  dónde queda al levantarse
+   */
   toggleSeat() {
     if (this.seat) { this.leaveSeat(); return { text: "Te levantas", level: "info" }; }
-    if (this.space !== "train") return { text: "Aquí no hay asientos libres cerca", level: "info" };
+    return this.space === "train" ? this.sitInTrain() : this.sitOnBench();
+  }
+
+  sitInTrain() {
     const free = this.unit.slots
       .filter(s => s.type === "seat" && !s.occupant)
       .map(s => ({ s, d: Math.hypot(s.approach.x - this.pos.x, s.approach.z - this.pos.z) }))
       .sort((a, b) => a.d - b.d)[0];
     if (!free || free.d > 1.2) return { text: "No hay ningún asiento libre a tu lado", level: "info" };
-    this.seat = free.s;
-    this.seat.occupant = "player";
-    this.pos.set(this.seat.pos.x * 0.95, F, this.seat.pos.z);
-    this.yaw = this.seat.yaw + Math.PI;
+    const slot = free.s;
+    slot.occupant = "player";
+    this.seat = { place: slot, seatY: slot.seatY, stand: slot.approach.clone() };
+    this.pos.set(slot.pos.x * 0.95, F, slot.pos.z);
+    this.yaw = slot.yaw + Math.PI;
     return { text: "Te sientas · F para levantarte", level: "ok" };
+  }
+
+  /** Banco del andén: te sientas mirando a la vía mientras esperas el tren. */
+  sitOnBench() {
+    const side = this.platformSide();
+    const st = side ? this.stationAt(this.pos.z) : null;
+    if (!st) return { text: "Aquí no hay asientos: los bancos están en los andenes, junto al muro", level: "info" };
+    const free = this.benches(st, side)
+      .filter(b => !b.occupant)
+      .map(b => ({ b, d: Math.hypot(b.pos.x - this.pos.x, b.pos.z - this.pos.z) }))
+      .sort((a, c) => a.d - c.d)[0];
+    if (!free || free.d > 1.8) return { text: "Acércate a un banco libre (junto al muro del andén) para sentarte", level: "info" };
+    const spot = free.b;
+    spot.occupant = "player";
+    this.seat = { place: spot, seatY: spot.seatY, stand: new THREE.Vector3(side * 7.15, S.platformTop, spot.pos.z) };
+    this.pos.set(side * 7.75, S.platformTop, spot.pos.z);
+    this.yaw = side > 0 ? Math.PI / 2 : -Math.PI / 2;           // mirando a la vía
+    this.pitch = -0.05;
+    return { text: "Te sientas en el banco · F para levantarte cuando llegue el tren", level: "ok" };
   }
 
   leaveSeat() {
     if (!this.seat) return;
-    if (this.seat.occupant === "player") this.seat.occupant = null;
-    this.pos.set(this.seat.approach.x, F, this.seat.approach.z);
+    if (this.seat.place.occupant === "player") this.seat.place.occupant = null;
+    this.pos.copy(this.seat.stand);
     this.seat = null;
   }
 
@@ -348,22 +388,24 @@ export class Walker {
     const dz = (-Math.cos(this.yaw) * f - Math.sin(this.yaw) * r) * speed;
     const { x, z, y } = this.pos;
 
+    const unit = this.space === "train" ? this.unit : null;
+    const free = (nx, nz) => !this.isCrowded(nx, y, nz, x, z, unit);      // no se atraviesa a otros viajeros
     if (this.space === "train") {
-      if (this.trainWalkable(x + dx, z + dz)) { this.pos.x += dx; this.pos.z += dz; }
-      else if (this.trainWalkable(x + dx, z)) this.pos.x += dx;
-      else if (this.trainWalkable(x, z + dz)) this.pos.z += dz;
+      if (this.trainWalkable(x + dx, z + dz) && free(x + dx, z + dz)) { this.pos.x += dx; this.pos.z += dz; }
+      else if (this.trainWalkable(x + dx, z) && free(x + dx, z)) this.pos.x += dx;
+      else if (this.trainWalkable(x, z + dz) && free(x, z + dz)) this.pos.z += dz;
       return;
     }
     const tries = [[dx, dz], [dx, 0], [0, dz]];
     for (const [mx, mz] of tries) {
       const fy = this.worldFloor(x + mx, z + mz, y);
-      if (fy !== null) { this.pos.set(x + mx, fy, z + mz); return; }
+      if (fy !== null && free(x + mx, z + mz)) { this.pos.set(x + mx, fy, z + mz); return; }
     }
   }
 
   /** Texto de ayuda contextual para el HUD. */
   hint() {
-    if (this.seat) return "F levantarse";
+    if (this.seat) return this.space === "train" ? "F levantarse" : "Sentado en el banco · F levantarse para subir al tren";
     if (this.space === "train") {
       const rs = this.unit.sim.dockedStation();
       const open = this.unit.sim.doorState === "open";
@@ -374,6 +416,9 @@ export class Walker {
       if (service?.kind === "boleteria") return "E · atención en boletería (cargar tarjeta bip!, comprar tarjeta)";
       if (service?.kind === "totem") return "E · tótem de autoservicio: carga con tarjeta de débito o crédito";
       if (this.nearExit() && !this.paid) return "E (o sigue caminando) para salir a la calle";
+      const here = this.stationAt(this.pos.z);
+      const closed = here && [1, -1].find(sd => isArrivalOnly(here, sd));
+      if (this.paid && closed) return `Estación terminal · baja por la escalera ${closed > 0 ? "izquierda" : "derecha"} (la otra es solo de salida)`;
       return this.paid
         ? "Zona pagada · escalera izquierda: dir. Plaza Quilicura · derecha: dir. F. Castillo Velasco"
         : "Pasa por un torniquete para validar tu tarjeta bip! · boletería a la izquierda, tótems a la derecha";
@@ -385,7 +430,8 @@ export class Walker {
     const side = this.platformSide();
     const st = this.stationAt(this.pos.z);
     if (st && side && this.openUnit(st, side)) return "El tren tiene las puertas abiertas: camina hacia una puerta para subir";
-    return "Espera el tren detrás de la línea amarilla · escalera mecánica y fija hacia la mezanina";
+    if (st && side && isArrivalOnly(st, side)) return "Andén de llegada de la terminal: no salen trenes desde aquí · sube a la mezanina para salir";
+    return "Espera el tren detrás de la línea amarilla · F sentarse en un banco · escaleras hacia la mezanina";
   }
 }
 

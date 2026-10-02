@@ -20,6 +20,7 @@
 import * as THREE from "three";
 import { CONFIG, STATIONS, WORLD, LINE, FARES, formatCLP } from "./config.js";
 import { ROUTE_A, ROUTE_B } from "./engine/route.js";
+import { PLATFORM_COLUMNS, PLATFORM_BENCHES, COLUMN_X, BENCH_X, PID_OFFSETS, isArrivalOnly } from "./stationLayout.js";
 import {
   std, glow, addBox, addBoxSpan, addPlane, makeCanvas, toTexture, tunnelTexture, concreteTexture,
   terrazzoTexture, tileTexture, stationNameCanvas, lineMapCanvas, lineMapU, signCanvas, stopBoardCanvas,
@@ -121,6 +122,8 @@ function createWorldMaterials() {
     stopBoard: glow(0xffffff, { map: toTexture(stopBoardCanvas()) }),
     lineMap: glow(0xffffff, { map: toTexture(lineMapCanvas()) }),
     youAreHere: glow(0xd42026),
+    noEntry: glow(0xd42026),
+    exitOnly: glow(0xffffff, { map: toTexture(signCanvas("SOLO SALIDA · ANDÉN DE LLEGADA", "#b3121f", 512, 128, "800 36px Arial")) }),
   };
 }
 
@@ -228,6 +231,9 @@ export class World {
   update(camera, dt = 0) {
     // Los peldaños avanzan (la textura se desplaza a lo largo de la rampa)
     this.escalatorTexture.offset.y -= dt * MZ.escSpeed * 38 / 15.2;
+    // Marca "usted está aquí" de los planos de andén: parpadea
+    this.blinkT = (this.blinkT || 0) + dt;
+    this.M.youAreHere.color.setHex(Math.floor(this.blinkT / 0.5) % 2 === 0 ? 0xff1a1a : 0x3a0808);
     const cz = camera.z, R = CONFIG.renderRadius;
     for (const s of this.stations) s.group.visible = Math.abs(s.st.z - cz) < R;
 
@@ -414,7 +420,6 @@ function buildStation(scene, M, st, gates) {
     const pw = wallX - edgeX, pcx = side * (edgeX + pw / 2);
     const faceRot = side > 0 ? -Math.PI / 2 : Math.PI / 2;
     const route = side > 0 ? ROUTE_A : ROUTE_B;
-    const inStairs = (zz) => zz > z + MZ.stairZ0 - 3 && zz < z + MZ.stairZ1 + 2;
 
     // Andén
     addBoxSpan(group, pcx, pw, -0.05, S.platformTop, z + ph, z - ph, M.platform);
@@ -428,23 +433,22 @@ function buildStation(scene, M, st, gates) {
     // Muro alicatado
     addBoxSpan(group, side * (wallX + 0.15), 0.3, -0.05, S.ceilingY, z + hall, z - hall, wallMat);
 
-    // Columnas y bancos del andén (fuera de la zona de escaleras)
-    for (let off = -46; off <= 46; off += 12) {
-      if (inStairs(z + off)) continue;
-      addBox(group, 0.42, S.platformCeilingY - S.platformTop + 0.4, 0.42, M.column, side * 6.0, (S.platformCeilingY + S.platformTop + 0.4) / 2, z + off);
-      const bz = z + off + 6;
-      if (off < 46 && !inStairs(bz)) {
-        addBox(group, 0.45, 0.06, 1.8, M.bench, side * 7.95, S.platformTop + 0.45, bz);
-        addBox(group, 0.06, 0.4, 1.8, M.bench, side * 8.22, S.platformTop + 0.7, bz);
-        [-0.75, 0.75].forEach(dz => addBox(group, 0.4, 0.45, 0.06, M.benchFrame, side * 7.95, S.platformTop + 0.22, bz + dz));
-      }
+    // Columnas y bancos del andén (posiciones compartidas: stationLayout.js)
+    for (const off of PLATFORM_COLUMNS) {
+      addBox(group, 0.42, S.platformCeilingY - S.platformTop + 0.4, 0.42, M.column, side * COLUMN_X, (S.platformCeilingY + S.platformTop + 0.4) / 2, z + off);
+    }
+    for (const off of PLATFORM_BENCHES) {
+      const bz = z + off;
+      addBox(group, 0.45, 0.06, 1.8, M.bench, side * BENCH_X, S.platformTop + 0.45, bz);
+      addBox(group, 0.06, 0.4, 1.8, M.bench, side * (BENCH_X + 0.27), S.platformTop + 0.7, bz);
+      [-0.75, 0.75].forEach(dz => addBox(group, 0.4, 0.45, 0.06, M.benchFrame, side * BENCH_X, S.platformTop + 0.22, bz + dz));
     }
 
     // Carteles de nombre y plano de línea en el muro
     for (const off of [-44, -32, 0, 12]) addPlane(group, 3.6, 0.9, nameMat, side * (wallX - 0.01), 2.85, z + off, faceRot);
     const mapW = 4.4, mapH = 0.825, mapZ = z - 16;
     addPlane(group, mapW, mapH, M.lineMap, side * (wallX - 0.01), 2.85, mapZ, faceRot);
-    addPlane(group, 0.09, 0.09, M.youAreHere, side * (wallX - 0.02), 2.85 + mapH * (0.5 - 190 / 384), mapZ + side * (lineMapU(st) - 0.5) * mapW, faceRot);
+    addPlane(group, 0.14, 0.14, M.youAreHere, side * (wallX - 0.02), 2.85 + mapH * (0.5 - 190 / 384), mapZ + side * (lineMapU(st) - 0.5) * mapW, faceRot);
 
     // Bandejas de luz sobre el andén (hasta la mezanina)
     for (let off = -57; off <= 31; off += 6) {
@@ -463,17 +467,22 @@ function buildStation(scene, M, st, gates) {
     hang(side > 0 ? M.dirA : M.dirB, side * 5.6, 4.7, z + 2, 3.2);
     hang(M.exitUp, side * 6.6, 4.9, z + MZ.stairZ0 - 2.5, 2.4);
 
-    // Pantalla de próximo tren (una por andén, con su sentido)
+    // Pantallas de próximo tren: una sola imagen por andén repetida en 3 puntos
+    // (cerca del pie de la escalera y repartidas por el andén), a la altura de la
+    // vista y lejos de los carteles colgantes de dirección para que nada las tape.
     const pidCanvas = makeCanvas(512, 160);
     const pid = { side, route, canvas: pidCanvas, ctx: pidCanvas.getContext("2d"), texture: toTexture(pidCanvas), lastKey: "" };
     pids.push(pid);
     const pidMat = glow(0xffffff, { map: pid.texture });
-    const px = side * 5.4, py = 4.0, pz = z - 10;
-    addBox(group, 0.03, 0.9, 0.03, M.steel, px - 0.5, py + 0.75, pz);
-    addBox(group, 0.03, 0.9, 0.03, M.steel, px + 0.5, py + 0.75, pz);
-    addBox(group, 1.66, 0.56, 0.1, M.screenHousing, px, py, pz);
-    addPlane(group, 1.5, 0.47, pidMat, px, py, pz + 0.052, 0);
-    addPlane(group, 1.5, 0.47, pidMat, px, py, pz - 0.052, Math.PI);
+    const sw = 2.1, sh = sw * 160 / 512, py = 3.75, px = side * 5.0;
+    for (const off of PID_OFFSETS) {
+      const pz = z + off;
+      addBox(group, 0.04, S.platformCeilingY - py - sh / 2, 0.04, M.steel, px - sw / 2 + 0.15, (S.platformCeilingY + py + sh / 2) / 2, pz);
+      addBox(group, 0.04, S.platformCeilingY - py - sh / 2, 0.04, M.steel, px + sw / 2 - 0.15, (S.platformCeilingY + py + sh / 2) / 2, pz);
+      addBox(group, sw + 0.16, sh + 0.12, 0.12, M.screenHousing, px, py, pz);
+      addPlane(group, sw, sh, pidMat, px, py, pz + 0.062, 0);
+      addPlane(group, sw, sh, pidMat, px, py, pz - 0.062, Math.PI);
+    }
 
     // Cartel de PARE (cabeza de tren) para el sentido de este andén
     const stopZ = route.toWorldZ(route.stationOf(st).stopZ);
@@ -484,6 +493,15 @@ function buildStation(scene, M, st, gates) {
 
     // Escalera al andén desde la mezanina
     buildStairs(group, M, side, z);
+
+    // Terminal: el andén de llegada es solo de salida (barrera en lo alto de la escalera fija)
+    if (isArrivalOnly(st, side)) {
+      const bz = z + MZ.stairZ1 + 0.35, x0 = MZ.stairX0, x1 = MZ.stairX1;
+      addBoxSpan(group, side * (x0 + x1) / 2, x1 - x0, MZ.y, MZ.y + 1.0, bz - 0.04, bz + 0.04, M.balustrade);
+      addBoxSpan(group, side * (x0 + x1) / 2, x1 - x0, MZ.y + 0.95, MZ.y + 1.05, bz - 0.06, bz + 0.06, M.noEntry);
+      addPlane(group, 2.2, 0.55, M.exitOnly, side * 6.7, MZ.y + 2.4, bz + 0.05, 0);
+      addPlane(group, 2.2, 0.55, M.exitOnly, side * 6.7, MZ.y + 2.4, bz - 0.05, Math.PI);
+    }
   });
 
   buildMezzanine(group, M, st, nameMat, gates);

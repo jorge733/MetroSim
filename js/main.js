@@ -8,6 +8,7 @@
      engine.js    MetroEngine: reloj de paso fijo, horarios, señales y trenes
      state.js     estado explícito de cada tren (arrancando, en andén, ante señal...)
      eta.js       llegadas estimadas desde la posición real de los trenes
+     commands.js  buzón de órdenes: los roles mandan órdenes al motor
      clock.js     reloj de la simulación
      route.js     los dos sentidos de circulación (vía 1 y vía 2)
      schedule.js  horarios por sentido y retrasos
@@ -21,6 +22,9 @@
    Render (js/render/ y resto de js/, con Three.js):
      render/trainViews.js   dibujo de los trenes del motor
      render/signalViews.js  dibujo de las señales del motor
+     render/lineMapPanel.js plano de línea dinámico de los coches (luz parpadeante)
+     roles/driverRole.js    rol de Conductor: teclado → órdenes al motor
+     stationLayout.js       columnas, bancos y pantallas de los andenes (compartido)
      config.js    Línea 3 de Santiago, geometría, mando, horarios y demanda
      utils.js     utilidades, materiales y texturas procedurales
      world.js     túnel, vías, catenaria, estaciones con mezanina y torniquetes
@@ -36,6 +40,10 @@
 
    Principio: Conductor y Pasajero comparten el MISMO mundo, el MISMO tráfico
    y los MISMOS viajeros. Solo cambia qué controla el jugador.
+
+   Hora: la partida empieza a la HORA LOCAL real del computador y el reloj
+   del motor se mantiene sincronizado con ella (si el juego se pausa o la
+   pestaña queda en segundo plano, el motor recupera el tiempo perdido).
    ========================================================================== */
 
 import * as THREE from "three";
@@ -50,8 +58,10 @@ import { formatDelay, makeTrip } from "./engine/schedule.js";
 import { MetroEngine } from "./engine/engine.js";
 import { TrainViews } from "./render/trainViews.js";
 import { SignalViews } from "./render/signalViews.js";
+import { LineMapPanel } from "./render/lineMapPanel.js";
+import { DriverRole } from "./roles/driverRole.js";
 import { World } from "./world.js";
-import { createTrainLights, resetTrainAssets } from "./train.js";
+import { createTrainLights, resetTrainAssets, trainLineMapMaterial } from "./train.js";
 import { PeopleSystem } from "./people.js";
 import { Walker } from "./walker.js";
 import { AudioSystem } from "./audio.js";
@@ -135,6 +145,11 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A) {
   pmrem.dispose();
   const camera = new THREE.PerspectiveCamera(mode === "driver" ? 62 : 70, innerWidth / innerHeight, 0.03, 340);
 
+  /* --- Hora local: la partida empieza "ahora" --- */
+  const startClock = localClock(), startEpoch = performance.now();
+  CONFIG.startTime = startClock;
+  CONFIG.schedule.playerDeparture = Math.ceil((startClock + 90) / 30) * 30;   // tu servicio sale en ~1,5 min
+
   /* --- Motor MetroSim (el "cerebro") y su dibujo --- */
   const world = new World(scene);
   const warmStart = CONFIG.startTime - 45 * 60;
@@ -143,6 +158,7 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A) {
   // El juego escucha al motor por su bus: sucesos y cambios de estado de cada tren
   engine.bus.on("train:event", ({ unit, type, data }) => onUnitEvent(unit, type, data));
   engine.bus.on("train:state", (change) => onTrainState(change));
+  engine.bus.on("command:result", (r) => onCommandResult(r));
   const trainViews = new TrainViews(scene, engine.bus);       // dibuja los trenes que crea el motor
   const signalViews = new SignalViews(scene, signals.values());
   const playerTrip = timetables.get(direction.id).anchorTrip;
@@ -161,7 +177,9 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A) {
   game.people = people;
   engine.runUntil(CONFIG.startTime, { onStep: (step, t) => people.update(step, t, { cameraZ: 1e9, render: false }) });
   game.clock = engine.time;
+  game.realClock = { epoch: startEpoch, clock: startClock };           // ancla para seguir la hora local (recupera el tiempo de carga)
   game.warming = false;
+  game.lineMap = new LineMapPanel(trainLineMapMaterial());              // plano de línea dinámico de los coches
 
   /* --- Jugador --- */
   game.trainLights = createTrainLights({ cab: mode === "driver" });
@@ -170,6 +188,7 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A) {
     const player = traffic.createUnit(playerTrip, { isPlayer: true, start: direction.first });
     player.arrivedIdx = player.dockedIdx = 0;
     game.player = player;
+    game.driverRole = new DriverRole(engine, () => game?.player);
     const rig = new CameraRig(camera, player.group);
     rig.setView("cab");
     rig.attach(renderer.domElement);
@@ -181,6 +200,8 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A) {
       scene, camera, traffic, station: STATIONS[stationIndex],
       onEvent: (t, d) => onWalkerEvent(t, d),
       onValidate: () => validateFare(),
+      benches: (st, side) => game.people.stations[st.index].benches[side],
+      isCrowded: (x, y, z, fx, fz, unit) => game.people.blocks(x, y, z, fx, fz, unit),
     });
     walker.attach(renderer.domElement);
     game.walker = walker;
@@ -273,18 +294,23 @@ function onKeyDown(event) {
     game.rig.setView(game.rig.view === "exterior" ? "cab" : "exterior");
     return hud.showMessage(game.rig.view === "exterior" ? "Vista exterior" : "Vista de cabina", "info", 1200);
   }
-  const sim = game.player.sim;
-  let result = null;
-  if (event.repeat && key !== " ") return;
-  if (key === "w" || key === "arrowup") result = sim.notchUp();
-  else if (key === "s" || key === "arrowdown") result = sim.notchDown();
-  else if (key === " ") result = sim.emergencyBrake();
-  else if (key === "q") result = sim.shiftReverser(+1);
-  else if (key === "e") result = sim.shiftReverser(-1);
-  else if (key === "d") result = sim.toggleDoors();
-  else if (key === "r") return restartGame();
-  else if (key === "t") return changeCab();
-  if (result) hud.showMessage(result.text, result.level);
+  // Mando del tren: el rol de Conductor envía órdenes al motor (la respuesta llega en onCommandResult)
+  if (game.driverRole.handleKey(key, event.repeat)) return;
+  if (event.repeat) return;
+  if (key === "r") return restartGame();
+  if (key === "t") return changeCab();
+}
+
+/** Respuesta del motor a una orden (del conductor o desde la consola / Centro de Control). */
+function onCommandResult(r) {
+  if (!game || game.warming || !r.result?.text) return;
+  if (game.driverRole?.owns(r) || r.type.startsWith("control.")) hud.showMessage(r.result.text, r.result.level);
+}
+
+/** Hora local del computador en segundos desde medianoche. */
+function localClock() {
+  const d = new Date();
+  return d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds() + d.getMilliseconds() / 1000;
 }
 
 function onKeyUp(event) {
@@ -714,6 +740,7 @@ function loop(now) {
   // 1. Motor: trenes y señales avanzan con su propio reloj de paso fijo
   engine.update(realDt);
   if (!game) return;
+  syncWithLocalTime();
   game.clock = engine.time;
 
   // 2. Cámara / jugador
@@ -745,6 +772,7 @@ function loop(now) {
   const focus = focusUnit(cameraZ);
   if (focus && focus !== game.lightsUnit) { focus.group.add(game.trainLights); game.lightsUnit = focus; }
   if (walker && walker.unit) game.innerLight.position.z = walker.pos.z;
+  game.lineMap.update(player || walker.unit || focus, game.elapsed);
 
   // 5. Sonido
   let level = 1, view = "cab", rider = null;
@@ -782,6 +810,20 @@ function loop(now) {
 
   game.renderer.render(game.scene, game.camera);
   game.raf = requestAnimationFrame(loop);
+}
+
+/**
+ * Mantiene el reloj del motor en la hora local: si se quedó atrás (pausa,
+ * pestaña en segundo plano), simula rápido lo que falta (máx. 60 s por fotograma).
+ */
+function syncWithLocalTime() {
+  const target = game.realClock.clock + (performance.now() - game.realClock.epoch) / 1000;
+  const behind = target - game.engine.time;
+  if (behind < 1) return;
+  const cameraZ = game.player ? game.player.group.position.z : game.walker.worldZ;
+  game.engine.runUntil(game.engine.time + Math.min(behind, 60), {
+    onStep: (step, t) => game.people.update(step, t, { cameraZ, render: false }),
+  });
 }
 
 /** Texto de próximo tren para un andén. */

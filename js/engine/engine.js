@@ -16,6 +16,8 @@
          "train:event"  { unit, type, data }   sucesos de cada tren
          "train:state"  { unit, from, to, time } cambio de estado (state.js)
      · llegadas estimadas desde la posición real de los trenes (eta.js)
+     · buzón de órdenes (commands.js): los roles mandan órdenes con
+       engine.command(tipo, datos) y el resultado llega por "command:result"
      · estado legible de toda la red (snapshot / report)
    Es la base para las siguientes fases: demanda de pasajeros, regulación,
    más líneas y el Centro de Control.
@@ -31,6 +33,7 @@ import { EventBus } from "./events.js";
 import { formatClock } from "./format.js";
 import { TRAIN_STATES } from "./state.js";
 import { estimateArrival } from "./eta.js";
+import { CommandQueue } from "./commands.js";
 
 export class MetroEngine {
   /**
@@ -43,16 +46,33 @@ export class MetroEngine {
     this.bus = new EventBus();
     this.clock = new SimClock(startTime);
     this.signals = new Map(ROUTES.map(r => [r.id, new SignalSystem(r)]));
+    // Malla de servicio alrededor de la hora de inicio (3 h antes, 8 h después): se puede
+    // empezar a cualquier hora, también de noche (frecuencia de valle).
+    const anchorA = CONFIG.schedule.playerDeparture, anchorB = anchorA + CONFIG.schedule.reverseOffset;
     this.timetables = new Map([
-      [ROUTE_A.id, new Timetable(ROUTE_A, CONFIG.schedule.playerDeparture)],
-      [ROUTE_B.id, new Timetable(ROUTE_B, CONFIG.schedule.playerDeparture + CONFIG.schedule.reverseOffset)],
+      [ROUTE_A.id, new Timetable(ROUTE_A, anchorA, anchorA - 3 * 3600, anchorA + 8 * 3600)],
+      [ROUTE_B.id, new Timetable(ROUTE_B, anchorB, anchorB - 3 * 3600, anchorB + 8 * 3600)],
     ]);
     this.onUnitEvent = onUnitEvent;
     this.traffic = new TrafficManager({
       timetables: this.timetables, signals: this.signals, bus: this.bus,
       onUnitEvent: (u, t, d) => this.onUnitEvent(u, t, d),
     });
+    this.commands = new CommandQueue(this);
   }
+
+  /* ----- Órdenes (roles) ----- */
+
+  /**
+   * Deja una orden en el buzón del motor; se cumple al comienzo del próximo paso.
+   * Ejemplos:
+   *   engine.command("driver.notchUp", { trainId: "L3-0801" })
+   *   engine.command("control.hold",   { trainId: "L3-0745" })
+   */
+  command(type, payload = {}) { this.commands.push(type, payload); }
+
+  /** Tren por su id de servicio (o null). */
+  findTrain(id) { return this.trains.find(u => u.id === id) || null; }
 
   /** Hora actual de la simulación (segundos desde medianoche). */
   get time() { return this.clock.time; }
@@ -64,6 +84,7 @@ export class MetroEngine {
 
   /** Un paso de simulación de duración fija. */
   step() {
+    this.commands.process();
     this.traffic.update(this.clock.step, this.clock.time);
     this.clock.tick();
   }
@@ -89,6 +110,7 @@ export class MetroEngine {
    */
   runUntil(time, { step = 0.25, onStep } = {}) {
     while (this.clock.time < time) {
+      this.commands.process();
       this.traffic.update(step, this.clock.time);
       onStep?.(step, this.clock.time);
       this.clock.time += step;

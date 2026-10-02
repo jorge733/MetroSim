@@ -25,12 +25,16 @@ Three.js se carga desde CDN, así que hace falta conexión a internet.
 - Tarjeta bip! con saldo persistente: el torniquete cobra según el tramo horario (punta, valle, baja); carga en la boletería (con cajero y fila) o en los tótems de autoservicio.
 - Maniobra de retorno en las terminales: cola de maniobras, cambio de cabina y cambio de vía (jugador y trenes automáticos).
 - Sonido procedural, anuncios de estación con voz y megafonía de andén.
+- **Hora local real:** la partida empieza a la hora de tu computador y el reloj se mantiene sincronizado.
+- Pantallas de próximo tren en tres puntos de cada andén y plano de línea dinámico en los coches (luz parpadeante en la estación actual o la próxima).
+- Bancos en los andenes para esperar sentado; nadie atraviesa columnas, bancos ni a otros viajeros.
+- En las terminales, el andén de llegada es solo de salida.
 
 > Las tarifas son valores de referencia configurables en `js/config.js` (`FARES`); revísalos si quieres que coincidan con las vigentes.
 
 ## Modos
 
-- **Conductor:** eliges servicio de ida (L3-0801) o de vuelta (L3V-0803) y conduces respetando señales, límites y horario. Al final recibes un resumen y puedes hacer la maniobra de retorno para seguir con el servicio contrario.
+- **Conductor:** eliges servicio de ida o de vuelta (sale ~1,5 min después de la hora actual) y conduces respetando señales, límites y horario. Al final recibes un resumen y puedes hacer la maniobra de retorno para seguir con el servicio contrario.
 - **Pasajero a pie:** entras desde la calle a la estación que elijas, cargas tu tarjeta bip! si hace falta, validas en el torniquete, bajas al andén del sentido que quieras, viajas y sales donde quieras.
 
 ## Controles
@@ -53,7 +57,7 @@ Three.js se carga desde CDN, así que hace falta conexión a internet.
 |---|---|
 | W A S D / flechas | Caminar (Shift: correr) |
 | Clic · Esc | Capturar / soltar el ratón |
-| F | Sentarse / levantarse |
+| F | Sentarse / levantarse (en el tren o en un banco del andén) |
 | E | Boletería, tótem de carga o salida a la calle |
 
 **Ambos:** M sonido · H ayuda.
@@ -71,6 +75,17 @@ los mire el jugador o no. Cada tren tiene un **estado explícito** (arrancando, 
 puertas abiertas, listo para salir, detenido ante señal...) y las pantallas de "próximo tren" se calculan desde
 la **posición real** de cada tren, no solo desde el horario. El juego escucha al motor por su bus de eventos
 (`train:created`, `train:removed`, `train:event`, `train:state`...).
+
+Los **roles** no tocan la simulación: mandan **órdenes** al buzón del motor y este decide si se pueden cumplir.
+El Conductor convierte sus teclas en órdenes (`driver.notchUp`, `driver.doors`...). Desde la consola del
+navegador se puede probar el futuro Centro de Control:
+
+```
+MetroSim.game.engine.command("control.hold",    { trainId: "L3-1405" })   // retener un tren en su próxima estación
+MetroSim.game.engine.command("control.release", { trainId: "L3-1405" })   // liberarlo
+```
+
+Al retener un tren, el siguiente se queda detenido ante la señal en rojo: causa y efecto.
 
 Se puede ejecutar sin gráficos:
 
@@ -98,11 +113,16 @@ js/engine/            MOTOR (sin Three.js)
   consist.js          composición lógica del tren de 5 coches
   state.js            estado explícito de cada tren
   eta.js              llegadas estimadas desde la posición real
+  commands.js         buzón de órdenes (roles → motor)
   events.js           bus de eventos del motor
   format.js           utilidades puras
 js/render/            dibujo del estado del motor
   trainViews.js       trenes
   signalViews.js      señales
+  lineMapPanel.js     plano de línea dinámico de los coches
+js/roles/             roles del jugador
+  driverRole.js       Conductor: teclado → órdenes
+js/stationLayout.js   columnas, bancos y pantallas de los andenes (compartido)
 js/main.js            punto de entrada: une motor, render, roles, interfaz y audio
 js/config.js          línea, estaciones, geometría, mando, tarifas, demanda
 js/world.js           túnel, vías, catenaria y estaciones con mezanina

@@ -20,6 +20,7 @@ export const TRAIN_STATES = {
   dwell:       "puertas abiertas",
   closing:     "cerrando puertas",
   ready:       "listo para salir",
+  held:        "retenido en estación",
   retiring:    "hacia la cola de maniobras",
   cabChange:   "cambio de cabina",
 };
@@ -43,11 +44,14 @@ export function trainState(u, signals) {
   if (ato === "retired") return "cabChange";
   if (ato === "retire") return "retiring";
 
-  // 2. Puertas
+  // 2. Retenido por el Centro de Control (en estación)
+  if (u.ato?.held && sim.isStopped && sim.dockedStation()) return "held";
+
+  // 3. Puertas
   if (sim.doorState === "closing") return "closing";
   if (sim.doorState !== "closed") return "dwell";
 
-  // 3. Parado: arrancando, en estación, ante una señal o en plena vía
+  // 4. Parado: arrancando, en estación, ante una señal o en plena vía
   if (sim.isStopped) {
     const departing = sim.accel > 0.05 || ato === "running";           // ya aplica tracción o el ATO va a arrancar
     const docked = sim.dockedStation();
@@ -59,7 +63,7 @@ export function trainState(u, signals) {
     return departing ? "starting" : "stopped";
   }
 
-  // 4. En movimiento
+  // 5. En movimiento
   if (u.state === "approaching" && sim.dockedStation()) return "approaching";          // últimos metros
   if (sim.speed < 3 && sim.accel > 0 && u.state !== "approaching") return "starting";
   // Aproximación: frenando hacia la próxima parada (y se mantiene hasta detenerse,

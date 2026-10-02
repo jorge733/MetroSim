@@ -235,6 +235,9 @@ export class TrainSim {
      retire   → tras la última estación, hacia el fondo de la cola de maniobras
      retired  → al final de la cola: el tráfico le cambia de cabina y de vía
                 (maniobra de retorno) o lo retira a cocheras
+
+   Retención (orden "control.hold" del Centro de Control): con held = true el
+   tren no cierra puertas ni sale de la estación hasta que lo liberen.
    ========================================================================== */
 
 export class AutoDriver {
@@ -260,6 +263,7 @@ export class AutoDriver {
     this.timer = 0;
     this.extraWait = 0;
     this.brakeTarget = null;
+    this.held = false;                 // retenido por el Centro de Control
     sim.notch = NOTCH_INDEX.N;
     sim.reverser = 1;
   }
@@ -298,7 +302,7 @@ export class AutoDriver {
         const minDwell = this.targetIndex === last ? CONFIG.schedule.minDwell + 10 : CONFIG.schedule.minDwell;
         const dep = this.scheduledDeparture();
         const timeOk = clock - this.arrivedAt >= minDwell && (dep === null || clock >= dep - CONFIG.train.doorTime - 3);
-        if (!timeOk || sim.doorState !== "open") break;
+        if (!timeOk || sim.doorState !== "open" || this.held) break;
         if (this.isBoardingBusy() && this.extraWait < 20) { this.extraWait += dt; break; }
         sim.toggleDoors({ automatic: true });
         this.onEvent("doorsClosing", { station: this.target });
@@ -312,6 +316,7 @@ export class AutoDriver {
       case "ready": {
         sim.autoDemand = -1.05;
         if (this.targetIndex === last) { this.state = "retire"; break; }
+        if (this.held) break;
         const dep = this.scheduledDeparture();
         const sig = this.signals?.startingSignal(this.target);
         if ((dep === null || clock >= dep) && (!sig || sig.aspect !== "red")) {

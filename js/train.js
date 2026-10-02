@@ -40,6 +40,9 @@ let ASSETS = null;
 /** Libera la caché (la escena anterior ya destruyó geometrías y materiales). */
 export function resetTrainAssets() { ASSETS = null; }
 
+/** Material compartido del plano de línea de los coches (lo anima render/lineMapPanel.js). */
+export function trainLineMapMaterial() { return ASSETS?.mat.lineMap ?? null; }
+
 function assets() {
   if (ASSETS) return ASSETS;
   const mat = {
