@@ -1,11 +1,11 @@
 /* ==========================================================================
-   MetroSim — Alpha 0.4 · hud.js
+   MetroSim — Alpha 0.5 · hud.js
    HUD HTML superpuesto: reloj, esquema de la Línea 3, selector de mando,
    inversor, velocímetro, estación, señal, horario, puertas, panel del
    pasajero a pie, mensajes y resumen de servicio.
    ========================================================================== */
 
-import { CONFIG, STATIONS, NOTCHES, NOTCH_INDEX, LINE_LENGTH } from "./config.js";
+import { STATIONS, NOTCHES, NOTCH_INDEX, WORLD } from "./config.js";
 import { $, clamp, formatClock, formatStopError } from "./utils.js";
 import { formatDelay } from "./schedule.js";
 
@@ -49,7 +49,7 @@ export class Hud {
     this.stripDots = STATIONS.map((s, i) => {
       const dot = document.createElement("div");
       dot.className = "line-strip-stop" + (i === 0 || i === STATIONS.length - 1 ? " terminal" : "") + (s.combos.length ? " combo" : "");
-      dot.style.left = `${this.progressOf(s.stopZ) * 100}%`;
+      dot.style.left = `${this.progressOf(s.z) * 100}%`;
       dot.innerHTML = `<span>${s.short}</span>`;
       dot.title = s.name;
       this.el.lineStrip.insertBefore(dot, this.el.lineStripTrain);
@@ -57,7 +57,8 @@ export class Hud {
     });
   }
 
-  progressOf(z) { return clamp((STATIONS[0].stopZ - z) / LINE_LENGTH, 0, 1); }
+  /** Posición (0..1) de una coordenada z del mundo en el esquema de línea. */
+  progressOf(z) { return clamp((STATIONS[0].z - z) / WORLD.lineLength, 0, 1); }
 
   setText(el, text) { if (el.textContent !== text) el.textContent = text; }
 
@@ -83,7 +84,8 @@ export class Hud {
   /** Esquema de línea: marcador en z y estación resaltada. */
   updateStrip(z, highlight) {
     this.el.lineStripTrain.style.left = `${this.progressOf(z) * 100}%`;
-    this.stripDots.forEach((d, i) => d.classList.toggle("current", highlight && STATIONS[i] === highlight));
+    const idx = highlight ? (highlight.worldIndex ?? highlight.index) : -1;
+    this.stripDots.forEach((d, i) => d.classList.toggle("current", i === idx));
   }
 
   /* ---------------------------------------------------------------------
@@ -92,7 +94,7 @@ export class Hud {
   updateDriver(sim, info, extra) {
     const e = this.el;
     this.setText(e.clock, formatClock(extra.clock));
-    this.updateStrip(sim.position, info.docked || info.next);
+    this.updateStrip(sim.route.toWorldZ(sim.position), info.docked || info.next);
 
     const kmh = sim.speedKmh;
     const over = kmh > info.limit + 0.5;
@@ -120,7 +122,7 @@ export class Hud {
     } else {
       this.setText(e.stationTitle, "FIN DE LÍNEA");
       this.setText(e.nextStation, "VÍA DE RETIRADA");
-      this.setText(e.distance, `${Math.max(0, Math.round(sim.position - CONFIG.track.bumperZ))} m a la topera`);
+      this.setText(e.distance, `${Math.max(0, Math.round(sim.position - sim.route.track.bumperZ))} m a la topera`);
     }
 
     // Precisión de parada (±10 m en la escala)

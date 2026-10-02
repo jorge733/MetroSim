@@ -1,16 +1,17 @@
 /* ==========================================================================
-   MetroSim — Alpha 0.4 · sim.js
+   MetroSim — Alpha 0.5 · sim.js
    Simulación de un tren (lógica pura, sin gráficos) y conducción automática.
 
    Principio: el tren del jugador y los trenes automáticos usan EXACTAMENTE la
    misma simulación (TrainSim). Solo cambia quién da las órdenes: el jugador
    (mando + inversor) o el AutoDriver (ATO).
 
-   Velocidad con signo: velocity > 0 = avanza hacia -Z (sentido F. Castillo
-   Velasco), velocity < 0 = retrocede (marcha atrás).
+   Todo se calcula en las coordenadas de la RUTA del tren (route.js): en
+   ellas el tren siempre avanza hacia -Z, sea cual sea su sentido real.
+   Velocidad con signo: velocity > 0 = avanza, velocity < 0 = retrocede.
    ========================================================================== */
 
-import { CONFIG, STATIONS, NOTCHES, NOTCH_INDEX, REVERSER, SPEED_LIMITS, speedLimitAt } from "./config.js";
+import { CONFIG, NOTCHES, NOTCH_INDEX, REVERSER } from "./config.js";
 import { clamp, formatStopError } from "./utils.js";
 
 
@@ -20,15 +21,17 @@ import { clamp, formatStopError } from "./utils.js";
 
 export class TrainSim {
   /**
+   * @param {object} route   ruta (sentido de circulación) del tren
    * @param {(type:string, data?:object)=>void} onEvent  receptor de eventos (mensajes, sonidos...)
-   * @param {object|number} start  estación (se coloca en su marca) o coordenada z
+   * @param {object|number} start  estación de la ruta (se coloca en su marca) o coordenada z
    */
-  constructor(onEvent = () => {}, start = STATIONS[0]) {
+  constructor(route, onEvent = () => {}, start = route.first) {
+    this.route = route;
     this.onEvent = onEvent;
     this.reset(start);
   }
 
-  reset(start = STATIONS[0]) {
+  reset(start = this.route.first) {
     this.position = typeof start === "number" ? start : start.stopZ;   // z del testero delantero
     this.velocity = 0;               // m/s con signo
     this.accel = 0;                  // esfuerzo aplicado (m/s²): + tracción, − freno. Con limitación de jerk
@@ -58,20 +61,20 @@ export class TrainSim {
 
   /** Límite efectivo: el de la vía o el de marcha atrás. */
   currentLimit() {
-    const track = speedLimitAt(this.position);
+    const track = this.route.speedLimitAt(this.position);
     return this.reverser === -1 || this.movingBackwards ? Math.min(track, Math.round(CONFIG.train.reverseMaxSpeed * 3.6)) : track;
   }
 
   dockedStation() {
-    return STATIONS.find(s => Math.abs(this.position - s.stopZ) <= CONFIG.station.stopTolerance) || null;
+    return this.route.stations.find(s => Math.abs(this.position - s.stopZ) <= CONFIG.station.stopTolerance) || null;
   }
   nearestStation() {
-    return STATIONS.reduce((best, s) =>
+    return this.route.stations.reduce((best, s) =>
       Math.abs(this.position - s.stopZ) < Math.abs(this.position - best.stopZ) ? s : best);
   }
   /** Próxima estación cuyo punto de parada está por delante del tren. */
   nextStation() {
-    return STATIONS.find(s => s.stopZ < this.position - CONFIG.station.stopTolerance) || null;
+    return this.route.stations.find(s => s.stopZ < this.position - CONFIG.station.stopTolerance) || null;
   }
 
   /* ----- Órdenes del conductor ----- */
@@ -183,13 +186,14 @@ export class TrainSim {
     this.velocity = newV;
 
     // 5. Límites físicos de la vía
-    if (this.position <= CONFIG.track.bumperZ) {
+    const track = this.route.track;
+    if (this.position <= track.bumperZ) {
       if (this.speed > 0.5) this.onEvent("bumper", { kmh: this.speedKmh });
-      this.position = CONFIG.track.bumperZ; this.velocity = 0; this.accel = Math.min(this.accel, 0);
+      this.position = track.bumperZ; this.velocity = 0; this.accel = Math.min(this.accel, 0);
     }
-    if (this.position >= CONFIG.track.rearLimitZ) {
+    if (this.position >= track.rearLimitZ) {
       if (this.speed > 0.5) this.onEvent("bumper", { kmh: this.speedKmh });
-      this.position = CONFIG.track.rearLimitZ; this.velocity = 0; this.accel = Math.min(this.accel, 0);
+      this.position = track.rearLimitZ; this.velocity = 0; this.accel = Math.min(this.accel, 0);
     }
 
     // 6. Detección de parada
@@ -256,7 +260,8 @@ export class AutoDriver {
     sim.reverser = 1;
   }
 
-  get target() { return STATIONS[this.targetIndex]; }
+  get stations() { return this.sim.route.stations; }
+  get target() { return this.stations[this.targetIndex]; }
 
   /** Hora de salida programada en la estación actual (o null si no hay horario). */
   scheduledDeparture() {
@@ -265,7 +270,7 @@ export class AutoDriver {
 
   update(dt, clock) {
     const sim = this.sim;
-    const last = STATIONS.length - 1;
+    const last = this.stations.length - 1;
     switch (this.state) {
       case "running": {
         sim.autoDemand = this.runDemand(this.target.stopZ, true);
@@ -302,7 +307,7 @@ export class AutoDriver {
         const dep = this.scheduledDeparture();
         const sig = this.signals?.startingSignal(this.target);
         if ((dep === null || clock >= dep) && (!sig || sig.aspect !== "red")) {
-          this.onEvent("departing", { station: this.target, next: STATIONS[this.targetIndex + 1] });
+          this.onEvent("departing", { station: this.target, next: this.stations[this.targetIndex + 1] });
           this.targetIndex++;
           this.brakeTarget = null;
           this.state = "running";
@@ -310,8 +315,8 @@ export class AutoDriver {
         break;
       }
       case "retire":
-        sim.autoDemand = this.runDemand(CONFIG.track.retireZ, false);
-        if (sim.isStopped && Math.abs(sim.position - CONFIG.track.retireZ) < 2) { this.state = "retired"; this.onEvent("retired"); }
+        sim.autoDemand = this.runDemand(sim.route.track.retireZ, false);
+        if (sim.isStopped && Math.abs(sim.position - sim.route.track.retireZ) < 2) { this.state = "retired"; this.onEvent("retired"); }
         break;
       case "retired":
         sim.autoDemand = -1.05;
@@ -347,8 +352,8 @@ export class AutoDriver {
     }
 
     // Velocidad de crucero respetando límites presentes y futuros
-    let cruise = Math.min((speedLimitAt(sim.position) - 4) / 3.6, cruiseCap);
-    for (const s of SPEED_LIMITS) {
+    let cruise = Math.min((sim.route.speedLimitAt(sim.position) - 4) / 3.6, cruiseCap);
+    for (const s of sim.route.limits) {
       if (s.from < sim.position && sim.position - s.from < 1500) {
         const dist = sim.position - s.from;
         const vTarget = (s.kmh - 4) / 3.6;

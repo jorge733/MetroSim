@@ -1,17 +1,21 @@
 /* ==========================================================================
-   MetroSim — Alpha 0.4 · config.js
-   Configuración global: Línea 3 del Metro de Santiago, mando, señales,
-   horarios y demanda.
+   MetroSim — Alpha 0.5 · config.js
+   Configuración global: Línea 3 del Metro de Santiago, geometría de
+   estaciones y trenes, mando, horarios y demanda.
 
-   Ejes: el tren avanza hacia -Z (sentido Fernando Castillo Velasco).
-   La "posición" de un tren es la Z de su testero delantero.
-   Altura de referencia: y = 0 es el nivel de la losa.
+   Ejes del MUNDO: Plaza Quilicura está en z = 0 y la línea avanza hacia -Z
+   (Fernando Castillo Velasco ≈ z = -23 400). Altura y = 0: nivel de la losa.
+   Doble vía: la vía 1 (hacia F. Castillo Velasco) está en x = +2 y la vía 2
+   (hacia Plaza Quilicura) en x = -2. Cada vía tiene su andén lateral.
 
-   Las distancias entre estaciones son APROXIMADAS (la línea real mide ~25 km
-   incluyendo colas de maniobra); el orden, nombres y combinaciones son reales.
+   Cada sentido de circulación es una "ruta" (route.js) con sus propias
+   coordenadas de simulación; ver route.js.
+
+   Las distancias entre estaciones son APROXIMADAS; el orden, los nombres y
+   las combinaciones son reales.
    ========================================================================== */
 
-export const VERSION = "ALPHA 0.4";
+export const VERSION = "ALPHA 0.5";
 
 /* ---------- Línea ---------- */
 export const LINE = {
@@ -29,7 +33,7 @@ export const LINE_COLORS = {
 };
 
 /**
- * Estaciones de la L3 en orden de servicio (norte → oriente).
+ * Estaciones de la L3 (norte → oriente).
  * gap = metros desde la estación anterior (aproximados).
  * combos = líneas de Metro con combinación.
  */
@@ -58,92 +62,101 @@ const STATION_DATA = [
 ];
 
 /* ---------- Parámetros generales ---------- */
+const CAR_LENGTH = 18, CAR_GAP = 0.6, CARS = 5;
+
 export const CONFIG = {
   startTime: 8 * 3600,                 // 08:00:00
-  track: {},                           // se completa más abajo (depende de las estaciones)
   station: {
-    hallHalf: 45,                      // media longitud del vestíbulo de andenes
-    platformHalf: 35,                  // media longitud del andén
-    stopOffset: -25,                   // la marca de parada está 25 m por delante del centro
+    hallHalf: 60,                      // media longitud del vestíbulo de andenes
+    platformHalf: 50,                  // media longitud del andén (cabe un tren de 5 coches)
+    stopOffset: -47,                   // la marca de parada (cabeza del tren) está 47 m por delante del centro
     stopTolerance: 2.5,                // ± metros para poder abrir puertas
+    trackX: 2.0,                       // ejes de vía en x = ±2
     platformTop: 1.2,
-    platformEdgeX: 1.55,
-    wallX: 7,
-    ceilingY: 6.6,
-    accessZ: 31,                       // accesos (salidas) a ±31 m del centro de la estación
+    platformEdgeX: 3.55,               // |x| del borde del andén
+    wallX: 8.5,                        // |x| de los muros laterales
+    ceilingY: 10.5,                    // techo alto: la mezanina queda dentro del vestíbulo
+    platformCeilingY: 6.4,             // altura de las bandejas de luz sobre los andenes
   },
-  tunnel: { radius: 3.9, centerY: 2.2, floorY: -0.05 },
-  catenary: { contactY: 4.55 },        // catenaria rígida 1500 V CC (como la L3 real)
+  // Mezanina (vestíbulo superior) con torniquetes. Cotas z relativas al centro de la estación.
+  mezzanine: {
+    y: 7.2,                            // nivel del piso de la mezanina
+    z0: 34, z1: 52,                    // extensión a lo largo de la estación
+    gateZ: 44,                         // línea de torniquetes (zona pagada z < gateZ)
+    gates: [-2.75, -1.65, -0.55, 0.55, 1.65, 2.75],   // ejes de los pasos de torniquete
+    gateHalf: 0.27,                    // medio ancho de paso
+    stairZ0: 20, stairZ1: 34,          // escalera desde el andén (abajo) hasta la mezanina (arriba)
+    stairX0: 6.1, stairX1: 8.3,        // |x| de la escalera (pegada al muro)
+    exitHalf: 1.6,                     // medio ancho de la salida a la calle
+  },
+  tunnel: { radius: 5.6, centerY: 1.6, floorY: -0.05 },   // túnel de doble vía (como el NATM de la L3)
+  catenary: { contactY: 4.55 },        // catenaria rígida 1500 V CC
   train: {
-    length: 18,
+    cars: CARS,
+    carLength: CAR_LENGTH,
+    carGap: CAR_GAP,
+    length: CARS * CAR_LENGTH + (CARS - 1) * CAR_GAP,      // ≈ 92,4 m (5 coches AS-2014)
     halfWidth: 1.4,
     floorY: 1.25,
     roofY: 3.45,
-    doorCenters: [6.2, 13.2],
     doorWidth: 1.4,
     doorHeight: 2.0,
     doorTime: 2.4,                     // segundos en abrir/cerrar
-    maxSpeed: 70 / 3.6,                // 70 km/h en m/s
-    reverseMaxSpeed: 10 / 3.6,         // marcha atrás limitada a 10 km/h
-    tractionBaseSpeed: 9,              // por encima de ~32 km/h la tracción cae (potencia constante)
+    maxSpeed: 70 / 3.6,
+    reverseMaxSpeed: 10 / 3.6,
+    tractionBaseSpeed: 9,
   },
+  track: { tail: 320, railTop: 0.27 }, // metros de cola de maniobra tras cada terminal
   people: {
-    maxWaitingPerStation: 22,
-    maxOnboard: 48,
+    maxWaitingPerSide: 20,             // viajeros esperando en cada andén
+    maxOnboard: 260,                   // capacidad total del tren (5 coches)
+    maxVisibleOnboard: 70,             // máximo de viajeros dibujados por tren (el resto se cuenta)
     activeRadius: 330,                 // solo se dibujan viajeros a esta distancia de la cámara
+    capacity: 700,                     // máximo de personas dibujadas a la vez
   },
   schedule: {
-    minDwell: 20,                      // segundos mínimos de parada
+    minDwell: 20,
     peakHeadway: 240,                  // 4 min en hora punta
     offPeakHeadway: 360,               // 6 min fuera de punta
     playerDeparture: 8 * 3600 + 90,    // tu servicio sale de Plaza Quilicura a las 08:01:30
-    punctualWindow: 30,                // ±30 s se considera puntual
+    reverseOffset: 120,                // los servicios de vuelta están desfasados 2 min
+    punctualWindow: 30,
   },
   signals: {
-    maxBlock: 450,                     // separación máxima entre señales intermedias
-    stopMargin: 8,                     // los trenes automáticos se detienen 8 m antes de una señal roja
+    maxBlock: 450,
+    stopMargin: 8,
   },
   defaultSpeedLimit: 70,
-  renderRadius: 420,                   // estaciones y trenes más lejos que esto no se dibujan
+  renderRadius: 420,
 };
 
-/* ---------- Estaciones con coordenadas ---------- */
+/* ---------- Estaciones (coordenadas del mundo) ---------- */
 let acc = 0;
 export const STATIONS = STATION_DATA.map((s, index) => {
   acc += s.gap;
-  const z = -acc;
   return {
     ...s,
     id: s.name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z]+/g, "-"),
     index,
     combos: s.combos || [],
-    z,
-    stopZ: z + CONFIG.station.stopOffset,
+    z: -acc,
     km: acc / 1000,
   };
 });
 
-const first = STATIONS[0], last = STATIONS.at(-1);
-Object.assign(CONFIG.track, {
-  start: first.z + 260,                // fondo de saco tras Plaza Quilicura (cocheras)
-  depotZ: first.stopZ + 150,           // aquí aparecen los trenes que entran en servicio
-  rearLimitZ: first.z + 238,           // marcha atrás: límite del testero
-  retireZ: last.stopZ - 140,           // aquí se retiran los trenes al terminar
-  bumperZ: last.stopZ - 200,           // topera final
-  end: last.stopZ - 209,               // muro final
-  railTop: 0.27,
-});
-export const LINE_LENGTH = first.stopZ - last.stopZ;
+/** Extremos del mundo (incluyendo colas de maniobra en ambos terminales). */
+export const WORLD = {
+  start: STATIONS[0].z + CONFIG.track.tail,
+  end: STATIONS.at(-1).z - CONFIG.track.tail,
+  lineLength: STATIONS[0].z - STATIONS.at(-1).z,
+};
 
-/* ---------- Limitaciones de velocidad (z "from" > z "to") ---------- */
-export const SPEED_LIMITS = [
-  { from: STATIONS[9].z + 300, to: STATIONS[10].z - 200, kmh: 50, label: "CURVAS BAJO EL MAPOCHO" },
-  { from: last.z + 300, to: CONFIG.track.end, kmh: 40, label: "ENTRADA A TERMINAL" },
-  { from: CONFIG.track.start, to: first.z + 46, kmh: 25, label: "SALIDA DE COCHERAS" },
+/* ---------- Limitaciones de velocidad (coordenadas del mundo, from > to) ---------- */
+export const WORLD_SPEED_LIMITS = [
+  { from: STATIONS[9].z + 300, to: STATIONS[10].z - 200, kmh: 50, label: "ZONA CÉNTRICA" },
 ];
 
 /* ---------- Mando ---------- */
-// Posiciones del manipulador combinado tracción/freno. accel en m/s².
 export const NOTCHES = [
   { id: "EM", label: "EMERGENCIA", accel: -1.45, type: "emergency" },
   { id: "B3", label: "FRENO 3",    accel: -1.05, type: "brake" },
@@ -157,24 +170,13 @@ export const NOTCHES = [
 ];
 export const NOTCH_INDEX = Object.fromEntries(NOTCHES.map((n, i) => [n.id, i]));
 
-// Inversor (sentido de marcha): 1 = adelante, 0 = neutro, -1 = atrás.
 export const REVERSER = {
   1:  { id: "F", label: "ADELANTE" },
   0:  { id: "N", label: "NEUTRO" },
   "-1": { id: "R", label: "ATRÁS" },
 };
 
-/** Límite de velocidad (km/h) vigente en la coordenada z. */
-export function speedLimitAt(z) {
-  let limit = CONFIG.defaultSpeedLimit;
-  for (const s of SPEED_LIMITS) if (z <= s.from && z >= s.to) limit = Math.min(limit, s.kmh);
-  return limit;
-}
-
-/**
- * Demanda de viajeros según la hora (0..1).
- * Picos en hora punta de mañana (~08:15) y tarde (~18:00).
- */
+/** Demanda de viajeros según la hora (0..1): picos ~08:15 y ~18:00. */
 export function demandAt(clockSeconds) {
   const h = (clockSeconds / 3600) % 24;
   const peak = (center, width, height) => height * Math.exp(-(((h - center) / width) ** 2));

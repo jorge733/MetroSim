@@ -1,5 +1,5 @@
 /* ==========================================================================
-   MetroSim — Alpha 0.4 · audio.js
+   MetroSim — Alpha 0.5 · audio.js
    Sonido procedural con Web Audio API (sin archivos externos).
 
    Capas continuas (se ajustan cada fotograma según el estado del tren):
@@ -289,6 +289,13 @@ export class AudioSystem {
     if (!this.ctx) return;
     this.burst({ duration: 0.9, gain: 0.5, type: "lowpass", freq: 600, attack: 0.002, buffer: this.brown });
     this.tone(55, { duration: 0.6, gain: 0.4, attack: 0.002 });
+  }
+
+  /** Validador de la tarjeta bip! en el torniquete. */
+  bip() {
+    if (!this.ctx) return;
+    this.tone(2400, { duration: 0.09, gain: 0.09, wave: "square", attack: 0.002 });
+    this.burst({ start: 0.12, duration: 0.25, gain: 0.05, type: "bandpass", freq: 900, q: 1.5, attack: 0.02 });   // aletas
   }
 
   /** Gong de megafonía (ding-dong). */

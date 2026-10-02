@@ -1,10 +1,10 @@
 /* ==========================================================================
-   MetroSim — Alpha 0.4 · utils.js
+   MetroSim — Alpha 0.5 · utils.js
    Utilidades: matemáticas, formato, materiales, geometría y texturas procedurales.
    ========================================================================== */
 
 import * as THREE from "three";
-import { CONFIG, STATIONS, LINE, LINE_COLORS, LINE_LENGTH } from "./config.js";
+import { CONFIG, STATIONS, LINE, LINE_COLORS, WORLD } from "./config.js";
 
 export const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 export const $ = (id) => document.getElementById(id);
@@ -209,7 +209,7 @@ export function lineMapCanvas() {
   g.fillStyle = "#1b2430"; g.font = "800 40px Arial"; g.textAlign = "left"; g.textBaseline = "middle";
   g.fillText(`${LINE.name} · PLAZA QUILICURA — FERNANDO CASTILLO VELASCO`, 130, 66);
   const x0 = 90, x1 = W - 90, y = 190;
-  const xOf = (st) => x0 + (x1 - x0) * ((STATIONS[0].stopZ - st.stopZ) / LINE_LENGTH);
+  const xOf = (st) => x0 + (x1 - x0) * ((STATIONS[0].z - st.z) / WORLD.lineLength);
   g.fillStyle = LINE.color; g.fillRect(x0, y - 9, x1 - x0, 18);
   STATIONS.forEach((st, i) => {
     const x = xOf(st);
@@ -227,7 +227,7 @@ export function lineMapCanvas() {
 /** Posición horizontal (0..1) de una estación en el plano de línea. */
 export function lineMapU(st) {
   const x0 = 90 / 2048, x1 = 1 - 90 / 2048;
-  return x0 + (x1 - x0) * ((STATIONS[0].stopZ - st.stopZ) / LINE_LENGTH);
+  return x0 + (x1 - x0) * ((STATIONS[0].z - st.z) / WORLD.lineLength);
 }
 
 /** Placa identificativa de una señal. */

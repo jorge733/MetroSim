@@ -1,24 +1,30 @@
 /* ==========================================================================
-   MetroSim — Alpha 0.4 · walker.js
-   Modo Pasajero a pie: el jugador camina en primera persona por el andén,
-   espera el tren, sube por una puerta abierta, viaja (de pie o sentado),
-   baja en la estación que quiera y sale por un acceso.
+   MetroSim — Alpha 0.5 · walker.js
+   Modo Pasajero a pie (primera persona).
+
+   Recorrido completo: entras desde la calle a la mezanina, validas en un
+   torniquete ("bip!"), bajas por la escalera al andén del sentido que
+   quieras, esperas, subes por una puerta abierta, recorres el tren de 5
+   coches por la intercirculación, te sientas, bajas, subes a la mezanina y
+   sales a la calle.
 
    Controles: W A S D / flechas caminar · Shift correr · ratón mirar
-   (clic para capturar el ratón, Esc para soltarlo) · F sentarse/levantarse
-   · E salir de la estación junto a un acceso.
+   (clic para capturar, Esc para soltar) · F sentarse · E salir a la calle.
 
-   El jugador vive en dos espacios, igual que los viajeros NPC:
-     · "world": andén (coordenadas del mundo)
-     · "train": dentro de un tren (coordenadas locales del tren; se mueve con él)
+   Zonas transitables con altura: andenes (y = 1,2), escaleras (rampa),
+   mezanina (y = 7,2) con la línea de torniquetes, huecos de puerta y el
+   interior del tren (coordenadas locales del tren).
    ========================================================================== */
 
 import * as THREE from "three";
 import { CONFIG, STATIONS } from "./config.js";
+import { ROUTES, routeForSide } from "./route.js";
+import { TRAIN_LAYOUT } from "./train.js";
 import { clamp } from "./utils.js";
 
-const EYE = 1.62;           // altura de los ojos sobre el suelo
+const EYE = 1.62;
 const WALK = 1.45, RUN = 3.1;
+const S = CONFIG.station, MZ = CONFIG.mezzanine, F = CONFIG.train.floorY;
 
 export class Walker {
   /**
@@ -26,7 +32,7 @@ export class Walker {
    * @param {THREE.Scene} opts.scene
    * @param {THREE.Camera} opts.camera
    * @param {import("./traffic.js").TrafficManager} opts.traffic
-   * @param {object} opts.station  estación inicial
+   * @param {object} opts.station  estación inicial (del mundo)
    * @param {(type:string, data?:object)=>void} opts.onEvent
    */
   constructor({ scene, camera, traffic, station, onEvent = () => {} }) {
@@ -35,34 +41,37 @@ export class Walker {
     this.traffic = traffic;
     this.onEvent = onEvent;
     this.keys = new Set();
-    this.holder = new THREE.Object3D();     // "cuerpo" del jugador; la cámara va a la altura de los ojos
+    this.holder = new THREE.Object3D();
     this.holder.add(camera);
     camera.position.set(0, EYE, 0);
     camera.rotation.order = "YXZ";
-    this.placeOnPlatform(station);
-    this.trip = { boardedAt: null, boardedClock: null, rode: [] };
+    this.tmp = new THREE.Vector3();
+    this.enterStation(station);
   }
 
-  /** Coloca al jugador de pie en el andén derecho, mirando a la vía. */
-  placeOnPlatform(st) {
+  /** Entra a la estación desde la calle (mezanina, zona no pagada). */
+  enterStation(st) {
     this.leaveSeat();
+    if (this.space === "train") this.unit.group.remove(this.holder);
     this.space = "world";
     this.unit = null;
     this.station = st;
     this.scene.add(this.holder);
-    this.pos = new THREE.Vector3(4.2, CONFIG.station.platformTop, st.stopZ + 9);
-    this.yaw = Math.PI / 2;                 // mirando hacia -X (la vía)
-    this.pitch = -0.05;
+    this.pos = new THREE.Vector3(0, MZ.y, st.z + MZ.z1 - 1.2);
+    this.yaw = 0;                         // mirando hacia los torniquetes (−Z)
+    this.pitch = -0.08;
     this.seat = null;
+    this.paid = false;
   }
 
   /* ----- Entrada ----- */
   attach(dom) {
     this.dom = dom;
-    this.onClick = () => { if (document.pointerLockElement !== dom) dom.requestPointerLock?.(); };
+    // requestPointerLock puede devolver una promesa rechazada (iframes, permisos): se ignora y queda el arrastre con el ratón
+    this.onClick = () => { if (document.pointerLockElement !== dom) dom.requestPointerLock?.()?.catch?.(() => {}); };
     this.onMouse = (ev) => {
       const locked = document.pointerLockElement === dom;
-      if (!locked && !(ev.buttons & 1)) return;           // sin captura: arrastrar con el botón
+      if (!locked && !(ev.buttons & 1)) return;
       const k = locked ? 0.0022 : 0.004;
       this.yaw -= ev.movementX * k;
       this.pitch = clamp(this.pitch - ev.movementY * k, -1.3, 1.3);
@@ -85,50 +94,89 @@ export class Walker {
   }
   keyUp(key) { this.keys.delete(key); }
 
-  /* ----- Geometría transitable ----- */
+  /* ----- Consultas ----- */
 
-  /** Estación en cuyo andén está una coordenada z (o null). */
+  /** Estación cuyo vestíbulo contiene la coordenada z (o null). */
   stationAt(z) {
-    return STATIONS.find(st => Math.abs(z - st.z) <= CONFIG.station.platformHalf - 0.3) || null;
+    return STATIONS.find(st => Math.abs(z - st.z) <= S.hallHalf) || null;
   }
 
-  /** Tren detenido con puertas abiertas en una estación. */
-  openUnitAt(st) {
-    const u = this.traffic.unitDockedAt(st);
+  /** Lado del andén en el que está (+1 / −1) o 0 si no está en un andén. */
+  platformSide() {
+    if (this.space !== "world" || Math.abs(this.pos.y - S.platformTop) > 0.3) return 0;
+    return Math.sign(this.pos.x);
+  }
+
+  /** Tren detenido con puertas abiertas en el andén de un lado. */
+  openUnit(st, side) {
+    const u = this.traffic.unitDockedAt(st, routeForSide(side));
     return u && u.sim.doorProgress > 0.75 && u.sim.doorState !== "closing" ? u : null;
   }
 
-  /** ¿Se puede estar en (x, z) del andén? */
-  worldWalkable(x, z) {
-    const S = CONFIG.station;
+  get worldPos() {
+    if (this.space === "world") return this.pos;
+    return this.unit.group.localToWorld(this.tmp.copy(this.pos));
+  }
+  get worldZ() { return this.worldPos.z; }
+
+  /* ----- Geometría transitable ----- */
+
+  /**
+   * Altura del suelo en (x, z) del mundo, o null si no se puede pisar.
+   * @param {number} fromY  altura actual (evita "saltar" entre niveles)
+   */
+  worldFloor(x, z, fromY) {
     const st = this.stationAt(z);
-    if (!st) return false;
-    const ax = Math.abs(x);
-    if (ax >= S.platformEdgeX + 0.3 && ax <= S.wallX - 0.35) return true;
-    // Hueco de puerta: del borde del andén al interior del tren
-    const u = this.openUnitAt(st);
-    if (u && ax >= 1.0 && ax < S.platformEdgeX + 0.3) {
-      return CONFIG.train.doorCenters.some(zc => Math.abs(z - (u.sim.position + zc)) < 0.55);
+    if (!st) return null;
+    const dz = z - st.z, ax = Math.abs(x), side = Math.sign(x) || 1;
+    const candidates = [];
+
+    // Andenes (salvo la huella de la escalera)
+    const onStairFoot = ax >= MZ.stairX0 - 0.05 && dz >= MZ.stairZ0 && dz <= MZ.stairZ1;
+    if (ax >= S.platformEdgeX + 0.3 && ax <= S.wallX - 0.35 && Math.abs(dz) <= S.platformHalf - 0.3 && !onStairFoot) candidates.push(S.platformTop);
+
+    // Hueco de puerta del tren detenido con puertas abiertas
+    if (Math.abs(dz) <= S.platformHalf && ax >= S.trackX + 1.0 && ax < S.platformEdgeX + 0.3) {
+      const u = this.openUnit(st, side);
+      if (u && this.traffic.doorAtWorldZ(u, z) !== null) candidates.push(S.platformTop);
     }
-    // Entrada del pasillo de acceso
-    if (ax > S.wallX - 0.35 && ax < S.wallX + 0.4) return [-1, 1].some(e => Math.abs(z - (st.z + e * S.accessZ)) < 0.9);
-    return false;
+
+    // Escaleras (rampa del andén a la mezanina)
+    if (ax >= MZ.stairX0 + 0.05 && ax <= MZ.stairX1 - 0.05 && dz >= MZ.stairZ0 - 0.2 && dz <= MZ.stairZ1 + 0.2) {
+      const t = clamp((dz - MZ.stairZ0) / (MZ.stairZ1 - MZ.stairZ0), 0, 1);
+      candidates.push(S.platformTop + t * (MZ.y - S.platformTop));
+    }
+
+    // Mezanina
+    if (ax <= S.wallX - 0.3 && dz >= MZ.z0 && dz <= MZ.z1 - 0.35) {
+      const nearGates = Math.abs(dz - MZ.gateZ) < 0.65;
+      const inGate = MZ.gates.some(g => Math.abs(x - g) < MZ.gateHalf - 0.05);
+      const inKiosk = x < -5.2 && dz > MZ.gateZ + 2.4;
+      if ((!nearGates || inGate) && !inKiosk) candidates.push(MZ.y);
+    }
+    // Umbral de la salida a la calle
+    if (Math.abs(x) < MZ.exitHalf - 0.2 && dz > MZ.z1 - 0.4 && dz < MZ.z1 + 0.3) candidates.push(MZ.y);
+
+    // Se elige el nivel más cercano a la altura actual, si es alcanzable
+    let best = null;
+    for (const y of candidates) if (Math.abs(y - fromY) < 0.45 && (best === null || Math.abs(y - fromY) < Math.abs(best - fromY))) best = y;
+    return best;
   }
 
   /** ¿Se puede estar en (x, z) dentro del tren (coordenadas locales)? */
   trainWalkable(x, z) {
-    const ax = Math.abs(x);
-    if (z < 2.95 || z > 17.75) return false;
-    if (ax <= 0.8) return true;
-    const nearDoor = CONFIG.train.doorCenters.some(zc => Math.abs(z - zc) < 0.6);
+    const [a0, a1] = TRAIN_LAYOUT.aisle;
+    if (z < a0 || z > a1) return false;
+    const inGangway = TRAIN_LAYOUT.gangways.some(([g0, g1]) => z > g0 && z < g1);
+    if (inGangway) return Math.abs(x) <= 0.5;
+    if (Math.abs(x) <= 0.8) return true;
+    const nearDoor = TRAIN_LAYOUT.doors.some(d => Math.abs(z - d) < 0.6);
     if (!nearDoor) return false;
-    if (ax <= 1.32) return true;
-    // Salida al andén si el tren está en una estación con puertas abiertas
-    const st = this.unit.sim.dockedStation();
-    return ax < 1.7 && !!st && this.unit.sim.doorProgress > 0.75 && this.unit.sim.doorState !== "closing";
+    if (Math.abs(x) <= 1.32) return true;
+    // Salida al andén (lado +X local) con el tren en una estación y puertas abiertas
+    const sim = this.unit.sim;
+    return x > 0 && x < 1.75 && !!sim.dockedStation() && sim.doorProgress > 0.75 && sim.doorState !== "closing";
   }
-
-  walkable(x, z) { return this.space === "world" ? this.worldWalkable(x, z) : this.trainWalkable(x, z); }
 
   /* ----- Acciones ----- */
   toggleSeat() {
@@ -141,39 +189,40 @@ export class Walker {
     if (!free || free.d > 1.2) return { text: "No hay ningún asiento libre a tu lado", level: "info" };
     this.seat = free.s;
     this.seat.occupant = "player";
-    this.pos.set(this.seat.pos.x * 0.95, CONFIG.train.floorY, this.seat.pos.z);
-    this.yaw = this.seat.yaw + Math.PI;     // la cámara mira hacia -Z local; el asiento mira al pasillo
+    this.pos.set(this.seat.pos.x * 0.95, F, this.seat.pos.z);
+    this.yaw = this.seat.yaw + Math.PI;
     return { text: "Te sientas · F para levantarte", level: "ok" };
   }
 
   leaveSeat() {
     if (!this.seat) return;
     if (this.seat.occupant === "player") this.seat.occupant = null;
-    this.pos.set(this.seat.approach.x, CONFIG.train.floorY, this.seat.approach.z);
+    this.pos.set(this.seat.approach.x, F, this.seat.approach.z);
     this.seat = null;
   }
 
-  /** Junto a un acceso del andén. */
-  nearAccess() {
-    if (this.space !== "world") return null;
-    const S = CONFIG.station;
+  /** Junto a la salida a la calle. */
+  nearExit() {
+    if (this.space !== "world" || Math.abs(this.pos.y - MZ.y) > 0.3) return null;
     const st = this.stationAt(this.pos.z);
     if (!st) return null;
-    const close = Math.abs(this.pos.x) > S.wallX - 1.3 && [-1, 1].some(e => Math.abs(this.pos.z - (st.z + e * S.accessZ)) < 1.4);
-    return close ? st : null;
+    return Math.abs(this.pos.x) < MZ.exitHalf + 0.5 && this.pos.z - st.z > MZ.z1 - 2.2 ? st : null;
   }
 
   tryExit() {
-    const st = this.nearAccess();
-    if (!st) return { text: "Acércate a un acceso de SALIDA para salir de la estación", level: "info" };
+    const st = this.nearExit();
+    if (!st) return { text: "La salida a la calle está en la mezanina, pasados los torniquetes", level: "info" };
+    if (this.paid) return { text: "Primero cruza los torniquetes para salir", level: "info" };
     this.onEvent("exit", { station: st });
     return null;
   }
 
   /* ----- Cambios de espacio ----- */
   enterTrain(unit) {
-    this.pos.sub(unit.group.position);
-    this.pos.y = CONFIG.train.floorY;
+    unit.group.updateMatrixWorld(true);
+    unit.group.worldToLocal(this.pos);
+    this.pos.y = F;
+    this.yaw -= unit.group.rotation.y;
     this.space = "train";
     this.unit = unit;
     unit.group.add(this.holder);
@@ -182,8 +231,10 @@ export class Walker {
 
   exitTrain() {
     const unit = this.unit;
-    this.pos.add(unit.group.position);
-    this.pos.y = CONFIG.station.platformTop;
+    unit.group.updateMatrixWorld(true);
+    unit.group.localToWorld(this.pos);
+    this.pos.y = S.platformTop;
+    this.yaw += unit.group.rotation.y;
     this.space = "world";
     this.unit = null;
     this.scene.add(this.holder);
@@ -192,29 +243,39 @@ export class Walker {
 
   /* ----- Paso por fotograma ----- */
   update(dt) {
-    if (!this.seat) this.move(dt);
+    if (!this.seat && dt > 0) this.move(dt);
 
-    // Si se cierran las puertas mientras estás en el umbral, quedas del lado en que estés
-    if (this.space === "world" && Math.abs(this.pos.x) < CONFIG.station.platformEdgeX + 0.3 && !this.worldWalkable(this.pos.x, this.pos.z)) {
-      this.pos.x = Math.sign(this.pos.x || 1) * (CONFIG.station.platformEdgeX + 0.35);
+    // Si se cierran las puertas con el jugador en el umbral, queda del lado del andén
+    if (this.space === "world" && Math.abs(this.pos.y - S.platformTop) < 0.3 && Math.abs(this.pos.x) < S.platformEdgeX + 0.3
+        && this.worldFloor(this.pos.x, this.pos.z, this.pos.y) === null) {
+      this.pos.x = Math.sign(this.pos.x || 1) * (S.platformEdgeX + 0.35);
     }
     if (this.space === "train" && Math.abs(this.pos.x) > 1.32 && !this.trainWalkable(this.pos.x, this.pos.z)) {
       this.pos.x = Math.sign(this.pos.x) * 1.3;
     }
 
-    // Transiciones andén ↔ tren por las puertas
-    if (this.space === "world" && Math.abs(this.pos.x) < 1.42) {
+    // Transiciones andén ↔ tren
+    if (this.space === "world" && Math.abs(this.pos.y - S.platformTop) < 0.3 && Math.abs(this.pos.x) < S.trackX + 1.42) {
       const st = this.stationAt(this.pos.z);
-      const u = st && this.openUnitAt(st);
+      const u = st && this.openUnit(st, Math.sign(this.pos.x));
       if (u) this.enterTrain(u);
-    } else if (this.space === "train" && Math.abs(this.pos.x) > 1.45) {
+    } else if (this.space === "train" && this.pos.x > 1.45) {
       this.exitTrain();
     }
 
+    // Torniquetes: zona pagada (z < línea) / no pagada
+    if (this.space === "world" && Math.abs(this.pos.y - MZ.y) < 0.3) {
+      const st = this.stationAt(this.pos.z);
+      if (st) {
+        const paid = this.pos.z - st.z < MZ.gateZ;
+        if (paid !== this.paid) { this.paid = paid; this.onEvent(paid ? "gateIn" : "gateOut", { station: st }); }
+        if (this.moving && this.pos.z - st.z > MZ.z1 - 0.1 && !paid) this.onEvent("exit", { station: st });
+      }
+    }
+
     // Cámara
-    const seated = !!this.seat;
     this.holder.position.copy(this.pos);
-    if (seated) this.holder.position.y = this.seat.seatY - 0.62;
+    if (this.seat) this.holder.position.y = this.seat.seatY - 0.62;
     const bob = this.moving ? Math.sin(this.stepPhase) * 0.025 : 0;
     this.camera.position.set(0, EYE + bob, 0);
     this.camera.rotation.set(this.pitch, this.yaw, 0);
@@ -231,31 +292,43 @@ export class Walker {
     if (!this.moving) return;
     const speed = (k.has("shift") ? RUN : WALK) * dt / Math.hypot(f, r);
     this.stepPhase = (this.stepPhase || 0) + dt * (k.has("shift") ? 14 : 9);
-    // Adelante = -Z local de la cámara girada "yaw"
     const dx = (-Math.sin(this.yaw) * f + Math.cos(this.yaw) * r) * speed;
     const dz = (-Math.cos(this.yaw) * f - Math.sin(this.yaw) * r) * speed;
-    const { x, z } = this.pos;
-    if (this.walkable(x + dx, z + dz)) { this.pos.x += dx; this.pos.z += dz; }
-    else if (this.walkable(x + dx, z)) this.pos.x += dx;
-    else if (this.walkable(x, z + dz)) this.pos.z += dz;
-  }
+    const { x, z, y } = this.pos;
 
-  /** Coordenada Z del jugador en el mundo. */
-  get worldZ() {
-    return this.space === "train" ? this.unit.group.position.z + this.pos.z : this.pos.z;
+    if (this.space === "train") {
+      if (this.trainWalkable(x + dx, z + dz)) { this.pos.x += dx; this.pos.z += dz; }
+      else if (this.trainWalkable(x + dx, z)) this.pos.x += dx;
+      else if (this.trainWalkable(x, z + dz)) this.pos.z += dz;
+      return;
+    }
+    const tries = [[dx, dz], [dx, 0], [0, dz]];
+    for (const [mx, mz] of tries) {
+      const fy = this.worldFloor(x + mx, z + mz, y);
+      if (fy !== null) { this.pos.set(x + mx, fy, z + mz); return; }
+    }
   }
 
   /** Texto de ayuda contextual para el HUD. */
   hint() {
     if (this.seat) return "F levantarse";
     if (this.space === "train") {
-      const st = this.unit.sim.dockedStation();
+      const rs = this.unit.sim.dockedStation();
       const open = this.unit.sim.doorState === "open";
-      return open && st ? `Puertas abiertas en ${st.name} · camina hacia una puerta para bajar · F sentarse` : "F sentarse en un asiento libre";
+      return open && rs ? `Puertas abiertas en ${rs.name} · camina hacia una puerta (lado derecho del pasillo) para bajar · F sentarse` : "F sentarse · puedes recorrer los 5 coches por el pasillo";
     }
-    if (this.nearAccess()) return "E salir de la estación";
+    if (Math.abs(this.pos.y - MZ.y) < 0.3) {
+      if (this.nearExit() && !this.paid) return "E (o sigue caminando) para salir a la calle";
+      return this.paid
+        ? "Zona pagada · escalera izquierda: dir. Plaza Quilicura · derecha: dir. F. Castillo Velasco"
+        : "Pasa por un torniquete para validar tu tarjeta bip!";
+    }
+    if (this.pos.y > S.platformTop + 0.3) return "Escalera entre el andén y la mezanina";
+    const side = this.platformSide();
     const st = this.stationAt(this.pos.z);
-    if (st && this.openUnitAt(st)) return "El tren tiene las puertas abiertas: camina hacia una puerta para subir";
-    return "Espera el tren detrás de la línea amarilla";
+    if (st && side && this.openUnit(st, side)) return "El tren tiene las puertas abiertas: camina hacia una puerta para subir";
+    return "Espera el tren detrás de la línea amarilla · la escalera lleva a la mezanina y la salida";
   }
 }
+
+export { ROUTES };

@@ -1,5 +1,5 @@
 /* ==========================================================================
-   MetroSim — Alpha 0.4 · signals.js
+   MetroSim — Alpha 0.5 · signals.js
    Señalización lateral con bloqueo automático de 3 aspectos.
 
    · Cada señal protege el cantón (bloque) que empieza en ella y termina en
@@ -13,24 +13,30 @@
 
    Tipos: "entrada" (antes de cada estación), "salida" (final de andén) e
    "intermedia" (en túnel, separación ≤ CONFIG.signals.maxBlock).
+
+   Hay un SignalSystem por ruta (sentido). La lógica trabaja en coordenadas
+   de la ruta; solo el dibujo 3D las convierte al mundo. Las señales están a
+   la derecha de su vía, mirando al tren que llega.
    ========================================================================== */
 
 import * as THREE from "three";
-import { CONFIG, STATIONS } from "./config.js";
+import { CONFIG } from "./config.js";
 import { std, glow, toTexture, signalPlateCanvas } from "./utils.js";
 
 const ASPECT_COLORS = { red: 0xff2020, yellow: 0xffb000, green: 0x20ff6a };
 const LAMP_OFF = 0x151515;
 
-/** Lista ordenada (z descendente) de señales a lo largo de la línea. */
-function buildSignalList() {
+/** Lista ordenada (z descendente) de señales a lo largo de una ruta. */
+function buildSignalList(route) {
   const list = [];
-  STATIONS.forEach((st, i) => {
-    list.push({ type: "entrada", station: st, z: st.z + 52 });
-    list.push({ type: "salida", station: st, z: st.z - 40 });
-    const next = STATIONS[i + 1];
+  const S = CONFIG.station;
+  const entryOff = S.hallHalf + 4, exitOff = -(S.platformHalf + 5);
+  route.stations.forEach((st, i) => {
+    list.push({ type: "entrada", station: st, z: st.z + entryOff });
+    list.push({ type: "salida", station: st, z: st.z + exitOff });
+    const next = route.stations[i + 1];
     if (!next) return;
-    const from = st.z - 40, to = next.z + 52;
+    const from = st.z + exitOff, to = next.z + entryOff;
     const gap = from - to;
     const n = Math.ceil(gap / CONFIG.signals.maxBlock) - 1;
     for (let k = 1; k <= n; k++) list.push({ type: "intermedia", station: null, z: from - (gap * k) / (n + 1) });
@@ -38,16 +44,17 @@ function buildSignalList() {
   list.sort((a, b) => b.z - a.z);
   list.forEach((s, i) => {
     s.index = i;
-    s.id = `${String(i + 1).padStart(3, "0")}`;
+    s.id = `${route.id === "A" ? 1 : 2}${String(i + 1).padStart(2, "0")}`;   // 1xx vía 1 · 2xx vía 2
     s.aspect = "green";
-    s.endZ = list[i + 1]?.z ?? CONFIG.track.end;   // final de su cantón
+    s.endZ = list[i + 1]?.z ?? route.track.end;    // final de su cantón
   });
   return list;
 }
 
 export class SignalSystem {
-  constructor() {
-    this.signals = buildSignalList();
+  constructor(route) {
+    this.route = route;
+    this.signals = buildSignalList(route);
   }
 
   /* ----- Construcción 3D ----- */
@@ -59,8 +66,9 @@ export class SignalSystem {
 
     for (const s of this.signals) {
       const g = new THREE.Group();
-      // Las de salida van en el vestíbulo junto a la vía; el resto, en túnel junto al hastial derecho
-      g.position.set(s.type === "salida" ? 2.2 : 2.75, 0, s.z);
+      // A la derecha de la vía, sobre el borde del andén de evacuación
+      g.position.set(this.route.trackX + this.route.dir * 1.85, 0, this.route.toWorldZ(s.z));
+      g.rotation.y = this.route.dir === 1 ? 0 : Math.PI;      // mirando al tren que llega
       scene.add(g);
 
       const pole = new THREE.Mesh(new THREE.BoxGeometry(0.1, 2.5, 0.1), post);
@@ -130,7 +138,7 @@ export class SignalSystem {
       s.hold = false;
       if (s.type !== "salida") continue;
       const st = s.station;
-      const standing = units.find(u => u.sim.position <= st.z + CONFIG.station.platformHalf && u.sim.position > s.z);
+      const standing = units.find(u => u.sim.position <= st.z + CONFIG.station.platformHalf && u.sim.position > s.z);   // (st en coordenadas de la ruta)
       if (standing && standing.sim.isStopped && Math.abs(standing.sim.position - st.stopZ) < 12) {
         const due = standing.trip ? standing.trip.dep[st.index] - 5 : -Infinity;
         s.hold = !standing.sim.doorsClosed || clock < due;
@@ -172,6 +180,6 @@ export class SignalSystem {
 
   updateVisibility(cameraZ) {
     const R = CONFIG.renderRadius;
-    for (const s of this.signals) if (s.group) s.group.visible = Math.abs(s.z - cameraZ) < R;
+    for (const s of this.signals) if (s.group) s.group.visible = Math.abs(this.route.toWorldZ(s.z) - cameraZ) < R;
   }
 }

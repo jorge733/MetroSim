@@ -1,18 +1,19 @@
 /* ==========================================================================
-   MetroSim — Alpha 0.4 · main.js
+   MetroSim — Alpha 0.5 · main.js
    Punto de entrada: crea la partida y une todos los sistemas.
 
    Módulos:
-     config.js    Línea 3 de Santiago, mando, señales, horarios y demanda
+     config.js    Línea 3 de Santiago, geometría, mando, horarios y demanda
+     route.js     los dos sentidos de circulación (vía 1 y vía 2)
      utils.js     utilidades, materiales y texturas procedurales
-     schedule.js  horario (malla de servicios) y retrasos
-     signals.js   señalización de bloqueo automático
-     sim.js       simulación de un tren (TrainSim) y conducción automática (AutoDriver)
+     schedule.js  horarios por sentido y retrasos
+     signals.js   señalización de bloqueo automático (una por vía)
+     sim.js       simulación de un tren y conducción automática
      traffic.js   todos los trenes de la línea
-     world.js     túnel, vía, catenaria, estaciones y pantallas de andén
-     train.js     modelo 3D del tren, cabina y luces
+     world.js     túnel, vías, catenaria, estaciones con mezanina y torniquetes
+     train.js     tren de 5 coches, cabina y luces
      dmi.js       pantalla de cabina
-     people.js    viajeros (NPC)
+     people.js    viajeros (NPC) instanciados
      walker.js    pasajero a pie (primera persona)
      audio.js     sonido procedural y megafonía
      camera.js    vistas del conductor
@@ -24,12 +25,13 @@
 
 import * as THREE from "three";
 import { CONFIG, STATIONS, NOTCH_INDEX, spokenName } from "./config.js";
+import { ROUTES, ROUTE_A, ROUTE_B, routeForSide } from "./route.js";
 import { $, clamp, formatClock, formatStopError, gradeStop } from "./utils.js";
 import { Timetable, formatDelay } from "./schedule.js";
 import { SignalSystem } from "./signals.js";
 import { TrafficManager } from "./traffic.js";
 import { World } from "./world.js";
-import { createTrainLights } from "./train.js";
+import { createTrainLights, resetTrainAssets } from "./train.js";
 import { PeopleSystem } from "./people.js";
 import { Walker } from "./walker.js";
 import { AudioSystem } from "./audio.js";
@@ -42,11 +44,11 @@ const gameScreen = $("gameScreen");
 const gameContainer = $("gameContainer");
 const hud = new Hud();
 
-let game = null;                 // estado de la partida activa
+let game = null;
 let muted = loadMuted();
 hud.setSound(!muted);
 
-// Selector de estación inicial del modo pasajero (Universidad de Chile por defecto)
+// Selector de estación del modo pasajero (Universidad de Chile por defecto)
 const stationSelect = $("startStation");
 STATIONS.forEach(st => {
   const opt = document.createElement("option");
@@ -63,8 +65,8 @@ window.addEventListener("keydown", onKeyDown);
 window.addEventListener("keyup", onKeyUp);
 window.addEventListener("resize", onResize);
 
-// Acceso de depuración desde la consola del navegador: MetroSim.game.traffic, etc.
-window.MetroSim = { get game() { return game; }, CONFIG, STATIONS };
+// Acceso de depuración desde la consola: MetroSim.game.traffic, etc.
+window.MetroSim = { get game() { return game; }, CONFIG, STATIONS, ROUTES };
 
 
 /* ==========================================================================
@@ -76,20 +78,18 @@ function startGame(mode) {
   const stationIndex = Number(stationSelect.value) || 0;
   startScreen.classList.add("hidden");
   loadingScreen.classList.remove("hidden");
-
-  // El audio debe crearse dentro del gesto del usuario (este clic)
-  const audio = new AudioSystem();
+  const audio = new AudioSystem();          // dentro del gesto del usuario
   audio.muted = muted;
   audio.start();
-
-  // Se deja pintar la pantalla de carga antes del trabajo pesado
   setTimeout(() => buildGame(mode, stationIndex, audio), 40);
 }
 
 function buildGame(mode, stationIndex, audio) {
+  resetTrainAssets();
+
   /* --- Render --- */
   const renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 1));   // resolución 1:1 (rendimiento en GPU integradas)
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 1));
   renderer.setSize(innerWidth, innerHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -99,42 +99,45 @@ function buildGame(mode, stationIndex, audio) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x040608);
   scene.fog = new THREE.Fog(0x040608, 30, 240);
-  scene.add(new THREE.HemisphereLight(0xb9cde4, 0x15171a, 0.55));
+  scene.add(new THREE.HemisphereLight(0xc4d6ea, 0x1c1f23, 0.85));   // luz ambiente (sin coste por píxel extra)
   const camera = new THREE.PerspectiveCamera(mode === "driver" ? 62 : 70, innerWidth / innerHeight, 0.03, 340);
 
-  /* --- Mundo, señales, horario y tráfico --- */
+  /* --- Mundo, señales, horarios y tráfico (ambos sentidos) --- */
   const world = new World(scene);
-  const signals = new SignalSystem();
-  signals.build3D(scene);
-  const timetable = new Timetable();
-  const traffic = new TrafficManager({ scene, timetable, signals, onUnitEvent: (u, t, d) => onUnitEvent(u, t, d) });
+  const signals = new Map(ROUTES.map(r => [r.id, new SignalSystem(r)]));
+  signals.forEach(s => s.build3D(scene));
+  const timetables = new Map([
+    [ROUTE_A.id, new Timetable(ROUTE_A, CONFIG.schedule.playerDeparture)],
+    [ROUTE_B.id, new Timetable(ROUTE_B, CONFIG.schedule.playerDeparture + CONFIG.schedule.reverseOffset)],
+  ]);
+  const traffic = new TrafficManager({ scene, timetables, signals, onUnitEvent: (u, t, d) => onUnitEvent(u, t, d) });
+  const playerTrip = timetables.get(ROUTE_A.id).anchorTrip;
 
   game = {
-    mode, renderer, scene, camera, world, signals, timetable, traffic, audio,
+    mode, renderer, scene, camera, world, signals, timetables, traffic, audio, playerTrip,
     clock: CONFIG.startTime, elapsed: 0, last: performance.now(), dmiTimer: 0, pidTimer: 0, raf: 0,
     warming: true,
     stats: { arrivals: [], stops: [], redSignals: 0, overspeeds: 0, emergencies: 0 },
-    ride: { origin: null, boardedClock: null, stations: 0 },
+    ride: { origin: null, boardedClock: null },
   };
+  if (mode === "driver") traffic.started.add(playerTrip.id);
 
-  if (mode === "driver") traffic.started.add(timetable.playerTrip.id);   // ese servicio lo conduces tú
-
-  /* --- Calentamiento: 45 min de servicio simulado para que la línea ya tenga trenes --- */
+  /* --- Calentamiento: 45 min de servicio para que la línea ya tenga trenes --- */
   const warmStart = CONFIG.startTime - 45 * 60;
   const people = new PeopleSystem(scene, traffic, warmStart);
   game.people = people;
-  const step = 0.25;
-  for (let t = warmStart; t < CONFIG.startTime; t += step) {
+  for (let t = warmStart, step = 0.25; t < CONFIG.startTime; t += step) {
     traffic.update(step, t);
-    people.update(step, t, { cameraZ: 1e9 });
+    people.update(step, t, { cameraZ: 1e9, render: false });
   }
   game.warming = false;
 
   /* --- Jugador --- */
   game.trainLights = createTrainLights({ cab: mode === "driver" });
+  game.innerLight = game.trainLights.getObjectByName("innerLight");
   if (mode === "driver") {
-    const player = traffic.createUnit(timetable.playerTrip, { isPlayer: true, start: STATIONS[0] });
-    player.arrivedIdx = player.dockedIdx = 0;        // ya está en el andén de Plaza Quilicura
+    const player = traffic.createUnit(playerTrip, { isPlayer: true, start: ROUTE_A.first });
+    player.arrivedIdx = player.dockedIdx = 0;
     game.player = player;
     const rig = new CameraRig(camera, player.group);
     rig.setView("cab");
@@ -149,14 +152,17 @@ function buildGame(mode, stationIndex, audio) {
     scene.add(game.trainLights);
   }
 
+  // Precompila los shaders para evitar tirones la primera vez que se ve cada cosa
+  renderer.compile(scene, camera);
+
   hud.setMode(mode);
   loadingScreen.classList.add("hidden");
   gameScreen.classList.remove("hidden");
   onResize();
 
   hud.showMessage(mode === "driver"
-    ? `Servicio ${timetable.playerTrip.id} · salida 08:01:30 · abre puertas (D) para el embarque`
-    : `Andén de ${STATIONS[stationIndex].name} · clic en la pantalla para mirar con el ratón`, "info", 6000);
+    ? `Servicio ${playerTrip.id} · 5 coches · salida 08:01:30 · abre puertas (D) para el embarque`
+    : `Mezanina de ${STATIONS[stationIndex].name} · clic para mirar con el ratón · pasa por un torniquete`, "info", 6000);
 
   game.raf = requestAnimationFrame(loop);
 }
@@ -193,14 +199,13 @@ function onResize() {
   game.renderer.setSize(innerWidth, innerHeight);
 }
 
-/* ---------- Sonido on/off (recordado entre sesiones) ---------- */
 function loadMuted() {
   try { return localStorage.getItem("metrosim.muted") === "1"; } catch { return false; }
 }
 
 function toggleSound() {
   muted = !muted;
-  try { localStorage.setItem("metrosim.muted", muted ? "1" : "0"); } catch { /* almacenamiento no disponible */ }
+  try { localStorage.setItem("metrosim.muted", muted ? "1" : "0"); } catch { /* sin almacenamiento */ }
   hud.setSound(!muted);
   game?.audio.setMuted(muted);
   if (game) hud.showMessage(muted ? "Sonido desactivado" : "Sonido activado", "info", 1200);
@@ -220,14 +225,12 @@ function onKeyDown(event) {
   if (key === "m") return toggleSound();
   if (key === "h") return hud.toggleHelp();
 
-  // Pasajero a pie
   if (game.walker) {
     const result = game.walker.keyDown(key);
     if (result) hud.showMessage(result.text, result.level);
     return;
   }
 
-  // Conductor
   if (key === "c") return game.rig.recenter();
   if (key === "v") {
     game.rig.setView(game.rig.view === "exterior" ? "cab" : "exterior");
@@ -235,7 +238,7 @@ function onKeyDown(event) {
   }
   const sim = game.player.sim;
   let result = null;
-  if (event.repeat && key !== " ") return;     // el mando avanza una posición por pulsación
+  if (event.repeat && key !== " ") return;
   if (key === "w" || key === "arrowup") result = sim.notchUp();
   else if (key === "s" || key === "arrowdown") result = sim.notchDown();
   else if (key === " ") result = sim.emergencyBrake();
@@ -260,7 +263,6 @@ function onUnitEvent(unit, type, data = {}) {
   if (type === "removed") { game.people?.clearUnit(unit); return; }
   if (unit === game.player) return onPlayerEvent(type, data);
 
-  // Trenes automáticos: solo interesan si el pasajero va en ellos
   const walker = game.walker;
   if (!walker) return;
   const riding = walker.unit === unit;
@@ -269,12 +271,10 @@ function onUnitEvent(unit, type, data = {}) {
       if (riding) hud.showMessage(`Estación ${data.station.name}`, "ok", 3500);
       break;
     case "ato:doorsClosing":
-      if (riding && data.station === STATIONS.at(-1)) {
-        // Fin de trayecto: el tren se retira y todos deben bajar
+      if (riding && data.station === unit.route.last) {
         walker.exitTrain();
-        walker.placeOnPlatform(data.station);
-        hud.showMessage("Fin de trayecto · todos los viajeros han bajado en F. Castillo Velasco", "info", 5000);
-      } else if (riding || (walker.space === "world" && walker.stationAt(walker.pos.z) === data.station)) {
+        hud.showMessage(`Fin de trayecto en ${data.station.name} · todos los viajeros han bajado`, "info", 5000);
+      } else if (riding || (walker.platformSide() === unit.route.side && walker.stationAt(walker.pos.z) === data.station.world)) {
         hud.showMessage("Atención: cierre de puertas", "warn");
       }
       break;
@@ -284,7 +284,6 @@ function onUnitEvent(unit, type, data = {}) {
   }
 }
 
-/** Eventos del tren del jugador (Modo Conductor). */
 function onPlayerEvent(type, data) {
   const audio = game.audio, stats = game.stats;
   switch (type) {
@@ -310,18 +309,17 @@ function onPlayerEvent(type, data) {
       if (data.delay < -10) hud.showMessage(`Salida anticipada de ${data.station.name} (${formatDelay(data.delay)}) · respeta el horario`, "warn", 4000);
       break;
     case "doorsOpen":
-      if (data.station === STATIONS.at(-1)) setTimeout(() => game && showDriverSummary(), 2500);
+      if (data.station === ROUTE_A.last) setTimeout(() => game && showDriverSummary(), 2500);
       break;
     case "overspeed":
       stats.overspeeds++;
       hud.showMessage(`EXCESO DE VELOCIDAD · límite ${data.limit} km/h`, "alert");
       break;
-    case "redSignal": {
+    case "redSignal":
       stats.redSignals++;
       game.player.sim.emergencyBrake();
       hud.showMessage(`REBASE DE SEÑAL S${data.signal.id} EN ROJO · frenado de emergencia automático`, "alert", 5000);
       break;
-    }
     case "collision":
       audio.impact();
       game.player.sim.emergencyBrake();
@@ -363,18 +361,22 @@ function showDriverSummary() {
   });
 }
 
-/** Eventos del pasajero a pie. */
 function onWalkerEvent(type, data) {
   const ride = game.ride;
   switch (type) {
+    case "gateIn":
+      game.audio.bip();
+      hud.showMessage("bip! · Tarjeta validada", "ok", 1500);
+      break;
     case "boarded":
-      if (!ride.origin) { ride.origin = data.unit.sim.dockedStation(); ride.boardedClock = game.clock; }
-      hud.showMessage(`Has subido al tren ${data.unit.id} · dirección F. Castillo Velasco`, "ok", 3500);
+      if (!ride.origin) { ride.origin = data.unit.sim.dockedStation()?.world || null; ride.boardedClock = game.clock; }
+      hud.showMessage(`Has subido al tren ${data.unit.id} · ${data.unit.route.label}`, "ok", 3500);
       break;
     case "alighted":
       if (data.station) hud.showMessage(`Has bajado en ${data.station.name}`, "ok", 3500);
       break;
     case "exit": {
+      if (hud.summaryOpen) return;
       const st = data.station;
       const rows = [["Estación de salida", st.name]];
       if (ride.origin && ride.origin !== st) {
@@ -385,11 +387,11 @@ function onWalkerEvent(type, data) {
       rows.push(["Combinaciones aquí", st.combos.length ? st.combos.map(c => `Línea ${c}`).join(", ") : "ninguna"]);
       rows.push(["Hora", formatClock(game.clock).slice(0, 5)]);
       hud.showSummary({
-        kicker: "HAS SALIDO DE LA ESTACIÓN",
+        kicker: "HAS SALIDO A LA CALLE",
         title: st.name,
         rows,
-        continueLabel: "Volver al andén",
-        onContinue: () => { game.walker.placeOnPlatform(st); game.ride = { origin: null, boardedClock: null }; },
+        continueLabel: "Volver a entrar",
+        onContinue: () => { game.walker.enterStation(st); game.ride = { origin: null, boardedClock: null }; },
         onMenu: stopGame,
       });
       break;
@@ -402,14 +404,13 @@ function onWalkerEvent(type, data) {
    Megafonía y sonidos de estado
    ========================================================================== */
 
-function arrivalText(st) {
-  const name = spokenName(st.name);
-  if (st === STATIONS.at(-1)) return `${name}. Fin de trayecto. Por favor, abandonen el tren.`;
-  if (st.combos.length) return `${name}. Combinación con Línea ${st.combos.join(" y Línea ")}.`;
+function arrivalText(rs) {
+  const name = spokenName(rs.name);
+  if (rs === rs.route.last) return `${name}. Fin de trayecto. Por favor, abandonen el tren.`;
+  if (rs.combos.length) return `${name}. Combinación con Línea ${rs.combos.join(" y Línea ")}.`;
   return `${name}.`;
 }
 
-/** Anuncios dentro del tren en el que va el jugador. */
 function updateOnboardAnnouncements(unit) {
   if (!unit) return;
   const sim = unit.sim, next = sim.nextStation();
@@ -425,22 +426,25 @@ function updateOnboardAnnouncements(unit) {
   }
 }
 
-/** Aviso en el andén cuando se acerca un tren a la estación del pasajero. */
+/** Aviso en el andén cuando se acerca un tren al andén del pasajero. */
 function updatePlatformAnnouncements() {
   const w = game.walker;
-  if (!w || w.space !== "world") return;
+  const side = w?.platformSide();
+  if (!side) return;
   const st = w.stationAt(w.pos.z);
-  if (!st || st === STATIONS.at(-1)) return;
+  const route = routeForSide(side);
+  const rs = st && route.stationOf(st);
+  if (!rs || rs === route.last) return;
   for (const u of game.traffic.units) {
-    const d = u.sim.position - st.stopZ;
-    if (d > 60 && d < 420 && u.sim.speed > 2 && u.platformAnnounced !== st.id) {
+    if (u.route !== route) continue;
+    const d = u.sim.position - rs.stopZ;
+    if (d > 80 && d < 450 && u.sim.speed > 2 && u.platformAnnounced !== st.id) {
       u.platformAnnounced = st.id;
-      game.audio.announce("Tren con destino Fernando Castillo Velasco, próximo a llegar. Por favor, manténganse detrás de la línea amarilla.");
+      game.audio.announce(`Tren con destino ${spokenName(route.last.name)}, próximo a llegar. Por favor, manténganse detrás de la línea amarilla.`);
     }
   }
 }
 
-/** Sonidos ligados a cambios de estado del tren que se oye (puertas, aire del freno). */
 function updateStateSounds(unit, level) {
   if (!unit) return;
   const sim = unit.sim, audio = game.audio;
@@ -468,35 +472,28 @@ function getRouteInfo(unit) {
   if (next && sim.position - next.stopZ < 60) approach = { station: next, error: sim.position - next.stopZ };
   else if (Math.abs(nearError) < 15) approach = { station: near, error: nearError };
 
-  // Próxima señal
-  const s = game.signals.nextAhead(sim.position);
+  const s = game.signals.get(unit.route.id).nextAhead(sim.position);
   const signal = s ? { id: s.id, aspect: s.aspect, distance: sim.position - s.z } : null;
 
-  // Horario
   let schedule = null;
   const trip = unit.trip, clock = game.clock;
-  if (trip) {
-    if (docked && docked !== STATIONS.at(-1)) {
-      const dep = trip.dep[docked.index];
-      const wait = dep - clock;
-      schedule = wait > 0
-        ? { label: `Salida ${formatClock(dep)}`, delayText: `espera ${formatDelay(wait).replace("+", "")}`, cls: "early", color: "#ffd166" }
-        : { label: `Salida ${formatClock(dep)}`, delayText: formatDelay(-wait), ...delayStyle(-wait) };
-    } else if (next) {
-      const arr = trip.arr[next.index];
-      // Retraso estimado: el último medido, o el actual si ya vamos tarde respecto a la llegada
-      const est = Math.max(unit.delay, clock - arr);
-      schedule = { label: `Llegada ${next.short} ${formatClock(arr)}`, delayText: formatDelay(est), ...delayStyle(est) };
-    }
+  if (docked && docked !== unit.route.last) {
+    const dep = trip.dep[docked.index];
+    const wait = dep - clock;
+    schedule = wait > 0
+      ? { label: `Salida ${formatClock(dep)}`, delayText: `espera ${formatDelay(wait).replace("+", "")}`, cls: "early", color: "#ffd166" }
+      : { label: `Salida ${formatClock(dep)}`, delayText: formatDelay(-wait), ...delayStyle(-wait) };
+  } else if (next) {
+    const arr = trip.arr[next.index];
+    const est = Math.max(unit.delay, clock - arr);
+    schedule = { label: `Llegada ${next.short} ${formatClock(arr)}`, delayText: formatDelay(est), ...delayStyle(est) };
   }
 
-  const first = STATIONS[0].stopZ, last = STATIONS.at(-1).stopZ;
   return {
     docked, next,
     distance: next ? sim.position - next.stopZ : 0,
     approach,
     limit: sim.currentLimit(),
-    progress: (first - sim.position) / (first - last),
     signal, schedule,
   };
 }
@@ -507,7 +504,6 @@ function delayStyle(d) {
   return d > 0 ? { cls: "late", color: "#ff6b6b" } : { cls: "early", color: "#ffd166" };
 }
 
-/** Palanca, inversor, pilotos y DMI de la cabina del jugador. */
 function updateCabVisuals(dt, unit, info) {
   const { sim, model } = unit;
   const target = (sim.notch - NOTCH_INDEX.N) * -0.11;
@@ -519,7 +515,7 @@ function updateCabVisuals(dt, unit, info) {
   const setLamp = (lamp, on) => lamp.material.color.copy(on ? lamp.on : lamp.off);
   const doorsActive = sim.doorState !== "closed";
   setLamp(model.lamps.doorsClosed, sim.doorsClosed);
-  setLamp(model.lamps.doorLeft, doorsActive && (sim.doorState === "open" || blink));
+  setLamp(model.lamps.doorLeft, false);                                 // el andén de la vía 1 queda a la derecha
   setLamp(model.lamps.doorRight, doorsActive && (sim.doorState === "open" || blink));
   setLamp(model.lamps.traction, sim.accel > 0.05 && sim.reverser !== 0);
   setLamp(model.lamps.brake, sim.accel < -0.05);
@@ -529,18 +525,17 @@ function updateCabVisuals(dt, unit, info) {
   if (game.dmiTimer <= 0) { model.dmi.draw(sim, info); game.dmiTimer = 1 / 12; }
 }
 
-/** Tren "en foco": el del jugador, aquel en el que va el pasajero o el que se acerca a su andén. */
-function focusUnit() {
+/** Tren "en foco": el del jugador, aquel en el que va el pasajero o el que se acerca a él. */
+function focusUnit(cameraZ) {
   if (game.player) return game.player;
   const w = game.walker;
   if (w.unit) return w.unit;
-  const z = w.worldZ;
-  let best = null, bestD = Infinity;
+  let best = null, bestScore = Infinity;
   for (const u of game.traffic.units) {
-    const center = u.sim.position + CONFIG.train.length / 2;
-    const d = center - z;
-    const score = d > -20 ? Math.abs(d) : Math.abs(d) * 3;    // se prefiere el que viene hacia el andén
-    if (score < bestD) { bestD = score; best = u; }
+    const d = game.traffic.worldCenterZ(u) - cameraZ;
+    const approaching = u.route.dir === 1 ? d > -20 : d < 20;   // la vía 1 avanza hacia −Z, la vía 2 hacia +Z
+    const score = Math.abs(d) * (approaching ? 1 : 3);
+    if (score < bestScore) { bestScore = score; best = u; }
   }
   return best;
 }
@@ -551,51 +546,57 @@ function focusUnit() {
    ========================================================================== */
 
 const cameraWorld = new THREE.Vector3();
+const deckAgents = [];
 
 function loop(now) {
   if (!game) return;
   const dt = clamp((now - game.last) / 1000, 0, 0.05);
   game.last = now;
-  if (hud.summaryOpen) { game.raf = requestAnimationFrame(loop); game.renderer.render(game.scene, game.camera); return; }
+  if (hud.summaryOpen) { game.renderer.render(game.scene, game.camera); game.raf = requestAnimationFrame(loop); return; }
   game.elapsed += dt;
   game.clock += dt;
   const { traffic, people, world, signals, audio, walker, player } = game;
 
-  // 1. Simulación de todos los trenes y señales
+  // 1. Trenes y señales
   traffic.update(dt, game.clock);
-  if (!game) return;                                // la partida pudo cerrarse por un evento
+  if (!game) return;
 
   // 2. Cámara / jugador
-  let cameraZ;
   if (player) {
-    traffic.syncVisuals(player.sim.position);
+    traffic.syncVisuals(player.group.position.z);
     game.rig.update(player.sim, game.elapsed);
-    game.camera.getWorldPosition(cameraWorld);
-    cameraZ = cameraWorld.z;
   } else {
     walker.update(dt);
-    cameraZ = walker.worldZ;
-    traffic.syncVisuals(cameraZ);
-    walker.update(0);                               // recoloca la cámara con el tren ya movido
+    traffic.syncVisuals(walker.worldZ);
+    walker.update(0);
   }
+  game.camera.updateMatrixWorld(true);
+  game.camera.getWorldPosition(cameraWorld);
+  const cameraZ = cameraWorld.z;
 
-  // 3. Mundo, señales y viajeros cercanos
-  world.update(cameraZ);
-  signals.updateVisibility(cameraZ);
+  // 3. Mundo, señales, viajeros, torniquetes y pantallas
+  world.update(cameraWorld);
+  signals.forEach(s => s.updateVisibility(cameraZ));
   people.update(dt, game.clock, { cameraZ, hideUnit: player && game.rig.view === "cab" ? player : null });
+  deckAgents.length = 0;
+  people.deckAgents(deckAgents);
+  if (walker && walker.space === "world") deckAgents.push(walker.pos);
+  const opened = world.updateGates(dt, deckAgents, cameraZ);
+  if (opened.some(g => Math.hypot(g.x - cameraWorld.x, g.z - cameraZ) < 10 && !(walker && Math.abs(g.x - walker.pos.x) < 0.5))) audio.bip();
   game.pidTimer -= dt;
-  if (game.pidTimer <= 0) { game.pidTimer = 1; world.updatePids(cameraZ, game.clock, st => traffic.arrivalsFor(st, game.clock)); }
+  if (game.pidTimer <= 0) { game.pidTimer = 1; world.updatePids(cameraZ, game.clock, (st, side) => traffic.arrivalsFor(st, routeForSide(side), game.clock)); }
 
-  // 4. Luces del tren en foco
-  const focus = focusUnit();
+  // 4. Luces del tren en foco (la interior sigue al pasajero a lo largo del tren)
+  const focus = focusUnit(cameraZ);
   if (focus && focus !== game.lightsUnit) { focus.group.add(game.trainLights); game.lightsUnit = focus; }
+  if (walker && walker.unit) game.innerLight.position.z = walker.pos.z;
 
   // 5. Sonido
   let level = 1, view = "cab", rider = null;
   if (player) { view = game.rig.view; rider = player; }
   else if (walker.unit) { view = "saloon"; rider = walker.unit; }
   else if (focus) {
-    const d = Math.abs(focus.sim.position + CONFIG.train.length / 2 - cameraZ);
+    const d = Math.abs(traffic.worldCenterZ(focus) - cameraZ);
     level = Math.pow(clamp(1 - d / 230, 0, 1), 1.5);
     view = "exterior";
   }
@@ -613,18 +614,14 @@ function loop(now) {
     inStation: STATIONS.some(s => Math.abs(cameraZ - s.z) < CONFIG.station.hallHalf),
     view,
     overspeed: !!player && player.sim.speedKmh > player.sim.currentLimit() + 2,
-    crowd: people.crowdLevel(cameraZ) * (view === "cab" ? 0.5 : 1),
+    crowd: people.crowdLevel(cameraWorld) * (view === "cab" ? 0.5 : 1),
   });
 
   // 6. HUD
   if (player) {
     const info = getRouteInfo(player);
     updateCabVisuals(dt, player, info);
-    hud.updateDriver(player.sim, info, {
-      clock: game.clock,
-      onboard: people.onboardCount(player),
-      boardingBusy: people.isBusy(player),
-    });
+    hud.updateDriver(player.sim, info, { clock: game.clock, onboard: people.onboardCount(player), boardingBusy: people.isBusy(player) });
   } else {
     hud.updatePassenger(walkerHudData());
   }
@@ -633,7 +630,16 @@ function loop(now) {
   game.raf = requestAnimationFrame(loop);
 }
 
-/** Datos del panel del pasajero a pie. */
+/** Texto de próximo tren para un andén. */
+function nextTrainText(st, side) {
+  const route = routeForSide(side);
+  if (route.stationOf(st) === route.last) return "andén de llegada";
+  const a = game.traffic.arrivalsFor(st, route, game.clock);
+  if (!a.length) return "sin trenes previstos";
+  const first = a[0].here ? "en andén" : a[0].minutes < 1 ? "llegando" : `${a[0].minutes} min`;
+  return `${first}${a[1] ? ` · siguiente ${a[1].minutes} min` : ""}`;
+}
+
 function walkerHudData() {
   const w = game.walker, clock = game.clock;
   const base = { clock, worldZ: w.worldZ, hint: w.hint() };
@@ -642,26 +648,31 @@ function walkerHudData() {
     const docked = sim.isStopped ? sim.dockedStation() : null;
     const next = sim.nextStation();
     const people = game.people.onboardCount(w.unit);
+    const car = clamp(Math.floor(w.pos.z / (CONFIG.train.carLength + CONFIG.train.carGap)) + 1, 1, CONFIG.train.cars);
+    const title = `A BORDO · ${w.unit.id} · COCHE ${car} · ${w.unit.route.label.toUpperCase()}`;
     if (docked) {
       const doors = { open: "Puertas abiertas", opening: "Abriendo puertas", closing: "Cierre de puertas", closed: "Puertas cerradas" }[sim.doorState];
-      return { ...base, title: `A BORDO · ${w.unit.id}`, station: docked.name, sub: `${doors} · ${people} viajeros`, highlight: docked };
+      return { ...base, title, station: docked.name, sub: `${doors} · ${people} viajeros`, highlight: docked };
     }
     return {
-      ...base,
-      title: `A BORDO · ${w.unit.id} · PRÓXIMA ESTACIÓN`,
-      station: next ? next.name : "VÍA DE RETIRADA",
+      ...base, title,
+      station: next ? `→ ${next.name}` : "VÍA DE RETIRADA",
       sub: `${Math.round(sim.speedKmh)} km/h · ${next ? Math.max(0, Math.round(sim.position - next.stopZ)) + " m" : ""} · ${people} viajeros`,
       highlight: next,
     };
   }
   const st = w.stationAt(w.pos.z) || w.station;
-  const arrivals = game.traffic.arrivalsFor(st, clock);
-  const first = arrivals[0];
-  let sub;
-  if (st === STATIONS.at(-1)) sub = "Fin de trayecto · los trenes no admiten viajeros aquí";
-  else if (!first) sub = "Sin trenes previstos";
-  else if (first.here) sub = "Tren en el andén";
-  else sub = `Próximo tren: ${first.minutes < 1 ? "llegando" : first.minutes + " min"}${arrivals[1] ? ` · siguiente: ${arrivals[1].minutes} min` : ""}`;
-  const combos = st.combos.length ? ` · Combinación L${st.combos.join(", L")}` : "";
-  return { ...base, title: `ANDÉN · DIRECCIÓN F. CASTILLO VELASCO${combos}`, station: st.name, sub, highlight: st };
+  const combos = st.combos.length ? ` · COMBINACIÓN L${st.combos.join(", L")}` : "";
+  const side = w.platformSide();
+  if (side) {
+    const route = routeForSide(side);
+    return { ...base, title: `ANDÉN · ${route.label.toUpperCase()}${combos}`, station: st.name, sub: `Próximo tren: ${nextTrainText(st, side)}`, highlight: st };
+  }
+  return {
+    ...base,
+    title: `${w.pos.y > CONFIG.mezzanine.y - 0.3 ? "MEZANINA" : "ESCALERA"}${combos}`,
+    station: st.name,
+    sub: `F. Castillo V.: ${nextTrainText(st, 1)} · Pza. Quilicura: ${nextTrainText(st, -1)}`,
+    highlight: st,
+  };
 }

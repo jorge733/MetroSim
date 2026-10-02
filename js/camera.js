@@ -1,5 +1,5 @@
 /* ==========================================================================
-   MetroSim — Alpha 0.4 · camera.js
+   MetroSim — Alpha 0.5 · camera.js
    Cámara: puntos de vista (cabina, salón, exterior) y mirada con el ratón.
    ========================================================================== */
 

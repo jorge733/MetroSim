@@ -1,122 +1,179 @@
 /* ==========================================================================
-   MetroSim — Alpha 0.4 · people.js
-   Viajeros (NPC) compartidos por todos los modos y todos los trenes.
+   MetroSim — Alpha 0.5 · people.js
+   Viajeros (NPC) compartidos por todos los modos, trenes y ambos sentidos.
 
-   Dos niveles de detalle (la línea tiene 21 estaciones y muchos trenes):
-     · Cerca de la cámara (CONFIG.people.activeRadius) los viajeros existen
-       como personas 3D que caminan, esperan, suben, se sientan y bajan.
-     · Lejos, solo se lleva la cuenta: viajeros esperando en cada andén y
-       viajeros a bordo de cada tren ("load"). Al acercarse la cámara, esas
-       cifras se convierten en personas, y al alejarse vuelven a ser cifras.
+   Recorrido de un viajero en una estación:
+     calle → mezanina → torniquete → escalera → andén de su sentido → espera
+     → sube al tren → viaja → baja → escalera → torniquete → calle
 
-   Ciclo de vida de un viajero 3D:
-     arriving → waiting → toDoor → boarding → onboard → alighting → leaving
-   En el andén viven en coordenadas del mundo; dentro de un tren son hijos del
-   grupo de ese tren (coordenadas locales) y se mueven con él.
+   Dos niveles de detalle:
+     · Cerca de la cámara: personas 3D articuladas (caminan, suben escaleras,
+       se sientan, se agarran a la barra...).
+     · Lejos: solo cifras (esperando en cada andén / a bordo de cada tren).
+
+   Dibujo: todas las personas se pintan con 3 InstancedMesh (cuerpo, cabeza y
+   pelo), así cientos de viajeros cuestan solo 3 llamadas de dibujo.
+   Cada persona es un esqueleto de Object3D (sin mallas) que se anima y
+   cuyas matrices se copian a las instancias cada fotograma.
    ========================================================================== */
 
 import * as THREE from "three";
 import { CONFIG, STATIONS, demandAt } from "./config.js";
+import { ROUTE_A, ROUTE_B, routeForSide } from "./route.js";
+import { TRAIN_LAYOUT } from "./train.js";
 import { clamp } from "./utils.js";
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const randInt = (a, b) => Math.floor(rand(a, b + 1));
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const wrapAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a));
-const LAST = STATIONS.length - 1;
+const S = CONFIG.station, MZ = CONFIG.mezzanine, F = CONFIG.train.floorY;
+const V = (x, y, z) => new THREE.Vector3(x, y, z);
+
+const PALETTE = {
+  shirt: [0x2f4f7f, 0x8a2b2b, 0x3f6e46, 0xd9d4c7, 0x1d1f24, 0x6b4f8a, 0xc7862f, 0x5f6f7a, 0xa33f6b, 0x2d6c78, 0xe5e5e5, 0x7a6450],
+  pants: [0x1f2a3a, 0x24262b, 0x3b3f46, 0x4a3b2c, 0x2c3e5c, 0x6d6a60],
+  skin: [0xf1c7a5, 0xe0ac86, 0xc68d65, 0x9c6644, 0x6b4430, 0xf5d5bd],
+  hair: [0x1b1410, 0x3a2617, 0x6b4a2b, 0xb08a52, 0x8f8f8f, 0x0d0d0d],
+  bag: [0x222222, 0x5a3b22, 0x1f3d5c, 0x6e1f2a],
+};
 
 
 /* ==========================================================================
-   Fábrica de personas (geometría y materiales compartidos)
+   Esqueleto de una persona y dibujo instanciado
    ========================================================================== */
 
-class PersonFactory {
-  constructor() {
-    this.geo = {
-      box: new THREE.BoxGeometry(1, 1, 1),
-      head: new THREE.SphereGeometry(1, 12, 9),
-      hair: new THREE.SphereGeometry(1, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.55),
+/** Crea el esqueleto articulado (Object3D sin mallas). Origen = pies; frente = +Z. */
+function createSkeleton() {
+  const h = rand(0.9, 1.1);
+  const legLen = 0.84 * h, thigh = legLen / 2, shin = legLen / 2;
+  const torsoH = 0.58 * h, armLen = 0.62 * h;
+  const width = rand(0.36, 0.44);
+  const color = (list) => new THREE.Color(pick(list));
+  const shirt = color(PALETTE.shirt), pants = color(PALETTE.pants);
+  const parts = [];
+
+  const root = new THREE.Group();
+  const body = new THREE.Group();
+  root.add(body);
+  const part = (parent, kind, col, sx, sy, sz, x, y, z) => {
+    const o = new THREE.Object3D();
+    o.scale.set(sx, sy, sz);
+    o.position.set(x, y, z);
+    parent.add(o);
+    parts.push({ obj: o, kind, color: col });
+    return o;
+  };
+
+  const legs = [-1, 1].map(s => {
+    const hip = new THREE.Group();
+    hip.position.set(s * width * 0.25, legLen, 0);
+    body.add(hip);
+    part(hip, "box", pants, 0.15, thigh, 0.17, 0, -thigh / 2, 0);
+    const knee = new THREE.Group();
+    knee.position.y = -thigh;
+    hip.add(knee);
+    part(knee, "box", pants, 0.13, shin, 0.16, 0, -shin / 2, 0.01);
+    return { hip, knee };
+  });
+  part(body, "box", shirt, width, torsoH, 0.23, 0, legLen + torsoH / 2, 0);
+  const shoulderY = legLen + torsoH - 0.05;
+  const arms = [-1, 1].map(s => {
+    const arm = new THREE.Group();
+    arm.position.set(s * (width / 2 + 0.055), shoulderY, 0);
+    body.add(arm);
+    part(arm, "box", shirt, 0.1, armLen, 0.11, 0, -armLen / 2, 0);
+    return arm;
+  });
+  const headY = shoulderY + 0.19 * h;
+  part(body, "head", color(PALETTE.skin), 0.105, 0.125, 0.115, 0, headY, 0);
+  part(body, "hair", color(PALETTE.hair), 0.112, Math.random() < 0.3 ? 0.16 : 0.12, 0.12, 0, headY + 0.01, -0.012);
+  if (Math.random() < 0.3) part(body, "box", color(PALETTE.bag), 0.3, 0.36, 0.13, 0, legLen + torsoH * 0.55, -0.18);
+
+  return {
+    root, body, legLen, parts,
+    hipL: legs[0].hip, hipR: legs[1].hip, kneeL: legs[0].knee, kneeR: legs[1].knee,
+    armL: arms[0], armR: arms[1],
+  };
+}
+
+class PeopleRenderer {
+  constructor(scene, capacity) {
+    const mk = (geo, rough, n) => {
+      const m = new THREE.InstancedMesh(geo, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: rough, metalness: 0 }), n);
+      m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(n * 3), 3);
+      m.frustumCulled = false;
+      m.count = 0;
+      scene.add(m);
+      return m;
     };
-    const m = (c, rough = 0.85) => new THREE.MeshStandardMaterial({ color: c, roughness: rough, metalness: 0 });
-    this.mat = {
-      shirt: [0x2f4f7f, 0x8a2b2b, 0x3f6e46, 0xd9d4c7, 0x1d1f24, 0x6b4f8a, 0xc7862f, 0x5f6f7a, 0xa33f6b, 0x2d6c78, 0xe5e5e5, 0x7a6450].map(c => m(c)),
-      pants: [0x1f2a3a, 0x24262b, 0x3b3f46, 0x4a3b2c, 0x2c3e5c, 0x6d6a60].map(c => m(c)),
-      skin: [0xf1c7a5, 0xe0ac86, 0xc68d65, 0x9c6644, 0x6b4430, 0xf5d5bd].map(c => m(c, 0.7)),
-      hair: [0x1b1410, 0x3a2617, 0x6b4a2b, 0xb08a52, 0x8f8f8f, 0x0d0d0d].map(c => m(c, 0.9)),
-      bag: [0x222222, 0x5a3b22, 0x1f3d5c, 0x6e1f2a].map(c => m(c, 0.7)),
-    };
+    this.box = mk(new THREE.BoxGeometry(1, 1, 1), 0.85, capacity * 8);
+    this.head = mk(new THREE.SphereGeometry(1, 12, 9), 0.7, capacity);
+    this.hair = mk(new THREE.SphereGeometry(1, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.55), 0.9, capacity);
   }
 
-  part(parent, geo, mat, sx, sy, sz, x, y, z) {
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.scale.set(sx, sy, sz);
-    mesh.position.set(x, y, z);
-    parent.add(mesh);
-    return mesh;
-  }
-
-  /** Figura humana low-poly articulada. Origen = pies; frente = +Z. */
-  create() {
-    const { geo, mat } = this;
-    const h = rand(0.9, 1.1);
-    const legLen = 0.84 * h, thigh = legLen / 2, shin = legLen / 2;
-    const torsoH = 0.58 * h, armLen = 0.62 * h;
-    const shirt = pick(mat.shirt), pants = pick(mat.pants), skin = pick(mat.skin), hair = pick(mat.hair);
-    const width = rand(0.36, 0.44);
-
-    const root = new THREE.Group();
-    const body = new THREE.Group();
-    root.add(body);
-
-    const legs = [-1, 1].map(s => {
-      const hip = new THREE.Group();
-      hip.position.set(s * width * 0.25, legLen, 0);
-      body.add(hip);
-      this.part(hip, geo.box, pants, 0.15, thigh, 0.17, 0, -thigh / 2, 0);
-      const knee = new THREE.Group();
-      knee.position.y = -thigh;
-      hip.add(knee);
-      this.part(knee, geo.box, pants, 0.13, shin, 0.16, 0, -shin / 2, 0.01);
-      return { hip, knee };
-    });
-
-    this.part(body, geo.box, shirt, width, torsoH, 0.23, 0, legLen + torsoH / 2, 0);
-    const shoulderY = legLen + torsoH - 0.05;
-    const arms = [-1, 1].map(s => {
-      const arm = new THREE.Group();
-      arm.position.set(s * (width / 2 + 0.055), shoulderY, 0);
-      body.add(arm);
-      this.part(arm, geo.box, shirt, 0.1, armLen, 0.11, 0, -armLen / 2, 0);
-      return arm;
-    });
-
-    const headY = shoulderY + 0.19 * h;
-    this.part(body, geo.head, skin, 0.105, 0.125, 0.115, 0, headY, 0);
-    this.part(body, geo.hair, hair, 0.112, Math.random() < 0.3 ? 0.16 : 0.12, 0.12, 0, headY + 0.01, -0.012);
-    if (Math.random() < 0.3) this.part(body, geo.box, pick(mat.bag), 0.3, 0.36, 0.13, 0, legLen + torsoH * 0.55, -0.18);
-
-    return {
-      root, body, legLen,
-      hipL: legs[0].hip, hipR: legs[1].hip, kneeL: legs[0].knee, kneeR: legs[1].knee,
-      armL: arms[0], armR: arms[1],
-    };
+  render(people) {
+    const meshes = { box: this.box, head: this.head, hair: this.hair };
+    const n = { box: 0, head: 0, hair: 0 };
+    for (const p of people) {
+      if (p.hidden) continue;
+      p.root.updateWorldMatrix(false, true);
+      for (const part of p.mesh.parts) {
+        const m = meshes[part.kind], i = n[part.kind];
+        if (i >= m.instanceMatrix.count) continue;
+        m.setMatrixAt(i, part.obj.matrixWorld);
+        m.setColorAt(i, part.color);
+        n[part.kind]++;
+      }
+    }
+    for (const k of Object.keys(meshes)) {
+      meshes[k].count = n[k];
+      meshes[k].instanceMatrix.needsUpdate = true;
+      meshes[k].instanceColor.needsUpdate = true;
+    }
   }
 }
 
-/** Bancos de cada estación (mismas posiciones que world.js). */
-function buildBenchSpots(st) {
-  const S = CONFIG.station, spots = [];
-  [-1, 1].forEach(side => {
-    for (let off = -30; off < 30; off += 10) {
-      const bz = st.z + off + 5;
-      [-0.45, 0.45].forEach(dz => spots.push({
-        side, bench: true, occupant: null,
-        pos: new THREE.Vector3(side * 6.42, S.platformTop, bz + dz),
-        seatY: S.platformTop + 0.48,
-      }));
+
+/* ==========================================================================
+   Geometría de recorridos en una estación
+   ========================================================================== */
+
+/** Bancos de un andén (mismas posiciones que world.js). */
+function benchSpots(st, side) {
+  const spots = [];
+  const inStairs = (zz) => zz > st.z + MZ.stairZ0 - 3 && zz < st.z + MZ.stairZ1 + 2;
+  for (let off = -46; off <= 46; off += 12) {
+    if (inStairs(st.z + off)) continue;
+    const bz = st.z + off + 6;
+    if (off < 46 && !inStairs(bz)) {
+      [-0.45, 0.45].forEach(dz => spots.push({ side, bench: true, occupant: null, pos: V(side * 7.92, S.platformTop, bz + dz), seatY: S.platformTop + 0.48 }));
     }
-  });
+  }
   return spots;
+}
+
+const stairTop = (st, side) => V(side * 7.2, MZ.y, st.z + MZ.stairZ1 + 0.4);
+const stairBottom = (st, side) => V(side * 7.2, S.platformTop, st.z + MZ.stairZ0 - 0.4);
+const streetDoor = (st) => V(rand(-1.2, 1.2), MZ.y, st.z + MZ.z1 - 0.3);
+
+/** Recorrido desde la calle hasta el andén de un lado (pasando por un torniquete). */
+function pathFromStreet(st, side, spot) {
+  const g = pick(MZ.gates);
+  return [
+    V(g, MZ.y, st.z + MZ.gateZ + 0.9), V(g, MZ.y, st.z + MZ.gateZ - 0.9),
+    stairTop(st, side), stairBottom(st, side), spot.clone(),
+  ];
+}
+
+/** Recorrido desde el andén hasta la calle. */
+function pathToStreet(st, side, from) {
+  const g = pick(MZ.gates);
+  return [
+    V(side * rand(4.4, 5.4), S.platformTop, from.z),
+    stairBottom(st, side), stairTop(st, side),
+    V(g, MZ.y, st.z + MZ.gateZ - 0.9), V(g, MZ.y, st.z + MZ.gateZ + 0.9), streetDoor(st),
+  ];
 }
 
 
@@ -132,55 +189,62 @@ export class PeopleSystem {
   constructor(scene, traffic, clock) {
     this.scene = scene;
     this.traffic = traffic;
-    this.factory = new PersonFactory();
+    this.renderer = new PeopleRenderer(scene, CONFIG.people.capacity);
     this.people = [];
     this.time = 0;
     this.stations = STATIONS.map(st => ({
       st,
-      waiting: this.targetWaiting(st, clock),     // viajeros abstractos esperando
+      waiting: { 1: this.targetWaiting(st, 1, clock), "-1": this.targetWaiting(st, -1, clock) },
       materialized: false,
-      benches: buildBenchSpots(st),
+      benches: { 1: benchSpots(st, 1), "-1": benchSpots(st, -1) },
       spawnTimer: rand(1, 5),
     }));
     traffic.isBusyFor = (unit) => this.isBusy(unit);
   }
 
   /* ----- Consultas ----- */
-  targetWaiting(st, clock) {
-    if (st.index === LAST) return Math.round(4 * demandAt(clock));     // fin de línea: casi nadie espera
-    return Math.round(CONFIG.people.maxWaitingPerStation * demandAt(clock));
+
+  /** Viajeros que esperan en un andén: ninguno en el andén de llegada de una terminal. */
+  targetWaiting(st, side, clock) {
+    const route = routeForSide(side);
+    if (route.stationOf(st) === route.last) return 0;
+    return Math.round(CONFIG.people.maxWaitingPerSide * demandAt(clock));
   }
 
   npcsOf(unit) { return this.people.filter(p => p.unit === unit && p.space === "train"); }
 
   onboardCount(unit) {
     if (!unit) return 0;
-    return unit.materialized ? this.npcsOf(unit).length : unit.load;
+    return unit.materialized ? this.npcsOf(unit).length + (unit.hiddenLoad || 0) : unit.load;
   }
 
-  /** true mientras haya viajeros subiendo o bajando de ese tren (el ATO espera). */
   isBusy(unit) {
     return this.people.some(p => (p.pending && p.pending.unit === unit)
       || (p.unit === unit && (p.state === "toDoor" || p.state === "boarding" || p.state === "alighting")));
   }
 
-  /** Nivel de murmullo (0..1) según la gente cerca de la cámara. */
-  crowdLevel(cameraZ) {
+  crowdLevel(cameraPos) {
     let n = 0;
     for (const p of this.people) {
       if (p.space !== "world") continue;
-      const dz = Math.abs(p.root.position.z - cameraZ);
-      if (dz < 60) n += 1 - dz / 60;
+      const d = p.root.position.distanceTo(cameraPos);
+      if (d < 50) n += 1 - d / 50;
     }
     return clamp(n / 14, 0, 1);
   }
 
-  /* ----- Creación de personas ----- */
+  /** Posiciones de mundo de los viajeros en la mezanina (para los torniquetes). */
+  deckAgents(out = []) {
+    for (const p of this.people) if (p.space === "world" && p.root.position.y > MZ.y - 0.5) out.push(p.root.position);
+    return out;
+  }
+
+  /* ----- Creación ----- */
   newPerson(station, side) {
-    const mesh = this.factory.create();
+    const mesh = createSkeleton();
     const p = {
       mesh, root: mesh.root,
-      state: "waiting", space: "world", unit: null,
+      state: "waiting", space: "world", unit: null, hidden: false,
       station, side, dest: null,
       slot: null, spot: null,
       path: [], onArrive: null,
@@ -195,30 +259,26 @@ export class PeopleSystem {
     return p;
   }
 
-  randomDestination(fromIndex) {
-    return fromIndex >= LAST ? null : randInt(fromIndex + 1, LAST);
+  /** Destino (índice de estación del mundo) para quien sube por un lado. */
+  randomDestination(st, side) {
+    const route = routeForSide(side);
+    const rs = route.stationOf(st);
+    if (rs === route.last) return null;
+    return route.stations[randInt(rs.index + 1, route.last.index)].worldIndex;
   }
 
   waitingSpot(st, side) {
-    const S = CONFIG.station;
     if (Math.random() < 0.25) {
-      const free = this.stations[st.index].benches.filter(b => b.side === side && !b.occupant);
+      const free = this.stations[st.index].benches[side].filter(b => !b.occupant);
       if (free.length) return pick(free);
     }
-    const z = Math.random() < 0.8 ? st.stopZ + rand(1, 18) : st.z + rand(-31, 18);
-    return { side, bench: false, pos: new THREE.Vector3(side * rand(2.6, 4.9), S.platformTop, z) };
+    const z = Math.random() < 0.85 ? st.z + rand(-45, 15) : st.z + rand(-49, 48);
+    return { side, bench: false, pos: V(side * rand(4.3, 5.7), S.platformTop, z) };
   }
 
-  accessPoint(st, side, nearZ) {
-    const S = CONFIG.station;
-    const end = nearZ < st.z ? -1 : 1;
-    return new THREE.Vector3(side * (S.wallX - 0.45), S.platformTop, st.z + end * S.accessZ);
-  }
-
-  spawnWaiting(st, instant) {
-    const side = Math.random() < 0.5 ? -1 : 1;
+  spawnWaiting(st, side, instant) {
     const p = this.newPerson(st, side);
-    p.dest = this.randomDestination(st.index);
+    p.dest = this.randomDestination(st, side);
     const spot = this.waitingSpot(st, side);
     if (spot.bench) spot.occupant = p;
     p.spot = spot;
@@ -227,8 +287,8 @@ export class PeopleSystem {
       this.settleWaiting(p);
     } else {
       p.state = "arriving";
-      p.root.position.copy(this.accessPoint(st, side, spot.pos.z));
-      this.walk(p, [spot.pos], () => this.settleWaiting(p));
+      p.root.position.copy(streetDoor(st));
+      this.walk(p, pathFromStreet(st, side, spot.pos), () => this.settleWaiting(p));
     }
     return p;
   }
@@ -246,13 +306,18 @@ export class PeopleSystem {
     return preferSeat && seats.length ? pick(seats) : pick(free);
   }
 
-  /** Crea un viajero directamente en una plaza de un tren (sin animación). */
-  spawnOnboard(unit, fromIndex) {
+  /** Viajero colocado directamente en una plaza (sin animación). */
+  spawnOnboard(unit, fromRouteIndex) {
     const slot = this.freeSlot(unit, Math.random() < 0.8);
     if (!slot) return null;
-    const p = this.newPerson(STATIONS[Math.max(0, fromIndex)], 1);
-    p.dest = this.randomDestination(fromIndex) ?? LAST;
-    this.toTrain(p, unit);
+    const route = unit.route;
+    const from = route.stations[Math.max(0, fromRouteIndex)];
+    const p = this.newPerson(from.world, route.side);
+    const destIdx = Math.min(route.last.index, randInt(fromRouteIndex + 1, route.last.index));
+    p.dest = route.stations[destIdx].worldIndex;
+    p.space = "train"; p.unit = unit;
+    this.scene.remove(p.root);
+    unit.group.add(p.root);
     slot.occupant = p;
     p.slot = slot;
     p.root.position.copy(slot.approach);
@@ -268,15 +333,11 @@ export class PeopleSystem {
     else { p.root.position.copy(slot.pos); p.pose = "hold"; }
   }
 
-  sitAt(p, pos, seatY) {
-    p.root.position.set(pos.x, seatY - p.mesh.legLen, pos.z);
-    p.pose = "sit";
-  }
-
+  sitAt(p, pos, seatY) { p.root.position.set(pos.x, seatY - p.mesh.legLen, pos.z); p.pose = "sit"; }
   standUp(p, floorY) { p.root.position.y = floorY; p.pose = "stand"; }
 
   remove(p) {
-    if (p.slot) { p.slot.occupant = null; p.slot = null; }
+    if (p.slot) { if (p.slot.occupant === p) p.slot.occupant = null; p.slot = null; }
     if (p.spot?.bench && p.spot.occupant === p) p.spot.occupant = null;
     p.root.parent?.remove(p.root);
     p.state = "gone";
@@ -285,7 +346,10 @@ export class PeopleSystem {
   /* ----- Cambios de espacio (andén ↔ tren) ----- */
   toTrain(p, unit) {
     if (p.space === "train") return;
-    p.root.position.sub(unit.group.position);
+    unit.group.updateMatrixWorld(true);
+    unit.group.worldToLocal(p.root.position);
+    p.root.rotation.y -= unit.group.rotation.y;
+    if (p.targetYaw !== undefined) p.targetYaw -= unit.group.rotation.y;
     this.scene.remove(p.root);
     unit.group.add(p.root);
     p.space = "train";
@@ -294,8 +358,12 @@ export class PeopleSystem {
 
   toWorld(p) {
     if (p.space === "world") return;
-    p.root.position.add(p.unit.group.position);
-    p.unit.group.remove(p.root);
+    const g = p.unit.group;
+    g.updateMatrixWorld(true);
+    g.localToWorld(p.root.position);
+    p.root.rotation.y += g.rotation.y;
+    if (p.targetYaw !== undefined) p.targetYaw += g.rotation.y;
+    g.remove(p.root);
     this.scene.add(p.root);
     p.space = "world";
     p.unit = null;
@@ -308,73 +376,75 @@ export class PeopleSystem {
   }
 
   nearestDoor(localZ) {
-    return CONFIG.train.doorCenters.reduce((a, b) => (Math.abs(b - localZ) < Math.abs(a - localZ) ? b : a));
+    return TRAIN_LAYOUT.doors.reduce((a, b) => (Math.abs(b - localZ) < Math.abs(a - localZ) ? b : a));
   }
 
   /* ----- Subida ----- */
   startBoarding(p, unit) {
-    const S = CONFIG.station, F = CONFIG.train.floorY;
-    const trainZ = unit.group.position.z;
-    const doorLocal = this.nearestDoor(p.root.position.z - trainZ);
-    const doorZ = trainZ + doorLocal;
     const side = p.side;
+    unit.group.updateMatrixWorld(true);
+    const local = unit.group.worldToLocal(p.root.position.clone());
+    const doorLocal = this.nearestDoor(local.z);
+    const doorWorld = unit.group.localToWorld(V(1.3, F, doorLocal));
 
     if (p.spot?.bench) { p.spot.occupant = null; this.standUp(p, S.platformTop); }
     p.state = "toDoor";
-    p.unit = unit;                                   // tren al que se dirige (aún en el andén)
+    p.unit = unit;
     p.root.position.y = S.platformTop;
     this.walk(p, [
-      new THREE.Vector3(side * rand(2.3, 2.7), S.platformTop, doorZ + rand(-0.6, 0.6)),
-      new THREE.Vector3(side * 1.7, S.platformTop, doorZ + rand(-0.25, 0.25)),
+      V(side * rand(3.95, 4.4), S.platformTop, doorWorld.z + rand(-0.6, 0.6)),
+      V(side * 3.7, S.platformTop, doorWorld.z + rand(-0.25, 0.25)),
     ], () => {
       if (unit.sim.doorState !== "open" || !this.traffic.units.includes(unit)) return this.abortBoarding(p);
+      // Tren lleno de viajeros dibujados: pasa a la cuenta oculta
+      if (this.npcsOf(unit).length >= CONFIG.people.maxVisibleOnboard) {
+        unit.hiddenLoad = (unit.hiddenLoad || 0) + 1;
+        return this.remove(p);
+      }
       p.unit = null;
       this.toTrain(p, unit);
-      p.root.position.set(side * 1.3, F, doorLocal + rand(-0.2, 0.2));
+      p.root.position.set(1.3, F, doorLocal + rand(-0.2, 0.2));
       p.state = "boarding";
-      this.walk(p, [new THREE.Vector3(side * 0.7, F, doorLocal), p.slot.approach], () => this.settleInSlot(p));
+      this.walk(p, [V(0.7, F, doorLocal), p.slot.approach], () => this.settleInSlot(p));
     });
   }
 
   abortBoarding(p) {
-    if (p.slot) { p.slot.occupant = null; p.slot = null; }
+    if (p.slot) { if (p.slot.occupant === p) p.slot.occupant = null; p.slot = null; }
     p.unit = null;
     const spot = this.waitingSpot(p.station, p.side);
     if (spot.bench) spot.occupant = p;
     p.spot = spot;
     p.state = "arriving";
+    p.root.position.y = S.platformTop;
     this.walk(p, [spot.pos], () => this.settleWaiting(p));
   }
 
   /* ----- Bajada ----- */
   startAlighting(p, station) {
-    const F = CONFIG.train.floorY, S = CONFIG.station;
     const unit = p.unit;
     const slot = p.slot;
-    const side = Math.random() < 0.5 ? -1 : 1;
     const doorLocal = this.nearestDoor(slot ? slot.pos.z : p.root.position.z);
     if (slot) {
       if (slot.type === "seat") { p.root.position.copy(slot.approach); this.standUp(p, F); }
-      slot.occupant = null;
+      if (slot.occupant === p) slot.occupant = null;
       p.slot = null;
     }
     p.state = "alighting";
-    this.walk(p, [new THREE.Vector3(side * 0.6, F, doorLocal + rand(-0.3, 0.3)), new THREE.Vector3(side * 1.3, F, doorLocal)], () => {
+    this.walk(p, [V(0.6, F, doorLocal + rand(-0.3, 0.3)), V(1.3, F, doorLocal)], () => {
       if (unit.sim.doorState !== "open") {
-        // Se le cerraron las puertas: vuelve a una plaza y bajará en la siguiente
         const back = this.freeSlot(unit, false);
         if (back) { back.occupant = p; p.slot = back; p.state = "boarding"; this.walk(p, [back.approach], () => this.settleInSlot(p)); }
         else { p.state = "onboard"; p.pose = "hold"; }
-        p.dest = Math.min(station.index + 1, LAST);
         return;
       }
+      const side = unit.route.side;
       this.toWorld(p);
       p.root.position.y = S.platformTop;
       p.station = station;
       p.side = side;
       p.state = "leaving";
-      const out = new THREE.Vector3(side * rand(2.4, 3.2), S.platformTop, p.root.position.z + rand(-1.5, 1.5));
-      this.walk(p, [out, this.accessPoint(station, side, out.z)], () => this.remove(p));
+      this.walk(p, pathToStreet(station, side, p.root.position), () => this.remove(p));
     });
   }
 
@@ -383,19 +453,22 @@ export class PeopleSystem {
      --------------------------------------------------------------------- */
   materializeStation(ss) {
     ss.materialized = true;
-    const n = Math.round(ss.waiting);
-    for (let i = 0; i < n; i++) this.spawnWaiting(ss.st, true);
+    [1, -1].forEach(side => {
+      const n = Math.round(ss.waiting[side]);
+      for (let i = 0; i < n; i++) this.spawnWaiting(ss.st, side, true);
+    });
   }
 
   dematerializeStation(ss) {
     ss.materialized = false;
-    let n = 0;
+    const count = { 1: 0, "-1": 0 };
     for (const p of this.people) {
       if (p.space !== "world" || p.station !== ss.st) continue;
-      if (p.state === "waiting" || p.state === "arriving" || p.state === "toDoor") n++;
+      if (p.state === "waiting" || p.state === "arriving" || p.state === "toDoor") count[p.side]++;
       this.remove(p);
     }
-    ss.waiting = n;
+    ss.waiting[1] = count[1];
+    ss.waiting[-1] = count[-1];
   }
 
   materializeUnit(unit) {
@@ -403,16 +476,19 @@ export class PeopleSystem {
     const sim = unit.sim;
     const docked = sim.dockedStation();
     const next = sim.nextStation();
-    const fromIndex = docked ? docked.index : next ? next.index - 1 : LAST;
-    for (let i = 0; i < unit.load; i++) if (!this.spawnOnboard(unit, fromIndex)) break;
+    const fromIndex = docked ? docked.index : next ? next.index - 1 : unit.route.last.index;
+    const visible = Math.min(unit.load, CONFIG.people.maxVisibleOnboard);
+    let placed = 0;
+    for (let i = 0; i < visible; i++) if (this.spawnOnboard(unit, fromIndex)) placed++;
+    unit.hiddenLoad = unit.load - placed;
   }
 
   dematerializeUnit(unit) {
     unit.materialized = false;
     const npcs = this.npcsOf(unit);
-    unit.load = npcs.length;
+    unit.load = npcs.length + (unit.hiddenLoad || 0);
+    unit.hiddenLoad = 0;
     npcs.forEach(p => this.remove(p));
-    // Quien iba hacia la puerta de este tren vuelve a esperar
     this.people.filter(p => p.state === "toDoor" && p.unit === unit).forEach(p => this.abortBoarding(p));
   }
 
@@ -422,24 +498,29 @@ export class PeopleSystem {
     this.people.filter(p => p.unit === unit && p.state === "toDoor").forEach(p => this.abortBoarding(p));
     unit.slots.forEach(s => { if (s.occupant && s.occupant !== "player") s.occupant = null; });
     unit.load = load;
+    unit.hiddenLoad = 0;
     unit.exchangeIdx = null;
-    if (unit.materialized) { unit.materialized = false; }
+    unit.materialized = false;
   }
 
-  /** Intercambio "por cifras" cuando el tren o la estación no están dibujados. */
-  abstractExchange(unit, st) {
-    const remaining = LAST - st.index;
+  /** Intercambio "por cifras" en una parada. */
+  abstractExchange(unit, rs) {
+    const route = unit.route, st = rs.world, side = route.side;
     const ss = this.stations[st.index];
+    const remaining = route.last.index - rs.index;
     const load = this.onboardCount(unit);
-    const alight = st.index === LAST ? load : Math.round(load * clamp(1.6 / Math.max(1, remaining), 0, 0.6));
-    const capacity = CONFIG.people.maxOnboard;
-    const board = st.index === LAST ? 0 : Math.min(Math.floor(ss.waiting), Math.max(0, capacity - (load - alight)));
-    ss.waiting -= board;
+    const alight = rs === route.last ? load : Math.round(load * clamp(1.6 / Math.max(1, remaining), 0, 0.6));
+    const board = rs === route.last ? 0 : Math.min(Math.floor(ss.waiting[side]), Math.max(0, CONFIG.people.maxOnboard - (load - alight)));
+    ss.waiting[side] -= board;
 
     if (unit.materialized) {
       const npcs = this.npcsOf(unit).sort((a, b) => (b.dest === st.index) - (a.dest === st.index));
-      npcs.slice(0, alight).forEach(p => this.remove(p));
-      for (let i = 0; i < board; i++) this.spawnOnboard(unit, st.index);
+      const fromNpcs = Math.min(alight, npcs.length);
+      npcs.slice(0, fromNpcs).forEach(p => this.remove(p));
+      unit.hiddenLoad = Math.max(0, (unit.hiddenLoad || 0) - (alight - fromNpcs));
+      for (let i = 0; i < board; i++) {
+        if (this.npcsOf(unit).length >= CONFIG.people.maxVisibleOnboard || !this.spawnOnboard(unit, rs.index)) unit.hiddenLoad++;
+      }
     } else {
       unit.load = load - alight + board;
     }
@@ -448,70 +529,74 @@ export class PeopleSystem {
   /* ---------------------------------------------------------------------
      Actualización por fotograma
      --------------------------------------------------------------------- */
-  update(dt, clock, { cameraZ = 0, hideUnit = null } = {}) {
+  update(dt, clock, { cameraZ = 0, hideUnit = null, render = true } = {}) {
     this.time += dt;
     const R = CONFIG.people.activeRadius;
     const demand = demandAt(clock);
-    const units = this.traffic.units;
+    const traffic = this.traffic;
+    const units = traffic.units;
 
-    // 1. Niveles de detalle de estaciones y trenes
+    // 1. Niveles de detalle
     for (const ss of this.stations) {
-      const near = Math.abs(ss.st.z - cameraZ) < R;
-      if (near && !ss.materialized) this.materializeStation(ss);
-      else if (!near && ss.materialized && Math.abs(ss.st.z - cameraZ) > R + 40) this.dematerializeStation(ss);
+      const d = Math.abs(ss.st.z - cameraZ);
+      if (d < R && !ss.materialized) this.materializeStation(ss);
+      else if (d > R + 40 && ss.materialized) this.dematerializeStation(ss);
     }
     for (const u of units) {
-      const near = Math.abs(u.sim.position + CONFIG.train.length / 2 - cameraZ) < R;
-      if (near && !u.materialized) this.materializeUnit(u);
-      else if (!near && u.materialized && Math.abs(u.sim.position + CONFIG.train.length / 2 - cameraZ) > R + 40) this.dematerializeUnit(u);
+      const d = Math.abs(traffic.worldCenterZ(u) - cameraZ);
+      if (d < R && !u.materialized) this.materializeUnit(u);
+      else if (d > R + 40 && u.materialized) this.dematerializeUnit(u);
     }
 
-    // 2. Llegada de viajeros a los andenes según la demanda horaria
+    // 2. Llegada de viajeros desde la calle según la demanda horaria
     for (const ss of this.stations) {
-      const target = this.targetWaiting(ss.st, clock);
       if (!ss.materialized) {
-        ss.waiting = Math.min(target, ss.waiting + (demand * 10 / 60) * dt);
+        [1, -1].forEach(side => { ss.waiting[side] = Math.min(this.targetWaiting(ss.st, side, clock), ss.waiting[side] + (demand * 6 / 60) * dt); });
         continue;
       }
       ss.spawnTimer -= dt;
       if (ss.spawnTimer > 0) continue;
-      ss.spawnTimer = rand(0.6, 1.4) * 60 / Math.max(1, demand * 10);
-      const waitingNow = this.people.filter(p => p.station === ss.st && p.space === "world" && (p.state === "arriving" || p.state === "waiting" || p.state === "toDoor")).length;
-      if (waitingNow < target) this.spawnWaiting(ss.st, false);
+      ss.spawnTimer = rand(0.5, 1.2) * 60 / Math.max(1, demand * 14);
+      const side = Math.random() < 0.5 ? 1 : -1;
+      const now = this.people.filter(p => p.station === ss.st && p.side === side && p.space === "world" && (p.state === "arriving" || p.state === "waiting" || p.state === "toDoor")).length;
+      if (now < this.targetWaiting(ss.st, side, clock)) this.spawnWaiting(ss.st, side, false);
     }
 
     // 3. Intercambio de viajeros en trenes con puertas abiertas
     for (const u of units) {
-      const docked = u.sim.isStopped ? u.sim.dockedStation() : null;
-      const open = u.sim.doorState === "open" && docked;
+      const rs = u.sim.isStopped ? u.sim.dockedStation() : null;
+      const open = u.sim.doorState === "open" && rs;
       if (!open) {
-        // Puertas no abiertas: cancelar subidas pendientes y retirar a quien iba hacia la puerta
         for (const p of this.people) {
           if (p.pending && p.pending.unit === u) {
-            if (p.pending.type === "board" && p.slot) { p.slot.occupant = null; p.slot = null; }
+            if (p.pending.type === "board" && p.slot) { if (p.slot.occupant === p) p.slot.occupant = null; p.slot = null; }
             p.pending = null;
           }
           if (p.state === "toDoor" && p.unit === u && u.sim.doorState !== "opening") this.abortBoarding(p);
         }
         continue;
       }
-      const ss = this.stations[docked.index];
+      const st = rs.world, ss = this.stations[st.index];
       if (!(u.materialized && ss.materialized)) {
-        if (u.exchangeIdx !== docked.index) { u.exchangeIdx = docked.index; this.abstractExchange(u, docked); }
+        if (u.exchangeIdx !== rs.index) { u.exchangeIdx = rs.index; this.abstractExchange(u, rs); }
         continue;
       }
-      u.exchangeIdx = docked.index;
-      let onboard = this.npcsOf(u).length + this.people.filter(p => p.pending?.type === "board" && p.pending.unit === u).length;
+      if (u.exchangeIdx !== rs.index) {
+        u.exchangeIdx = rs.index;
+        // Los viajeros "ocultos" también bajan en proporción
+        const remaining = u.route.last.index - rs.index;
+        u.hiddenLoad = rs === u.route.last ? 0 : Math.round((u.hiddenLoad || 0) * (1 - clamp(1.6 / Math.max(1, remaining), 0, 0.6)));
+      }
+      const terminal = rs === u.route.last;
       for (const p of this.people) {
         if (p.pending) continue;
-        if (p.space === "train" && p.unit === u && p.state === "onboard" && (p.dest === docked.index || docked.index === LAST)) {
-          p.pending = { type: "alight", t: rand(0, 2.5), station: docked, unit: u };
-        } else if (p.state === "waiting" && p.station === docked && p.dest !== null && onboard < CONFIG.people.maxOnboard) {
+        if (p.space === "train" && p.unit === u && p.state === "onboard" && (p.dest === st.index || terminal)) {
+          p.pending = { type: "alight", t: rand(0, 2.5), station: st, unit: u };
+        } else if (p.state === "waiting" && p.station === st && p.side === u.route.side && p.dest !== null && !terminal) {
           const slot = this.freeSlot(u, Math.random() < 0.7);
           if (!slot) continue;
           slot.occupant = p; p.slot = slot;
           p.pending = { type: "board", t: rand(1.2, 4), unit: u };
-          onboard++;
         }
       }
     }
@@ -527,14 +612,15 @@ export class PeopleSystem {
       else this.startAlighting(p, action.station);
     }
 
-    // 5. Movimiento, animación y visibilidad
+    // 5. Movimiento, animación y dibujo
     for (const p of this.people) {
       if (p.state === "gone") continue;
       this.move(p, dt);
       this.animate(p, dt);
-      if (p.space === "train") p.root.visible = p.unit.group.visible && p.unit !== hideUnit;
+      p.hidden = p.space === "train" && (!p.unit.group.visible || p.unit === hideUnit);
     }
     this.people = this.people.filter(p => p.state !== "gone");
+    if (render) this.renderer.render(this.people);
   }
 
   move(p, dt) {
@@ -542,7 +628,7 @@ export class PeopleSystem {
       const target = p.path[0], pos = p.root.position;
       const dx = target.x - pos.x, dz = target.z - pos.z;
       const dist = Math.hypot(dx, dz);
-      const step = p.speed * dt;
+      const step = p.speed * dt * (Math.abs(target.y - pos.y) > 0.3 ? 0.75 : 1);   // más lento en escaleras
       if (dist <= step) {
         pos.set(target.x, target.y, target.z);
         p.path.shift();
@@ -552,9 +638,9 @@ export class PeopleSystem {
           cb?.();
         }
       } else {
+        pos.y += (target.y - pos.y) * (step / dist);        // sube o baja en proporción (escaleras)
         pos.x += (dx / dist) * step;
         pos.z += (dz / dist) * step;
-        pos.y = target.y;
         p.targetYaw = Math.atan2(dx, dz);
       }
     }
