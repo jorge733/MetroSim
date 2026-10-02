@@ -25,6 +25,7 @@
      render/lineMapPanel.js plano de línea dinámico de los coches (luz parpadeante)
      roles/driverRole.js    rol de Conductor: teclado → órdenes al motor
      control/controlCenter.js  rol de Centro de Control: esquema de la red y órdenes
+     touch.js               controles táctiles (celular y tablet)
      stationLayout.js       columnas, bancos y pantallas de los andenes (compartido)
      config.js    Línea 3 de Santiago, geometría, mando, horarios y demanda
      utils.js     utilidades, materiales y texturas procedurales
@@ -63,6 +64,7 @@ import { SignalViews } from "./render/signalViews.js";
 import { LineMapPanel } from "./render/lineMapPanel.js";
 import { DriverRole } from "./roles/driverRole.js";
 import { ControlCenter } from "./control/controlCenter.js";
+import { TouchControls, wantsTouch } from "./touch.js";
 import { World } from "./world.js";
 import { createTrainLights, resetTrainAssets, trainLineMapMaterial } from "./train.js";
 import { PeopleSystem } from "./people.js";
@@ -136,6 +138,9 @@ $("soundButton").addEventListener("click", toggleSound);
 window.addEventListener("keydown", onKeyDown);
 window.addEventListener("keyup", onKeyUp);
 window.addEventListener("resize", onResize);
+
+// Pantallas táctiles: se ocultan las ayudas de teclado
+if (wantsTouch()) document.body.classList.add("touch-mode");
 
 // Acceso de depuración desde la consola: MetroSim.game.traffic, etc.
 window.MetroSim = { get game() { return game; }, CONFIG, get STATIONS() { return STATIONS; }, get ROUTES() { return ROUTES; }, LINES };
@@ -249,6 +254,11 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A) {
   renderer.compile(scene, camera);
 
   hud.setMode(mode);
+
+  // Controles táctiles (celular / tablet): cada botón equivale a su tecla
+  if (wantsTouch()) {
+    game.touch = new TouchControls({ mode, parent: gameScreen, canvas: renderer.domElement, press: pressKey, walker: game.walker });
+  }
   loadingScreen.classList.add("hidden");
   gameScreen.classList.remove("hidden");
   onResize();
@@ -263,6 +273,7 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A) {
 
 function stopGame() {
   if (!game) return;
+  game.touch?.destroy();
   cancelAnimationFrame(game.raf);
   game.audio.stop();
   game.walker?.detach();
@@ -394,6 +405,13 @@ function onCommandResult(r) {
 function localClock() {
   const d = new Date();
   return d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds() + d.getMilliseconds() / 1000;
+}
+
+/** Pulsación de una tecla desde los controles táctiles (mismo efecto que el teclado). */
+function pressKey(key) {
+  const ev = { key, repeat: false, preventDefault() {} };
+  onKeyDown(ev);
+  onKeyUp(ev);
 }
 
 function onKeyUp(event) {

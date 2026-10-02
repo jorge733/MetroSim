@@ -68,6 +68,11 @@ Three.js se carga desde CDN, así que hace falta conexión a internet.
 
 **Ambos:** M sonido · H ayuda.
 
+**Celular o tablet:** aparecen controles táctiles (mejor con el teléfono en horizontal). Conductor: ▲ / ▼ mando,
+EMERGENCIA, Puertas, Inversor, Vista y Cabina; arrastra la pantalla para mirar. Pasajero: joystick a la izquierda
+para caminar (al borde corre), arrastra a la derecha para mirar, botones E (usar), F (sentarse) y Correr.
+Para probarlos en el computador, abre la página con `?touch=1` al final de la dirección.
+
 ## Arquitectura
 
 MetroSim separa el **motor** (el "cerebro" del Metro) del **render** (lo que se ve).
@@ -148,6 +153,7 @@ js/render/            dibujo del estado del motor
   lineMapPanel.js     plano de línea dinámico de los coches
 js/control/           Centro de Control
   controlCenter.js    esquema de la red, ficha de tren, incidencias y órdenes
+js/touch.js           controles táctiles (celular y tablet)
 js/roles/             roles del jugador
   driverRole.js       Conductor: teclado → órdenes
 js/stationLayout.js   columnas, bancos y pantallas de los andenes (compartido)
