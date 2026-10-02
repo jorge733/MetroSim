@@ -6,6 +6,8 @@
 
    Motor (js/engine/, sin Three.js; se puede ejecutar en Node):
      engine.js    MetroEngine: reloj de paso fijo, horarios, señales y trenes
+     state.js     estado explícito de cada tren (arrancando, en andén, ante señal...)
+     eta.js       llegadas estimadas desde la posición real de los trenes
      clock.js     reloj de la simulación
      route.js     los dos sentidos de circulación (vía 1 y vía 2)
      schedule.js  horarios por sentido y retrasos
@@ -136,8 +138,11 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A) {
   /* --- Motor MetroSim (el "cerebro") y su dibujo --- */
   const world = new World(scene);
   const warmStart = CONFIG.startTime - 45 * 60;
-  const engine = new MetroEngine({ startTime: warmStart, onUnitEvent: (u, t, d) => onUnitEvent(u, t, d) });
+  const engine = new MetroEngine({ startTime: warmStart });
   const { traffic, signals, timetables } = engine;
+  // El juego escucha al motor por su bus: sucesos y cambios de estado de cada tren
+  engine.bus.on("train:event", ({ unit, type, data }) => onUnitEvent(unit, type, data));
+  engine.bus.on("train:state", (change) => onTrainState(change));
   const trainViews = new TrainViews(scene, engine.bus);       // dibuja los trenes que crea el motor
   const signalViews = new SignalViews(scene, signals.values());
   const playerTrip = timetables.get(direction.id).anchorTrip;
@@ -320,6 +325,13 @@ function onUnitEvent(unit, type, data = {}) {
       if (riding && data.next) hud.showMessage(`Próxima estación: ${data.next.name}`, "info", 3500);
       break;
   }
+}
+
+/** Cambios de estado de los trenes (state.js): avisos para el viajero a bordo. */
+function onTrainState({ unit, from, to }) {
+  if (!game || game.warming || game.walker?.unit !== unit) return;
+  if (to === "signalStop") hud.showMessage("Tren detenido por señal · reanudaremos la marcha en breve", "info", 4500);
+  else if (from === "signalStop" && to === "starting") hud.showMessage("Reanudamos la marcha", "ok", 2500);
 }
 
 function onPlayerEvent(type, data) {
@@ -625,8 +637,9 @@ function getRouteInfo(unit) {
       ? { label: `Salida ${formatClock(dep)}`, delayText: `espera ${formatDelay(wait).replace("+", "")}`, cls: "early", color: "#ffd166" }
       : { label: `Salida ${formatClock(dep)}`, delayText: formatDelay(-wait), ...delayStyle(-wait) };
   } else if (next) {
+    // Llegada prevista desde la posición y velocidad reales del tren (motor · eta.js)
     const arr = trip.arr[next.index];
-    const est = Math.max(unit.delay, clock - arr);
+    const est = (game.engine.eta(unit, next.world) ?? clock) - arr;
     schedule = { label: `Llegada ${next.short} ${formatClock(arr)}`, delayText: formatDelay(est), ...delayStyle(est) };
   }
 

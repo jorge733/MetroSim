@@ -6,9 +6,13 @@
      desde las cocheras de su terminal de origen y se retiran tras la de destino.
    · Cada tren es una "unidad": simulación (TrainSim, en coordenadas de su
      ruta) + conductor (AutoDriver o el jugador).
-   · Este módulo es SOLO lógica. Avisa por el bus de eventos cuando un tren
-     se crea ("train:created"), cambia de vía ("train:rebuilt") o se retira
-     ("train:removed"); render/trainViews.js escucha y dibuja su modelo 3D.
+   · Este módulo es SOLO lógica. Avisa por el bus de eventos del motor:
+       "train:created" / "train:rebuilt" / "train:removed"  ciclo de vida
+                         (render/trainViews.js dibuja o quita el modelo 3D)
+       "train:event"     todo lo que le pasa a un tren (llegada, puertas,
+                         señal rebasada...) como { unit, type, data }
+       "train:state"     cambio de estado explícito (state.js) como
+                         { unit, from, to, time }
    · Maniobra de retorno: al llegar al fondo de la cola de maniobras tras una
      terminal, el tren cambia de cabina, pasa por el cambio de vía a la vía
      contraria y toma el siguiente servicio del sentido opuesto. Si no hay
@@ -20,6 +24,8 @@ import { ROUTES, oppositeRoute } from "./route.js";
 import { TrainSim, AutoDriver } from "./sim.js";
 import { TRAIN_LAYOUT } from "./consist.js";
 import { EventBus } from "./events.js";
+import { trainState } from "./state.js";
+import { estimateArrival } from "./eta.js";
 
 const L = CONFIG.train.length;
 
@@ -29,7 +35,7 @@ export class TrafficManager {
    * @param {Map<string, import("./schedule.js").Timetable>} opts.timetables  por id de ruta
    * @param {Map<string, import("./signals.js").SignalSystem>} opts.signals  por id de ruta
    * @param {EventBus} opts.bus  bus de eventos del motor (ciclo de vida de los trenes)
-   * @param {(unit, type:string, data?:object)=>void} opts.onUnitEvent
+   * @param {(unit, type:string, data?:object)=>void} opts.onUnitEvent  (opcional; mejor escuchar "train:event")
    */
   constructor({ timetables, signals, bus = new EventBus(), onUnitEvent = () => {} }) {
     this.bus = bus;
@@ -39,6 +45,12 @@ export class TrafficManager {
     this.units = [];
     this.started = new Set();          // servicios ya iniciados (o reservados para el jugador)
     this.isBusyFor = () => false;      // lo conecta el sistema de viajeros
+  }
+
+  /** Avisa de un suceso de un tren: al receptor directo y por el bus. */
+  notify(unit, type, data = {}) {
+    this.onUnitEvent(unit, type, data);
+    this.bus.emit("train:event", { unit, type, data });
   }
 
   /* ----- Creación y retirada ----- */
@@ -60,8 +72,10 @@ export class TrafficManager {
       delay: 0,
       dockedIdx: null,
       arrivedIdx: null,
+      state: null,           // estado explícito (state.js), lo calcula el motor en cada paso
+      stateSince: null,
     };
-    unit.sim = new TrainSim(route, (type, data) => this.onUnitEvent(unit, type, data), start ?? route.track.depotZ);
+    unit.sim = new TrainSim(route, (type, data) => this.notify(unit, type, data), start ?? route.track.depotZ);
     unit.prevPos = unit.sim.position;
     unit.ato = isPlayer ? null : this.makeDriver(unit, targetIndex, holdUntil);
     this.started.add(trip.id);
@@ -73,7 +87,7 @@ export class TrafficManager {
   makeDriver(unit, targetIndex = 0, holdUntil = null) {
     return new AutoDriver(unit.sim, {
       trip: unit.trip, signals: this.signals.get(unit.route.id), targetIndex, holdUntil,
-      onEvent: (type, data) => this.onUnitEvent(unit, `ato:${type}`, data),
+      onEvent: (type, data) => this.notify(unit, `ato:${type}`, data),
       isBoardingBusy: () => this.isBusyFor(unit),
     });
   }
@@ -94,7 +108,7 @@ export class TrafficManager {
    */
   turnback(unit, trip) {
     const route = trip.route;
-    this.onUnitEvent(unit, "turnbackStart");
+    this.notify(unit, "turnbackStart");
     unit.route = route;
     unit.trip = trip;
     unit.id = trip.id;
@@ -108,11 +122,11 @@ export class TrafficManager {
     this.bus.emit("train:rebuilt", unit);          // el dibujo cambia de vía y de cabina
     unit.ato = unit.isPlayer ? null : this.makeDriver(unit, 0, trip.departure - 150);
     this.started.add(trip.id);
-    this.onUnitEvent(unit, "turnback", { trip });
+    this.notify(unit, "turnback", { trip });
   }
 
   removeUnit(unit) {
-    this.onUnitEvent(unit, "removed");
+    this.notify(unit, "removed");
     this.units = this.units.filter(u => u !== unit);
     this.bus.emit("train:removed", unit);
   }
@@ -148,7 +162,7 @@ export class TrafficManager {
         const behind = ordered[i], ahead = ordered[i + 1];
         const rear = ahead.sim.position + L;
         if (behind.sim.position < rear + 0.2) {
-          if (behind.sim.speed > 0.5) this.onUnitEvent(behind, "collision", { kmh: behind.sim.speedKmh, other: ahead });
+          if (behind.sim.speed > 0.5) this.notify(behind, "collision", { kmh: behind.sim.speedKmh, other: ahead });
           behind.sim.position = rear + 0.2;
           behind.sim.velocity = Math.min(0, behind.sim.velocity);
           behind.sim.accel = Math.min(behind.sim.accel, 0);
@@ -159,7 +173,7 @@ export class TrafficManager {
       const sig = this.signals.get(route.id);
       for (const u of units) {
         for (const s of sig.passedBetween(u.prevPos, u.sim.position)) {
-          if (s.aspect === "red") this.onUnitEvent(u, "redSignal", { signal: s });
+          if (s.aspect === "red") this.notify(u, "redSignal", { signal: s });
         }
       }
       sig.update(units, clock);
@@ -175,6 +189,20 @@ export class TrafficManager {
       if (trip) { u.retiredFor = 0; this.turnback(u, trip); }
       else this.removeUnit(u);              // sin servicio próximo o vía contraria ocupada: a cocheras (libera la cola)
     }
+
+    this.updateStates(clock);
+  }
+
+  /** Recalcula el estado explícito de cada tren y avisa de los cambios. */
+  updateStates(clock) {
+    for (const u of this.units) {
+      const to = trainState(u, this.signals.get(u.route.id));
+      if (to === u.state) continue;
+      const from = u.state;
+      u.state = to;
+      u.stateSince = clock;
+      this.bus.emit("train:state", { unit: u, from, to, time: clock });
+    }
   }
 
   /** Llegadas y salidas reales frente al horario. */
@@ -185,12 +213,12 @@ export class TrafficManager {
       u.arrivedIdx = docked.index;
       u.dockedIdx = docked.index;
       u.delay = clock - u.trip.arr[docked.index];
-      this.onUnitEvent(u, "arrivedStation", { station: docked, delay: u.delay });
+      this.notify(u, "arrivedStation", { station: docked, delay: u.delay });
     }
     if (u.dockedIdx !== null && sim.position < u.route.stations[u.dockedIdx].stopZ - 3) {
       const st = u.route.stations[u.dockedIdx];
       u.delay = clock - u.trip.dep[st.index];
-      this.onUnitEvent(u, "departedStation", { station: st, delay: u.delay });
+      this.notify(u, "departedStation", { station: st, delay: u.delay });
       u.dockedIdx = null;
     }
   }
@@ -208,19 +236,26 @@ export class TrafficManager {
     return this.units.find(u => u.route === route && u.sim.isStopped && Math.abs(u.sim.position - rs.stopZ) <= CONFIG.station.stopTolerance) || null;
   }
 
-  /** Próximos trenes a una estación por un andén (side = +1 vía 1 · −1 vía 2). */
+  /**
+   * Próximos trenes a una estación del mundo en una ruta.
+   * Los trenes que ya circulan se estiman desde su posición real (eta.js);
+   * los que aún no han salido de cocheras, por el horario.
+   * @returns {Array<{id, here, eta, minutes, at, scheduled, delay}>}  ordenados por llegada
+   */
   arrivalsFor(worldStation, route, clock) {
     const rs = route.stationOf(worldStation);
     const list = [];
     for (const u of this.units) {
-      if (u.route !== route || u.sim.position < rs.stopZ - 1) continue;
-      const here = Math.abs(u.sim.position - rs.stopZ) <= CONFIG.station.stopTolerance && u.sim.isStopped;
-      const eta = here ? 0 : Math.max(0, u.trip.arr[rs.index] + Math.max(0, u.delay) - clock);
-      list.push({ here, eta, minutes: Math.floor(eta / 60) });
+      if (u.route !== route) continue;
+      const at = estimateArrival(u, rs, clock);
+      if (at === null) continue;
+      const eta = Math.max(0, at - clock);
+      const scheduled = u.trip.arr[rs.index];
+      list.push({ id: u.id, here: eta === 0, eta, minutes: Math.floor(eta / 60), at, scheduled, delay: at - scheduled });
     }
     for (const t of this.timetables.get(route.id).upcomingAt(rs.index, clock, this.started)) {
-      const eta = t.arr[rs.index] - clock;
-      list.push({ here: false, eta, minutes: Math.floor(eta / 60) });
+      const at = t.arr[rs.index], eta = at - clock;
+      list.push({ id: t.id, here: false, eta, minutes: Math.floor(eta / 60), at, scheduled: at, delay: 0 });
     }
     return list.sort((a, b) => a.eta - b.eta);
   }

@@ -67,11 +67,17 @@ ENTRADA DEL JUGADOR → MOTOR METROSIM → ESTADO DE LA RED → RENDER 3D / INTE
 ```
 
 El motor (`js/engine/`) no usa Three.js ni el navegador: los trenes circulan con su propio reloj de paso fijo,
-los mire el jugador o no. Se puede ejecutar sin gráficos:
+los mire el jugador o no. Cada tren tiene un **estado explícito** (arrancando, circulando, aproximándose,
+puertas abiertas, listo para salir, detenido ante señal...) y las pantallas de "próximo tren" se calculan desde
+la **posición real** de cada tren, no solo desde el horario. El juego escucha al motor por su bus de eventos
+(`train:created`, `train:removed`, `train:event`, `train:state`...).
+
+Se puede ejecutar sin gráficos:
 
 ```
 node tools/simular.mjs            # 08:00 → 10:00, informe cada 15 min
 node tools/simular.mjs 09:30 5    # hasta las 09:30, informe cada 5 min
+node tools/simular.mjs 09:00 10 "PLAZA EGAÑA"   # pantallas de andén de otra estación
 ```
 
 (Requiere Node 22 o superior.)
@@ -90,6 +96,8 @@ js/engine/            MOTOR (sin Three.js)
   sim.js              física del tren y conducción automática
   traffic.js          todos los trenes de la línea, maniobras y retrasos
   consist.js          composición lógica del tren de 5 coches
+  state.js            estado explícito de cada tren
+  eta.js              llegadas estimadas desde la posición real
   events.js           bus de eventos del motor
   format.js           utilidades puras
 js/render/            dibujo del estado del motor

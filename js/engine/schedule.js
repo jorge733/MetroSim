@@ -28,18 +28,26 @@ function cruiseSpeed(route, zFrom, zTo) {
   return (kmh - 4) / 3.6;
 }
 
-/** Tiempo de recorrido (s) entre dos puntos de parada de una ruta. */
-export function runTime(route, zFrom, zTo) {
+/**
+ * Tiempo puro de marcha (s, sin márgenes) de zFrom a zTo terminando parado,
+ * empezando a velocidad v0 (m/s): acelera hasta el crucero, mantiene y frena.
+ */
+export function travelTime(route, zFrom, zTo, v0 = 0) {
   const d = zFrom - zTo;
+  if (d <= 0) return 0;
   const v = cruiseSpeed(route, zFrom, zTo);
-  const dAcc = (v * v) / (2 * ACCEL), dDec = (v * v) / (2 * DECEL);
-  let t;
-  if (d >= dAcc + dDec) t = v / ACCEL + v / DECEL + (d - dAcc - dDec) / v;
-  else {
-    const vPeak = Math.sqrt((2 * d * ACCEL * DECEL) / (ACCEL + DECEL));
-    t = vPeak / ACCEL + vPeak / DECEL;
-  }
-  return Math.round(t * MARGIN + FIXED);
+  v0 = Math.min(v0, v);
+  const dAcc = (v * v - v0 * v0) / (2 * ACCEL), dDec = (v * v) / (2 * DECEL);
+  if (d >= dAcc + dDec) return (v - v0) / ACCEL + v / DECEL + (d - dAcc - dDec) / v;
+  // Tramo corto: no llega al crucero
+  const vPeak = Math.sqrt((2 * d * ACCEL * DECEL + v0 * v0 * DECEL) / (ACCEL + DECEL));
+  if (vPeak <= v0) return (2 * d) / Math.max(v0, 0.1);              // ya va frenando
+  return (vPeak - v0) / ACCEL + vPeak / DECEL;
+}
+
+/** Tiempo de recorrido del horario (s) entre dos puntos de parada de una ruta. */
+export function runTime(route, zFrom, zTo) {
+  return Math.round(travelTime(route, zFrom, zTo, 0) * MARGIN + FIXED);
 }
 
 /** Tiempo de parada (s) en una estación según demanda y combinaciones. */

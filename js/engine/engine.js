@@ -9,13 +9,19 @@
 
      ENTRADA DEL JUGADOR → MetroEngine → estado de la red → render / interfaz / audio
 
-   Por ahora envuelve los sistemas que ya existían (TrafficManager,
-   SignalSystem, Timetable) sin cambiar su comportamiento. Es la base para
-   las siguientes fases: demanda de pasajeros, regulación, más líneas y el
-   Centro de Control.
+   Envuelve los sistemas del Metro (TrafficManager, SignalSystem, Timetable)
+   y ofrece lo que necesita quien lo mira desde fuera:
+     · bus de eventos (events.js):
+         "train:created" / "train:rebuilt" / "train:removed"  ciclo de vida
+         "train:event"  { unit, type, data }   sucesos de cada tren
+         "train:state"  { unit, from, to, time } cambio de estado (state.js)
+     · llegadas estimadas desde la posición real de los trenes (eta.js)
+     · estado legible de toda la red (snapshot / report)
+   Es la base para las siguientes fases: demanda de pasajeros, regulación,
+   más líneas y el Centro de Control.
    ========================================================================== */
 
-import { CONFIG } from "../config.js";
+import { CONFIG, STATIONS } from "../config.js";
 import { ROUTES, ROUTE_A, ROUTE_B } from "./route.js";
 import { Timetable } from "./schedule.js";
 import { SignalSystem } from "./signals.js";
@@ -23,12 +29,15 @@ import { TrafficManager } from "./traffic.js";
 import { SimClock } from "./clock.js";
 import { EventBus } from "./events.js";
 import { formatClock } from "./format.js";
+import { TRAIN_STATES } from "./state.js";
+import { estimateArrival } from "./eta.js";
 
 export class MetroEngine {
   /**
    * @param {object} opts
    * @param {number} opts.startTime   hora inicial (segundos desde medianoche)
-   * @param {(unit, type:string, data?:object)=>void} opts.onUnitEvent  eventos de cada tren (sonidos, mensajes...)
+   * @param {(unit, type:string, data?:object)=>void} opts.onUnitEvent  receptor directo de los sucesos de cada tren
+   *        (opcional: también llegan por el bus como "train:event")
    */
   constructor({ startTime = CONFIG.startTime, onUnitEvent = () => {} } = {}) {
     this.bus = new EventBus();
@@ -87,6 +96,23 @@ export class MetroEngine {
     this.clock.time = time;
   }
 
+  /* ----- Llegadas ----- */
+
+  /** Hora estimada de llegada de un tren a una estación del mundo (o null si ya la pasó). */
+  eta(unit, worldStation) {
+    return estimateArrival(unit, unit.route.stationOf(worldStation), this.time);
+  }
+
+  /**
+   * Próximos trenes a una estación en un sentido (lo que muestran las pantallas del andén).
+   * @param {object|string} station  estación del mundo o su nombre
+   * @param {object} route           ruta (sentido)
+   */
+  arrivalsAt(station, route) {
+    const st = typeof station === "string" ? STATIONS.find(s => s.name === station) : station;
+    return this.traffic.arrivalsFor(st, route, this.time);
+  }
+
   /* ----- Estado legible ----- */
 
   /** Descripción de cada tren de la red, en datos simples. */
@@ -116,24 +142,14 @@ export function describeTrain(u) {
   else if (!next) location = `cola de maniobras tras ${route.last.name}`;
   else location = `entre ${route.stations[next.index - 1].name} y ${next.name}`;
 
-  const STATES = {
-    depot: "en cocheras", dwell: "detenido, puertas abiertas", closing: "cerrando puertas",
-    ready: "listo para salir", retire: "hacia la cola de maniobras", retired: "cambio de cabina",
-  };
-  let state;
-  if (u.isPlayer) state = sim.isStopped ? "detenido (jugador)" : "conducido por el jugador";
-  else if (u.ato.state === "running") {
-    if (sim.isStopped) state = docked ? "detenido" : "esperando señal";
-    else if (sim.speed < 1 && sim.accel > 0) state = "arrancando";
-    else state = next && sim.position - next.stopZ < 400 && sim.accel < 0 ? "aproximándose" : "circulando";
-  } else state = STATES[u.ato.state] || u.ato.state;
-
+  const label = TRAIN_STATES[u.state] ?? "—";
   return {
     id: u.id,
     direction: `${route.first.name} → ${route.last.name}`,
     location,
     kmh: Math.round(sim.speedKmh),
-    state,
+    stateId: u.state,
+    state: u.isPlayer ? `${label} (jugador)` : label,
     doors: sim.doorState,
     delay: u.arrivedIdx === null && u.dockedIdx === null ? null : u.delay,
     load: u.load,
