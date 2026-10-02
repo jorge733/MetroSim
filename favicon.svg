@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Favicon de MetroSim: el símbolo "M" rojo del menú con el círculo café de la Línea 3 -->
+  <rect x="2" y="2" width="60" height="60" rx="15" fill="#e42a2d"/>
+  <path d="M15 47V17h7.5L32 32.5 41.5 17H49v30h-7.5V30.5L32 45.5 22.5 30.5V47z" fill="#fff"/>
+  <circle cx="51" cy="51" r="11" fill="#8b5a2b" stroke="#fff" stroke-width="3"/>
+  <text x="51" y="56" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="900" fill="#fff">3</text>
+</svg>
