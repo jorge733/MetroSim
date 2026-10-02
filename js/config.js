@@ -1,12 +1,18 @@
 /* ==========================================================================
    MetroSim — Alpha 0.6 · config.js
-   Configuración global: Línea 3 del Metro de Santiago, geometría de
-   estaciones y trenes, mando, horarios y demanda.
+   Configuración global: geometría de estaciones y trenes, mando, horarios,
+   demanda y la LÍNEA ACTIVA (la que se juega y se construye en 3D).
 
-   Ejes del MUNDO: Plaza Quilicura está en z = 0 y la línea avanza hacia -Z
-   (Fernando Castillo Velasco ≈ z = -23 400). Altura y = 0: nivel de la losa.
-   Doble vía: la vía 1 (hacia F. Castillo Velasco) está en x = +2 y la vía 2
-   (hacia Plaza Quilicura) en x = -2. Cada vía tiene su andén lateral.
+   Las estaciones de todas las líneas están en engine/network.js. Al empezar
+   una partida se elige una línea (route.js → setActiveLine) y LINE,
+   STATIONS, WORLD y WORLD_SPEED_LIMITS pasan a ser los de esa línea: todos
+   los módulos que los importan ven el cambio (enlaces "vivos" de los
+   módulos ES).
+
+   Ejes del MUNDO: la primera estación de la línea está en z = 0 y la línea
+   avanza hacia -Z. Altura y = 0: nivel de la losa. Doble vía: la vía 1 (de
+   ida) está en x = +2 y la vía 2 (de vuelta) en x = -2. Cada vía tiene su
+   andén lateral.
 
    Cada sentido de circulación es una "ruta" (route.js) con sus propias
    coordenadas de simulación; ver route.js.
@@ -15,51 +21,38 @@
    las combinaciones son reales.
    ========================================================================== */
 
-export const VERSION = "ALPHA 0.6";
+export const VERSION = "ALPHA 0.7";
 
-/* ---------- Línea ---------- */
-export const LINE = {
-  id: "3",
-  name: "LÍNEA 3",
-  color: "#8b5a2b",             // café, color oficial de la L3
-  colorHex: 0x8b5a2b,
-  operator: "METRO DE SANTIAGO",
-};
-
-/** Colores de las líneas con las que hay combinación. */
+/* ---------- Colores oficiales de las líneas ---------- */
 export const LINE_COLORS = {
   "1": "#e1251b", "2": "#f4b400", "3": "#8b5a2b", "4": "#1d3f95",
   "4A": "#3c86c6", "5": "#00965e", "6": "#9b26b6",
 };
 
+/* ---------- Línea activa (la que se juega) ---------- */
+/** Datos de la línea activa: id, nombre, color… */
+export let LINE = null;
+/** Estaciones de la línea activa (coordenadas del mundo). */
+export let STATIONS = [];
+/** Extremos del mundo de la línea activa (incluyendo colas de maniobra). */
+export let WORLD = null;
+/** Limitaciones de velocidad de la línea activa (coordenadas del mundo, from > to). */
+export let WORLD_SPEED_LIMITS = [];
+
 /**
- * Estaciones de la L3 (norte → oriente).
- * gap = metros desde la estación anterior (aproximados).
- * combos = líneas de Metro con combinación.
+ * Cambia la línea activa (lo llama route.js → setActiveLine).
+ * @param {object} line  línea de engine/network.js
  */
-const STATION_DATA = [
-  { name: "PLAZA QUILICURA",            short: "PLAZA QUILICURA",   gap: 0 },
-  { name: "LO CRUZAT",                  short: "LO CRUZAT",         gap: 1500 },
-  { name: "FERROCARRIL",                short: "FERROCARRIL",       gap: 1300 },
-  { name: "LOS LIBERTADORES",           short: "LOS LIBERTADORES",  gap: 1700 },
-  { name: "CARDENAL CARO",              short: "CARDENAL CARO",     gap: 1600 },
-  { name: "VIVACETA",                   short: "VIVACETA",          gap: 1250 },
-  { name: "CONCHALÍ",                   short: "CONCHALÍ",          gap: 1150 },
-  { name: "PLAZA CHACABUCO",            short: "PZA. CHACABUCO",    gap: 1050 },
-  { name: "HOSPITALES",                 short: "HOSPITALES",        gap: 1150 },
-  { name: "PUENTE CAL Y CANTO",         short: "CAL Y CANTO",       gap: 1400, combos: ["2"] },
-  { name: "PLAZA DE ARMAS",             short: "PLAZA DE ARMAS",    gap: 650,  combos: ["5"] },
-  { name: "UNIVERSIDAD DE CHILE",       short: "U. DE CHILE",       gap: 750,  combos: ["1"] },
-  { name: "PARQUE ALMAGRO",             short: "PARQUE ALMAGRO",    gap: 950 },
-  { name: "MATTA",                      short: "MATTA",             gap: 1050 },
-  { name: "IRARRÁZAVAL",                short: "IRARRÁZAVAL",       gap: 1350, combos: ["5"] },
-  { name: "MONSEÑOR EYZAGUIRRE",        short: "M. EYZAGUIRRE",     gap: 1200 },
-  { name: "ÑUÑOA",                      short: "ÑUÑOA",             gap: 1000, combos: ["6"] },
-  { name: "CHILE ESPAÑA",               short: "CHILE ESPAÑA",      gap: 1050 },
-  { name: "VILLA FREI",                 short: "VILLA FREI",        gap: 950 },
-  { name: "PLAZA EGAÑA",                short: "PLAZA EGAÑA",       gap: 1050, combos: ["4"] },
-  { name: "FERNANDO CASTILLO VELASCO",  short: "F. CASTILLO V.",    gap: 1300 },
-];
+export function setActiveLineData(line) {
+  LINE = { id: line.id, name: line.name, color: line.color, colorHex: line.colorHex, operator: "METRO DE SANTIAGO" };
+  STATIONS = line.stations;
+  WORLD = {
+    start: STATIONS[0].z + CONFIG.track.tail,
+    end: STATIONS.at(-1).z - CONFIG.track.tail,
+    lineLength: STATIONS[0].z - STATIONS.at(-1).z,
+  };
+  WORLD_SPEED_LIMITS = line.speedLimits;
+}
 
 /* ---------- Parámetros generales ---------- */
 const CAR_LENGTH = 18, CAR_GAP = 0.6, CARS = 5;
@@ -123,7 +116,7 @@ export const CONFIG = {
     minDwell: 20,
     peakHeadway: 240,                  // 4 min en hora punta
     offPeakHeadway: 360,               // 6 min fuera de punta
-    playerDeparture: 8 * 3600 + 90,    // tu servicio sale de Plaza Quilicura a las 08:01:30
+    playerDeparture: 8 * 3600 + 90,    // referencia de las mallas (en el juego: ~1,5 min después de la hora local)
     reverseOffset: 120,                // los servicios de vuelta están desfasados 2 min
     punctualWindow: 30,
   },
@@ -163,32 +156,6 @@ export function fareBandAt(clockSeconds) {
 
 /** Formato de pesos chilenos: 2350 → "$2.350". */
 export const formatCLP = (n) => "$" + Math.round(n).toLocaleString("es-CL");
-
-/* ---------- Estaciones (coordenadas del mundo) ---------- */
-let acc = 0;
-export const STATIONS = STATION_DATA.map((s, index) => {
-  acc += s.gap;
-  return {
-    ...s,
-    id: s.name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z]+/g, "-"),
-    index,
-    combos: s.combos || [],
-    z: -acc,
-    km: acc / 1000,
-  };
-});
-
-/** Extremos del mundo (incluyendo colas de maniobra en ambos terminales). */
-export const WORLD = {
-  start: STATIONS[0].z + CONFIG.track.tail,
-  end: STATIONS.at(-1).z - CONFIG.track.tail,
-  lineLength: STATIONS[0].z - STATIONS.at(-1).z,
-};
-
-/* ---------- Limitaciones de velocidad (coordenadas del mundo, from > to) ---------- */
-export const WORLD_SPEED_LIMITS = [
-  { from: STATIONS[9].z + 300, to: STATIONS[10].z - 200, kmh: 50, label: "ZONA CÉNTRICA" },
-];
 
 /* ---------- Mando ---------- */
 export const NOTCHES = [

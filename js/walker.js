@@ -29,7 +29,7 @@
 
 import * as THREE from "three";
 import { CONFIG, STATIONS } from "./config.js";
-import { ROUTES, routeForSide } from "./engine/route.js";
+import { ROUTES, ROUTE_A, ROUTE_B, routeForSide } from "./engine/route.js";
 import { TRAIN_LAYOUT } from "./engine/consist.js";
 import { clamp } from "./utils.js";
 import { platformSolidAt, isArrivalOnly } from "./stationLayout.js";
@@ -420,7 +420,7 @@ export class Walker {
       const closed = here && [1, -1].find(sd => isArrivalOnly(here, sd));
       if (this.paid && closed) return `Estación terminal · baja por la escalera ${closed > 0 ? "izquierda" : "derecha"} (la otra es solo de salida)`;
       return this.paid
-        ? "Zona pagada · escalera izquierda: dir. Plaza Quilicura · derecha: dir. F. Castillo Velasco"
+        ? `Zona pagada · escalera izquierda: dir. ${ROUTE_B.last.short} · derecha: dir. ${ROUTE_A.last.short}`
         : "Pasa por un torniquete para validar tu tarjeta bip! · boletería a la izquierda, tótems a la derecha";
     }
     if (this.pos.y > S.platformTop + 0.3) {

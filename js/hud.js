@@ -1,12 +1,12 @@
 /* ==========================================================================
    MetroSim — Alpha 0.6 · hud.js
-   HUD HTML superpuesto: reloj, esquema de la Línea 3, selector de mando,
+   HUD HTML superpuesto: reloj, esquema de la línea activa, selector de mando,
    inversor, velocímetro, estación, señal, horario, puertas, panel del
    pasajero a pie, tarjeta bip!, panel de boletería / tótem, fundido de
    pantalla, mensajes y resumen de servicio.
    ========================================================================== */
 
-import { STATIONS, NOTCHES, NOTCH_INDEX, WORLD, FARES, formatCLP, fareBandAt } from "./config.js";
+import { STATIONS, LINE, NOTCHES, NOTCH_INDEX, WORLD, FARES, formatCLP, fareBandAt } from "./config.js";
 import { $, clamp, formatClock, formatStopError } from "./utils.js";
 import { formatDelay } from "./engine/schedule.js";
 
@@ -50,7 +50,20 @@ export class Hud {
     });
   }
 
-  /** 21 estaciones colocadas según su distancia; solo se rotulan terminales y la actual. */
+  /**
+   * Cambia la línea mostrada (al empezar una partida): esquema, nombre,
+   * insignia y color de acento de toda la interfaz.
+   */
+  setLine() {
+    document.documentElement.style.setProperty("--line", LINE.color);
+    this.setText($("hudLineBadge"), LINE.id);
+    this.setText($("hudLineLabel"), `METRO DE SANTIAGO · ${LINE.name}`);
+    this.setText($("hudLineRoute"), `${STATIONS[0].name} ⇄ ${STATIONS.at(-1).name}`);
+    this.stripDots?.forEach(d => d.remove());
+    this.buildLineStrip();
+  }
+
+  /** Estaciones colocadas según su distancia; solo se rotulan terminales y la actual. */
   buildLineStrip() {
     this.stripDots = STATIONS.map((s, i) => {
       const dot = document.createElement("div");

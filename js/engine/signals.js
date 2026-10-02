@@ -67,9 +67,16 @@ export class SignalSystem {
     for (const s of list) s.occupied = false;
     for (const u of units) {
       const front = u.sim.position, rear = front + L;
-      // Cantones que se solapan con el tren: el tren ocupa (front, rear)
-      for (const s of list) {
-        if (front < s.z && rear > s.endZ) s.occupied = true;
+      // Cantones que se solapan con el tren: el tren ocupa (front, rear).
+      // La lista va ordenada por z descendente: se empieza por la primera señal por delante del testero.
+      const first = this.nextAhead(front);
+      let i = first ? first.index : list.length;
+      if (i > 0 && list[i - 1].z > front && list[i - 1].endZ < rear) i--;   // cantón que contiene el testero
+      for (let j = Math.max(0, i - 3); j < list.length; j++) {
+        const s = list[j];
+        if (s.endZ >= rear) continue;
+        if (s.z <= front) break;
+        s.occupied = true;
       }
     }
 

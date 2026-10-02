@@ -161,7 +161,7 @@ function fitFont(g, text, weight, maxSize, maxWidth) {
 
 /**
  * Cartel de estación al estilo Metro de Santiago: fondo oscuro, insignia
- * café de la Línea 3 y, si existen, insignias de combinación.
+ * del color de la línea activa y, si existen, insignias de combinación.
  */
 export function stationNameCanvas(st) {
   const W = 1024, H = 256, c = makeCanvas(W, H), g = c.getContext("2d");
@@ -178,7 +178,7 @@ export function stationNameCanvas(st) {
 }
 
 /**
- * Plano de la Línea 3 completo (compartido por todas las estaciones y trenes).
+ * Plano completo de la línea activa (compartido por todas las estaciones y trenes).
  * Las estaciones se colocan según su distancia real aproximada.
  */
 export function lineMapCanvas() {
@@ -186,7 +186,7 @@ export function lineMapCanvas() {
   g.fillStyle = "#f4f2ec"; g.fillRect(0, 0, W, H);
   drawLineBadge(g, LINE.id, 70, 64, 40);
   g.fillStyle = "#1b2430"; g.font = "800 40px Arial"; g.textAlign = "left"; g.textBaseline = "middle";
-  g.fillText(`${LINE.name} · PLAZA QUILICURA — FERNANDO CASTILLO VELASCO`, 130, 66);
+  g.fillText(`${LINE.name} · ${STATIONS[0].name} — ${STATIONS.at(-1).name}`, 130, 66);
   const x0 = 90, x1 = W - 90, y = 190;
   const xOf = (st) => x0 + (x1 - x0) * ((STATIONS[0].z - st.z) / WORLD.lineLength);
   g.fillStyle = LINE.color; g.fillRect(x0, y - 9, x1 - x0, 18);

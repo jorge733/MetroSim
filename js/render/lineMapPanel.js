@@ -65,7 +65,7 @@ export class LineMapPanel {
     g.fillStyle = "#f4f2ec"; g.fillRect(0, 0, W, 108);
     drawLineBadge(g, LINE.id, 70, 64, 40);
     g.fillStyle = "#1b2430"; g.textBaseline = "middle"; g.textAlign = "left"; g.font = "800 40px Arial";
-    g.fillText(info ? `${LINE.name} · DIRECCIÓN ${info.route.last.name}` : `${LINE.name} · PLAZA QUILICURA — FERNANDO CASTILLO VELASCO`, 130, 66);
+    g.fillText(info ? `${LINE.name} · DIRECCIÓN ${info.route.last.name}` : `${LINE.name} · ${STATIONS[0].name} — ${STATIONS.at(-1).name}`, 130, 66);
     if (!info) { this.texture.needsUpdate = true; return; }
     if (info.current) {
       g.textAlign = "right";

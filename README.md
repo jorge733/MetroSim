@@ -1,6 +1,6 @@
 # MetroSim
 
-Simulador ferroviario 3D de la **Línea 3 del Metro de Santiago** para navegador, hecho con HTML, CSS, JavaScript y [Three.js](https://threejs.org/).
+Simulador ferroviario 3D del **Metro de Santiago**: líneas 1, 2, 3, 4, 4A, 5 y 6 para navegador, hecho con HTML, CSS, JavaScript y [Three.js](https://threejs.org/).
 
 Conductor y pasajero comparten el mismo mundo: los mismos trenes, señales, horarios y viajeros.
 
@@ -13,7 +13,12 @@ Los módulos ES necesitan un servidor local (no funciona abriendo `index.html` c
 
 Three.js se carga desde CDN, así que hace falta conexión a internet.
 
-## Qué incluye (Alpha 0.6)
+## Qué incluye (Alpha 0.7)
+
+- **Elige tu línea** en la pantalla principal (conductor y pasajero): L1, L2, L3, L4, L4A, L5 o L6, cada una con su
+  mundo 3D, sus estaciones reales en orden, sus combinaciones, su color y sus carteles. El resto de la red sigue
+  funcionando a la vez (sin dibujo) y se conecta por las combinaciones. Las distancias son aproximadas y, por
+  simplicidad, todas las líneas se representan subterráneas.
 
 - Las 21 estaciones reales de la L3 (Plaza Quilicura ⇄ Fernando Castillo Velasco) con sus combinaciones.
 - Doble vía con trenes automáticos en ambos sentidos según horario (cada 4 min en punta).
@@ -67,10 +72,10 @@ Three.js se carga desde CDN, así que hace falta conexión a internet.
 
 MetroSim separa el **motor** (el "cerebro" del Metro) del **render** (lo que se ve).
 
-El motor simula una **red de varias líneas** con un único reloj: la **L3** (la que se dibuja y se juega) y la
-**L6** (Cerrillos ⇄ Los Leones, simulada sin dibujo). Se conectan en **Ñuñoa**: parte de la gente que baja de una
-línea sigue viaje por la otra, así que un problema en una se nota en la otra. En Ñuñoa, el HUD del pasajero muestra
-los próximos trenes de la L6.
+El motor simula **toda la red (7 líneas)** con un único reloj. La línea que eliges se construye en 3D; las demás
+se simulan sin dibujo. Se conectan en sus combinaciones (Universidad de Chile, Baquedano, Los Héroes, Tobalaba,
+Ñuñoa…): parte de la gente que baja de una línea sigue viaje por otra, así que un problema en una se nota en las
+demás. En una estación de combinación, el HUD del pasajero muestra los próximos trenes de las otras líneas.
 
 
 ```
@@ -122,7 +127,7 @@ index.html            pantallas y HUD
 styles.css            estilos
 js/engine/            MOTOR (sin Three.js)
   engine.js           MetroEngine: red de líneas con un reloj común; informe de estado
-  network.js          líneas de la red (L3, L6) y combinaciones
+  network.js          las 7 líneas de la red (estaciones reales) y combinaciones
   clock.js            reloj de paso fijo
   route.js            los dos sentidos de circulación
   schedule.js         horarios

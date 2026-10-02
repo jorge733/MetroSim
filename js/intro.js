@@ -1,7 +1,7 @@
 /* ==========================================================================
    MetroSim — Alpha 0.6 · intro.js
    Introducción de bienvenida: viaje animado por un túnel, logo, título,
-   esquema de la Línea 3 que se enciende y tres tarjetas de presentación.
+   esquema de una línea que se enciende y tres tarjetas de presentación.
    "Comenzar" (o cualquier tecla) toca el gong, da la bienvenida por voz y
    pasa al menú. Solo se muestra al abrir la página.
    El módulo crea su propio HTML y CSS para no tocar el resto de la interfaz.
@@ -87,7 +87,7 @@ function welcomeSound(muted) {
   } catch { /* sin audio */ }
   if (!("speechSynthesis" in window)) return;
   setTimeout(() => {
-    const u = new SpeechSynthesisUtterance("Bienvenido a MetroSim. Línea 3 del Metro de Santiago.");
+    const u = new SpeechSynthesisUtterance("Bienvenido a MetroSim. Metro de Santiago.");
     const v = bestSpanishVoice();
     if (v) { u.voice = v; u.lang = v.lang; } else u.lang = "es-CL";
     u.rate = 0.92;
@@ -113,11 +113,11 @@ export function playIntro({ isMuted = () => false } = {}) {
     <div class="intro-content">
       <div class="intro-logo">M</div>
       <h1 class="intro-title">MetroSim</h1>
-      <p class="intro-sub"><span class="intro-dot">3</span>Bienvenido a la Línea 3 del Metro de Santiago</p>
+      <p class="intro-sub">Bienvenido al Metro de Santiago · 7 líneas</p>
       <div class="intro-line"></div>
       <div class="intro-cards">
         <div><b>🚇 Conduce</b>Trenes de 5 coches con señales, horarios y maniobra de retorno.</div>
-        <div><b>🚶 Viaja</b>Recorre 21 estaciones reales a pie, con mezanina y escaleras.</div>
+        <div><b>🚶 Viaja</b>Recorre las estaciones reales de cualquier línea, con mezanina y escaleras.</div>
         <div><b>💳 bip!</b>Carga tu tarjeta en la boletería y valida en el torniquete.</div>
       </div>
       <button class="intro-start">Comenzar ›</button>

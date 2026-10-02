@@ -121,7 +121,7 @@ export class ControlCenter {
         <header>
           <span class="pcc-badge" style="background:${ls.line.color}">${ls.line.id}</span>
           <strong>${ls.line.name}</strong>
-          <small style="color:var(--pcc-dim)">${ls.line.stations[0].name} ⇄ ${ls.line.stations.at(-1).name}${ls.line.id === "3" ? " · con mundo 3D" : " · simulada"}</small>
+          <small style="color:var(--pcc-dim)">${ls.line.stations[0].name} ⇄ ${ls.line.stations.at(-1).name}</small>
           <button data-act="reg" data-line="${ls.line.id}" style="margin-left:auto">Regulación</button>
         </header>
         <div class="pcc-kpis"></div>

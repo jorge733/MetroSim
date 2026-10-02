@@ -1,6 +1,6 @@
 /* ==========================================================================
    MetroSim — Alpha 0.6 · world.js
-   Mundo 3D fijo de la Línea 3 (doble vía): vías, catenaria rígida, túnel de
+   Mundo 3D de la línea activa (doble vía): vías, catenaria rígida, túnel de
    doble vía, 21 estaciones con andenes laterales, escaleras, mezanina con
    torniquetes y salida a la calle, pantallas de próximo tren y topes.
 
@@ -33,6 +33,11 @@ const TILE_TINTS = [[0, 0, 0], [-14, -4, 10], [8, -2, -14], [-8, 4, -4]];
 /* ==========================================================================
    Materiales compartidos
    ========================================================================== */
+
+/** Fuente que hace caber un texto en un cartel (más pequeña para nombres largos). */
+function fitFont(text, size, maxChars) {
+  return `800 ${Math.round(size * Math.min(1, maxChars / Math.max(maxChars, text.length)))}px Arial`;
+}
 
 function createWorldMaterials() {
   const wallH = S.ceilingY + 0.05;
@@ -115,9 +120,9 @@ function createWorldMaterials() {
     // Carteles compartidos
     exitUp: glow(0xffffff, { map: toTexture(signCanvas("↑  SALIDA")) }),
     exitStreet: glow(0xffffff, { map: toTexture(signCanvas("SALIDA A LA CALLE", "#1f7a3c", 1024, 128, "800 60px Arial")) }),
-    dirA: glow(0xffffff, { map: toTexture(signCanvas("DIRECCIÓN F. CASTILLO VELASCO", "#1d2228", 1024, 128, "800 50px Arial")) }),
-    dirB: glow(0xffffff, { map: toTexture(signCanvas("DIRECCIÓN PLAZA QUILICURA", "#1d2228", 1024, 128, "800 50px Arial")) }),
-    toPlatforms: glow(0xffffff, { map: toTexture(signCanvas("←  PLAZA QUILICURA     ANDENES     F. CASTILLO VELASCO  →", LINE.color, 2048, 128, "800 52px Arial")) }),
+    dirA: glow(0xffffff, { map: toTexture(signCanvas(`DIRECCIÓN ${ROUTE_A.last.name}`, "#1d2228", 1024, 128, fitFont(`DIRECCIÓN ${ROUTE_A.last.name}`, 50, 26))) }),
+    dirB: glow(0xffffff, { map: toTexture(signCanvas(`DIRECCIÓN ${ROUTE_B.last.name}`, "#1d2228", 1024, 128, fitFont(`DIRECCIÓN ${ROUTE_B.last.name}`, 50, 26))) }),
+    toPlatforms: glow(0xffffff, { map: toTexture(signCanvas(`←  ${ROUTE_B.last.short}     ANDENES     ${ROUTE_A.last.short}  →`, LINE.color, 2048, 128, "800 52px Arial")) }),
     ticketOffice: glow(0xffffff, { map: toTexture(signCanvas("BOLETERÍA · CARGA TU TARJETA bip!", "#c41e2a", 1024, 128, "800 48px Arial")) }),
     stopBoard: glow(0xffffff, { map: toTexture(stopBoardCanvas()) }),
     lineMap: glow(0xffffff, { map: toTexture(lineMapCanvas()) }),
@@ -380,7 +385,7 @@ function buildTunnelSegment(scene, M, zA, zB) {
   }
   scene.add(housings, lamps);
 
-  // Hitos kilométricos cada 200 m (pk desde Plaza Quilicura)
+  // Hitos kilométricos cada 200 m (pk desde la primera estación de la línea)
   const origin = STATIONS[0].z;
   for (let d = Math.ceil((origin - zA) / 200) * 200; origin - d > zB; d += 200) {
     const z = origin - d;
@@ -753,7 +758,7 @@ function drawPid(pid, st, clock, arrivals) {
   g.fillStyle = "#050607"; g.fillRect(0, 0, W, H);
   g.fillStyle = LINE.color; g.fillRect(0, 0, W, 34);
   g.fillStyle = "#fff"; g.font = "800 19px Arial"; g.textBaseline = "middle"; g.textAlign = "left";
-  g.fillText(`L3 · DIR. ${route.last.short}`, 12, 18);
+  g.fillText(`L${LINE.id} · DIR. ${route.last.short}`, 12, 18);
   g.textAlign = "right"; g.fillText(formatClock(clock).slice(0, 5), W - 12, 18);
 
   g.font = "700 30px monospace";

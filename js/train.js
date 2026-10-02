@@ -16,7 +16,8 @@
 
 import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
-import { CONFIG } from "./config.js";
+import { CONFIG, LINE } from "./config.js";
+import { ROUTE_A, ROUTE_B } from "./engine/route.js";
 import { std, glow, addBox, addBoxSpan, addPlane, toTexture, lineMapCanvas, destinationCanvas } from "./utils.js";
 import { CabDisplay } from "./dmi.js";
 import { CAR_TYPES, CONSIST, carToTrainZ, TRAIN_LAYOUT } from "./engine/consist.js";
@@ -40,6 +41,9 @@ let ASSETS = null;
 /** Libera la caché (la escena anterior ya destruyó geometrías y materiales). */
 export function resetTrainAssets() { ASSETS = null; }
 
+/** Nombre del destino para el letrero del tren (abreviado si es muy largo). */
+const signName = (st) => (st.name.length <= 20 ? st.name : st.short);
+
 /** Material compartido del plano de línea de los coches (lo anima render/lineMapPanel.js). */
 export function trainLineMapMaterial() { return ASSETS?.mat.lineMap ?? null; }
 
@@ -47,7 +51,7 @@ function assets() {
   if (ASSETS) return ASSETS;
   const mat = {
     body: std(0xc9d0d6, { metal: 0.65, rough: 0.32 }),
-    stripe: std(0x8b5a2b, { metal: 0.3, rough: 0.4 }),         // franja café de la Línea 3
+    stripe: std(LINE.colorHex, { metal: 0.3, rough: 0.4 }),    // franja del color de la línea activa
     mask: std(0x2a2e33, { metal: 0.35, rough: 0.35 }),
     black: std(0x101418, { metal: 0.3, rough: 0.5 }),
     roof: std(0x6e757b, { metal: 0.5, rough: 0.55 }),
@@ -71,8 +75,8 @@ function assets() {
     panelGrey: std(0x4a535c, { metal: 0.3, rough: 0.5 }),
     headlight: glow(0xfff6dc),
     taillight: glow(0xff1e1e),
-    destination: glow(0xffffff, { map: toTexture(destinationCanvas("F. CASTILLO VELASCO")) }),
-    destinationB: glow(0xffffff, { map: toTexture(destinationCanvas("PLAZA QUILICURA")) }),
+    destination: glow(0xffffff, { map: toTexture(destinationCanvas(signName(ROUTE_A.last))) }),
+    destinationB: glow(0xffffff, { map: toTexture(destinationCanvas(signName(ROUTE_B.last))) }),
     lineMap: glow(0xffffff, { map: toTexture(lineMapCanvas()) }),
   };
   ASSETS = { mat, templates: {} };

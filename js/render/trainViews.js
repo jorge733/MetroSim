@@ -9,7 +9,7 @@
    y en cada fotograma copia la posición y las puertas del estado lógico al
    modelo. El motor nunca toca Three.js.
 
-   Solo se dibujan los trenes de la línea que tiene mundo 3D (la L3); las
+   Solo se dibujan los trenes de la línea activa (la que tiene mundo 3D); las
    demás líneas de la red se simulan sin dibujo.
 
    Por compatibilidad con el resto del juego, la vista se cuelga del propio
@@ -19,10 +19,9 @@
 
 import { CONFIG } from "../config.js";
 import { buildTrain, buildTrainSlots } from "../train.js";
+import { ROUTE_A } from "../engine/route.js";
 
 const L = CONFIG.train.length;
-/** Línea que tiene mundo 3D. */
-const DRAWN_LINE = "3";
 
 export class TrainViews {
   /**
@@ -31,14 +30,14 @@ export class TrainViews {
    */
   constructor(scene, bus) {
     this.scene = scene;
-    const drawn = (u) => u.route.line.id === DRAWN_LINE;
+    const drawn = (u) => u.route.line === ROUTE_A.line;      // solo la línea activa tiene mundo 3D
     bus.on("train:created", (u) => drawn(u) && this.create(u));
     bus.on("train:rebuilt", (u) => { if (!drawn(u)) return; this.scene.remove(u.group); this.create(u); });
     bus.on("train:removed", (u) => drawn(u) && this.scene.remove(u.group));
   }
 
   create(u) {
-    u.model = buildTrain({ routeId: u.route.id, cab: u.isPlayer });
+    u.model = buildTrain({ routeId: u.route.dir === 1 ? "A" : "B", cab: u.isPlayer });
     u.group = u.model.group;
     u.group.rotation.y = u.route.dir === 1 ? 0 : Math.PI;   // la vía 2 circula hacia +Z
     u.slots = buildTrainSlots();

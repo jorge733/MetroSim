@@ -124,7 +124,7 @@ kbd {
   color: #8796a8;
 }
 .start-keys kbd { margin-right: 3px; }
-.version { position: absolute; bottom: 24px; color: #667586; font-size: 11px; letter-spacing: 1px; }
+.version { position: relative; margin: 0 0 18px; color: #667586; font-size: 11px; letter-spacing: 1px; text-align: center; }   /* debajo de las tarjetas (no se monta sobre ellas) */
 
 /* ---------- 3. Pantalla de juego y HUD superior ---------- */
 .game-screen, #gameContainer, #hud { position: absolute; inset: 0; }

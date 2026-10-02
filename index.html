@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>MetroSim — Alpha 0.6</title>
+  <title>MetroSim — Alpha 0.7</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="styles.css">
   <!-- Three.js mediante importmap (CDN). es-module-shims da compatibilidad a navegadores antiguos. -->
@@ -25,7 +25,7 @@
       <div class="metro-mark">M</div>
       <p class="eyebrow">SIMULADOR FERROVIARIO URBANO</p>
       <h1>MetroSim</h1>
-      <p class="tagline"><span class="line-dot">3</span> Línea 3 · Metro de Santiago · 21 estaciones · doble vía</p>
+      <p class="tagline" id="startTagline">Metro de Santiago · 7 líneas · elige la tuya</p>
 
       <div class="mode-selection">
         <div class="mode-card mode-card-passenger">
@@ -33,6 +33,9 @@
           <span>
             <strong>Modo Conductor</strong>
             <small>Tren de 5 coches. Respeta señales y horario; al final haz la maniobra de retorno.</small>
+            <label class="station-select">Línea
+              <select id="driverLine"></select>
+            </label>
             <label class="station-select">Servicio
               <select id="startDirection">
                 <option value="A">Ida · Plaza Quilicura → F. Castillo Velasco</option>
@@ -47,6 +50,9 @@
           <span>
             <strong>Modo Pasajero a pie</strong>
             <small>Carga tu tarjeta bip! en la boletería, valida en el torniquete y viaja en cualquier sentido.</small>
+            <label class="station-select">Línea
+              <select id="paxLine"></select>
+            </label>
             <label class="station-select">Empezar en
               <select id="startStation"></select>
             </label>
@@ -57,7 +63,7 @@
           <span class="mode-icon">🖥️</span>
           <span>
             <strong>Centro de Control</strong>
-            <small>Supervisa la red (L3 y L6) en tiempo real: retén o libera trenes y controla la regulación de intervalos.</small>
+            <small>Supervisa la red completa (7 líneas) en tiempo real: retén o libera trenes y controla la regulación de intervalos.</small>
           </span>
           <button class="go-button" data-mode="control">Supervisar ›</button>
         </div>
@@ -74,14 +80,14 @@
       </div>
       <p class="start-note">🔊 Con sonido y anuncios. La carga de la línea completa puede tardar unos segundos.</p>
     </main>
-    <p class="version">METROSIM ALPHA 0.6 · MANIOBRA DE RETORNO · BOLETERÍAS · ESCALERAS MECÁNICAS</p>
+    <p class="version">METROSIM ALPHA 0.7 · 7 LÍNEAS · CENTRO DE CONTROL · MANIOBRA DE RETORNO · BOLETERÍAS</p>
   </section>
 
   <!-- =============================== PANTALLA DE CARGA =============================== -->
   <section id="loadingScreen" class="screen loading-screen hidden">
     <div class="loading-card">
-      <span class="line-dot big">3</span>
-      <strong>Preparando la Línea 3…</strong>
+      <span class="line-dot big" id="loadingBadge">3</span>
+      <strong id="loadingTitle">Preparando la Línea 3…</strong>
       <small id="loadingText">Construyendo túneles y estaciones</small>
     </div>
   </section>
@@ -94,10 +100,10 @@
       <!-- Barra superior -->
       <header class="hud-top">
         <div class="hud-brand">
-          <span class="line-badge">3</span>
+          <span class="line-badge" id="hudLineBadge">3</span>
           <div class="hud-route">
-            <span class="hud-label">METRO DE SANTIAGO · LÍNEA 3</span>
-            <strong>PLAZA QUILICURA ⇄ F. CASTILLO VELASCO</strong>
+            <span class="hud-label" id="hudLineLabel">METRO DE SANTIAGO · LÍNEA 3</span>
+            <strong id="hudLineRoute">PLAZA QUILICURA ⇄ F. CASTILLO VELASCO</strong>
           </div>
           <span id="modeLabel" class="mode-pill">CONDUCTOR</span>
         </div>

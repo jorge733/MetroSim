@@ -50,7 +50,8 @@
 import * as THREE from "three";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { CONFIG, STATIONS, NOTCH_INDEX, FARES, spokenName, fareBandAt, formatCLP } from "./config.js";
-import { ROUTES, ROUTE_A, ROUTE_B, routeForSide, oppositeRoute } from "./engine/route.js";
+import { ROUTES, ROUTE_A, ROUTE_B, routeForSide, oppositeRoute, setActiveLine } from "./engine/route.js";
+import { LINES, lineById } from "./engine/network.js";
 import { BipCard } from "./card.js";
 import { PHRASES } from "./announcements.js";
 import { playIntro } from "./intro.js";
@@ -87,15 +88,47 @@ const directionSelect = $("startDirection");
 playIntro({ isMuted: () => muted });
 const wait = (ms) => new Promise(r => setTimeout(r, ms));
 
-// Selector de estación del modo pasajero (Universidad de Chile por defecto)
+/* --- Selección de línea en la pantalla principal (conductor y pasajero) --- */
 const stationSelect = $("startStation");
-STATIONS.forEach(st => {
-  const opt = document.createElement("option");
-  opt.value = st.index;
-  opt.textContent = st.name + (st.combos.length ? `  (L${st.combos.join(", L")})` : "");
-  stationSelect.append(opt);
-});
-stationSelect.value = String(STATIONS.findIndex(s => s.id === "universidad-de-chile"));
+const driverLineSelect = $("driverLine"), paxLineSelect = $("paxLine");
+const savedLine = loadSetting("metrosim.line") || "3";
+for (const sel of [driverLineSelect, paxLineSelect]) {
+  LINES.forEach(l => sel.append(new Option(`${l.name} · ${l.stations[0].short} ⇄ ${l.stations.at(-1).short}`, l.id)));
+  sel.value = lineById(savedLine) ? savedLine : "3";
+}
+fillDirections(lineById(driverLineSelect.value));
+fillStations(lineById(paxLineSelect.value));
+driverLineSelect.addEventListener("change", () => { fillDirections(lineById(driverLineSelect.value)); saveSetting("metrosim.line", driverLineSelect.value); });
+paxLineSelect.addEventListener("change", () => { fillStations(lineById(paxLineSelect.value)); saveSetting("metrosim.line", paxLineSelect.value); });
+
+/** Servicios del conductor: ida y vuelta de la línea elegida. */
+function fillDirections(line) {
+  const [A, B] = line.routes;
+  directionSelect.replaceChildren(
+    new Option(`Ida · ${A.first.short} → ${A.last.short}`, "A"),
+    new Option(`Vuelta · ${B.first.short} → ${B.last.short}`, "B"),
+  );
+}
+
+/** Estaciones del modo pasajero de la línea elegida (por defecto, la de más combinaciones). */
+function fillStations(line) {
+  stationSelect.replaceChildren(...line.stations.map(st =>
+    new Option(st.name + (st.combos.length ? `  (L${st.combos.join(", L")})` : ""), st.index)));
+  const preferred = line.stations.find(s => s.name === "UNIVERSIDAD DE CHILE")
+    || [...line.stations].sort((a, b) => b.combos.length - a.combos.length)[0];
+  stationSelect.value = String(preferred.index);
+}
+
+function loadSetting(key) { try { return localStorage.getItem(key); } catch { return null; } }
+function saveSetting(key, value) { try { localStorage.setItem(key, value); } catch { /* sin almacenamiento */ } }
+
+/** Activa la línea elegida: su mundo 3D, sus trenes, su interfaz y su color. */
+function useLine(line) {
+  setActiveLine(line);
+  hud.setLine();
+  $("loadingBadge").textContent = line.id;
+  $("loadingTitle").textContent = `Preparando la ${line.name.charAt(0) + line.name.slice(1).toLowerCase()}…`;
+}
 
 document.querySelectorAll("[data-mode]").forEach(btn => btn.addEventListener("click", () => startGame(btn.dataset.mode)));
 $("backButton").addEventListener("click", stopGame);
@@ -105,7 +138,7 @@ window.addEventListener("keyup", onKeyUp);
 window.addEventListener("resize", onResize);
 
 // Acceso de depuración desde la consola: MetroSim.game.traffic, etc.
-window.MetroSim = { get game() { return game; }, CONFIG, STATIONS, ROUTES };
+window.MetroSim = { get game() { return game; }, CONFIG, get STATIONS() { return STATIONS; }, get ROUTES() { return ROUTES; }, LINES };
 
 
 /* ==========================================================================
@@ -115,6 +148,7 @@ window.MetroSim = { get game() { return game; }, CONFIG, STATIONS, ROUTES };
 function startGame(mode) {
   if (game) stopGame();
   if (mode === "control") return startControl();
+  useLine(lineById(mode === "driver" ? driverLineSelect.value : paxLineSelect.value));
   const stationIndex = Number(stationSelect.value) || 0;
   const direction = directionSelect.value === "B" ? ROUTE_B : ROUTE_A;
   startScreen.classList.add("hidden");
@@ -373,7 +407,7 @@ function onKeyUp(event) {
 
 function onUnitEvent(unit, type, data = {}) {
   if (!game || game.warming || !unit.sim) return;
-  if (unit.route.line.id !== "3") return;                // otras líneas: simuladas sin dibujo ni sonido
+  if (unit.route.line !== ROUTE_A.line) return;          // otras líneas: simuladas sin dibujo ni sonido
   if (type === "removed") { game.people?.clearUnit(unit); return; }
   if (type === "turnbackStart") { game.people?.clearUnit(unit); return; }
   if (type === "turnback") {
@@ -920,7 +954,7 @@ function walkerHudData() {
     ...base,
     title: `${w.pos.y > CONFIG.mezzanine.y - 0.3 ? "MEZANINA" : "ESCALERA"}${combos}`,
     station: st.name,
-    sub: `F. Castillo V.: ${nextTrainText(st, 1)} · Pza. Quilicura: ${nextTrainText(st, -1)}${transferText(st)}`,
+    sub: `${ROUTE_A.last.short}: ${nextTrainText(st, 1)} · ${ROUTE_B.last.short}: ${nextTrainText(st, -1)}${transferText(st)}`,
     highlight: st,
   };
 }

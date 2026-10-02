@@ -2,9 +2,12 @@
    MetroSim — Motor · route.js
    Rutas: los dos sentidos de circulación de cada línea.
 
-     L3 · ruta A · vía 1 (x = +2): Plaza Quilicura → Fernando Castillo Velasco
-     L3 · ruta B · vía 2 (x = -2): Fernando Castillo Velasco → Plaza Quilicura
-     L6 · rutas 6A / 6B: Cerrillos ⇄ Los Leones (simulada, sin dibujo)
+     Ida    · vía 1 (x = +2): de la primera a la última estación de la línea
+     Vuelta · vía 2 (x = -2): en sentido contrario
+     (L3: rutas A / B · demás líneas: <id>A / <id>B, por ejemplo 1A / 1B)
+
+   La LÍNEA ACTIVA (la que se juega y se dibuja) se elige con setActiveLine:
+   ROUTES, ROUTE_A y ROUTE_B pasan a ser sus dos sentidos.
 
    Truco de diseño: cada ruta tiene sus propias "coordenadas de simulación"
    en las que el tren SIEMPRE avanza hacia -Z y la primera estación de la
@@ -14,7 +17,7 @@
    igual en ambos sentidos y en todas las líneas sin duplicar código.
    ========================================================================== */
 
-import { CONFIG } from "../config.js";
+import { CONFIG, setActiveLineData } from "../config.js";
 import { L3, LINES } from "./network.js";
 
 function makeRoute(line, dir) {
@@ -94,12 +97,25 @@ function makeLineRoutes(line) {
 /** Sentidos de todas las líneas de la red. */
 export const ALL_ROUTES = LINES.flatMap(makeLineRoutes);
 
-/* ----- Línea 3 (la que se dibuja y se juega): nombres de siempre ----- */
-export const ROUTES = L3.routes;
-export const ROUTE_A = ROUTES[0];
-export const ROUTE_B = ROUTES[1];
+/* ----- Línea activa (la que se dibuja y se juega) ----- */
+export let ROUTES = null;
+export let ROUTE_A = null;
+export let ROUTE_B = null;
 
-/** Ruta de la L3 que sale desde el andén de un lado (+1 → A, -1 → B). */
+/**
+ * Elige la línea que se juega: sus estaciones pasan a ser las del mundo 3D
+ * (config.js) y sus dos sentidos, ROUTES / ROUTE_A / ROUTE_B.
+ * @param {object} line  línea de network.js
+ */
+export function setActiveLine(line) {
+  setActiveLineData(line);
+  ROUTES = line.routes;
+  ROUTE_A = ROUTES[0];
+  ROUTE_B = ROUTES[1];
+}
+setActiveLine(L3);                                 // por defecto, la Línea 3
+
+/** Ruta de la línea activa que sale desde el andén de un lado (+1 → ida, -1 → vuelta). */
 export const routeForSide = (side) => (side > 0 ? ROUTE_A : ROUTE_B);
 
 /** Ruta del sentido contrario (de la misma línea). */

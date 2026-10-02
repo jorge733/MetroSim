@@ -55,9 +55,20 @@ export class PassengerFlow {
 
   /** Personas por segundo que llegan a un andén. Nadie espera en el andén de llegada de una terminal. */
   rate(st, side, clock) {
-    const route = this.line.routes.find(r => r.side === side);
-    if (route.stationOf(st) === route.last) return 0;
-    return BASE_RATE * demandAt(clock) * this.weight(st);
+    return BASE_RATE * demandAt(clock) * this.baseWeight(st, side);
+  }
+
+  /** Peso de un andén (0 en el andén de llegada de una terminal); se calcula una sola vez. */
+  baseWeight(st, side) {
+    this.weights ??= this.stations.map(s => {
+      const w = {};
+      for (const sd of [1, -1]) {
+        const route = this.line.routes.find(r => r.side === sd);
+        w[sd] = route.stationOf(s) === route.last ? 0 : this.weight(s);
+      }
+      return w;
+    });
+    return this.weights[st.index][side];
   }
 
   /** Llega gente que hace transbordo desde otra línea: se reparte entre los dos andenes con servicio. */
@@ -84,9 +95,11 @@ export class PassengerFlow {
    */
   update(dt, clock, units) {
     // 1. Llegada de gente a los andenes
-    for (const st of this.stations) for (const side of [1, -1]) {
+    const k = BASE_RATE * demandAt(clock) * dt;
+    for (const st of this.stations) {
       const w = this.waiting[st.index];
-      w[side] = Math.min(PLATFORM_CAPACITY, w[side] + this.rate(st, side, clock) * dt);
+      w[1] = Math.min(PLATFORM_CAPACITY, w[1] + k * this.baseWeight(st, 1));
+      w[-1] = Math.min(PLATFORM_CAPACITY, w[-1] + k * this.baseWeight(st, -1));
     }
 
     // 2. Intercambio en los trenes con puertas abiertas

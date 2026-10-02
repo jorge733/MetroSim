@@ -25,13 +25,13 @@
      · estado legible de toda la red (snapshot / report)
 
    Compatibilidad: engine.traffic, engine.signals, engine.timetables,
-   engine.passengers y engine.regulator son los de la Línea 3 (la que se
-   dibuja y se juega).
+   engine.passengers y engine.regulator son los de la línea activa (la que
+   se dibuja y se juega, route.js → setActiveLine).
    ========================================================================== */
 
 import { CONFIG } from "../config.js";
-import { LINES, L3, TRANSFERS } from "./network.js";
-import "./route.js";                                   // crea los sentidos de cada línea (line.routes)
+import { LINES, TRANSFERS } from "./network.js";
+import { ROUTE_A } from "./route.js";                 // crea los sentidos de cada línea y la línea activa
 import { Timetable } from "./schedule.js";
 import { SignalSystem } from "./signals.js";
 import { TrafficManager } from "./traffic.js";
@@ -111,8 +111,8 @@ export class MetroEngine {
       link(B, A, t.a.station);
     }
 
-    // Línea 3: la que se dibuja y se juega (nombres de siempre)
-    const main = this.lines.get(L3.id);
+    // Línea activa: la que se dibuja y se juega (nombres de siempre)
+    const main = this.lines.get(ROUTE_A.line.id);
     this.main = main;
     this.traffic = main.traffic;
     this.signals = main.signals;
@@ -176,7 +176,7 @@ export class MetroEngine {
    * Simula rápidamente hasta una hora (por ejemplo, el servicio previo al
    * inicio de la partida), con pasos más largos.
    */
-  runUntil(time, { step = 0.25, onStep } = {}) {
+  runUntil(time, { step = 0.5, onStep } = {}) {
     while (this.clock.time < time) {
       this.commands.process();
       for (const l of this.lines.values()) l.update(step, this.clock.time);
