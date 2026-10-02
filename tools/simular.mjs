@@ -9,6 +9,8 @@
      node tools/simular.mjs 09:00 10 "PLAZA EGAÑA"
                                             pantallas de andén de otra estación
                                             (por defecto, UNIVERSIDAD DE CHILE)
+     node tools/simular.mjs 10:00 15 "UNIVERSIDAD DE CHILE" sin-regulacion
+                                            sin regulación automática de intervalos
 
    Si esto funciona, el "cerebro" del Metro es independiente del dibujo 3D.
    ========================================================================== */
@@ -18,13 +20,14 @@ import { MetroEngine } from "../js/engine/engine.js";
 import { ROUTES } from "../js/engine/route.js";
 import { formatClock } from "../js/engine/format.js";
 
-const [untilArg = "10:00", everyArg = "15", stationArg = "UNIVERSIDAD DE CHILE"] = process.argv.slice(2);
+const [untilArg = "10:00", everyArg = "15", stationArg = "UNIVERSIDAD DE CHILE", regArg = ""] = process.argv.slice(2);
 const [hh, mm] = untilArg.split(":").map(Number);
 const until = hh * 3600 + (mm || 0) * 60;
 const every = Number(everyArg) * 60;
 
 const started = Date.now();
 const engine = new MetroEngine({ startTime: CONFIG.startTime - 45 * 60 });
+engine.regulator.enabled = regArg !== "sin-regulacion";
 
 /** Lo que mostrarían las pantallas de los andenes de una estación (llegadas por posición real). */
 function screens(name) {
@@ -59,6 +62,13 @@ for (let next = CONFIG.startTime + every; next <= until; next += every) {
 
 const t = engine.passengers.totals;
 console.log(`Viajeros: ${Math.round(t.boarded)} subidas · ${Math.round(t.alighted)} bajadas`);
+for (const route of ROUTES) {
+  const rs = route.stationOf(STATIONS.find(s => s.name === stationArg));
+  const q = engine.regulator.regularity(route.id, rs.index);
+  if (q) console.log(`Intervalos en ${stationArg} (dir. ${route.last.name}): medio ${Math.round(q.mean)} s · desviación ${Math.round(q.sd)} s · mín ${Math.round(q.min)} s · máx ${Math.round(q.max)} s`);
+}
+const rg = engine.regulator.stats;
+console.log(`Regulación ${engine.regulator.enabled ? "activa" : "desactivada"}: ${rg.holds} retenciones (${Math.round(rg.holdSeconds)} s en total)`);
 console.log("Cambios de estado: " + Object.entries(changes).map(([k, n]) => `${k} ${n}`).join(" · "));
 const simulated = (until - CONFIG.startTime + 45 * 60) / 60;
 console.log(`Simulados ${Math.round(simulated)} min de servicio en ${((Date.now() - started) / 1000).toFixed(1)} s.`);

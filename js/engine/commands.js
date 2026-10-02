@@ -41,6 +41,12 @@ export const COMMANDS = {
     u.ato.held = true;
     return ok(`${u.id} retenido en su próxima parada`, "warn");
   },
+  /** Activar o desactivar la regulación automática de intervalos. */
+  "control.regulation": (e, p) => {
+    e.regulator.enabled = !!p.on;
+    return ok(`Regulación de intervalos ${p.on ? "activada" : "desactivada"}`, p.on ? "ok" : "warn");
+  },
+
   /** Liberar un tren retenido. */
   "control.release": (e, p, u) => {
     if (!u.ato?.held) return fail(`${u.id} no estaba retenido`, "info");
@@ -50,7 +56,7 @@ export const COMMANDS = {
 };
 
 /** Órdenes que no necesitan tren. */
-const NO_TRAIN = new Set();
+const NO_TRAIN = new Set(["control.regulation"]);
 
 export class CommandQueue {
   constructor(engine) {

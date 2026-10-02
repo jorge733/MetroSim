@@ -92,6 +92,12 @@ Los **pasajeros** también son cifras reales del motor: llega gente a cada andé
 y el tren no cierra mientras haya intercambio. Un tren atrasado encuentra más gente, tarda más y se atrasa más;
 el de atrás va más vacío (trenes en racimo). Los viajeros dibujados son solo una muestra de esas cifras.
 
+La **regulación de intervalos** lo corrige como un Puesto de Mando: retiene unos segundos en la estación al tren
+que va demasiado pegado al de delante (respetando la proporción del horario) y acorta la parada del que va con
+mucho hueco. Tras retener un tren 5 min en punta, el intervalo mínimo en Universidad de Chile pasa de 86 s sin
+regulación a 170 s con ella. Se puede apagar desde la consola (`engine.command("control.regulation", { on: false })`)
+o en la simulación sin gráficos con `node tools/simular.mjs 10:00 15 "UNIVERSIDAD DE CHILE" sin-regulacion`.
+
 Se puede ejecutar sin gráficos:
 
 ```
@@ -120,6 +126,7 @@ js/engine/            MOTOR (sin Three.js)
   eta.js              llegadas estimadas desde la posición real
   commands.js         buzón de órdenes (roles → motor)
   passengers.js       pasajeros lógicos: demanda, subidas y bajadas
+  regulation.js       regulación de intervalos (retener / apurar trenes)
   events.js           bus de eventos del motor
   format.js           utilidades puras
 js/render/            dibujo del estado del motor

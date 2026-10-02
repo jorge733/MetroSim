@@ -357,6 +357,8 @@ function onUnitEvent(unit, type, data = {}) {
 function onTrainState({ unit, from, to }) {
   if (!game || game.warming || game.walker?.unit !== unit) return;
   if (to === "signalStop") hud.showMessage("Tren detenido por señal · reanudaremos la marcha en breve", "info", 4500);
+  else if (to === "regulating") hud.showMessage("Este tren se encuentra regulando su intervalo · saldremos en unos momentos", "info", 5000);
+  else if (to === "held") hud.showMessage("Tren retenido en la estación por el Centro de Control", "warn", 5000);
   else if (from === "signalStop" && to === "starting") hud.showMessage("Reanudamos la marcha", "ok", 2500);
 }
 

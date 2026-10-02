@@ -21,6 +21,7 @@ export const TRAIN_STATES = {
   closing:     "cerrando puertas",
   ready:       "listo para salir",
   held:        "retenido en estación",
+  regulating:  "regulando intervalo",
   retiring:    "hacia la cola de maniobras",
   cabChange:   "cambio de cabina",
 };
@@ -46,6 +47,8 @@ export function trainState(u, signals) {
 
   // 2. Retenido por el Centro de Control (en estación)
   if (u.ato?.held && sim.isStopped && sim.dockedStation()) return "held";
+  // Retenido por la regulación (espera con puertas abiertas para igualar intervalos)
+  if (u.ato?.regulating && sim.isStopped && sim.doorState === "open") return "regulating";
 
   // 3. Puertas
   if (sim.doorState === "closing") return "closing";

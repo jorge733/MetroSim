@@ -18,6 +18,8 @@
      · llegadas estimadas desde la posición real de los trenes (eta.js)
      · pasajeros lógicos (passengers.js): gente esperando en cada andén,
        subidas y bajadas que alargan las paradas
+     · regulación de intervalos (regulation.js): retiene o apura trenes
+       para que no se formen racimos
      · buzón de órdenes (commands.js): los roles mandan órdenes con
        engine.command(tipo, datos) y el resultado llega por "command:result"
      · estado legible de toda la red (snapshot / report)
@@ -37,6 +39,7 @@ import { TRAIN_STATES } from "./state.js";
 import { estimateArrival } from "./eta.js";
 import { CommandQueue } from "./commands.js";
 import { PassengerFlow } from "./passengers.js";
+import { Regulator } from "./regulation.js";
 
 export class MetroEngine {
   /**
@@ -64,6 +67,7 @@ export class MetroEngine {
     this.commands = new CommandQueue(this);
     this.passengers = new PassengerFlow(startTime);
     this.traffic.boardingChecks.push(u => this.passengers.isBusy(u));
+    this.regulator = new Regulator(this);
   }
 
   /** ¿Está subiendo o bajando gente de este tren (lógica o visible)? */
@@ -95,6 +99,7 @@ export class MetroEngine {
     this.commands.process();
     this.traffic.update(this.clock.step, this.clock.time);
     this.passengers.update(this.clock.step, this.clock.time, this.trains);
+    this.regulator.update(this.clock.time);
     this.clock.tick();
   }
 
@@ -122,6 +127,7 @@ export class MetroEngine {
       this.commands.process();
       this.traffic.update(step, this.clock.time);
       this.passengers.update(step, this.clock.time, this.trains);
+      this.regulator.update(this.clock.time);
       onStep?.(step, this.clock.time);
       this.clock.time += step;
     }

@@ -238,6 +238,9 @@ export class TrainSim {
 
    Retención (orden "control.hold" del Centro de Control): con held = true el
    tren no cierra puertas ni sale de la estación hasta que lo liberen.
+
+   Regulación (regulation.js): regulateUntil retrasa la salida para igualar
+   intervalos; hurry acorta la parada de un tren que va con mucho hueco.
    ========================================================================== */
 
 export class AutoDriver {
@@ -264,6 +267,9 @@ export class AutoDriver {
     this.extraWait = 0;
     this.brakeTarget = null;
     this.held = false;                 // retenido por el Centro de Control
+    this.regulateUntil = null;         // regulación: no sale antes de esta hora
+    this.regulating = false;
+    this.hurry = false;                // regulación: parada mínima
     sim.notch = NOTCH_INDEX.N;
     sim.reverser = 1;
   }
@@ -274,6 +280,14 @@ export class AutoDriver {
   /** Hora de salida programada en la estación actual (o null si no hay horario). */
   scheduledDeparture() {
     return this.trip ? this.trip.dep[this.targetIndex] : null;
+  }
+
+  /** Hora mínima de salida: la del horario o la de la regulación, la que sea más tarde. */
+  leaveTime() {
+    const dep = this.scheduledDeparture();
+    const reg = this.regulateUntil || null;
+    if (dep === null) return reg;
+    return reg === null ? dep : Math.max(dep, reg);
   }
 
   update(dt, clock) {
@@ -299,12 +313,13 @@ export class AutoDriver {
       }
       case "dwell": {
         sim.autoDemand = -1.05;
-        const minDwell = this.targetIndex === last ? CONFIG.schedule.minDwell + 10 : CONFIG.schedule.minDwell;
-        const dep = this.scheduledDeparture();
-        const timeOk = clock - this.arrivedAt >= minDwell && (dep === null || clock >= dep - CONFIG.train.doorTime - 3);
+        let minDwell = this.targetIndex === last ? CONFIG.schedule.minDwell + 10 : CONFIG.schedule.minDwell;
+        if (this.hurry) minDwell = Math.min(minDwell, 12);
+        const leave = this.leaveTime();
+        const timeOk = clock - this.arrivedAt >= minDwell && (leave === null || clock >= leave - CONFIG.train.doorTime - 3);
         if (!timeOk || sim.doorState !== "open" || this.held) break;
         // Mientras sube o baja gente se espera (hasta 45 s más): con mucha gente, la parada se alarga
-        if (this.isBoardingBusy() && this.extraWait < 45) { this.extraWait += dt; break; }
+        if (this.isBoardingBusy() && this.extraWait < (this.hurry ? 15 : 45)) { this.extraWait += dt; break; }
         sim.toggleDoors({ automatic: true });
         this.onEvent("doorsClosing", { station: this.target });
         this.state = "closing";
@@ -318,9 +333,9 @@ export class AutoDriver {
         sim.autoDemand = -1.05;
         if (this.targetIndex === last) { this.state = "retire"; break; }
         if (this.held) break;
-        const dep = this.scheduledDeparture();
+        const leave = this.leaveTime();
         const sig = this.signals?.startingSignal(this.target);
-        if ((dep === null || clock >= dep) && (!sig || sig.aspect !== "red")) {
+        if ((leave === null || clock >= leave) && (!sig || sig.aspect !== "red")) {
           this.onEvent("departing", { station: this.target, next: this.stations[this.targetIndex + 1] });
           this.targetIndex++;
           this.brakeTarget = null;

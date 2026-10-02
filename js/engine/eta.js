@@ -59,5 +59,5 @@ function departureFrom(u, st, clock) {
   let t = clock;
   if (sim.doorState === "open" || sim.doorState === "opening") t += doorTime + 1;
   else if (sim.doorState === "closing") t += sim.doorProgress * doorTime;
-  return Math.max(t, u.trip?.dep[st.index] ?? t);
+  return Math.max(t, u.trip?.dep[st.index] ?? t, u.ato?.regulateUntil || t);
 }
