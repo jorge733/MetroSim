@@ -1,0 +1,651 @@
+/* ==========================================================================
+   MetroSim — Alpha 0.4 · Estilos
+   1. Base y variables
+   2. Pantalla inicial
+   3. Pantalla de juego y HUD superior
+   4. Esquema de línea
+   5. Selector de mando
+   6. Panel del conductor (velocidad, estación, puertas)
+   7. Panel del pasajero, ayuda y mensajes
+   8. Responsive
+   9. Alpha 0.3: sonido, inversor y viajeros
+   10. Alpha 0.4: Línea 3, señales, horarios y pasajero a pie
+   ========================================================================== */
+
+/* ---------- 1. Base y variables ---------- */
+:root {
+  color-scheme: dark;
+  --bg: #05080d;
+  --panel: #0a121bdd;
+  --panel-border: #ffffff22;
+  --text: #f4f7fb;
+  --muted: #91a1b4;
+  --line: #8b5a2b;            /* café, Línea 3 de Santiago */
+  --power: #4fd6ff;
+  --neutral: #e8eef5;
+  --brake: #ffb547;
+  --emergency: #ff4b4b;
+  --ok: #6fe39a;
+  --warn: #ffd166;
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body, .screen { width: 100%; height: 100%; overflow: hidden; }
+button { font: inherit; }
+.hidden { display: none !important; }
+kbd {
+  display: inline-block;
+  min-width: 18px;
+  padding: 1px 5px;
+  border: 1px solid #ffffff33;
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: #ffffff10;
+  font: 600 10px/1.4 inherit;
+  text-align: center;
+  color: #dfe7f0;
+}
+.hud-label, .small-label, .eyebrow {
+  font-size: 10px;
+  letter-spacing: 1.7px;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+/* ---------- 2. Pantalla inicial ---------- */
+.start-screen {
+  display: grid;
+  place-items: center;
+  position: relative;
+  background: radial-gradient(circle at 50% 20%, #19334c 0, #080f18 42%, #030509 100%);
+}
+.start-screen::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: .18;
+  background:
+    linear-gradient(90deg, #fff1 1px, transparent 1px),
+    linear-gradient(#fff1 1px, transparent 1px);
+  background-size: 42px 42px;
+}
+.start-card { position: relative; width: min(92vw, 520px); text-align: center; }
+.metro-mark {
+  display: grid;
+  place-items: center;
+  width: 74px;
+  height: 74px;
+  margin: 0 auto 18px;
+  border-radius: 19px;
+  background: var(--line);
+  font-size: 43px;
+  font-weight: 900;
+  box-shadow: 0 12px 38px #e42a2d66;
+}
+.start-card h1 { font-size: clamp(48px, 8vw, 76px); line-height: 1; letter-spacing: -3px; }
+.tagline { margin: 12px 0 30px; color: #a8b4c2; }
+.mode-selection { display: grid; gap: 12px; }
+.mode-card {
+  display: flex;
+  align-items: center;
+  gap: 17px;
+  padding: 18px;
+  border: 1px solid #ffffff1e;
+  border-radius: 16px;
+  color: #fff;
+  background: #ffffff0d;
+  text-align: left;
+  cursor: pointer;
+  transition: .2s;
+}
+.mode-card:hover { background: #ffffff18; border-color: #ffffff50; transform: translateY(-2px); }
+.mode-card span:nth-child(2) { display: grid; gap: 4px; flex: 1; }
+.mode-card small { color: #aab6c5; }
+.mode-icon {
+  display: grid !important;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 13px;
+  background: #ffffff12;
+  font-size: 27px;
+}
+.mode-card b { font-size: 30px; color: #94a4b6; font-weight: 300; }
+.start-keys {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 16px;
+  margin-top: 24px;
+  font-size: 11px;
+  color: #8796a8;
+}
+.start-keys kbd { margin-right: 3px; }
+.version { position: absolute; bottom: 24px; color: #667586; font-size: 11px; letter-spacing: 1px; }
+
+/* ---------- 3. Pantalla de juego y HUD superior ---------- */
+.game-screen, #gameContainer, #hud { position: absolute; inset: 0; }
+.game-screen { background: #000; }
+#gameContainer canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+#gameContainer canvas:active { cursor: grabbing; }
+#hud { pointer-events: none; }
+
+.hud-top {
+  position: absolute;
+  top: 16px;
+  left: 18px;
+  right: 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.hud-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px 8px 8px;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  background: var(--panel);
+  backdrop-filter: blur(12px);
+}
+.line-badge {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--line);
+  font-weight: 900;
+  font-size: 15px;
+}
+.hud-route { display: grid; gap: 2px; }
+.hud-route strong { font-size: 13px; letter-spacing: 1px; }
+.mode-pill {
+  padding: 4px 9px;
+  border-radius: 20px;
+  background: #ffffff14;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  color: #cfe0f1;
+}
+.hud-clock {
+  display: grid;
+  gap: 2px;
+  padding: 8px 14px;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  background: var(--panel);
+  backdrop-filter: blur(12px);
+  text-align: right;
+}
+#clock { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: 1px; }
+
+.back-button {
+  position: absolute;
+  top: 74px;
+  left: 18px;
+  padding: 7px 12px;
+  color: #e5ecf4;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  background: #081018b8;
+  cursor: pointer;
+  font-size: 12px;
+}
+.back-button:hover { background: #12202ed0; }
+
+/* ---------- 4. Esquema de línea ---------- */
+.line-strip {
+  position: absolute;
+  top: 26px;
+  left: 50%;
+  width: min(34vw, 420px);
+  height: 30px;
+  transform: translateX(-50%);
+}
+.line-strip-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 6px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
+  box-shadow: 0 0 10px #e42a2d88;
+}
+.line-strip-stop {
+  position: absolute;
+  top: 2px;
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  border: 3px solid var(--line);
+  border-radius: 50%;
+  background: #fff;
+}
+.line-strip-stop span {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 9px;
+  letter-spacing: 1.2px;
+  color: #c9d5e2;
+  white-space: nowrap;
+  text-shadow: 0 1px 3px #000;
+}
+.line-strip-train {
+  position: absolute;
+  top: -1px;
+  width: 18px;
+  height: 18px;
+  margin-left: -9px;
+  border-radius: 5px;
+  background: #fff;
+  box-shadow: 0 0 0 2px #0a121b, 0 0 14px #ffffffaa;
+  transition: left .2s linear;
+}
+
+/* ---------- 5. Selector de mando ---------- */
+.selector-hud {
+  position: absolute;
+  right: 18px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  gap: 8px;
+  padding: 12px 10px;
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  background: var(--panel);
+  backdrop-filter: blur(12px);
+  text-align: center;
+}
+#notchList { list-style: none; display: grid; gap: 3px; }
+#notchList li {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  align-items: center;
+  gap: 6px;
+  min-width: 132px;
+  padding: 5px 8px;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  color: #6f8092;
+  font-size: 10px;
+  text-align: left;
+  transition: background .12s, color .12s;
+}
+#notchList li b { font-size: 15px; letter-spacing: .5px; }
+#notchList li.power b { color: #2e7e98; }
+#notchList li.brake b { color: #9a7234; }
+#notchList li.emergency b { color: #9a3434; }
+#notchList li.active { color: #0a121b; font-weight: 700; }
+#notchList li.active b { color: #0a121b; }
+#notchList li.active.power { background: var(--power); box-shadow: 0 0 16px #4fd6ff66; }
+#notchList li.active.neutral { background: var(--neutral); }
+#notchList li.active.brake { background: var(--brake); box-shadow: 0 0 16px #ffb54766; }
+#notchList li.active.emergency { background: var(--emergency); color: #fff; box-shadow: 0 0 20px #ff4b4b99; animation: blink 0.8s steps(2) infinite; }
+#notchList li.active.emergency b { color: #fff; }
+#notchList li.separator { margin-top: 4px; }
+@keyframes blink { 50% { opacity: .55; } }
+
+/* ---------- 6. Panel del conductor ---------- */
+.driver-hud {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  overflow: hidden;
+  border: 1px solid var(--panel-border);
+  border-radius: 16px;
+  background: var(--panel);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 16px 50px #0009;
+}
+.panel {
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  padding: 12px 18px;
+  border-left: 1px solid #ffffff12;
+}
+.panel:first-child { border-left: 0; }
+.station-sub { font-size: 11px; color: #a9b7c5; }
+
+/* Velocímetro circular */
+.speed-panel {
+  position: relative;
+  grid-template-columns: auto;
+  place-items: center;
+  width: 150px;
+  padding: 8px 12px;
+}
+.speed-gauge { width: 118px; height: 118px; }
+.gauge-track, .gauge-fill {
+  fill: none;
+  stroke-width: 8;
+  stroke-linecap: round;
+  transform: rotate(135deg);
+  transform-origin: 60px 60px;
+}
+.gauge-track { stroke: #ffffff14; stroke-dasharray: 235.6 314.2; }
+.gauge-fill { stroke: var(--power); stroke-dasharray: 0 314.2; transition: stroke .2s; }
+.gauge-fill.over { stroke: var(--emergency); }
+.gauge-limit { stroke: var(--emergency); stroke-width: 3; stroke-linecap: round; }
+.speed-readout {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  gap: 2px;
+}
+.speed-number { font-size: 38px; font-weight: 800; line-height: .95; font-variant-numeric: tabular-nums; }
+.limit-sign {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 3px solid var(--emergency);
+  border-radius: 50%;
+  background: #fff;
+  color: #111;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+/* Estación y precisión de parada */
+.station-panel { min-width: 230px; }
+.station-panel strong { font-size: 20px; letter-spacing: .5px; }
+.precision { display: grid; gap: 3px; margin-top: 4px; }
+.precision span { font-size: 11px; font-variant-numeric: tabular-nums; color: #cfe0f1; }
+.precision-scale {
+  position: relative;
+  height: 10px;
+  border-radius: 5px;
+  background: #ffffff14;
+  overflow: hidden;
+}
+.precision-ok {
+  position: absolute;
+  left: 37.5%;
+  width: 25%;
+  top: 0;
+  bottom: 0;
+  background: #6fe39a40;
+}
+.precision-center { position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--ok); }
+.precision-marker {
+  position: absolute;
+  top: 1px;
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 6px #fff;
+}
+
+/* Puertas */
+.door-panel { min-width: 170px; }
+.door-row { display: flex; align-items: center; gap: 8px; }
+.door-row strong { font-size: 15px; letter-spacing: .5px; }
+.lamp {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #2a74ff;
+  box-shadow: 0 0 10px #2a74ff;
+}
+.lamp.open { background: var(--ok); box-shadow: 0 0 12px var(--ok); }
+.lamp.moving { background: var(--warn); box-shadow: 0 0 12px var(--warn); animation: blink .6s steps(2) infinite; }
+
+/* ---------- 7. Pasajero, ayuda y mensajes ---------- */
+.passenger-hud {
+  position: absolute;
+  bottom: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: grid;
+  gap: 4px;
+  min-width: 300px;
+  padding: 14px 22px;
+  border: 1px solid var(--panel-border);
+  border-left: 6px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  backdrop-filter: blur(14px);
+}
+.passenger-hud strong { font-size: 24px; letter-spacing: 1px; }
+
+.controls-help {
+  position: absolute;
+  bottom: 22px;
+  left: 18px;
+  display: grid;
+  gap: 5px;
+  padding: 10px 12px;
+  border: 1px solid #ffffff14;
+  border-radius: 10px;
+  background: #060b10aa;
+  color: #c4cfdb;
+  font-size: 11px;
+}
+
+.message {
+  position: absolute;
+  top: 82px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10px 16px;
+  border: 1px solid #ffffff22;
+  border-radius: 9px;
+  background: #101b27e6;
+  color: #ddebfa;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity .2s;
+}
+.message.visible { opacity: 1; }
+.message.ok { border-color: #6fe39a88; color: #c8f5d8; }
+.message.warn { border-color: #ffd16688; color: #ffe7a8; }
+.message.alert { border-color: #ff4b4bbb; background: #3a0e10e6; color: #ffd0d0; }
+
+/* ---------- 8. Responsive ---------- */
+@media (max-width: 980px) {
+  .controls-help { display: none; }
+  .line-strip { display: none; }
+}
+@media (max-width: 720px) {
+  .driver-hud { width: calc(100% - 20px); bottom: 12px; }
+  .panel { padding: 10px 10px; }
+  .speed-panel { width: 112px; }
+  .speed-gauge { width: 90px; height: 90px; }
+  .speed-number { font-size: 28px; }
+  .station-panel { min-width: 0; flex: 1; }
+  .station-panel strong { font-size: 15px; }
+  .door-panel { display: none; }
+  .selector-hud { top: auto; bottom: 150px; transform: none; right: 10px; padding: 8px 6px; }
+  #notchList li { min-width: 0; grid-template-columns: 1fr; padding: 3px 8px; }
+  #notchList li small { display: none; }
+  .hud-route, .mode-pill { display: none; }
+  .message { white-space: normal; width: calc(100% - 40px); text-align: center; }
+}
+
+/* ---------- 9. Alpha 0.3: sonido, inversor y viajeros ---------- */
+.start-note { margin-top: 14px; font-size: 11px; color: #7f8fa2; }
+
+.hud-right { display: flex; align-items: flex-start; gap: 10px; }
+.sound-button {
+  pointer-events: auto;
+  padding: 9px 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  background: var(--panel);
+  color: #dfe7f0;
+  font-size: 12px;
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+}
+.sound-button:hover { background: #12202ed0; }
+.sound-button.off { color: #8796a8; }
+
+.reverser-pills {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.reverser-pills span {
+  padding: 5px 0;
+  border-radius: 6px;
+  background: #ffffff0d;
+  color: #6f8092;
+  font-size: 13px;
+  font-weight: 800;
+}
+.reverser-pills span.active[data-dir="1"] { background: var(--ok); color: #0a121b; box-shadow: 0 0 12px #6fe39a66; }
+.reverser-pills span.active[data-dir="0"] { background: var(--neutral); color: #0a121b; }
+.reverser-pills span.active[data-dir="-1"] { background: var(--brake); color: #0a121b; box-shadow: 0 0 12px #ffb54766; }
+
+.station-sub.onboard { color: #8fb4d6; }
+#doorHint.ready { color: var(--ok); }
+
+@media (max-width: 720px) {
+  .sound-button { padding: 7px 9px; font-size: 11px; }
+}
+
+/* ---------- 10. Alpha 0.4: Línea 3, señales, horarios y pasajero a pie ---------- */
+.metro-mark { background: #e1251b; }
+.line-dot {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-right: 4px;
+  border-radius: 50%;
+  background: var(--line);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 900;
+  vertical-align: middle;
+}
+.line-dot.big { width: 64px; height: 64px; font-size: 34px; margin: 0 auto 6px; }
+
+/* Tarjeta del modo pasajero con selector de estación */
+.mode-card-passenger { cursor: default; }
+.mode-card-passenger:hover { transform: none; }
+.station-select { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 12px; color: #aab6c5; }
+.station-select select {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid #ffffff2a;
+  border-radius: 8px;
+  background: #0b141e;
+  color: #f4f7fb;
+  font: inherit;
+}
+.go-button, .ghost-button {
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.go-button { border: 0; background: var(--line); color: #fff; }
+.go-button:hover { filter: brightness(1.15); }
+.ghost-button { border: 1px solid #ffffff33; background: transparent; color: #dfe7f0; }
+.ghost-button:hover { background: #ffffff12; }
+
+/* Pantalla de carga */
+.loading-screen { display: grid; place-items: center; background: radial-gradient(circle at 50% 30%, #2a1d12 0, #07090c 60%); }
+.loading-card { display: grid; gap: 8px; text-align: center; }
+.loading-card strong { font-size: 22px; }
+.loading-card small { color: #9aa8b8; }
+
+/* Esquema de línea con 21 estaciones: solo se rotulan terminales y la estación actual */
+.line-strip { width: min(46vw, 620px); }
+.line-strip-stop { width: 9px; height: 9px; margin-left: -4.5px; top: 3.5px; border-width: 2px; }
+.line-strip-stop.combo { box-shadow: 0 0 0 2px #ffffff55; }
+.line-strip-stop span { display: none; }
+.line-strip-stop.terminal span, .line-strip-stop.current span { display: block; }
+.line-strip-stop.current { background: var(--warn); }
+.line-strip-stop.current span { color: var(--warn); font-weight: 700; }
+
+/* Panel de señal y horario */
+.signal-panel { min-width: 170px; }
+.signal-row { display: flex; align-items: center; gap: 10px; }
+.signal-row > span:last-child { display: grid; gap: 1px; }
+.signal-row strong { font-size: 15px; letter-spacing: .5px; }
+.signal-head {
+  display: grid;
+  gap: 3px;
+  padding: 4px;
+  border-radius: 6px;
+  background: #05080b;
+  border: 1px solid #ffffff1a;
+}
+.signal-head i { display: block; width: 11px; height: 11px; border-radius: 50%; background: #1f262d; }
+.signal-head i.on[data-a="red"] { background: #ff3030; box-shadow: 0 0 10px #ff3030; }
+.signal-head i.on[data-a="yellow"] { background: #ffb000; box-shadow: 0 0 10px #ffb000; }
+.signal-head i.on[data-a="green"] { background: #30ff7a; box-shadow: 0 0 10px #30ff7a; }
+.delay { font-size: 18px; font-variant-numeric: tabular-nums; }
+.delay.ontime { color: var(--ok); }
+.delay.late { color: var(--emergency); }
+.delay.early { color: var(--warn); }
+
+/* Pasajero a pie */
+.pax-hint { color: #cfe0f1; margin-top: 2px; }
+.crosshair {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 50%;
+  background: #ffffffaa;
+  box-shadow: 0 0 0 1px #0008;
+}
+.help-walker, .help-driver { display: block; }
+
+/* Resumen de servicio / viaje */
+.summary {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: #000a;
+  backdrop-filter: blur(4px);
+}
+.summary-card {
+  display: grid;
+  gap: 10px;
+  width: min(92vw, 440px);
+  padding: 22px;
+  border: 1px solid var(--panel-border);
+  border-top: 6px solid var(--line);
+  border-radius: 16px;
+  background: #0b131c;
+}
+.summary-card h2 { font-size: 24px; }
+.summary-card ul { list-style: none; display: grid; gap: 6px; }
+.summary-card li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid #ffffff10; font-size: 14px; }
+.summary-card li b { font-variant-numeric: tabular-nums; }
+.summary-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 6px; }
+
+@media (max-width: 980px) {
+  .signal-panel { display: none; }
+}

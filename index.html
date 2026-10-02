@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>MetroSim — Alpha 0.4</title>
+  <link rel="stylesheet" href="styles.css">
+  <!-- Three.js mediante importmap (CDN). es-module-shims da compatibilidad a navegadores antiguos. -->
+  <script async src="https://unpkg.com/es-module-shims@1.10.0/dist/es-module-shims.js"></script>
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js" } }
+  </script>
+</head>
+<body>
+
+  <!-- =============================== PANTALLA INICIAL =============================== -->
+  <section id="startScreen" class="screen start-screen">
+    <main class="start-card">
+      <div class="metro-mark">M</div>
+      <p class="eyebrow">SIMULADOR FERROVIARIO URBANO</p>
+      <h1>MetroSim</h1>
+      <p class="tagline"><span class="line-dot">3</span> Línea 3 · Metro de Santiago · 21 estaciones</p>
+
+      <div class="mode-selection">
+        <button class="mode-card" data-mode="driver">
+          <span class="mode-icon">🚇</span>
+          <span><strong>Modo Conductor</strong><small>Tu servicio sale de Plaza Quilicura a las 08:01:30. Respeta señales y horario.</small></span>
+          <b>›</b>
+        </button>
+        <div class="mode-card mode-card-passenger">
+          <span class="mode-icon">🚶</span>
+          <span>
+            <strong>Modo Pasajero a pie</strong>
+            <small>Camina por el andén, toma el tren, viaja y baja donde quieras.</small>
+            <label class="station-select">Empezar en
+              <select id="startStation"></select>
+            </label>
+          </span>
+          <button class="go-button" data-mode="passenger">Entrar ›</button>
+        </div>
+      </div>
+
+      <div class="start-keys">
+        <span><kbd>W</kbd><kbd>S</kbd> mando / caminar</span>
+        <span><kbd>Q</kbd><kbd>E</kbd> inversor</span>
+        <span><kbd>Espacio</kbd> emergencia</span>
+        <span><kbd>D</kbd> puertas</span>
+        <span><kbd>F</kbd> sentarse</span>
+        <span><kbd>M</kbd> sonido</span>
+      </div>
+      <p class="start-note">🔊 Con sonido y anuncios. La carga de la línea completa puede tardar unos segundos.</p>
+    </main>
+    <p class="version">METROSIM ALPHA 0.4 · LÍNEA 3 · SEÑALES Y HORARIOS</p>
+  </section>
+
+  <!-- =============================== PANTALLA DE CARGA =============================== -->
+  <section id="loadingScreen" class="screen loading-screen hidden">
+    <div class="loading-card">
+      <span class="line-dot big">3</span>
+      <strong>Preparando la Línea 3…</strong>
+      <small id="loadingText">Construyendo túneles y estaciones</small>
+    </div>
+  </section>
+
+  <!-- =============================== PANTALLA DE JUEGO =============================== -->
+  <section id="gameScreen" class="screen game-screen hidden">
+    <div id="gameContainer"></div>
+
+    <div id="hud">
+      <!-- Barra superior -->
+      <header class="hud-top">
+        <div class="hud-brand">
+          <span class="line-badge">3</span>
+          <div class="hud-route">
+            <span class="hud-label">METRO DE SANTIAGO · LÍNEA 3</span>
+            <strong>PLAZA QUILICURA → F. CASTILLO VELASCO</strong>
+          </div>
+          <span id="modeLabel" class="mode-pill">CONDUCTOR</span>
+        </div>
+        <div class="hud-right">
+          <button id="soundButton" class="sound-button">🔊 Sonido</button>
+          <div class="hud-clock">
+            <span class="hud-label">HORA</span>
+            <span id="clock">08:00:00</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- Esquema de línea con la posición del tren / jugador -->
+      <div class="line-strip" id="lineStrip">
+        <div class="line-strip-track"></div>
+        <div class="line-strip-train" id="lineStripTrain"></div>
+      </div>
+
+      <!-- Inversor y selector de mando (solo conductor) -->
+      <aside id="selectorHud" class="selector-hud">
+        <span class="hud-label">INVERSOR</span>
+        <div id="reverserPills" class="reverser-pills">
+          <span data-dir="1">F</span><span data-dir="0">N</span><span data-dir="-1">R</span>
+        </div>
+        <span class="hud-label">MANDO</span>
+        <ol id="notchList"></ol>
+      </aside>
+
+      <!-- Panel inferior del conductor -->
+      <div id="driverHud" class="driver-hud">
+        <div class="panel speed-panel">
+          <svg class="speed-gauge" viewBox="0 0 120 120" aria-hidden="true">
+            <circle class="gauge-track" cx="60" cy="60" r="50"></circle>
+            <circle id="speedArc" class="gauge-fill" cx="60" cy="60" r="50"></circle>
+            <line id="limitTick" class="gauge-limit" x1="60" y1="3" x2="60" y2="17"></line>
+          </svg>
+          <div class="speed-readout">
+            <span id="speed" class="speed-number">0</span>
+            <span class="small-label">KM/H</span>
+          </div>
+          <div class="limit-sign"><span id="speedLimit">70</span></div>
+        </div>
+
+        <div class="panel station-panel">
+          <span class="small-label" id="stationTitle">PRÓXIMA ESTACIÓN</span>
+          <strong id="nextStation">LO CRUZAT</strong>
+          <span id="distance" class="station-sub">— m</span>
+          <div id="precision" class="precision hidden">
+            <div class="precision-scale">
+              <div class="precision-ok"></div>
+              <div class="precision-center"></div>
+              <div id="precisionMarker" class="precision-marker"></div>
+            </div>
+            <span id="precisionText">0.0 m</span>
+          </div>
+        </div>
+
+        <div class="panel signal-panel">
+          <span class="small-label">SEÑAL Y HORARIO</span>
+          <div class="signal-row">
+            <span class="signal-head"><i data-a="red"></i><i data-a="yellow"></i><i data-a="green"></i></span>
+            <span><strong id="signalId">S---</strong><span id="signalDist" class="station-sub">— m</span></span>
+          </div>
+          <span id="scheduleLabel" class="station-sub">—</span>
+          <strong id="scheduleDelay" class="delay">0:00</strong>
+        </div>
+
+        <div class="panel door-panel">
+          <span class="small-label">PUERTAS</span>
+          <div class="door-row"><span id="doorLamp" class="lamp"></span><strong id="doorStatus">CERRADAS</strong></div>
+          <span id="doorHint" class="station-sub">D · tren detenido en andén</span>
+          <span id="onboardCount" class="station-sub onboard">A bordo: 0 viajeros</span>
+        </div>
+      </div>
+
+      <!-- Panel del pasajero a pie -->
+      <div id="passengerHud" class="passenger-hud hidden">
+        <span class="small-label" id="paxTitle">ANDÉN</span>
+        <strong id="paxStation">—</strong>
+        <span id="paxSub" class="station-sub">—</span>
+        <span id="paxHint" class="station-sub pax-hint">—</span>
+      </div>
+      <div id="crosshair" class="crosshair hidden"></div>
+
+      <!-- Ayuda de controles -->
+      <div id="controlsHelp" class="controls-help">
+        <span class="hud-label">CONTROLES · H ocultar</span>
+        <span class="help-driver"><kbd>W</kbd>/<kbd>↑</kbd> subir mando · <kbd>S</kbd>/<kbd>↓</kbd> bajar mando</span>
+        <span class="help-driver"><kbd>Q</kbd> inversor adelante · <kbd>E</kbd> inversor atrás</span>
+        <span class="help-driver"><kbd>Espacio</kbd> emergencia · <kbd>D</kbd> puertas · <kbd>R</kbd> reiniciar</span>
+        <span class="help-driver">Arrastrar ratón: mirar · <kbd>C</kbd> centrar · <kbd>V</kbd> vista exterior</span>
+        <span class="help-walker"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> caminar · <kbd>Shift</kbd> correr</span>
+        <span class="help-walker">Clic: capturar ratón · <kbd>Esc</kbd> soltar</span>
+        <span class="help-walker"><kbd>F</kbd> sentarse · <kbd>E</kbd> salir por un acceso</span>
+        <span><kbd>M</kbd> sonido</span>
+      </div>
+
+      <div id="message" class="message" aria-live="polite"></div>
+    </div>
+
+    <!-- Resumen de servicio / viaje -->
+    <div id="summary" class="summary hidden">
+      <div class="summary-card">
+        <span class="small-label" id="summaryKicker">SERVICIO COMPLETADO</span>
+        <h2 id="summaryTitle">Fernando Castillo Velasco</h2>
+        <ul id="summaryList"></ul>
+        <div class="summary-actions">
+          <button id="summaryContinue" class="go-button">Seguir</button>
+          <button id="summaryMenu" class="ghost-button">Menú</button>
+        </div>
+      </div>
+    </div>
+
+    <button id="backButton" class="back-button">← Menú</button>
+  </section>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
