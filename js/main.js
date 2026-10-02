@@ -19,6 +19,7 @@
      camera.js    vistas del conductor
      hud.js       interfaz HTML (incluye boletería y tótem)
      card.js      tarjeta bip! del jugador
+     announcements.js  frases reales de megafonía del Metro de Santiago
 
    Principio: Conductor y Pasajero comparten el MISMO mundo, el MISMO tráfico
    y los MISMOS viajeros. Solo cambia qué controla el jugador.
@@ -29,6 +30,7 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { CONFIG, STATIONS, NOTCH_INDEX, FARES, spokenName, fareBandAt, formatCLP } from "./config.js";
 import { ROUTES, ROUTE_A, ROUTE_B, routeForSide, oppositeRoute } from "./route.js";
 import { BipCard } from "./card.js";
+import { PHRASES } from "./announcements.js";
 import { $, clamp, formatClock, formatStopError, gradeStop } from "./utils.js";
 import { Timetable, formatDelay, makeTrip } from "./schedule.js";
 import { SignalSystem } from "./signals.js";
@@ -531,53 +533,54 @@ function openService({ kind, station }) {
    Megafonía y sonidos de estado
    ========================================================================== */
 
-function arrivalText(rs) {
-  const name = spokenName(rs.name);
-  if (rs === rs.route.last) return `${name}. Fin de trayecto. Por favor, abandonen el tren.`;
-  if (rs.combos.length) return `${name}. Combinación con Línea ${rs.combos.join(" y Línea ")}.`;
-  return `${name}.`;
+/** ¿El jugador está en el andén donde se detiene este tren? */
+function walkerOnPlatformOf(unit) {
+  const w = game.walker;
+  if (!w || w.unit) return false;
+  const rs = unit.sim.dockedStation();
+  return !!rs && w.platformSide() === unit.route.side && w.stationAt(w.pos.z) === rs.world;
 }
 
+/**
+ * Megafonía del tren en el que va el jugador (conductor o pasajero), con las
+ * frases reales del Metro de Santiago (announcements.js).
+ */
 function updateOnboardAnnouncements(unit) {
   if (!unit) return;
   const sim = unit.sim, next = sim.nextStation();
-  unit.announced ??= { next: null, arrival: null };
+  unit.announced ??= { next: null, safety: 0 };
   if (!next || sim.movingBackwards) return;
+  // Al salir de una estación: "Próxima estación, <nombre>[, combinación a línea N]"
   if (sim.speedKmh > 8 && sim.doorsClosed && unit.announced.next !== next.id) {
     unit.announced.next = next.id;
-    game.audio.announce(`Próxima estación: ${spokenName(next.name)}.`);
+    unit.announced.safetyDone = false;
+    game.audio.announce(PHRASES.nextStation(next));
   }
-  if (sim.position - next.stopZ < 170 && sim.speedKmh > 3 && unit.announced.arrival !== next.id) {
-    unit.announced.arrival = next.id;
-    game.audio.announce(arrivalText(next));
-  }
-}
-
-/** Aviso en el andén cuando se acerca un tren al andén del pasajero. */
-function updatePlatformAnnouncements() {
-  const w = game.walker;
-  const side = w?.platformSide();
-  if (!side) return;
-  const st = w.stationAt(w.pos.z);
-  const route = routeForSide(side);
-  const rs = st && route.stationOf(st);
-  if (!rs || rs === route.last) return;
-  for (const u of game.traffic.units) {
-    if (u.route !== route) continue;
-    const d = u.sim.position - rs.stopZ;
-    if (d > 80 && d < 450 && u.sim.speed > 2 && u.platformAnnounced !== st.id) {
-      u.platformAnnounced = st.id;
-      game.audio.announce(`Tren con destino ${spokenName(route.last.name)}, próximo a llegar. Por favor, manténganse detrás de la línea amarilla.`);
-    }
+  // De vez en cuando, en plena marcha, el mensaje de seguridad
+  const remaining = sim.position - next.stopZ;
+  if (!unit.announced.safetyDone && sim.speedKmh > 45 && remaining > 500 && next.index % 4 === 2) {
+    unit.announced.safetyDone = true;
+    game.audio.announce(PHRASES.safety());
   }
 }
 
-function updateStateSounds(unit, level) {
+/** Cambios de estado del tren que se oye: puertas (con su locución) y aire del freno. */
+function updateStateSounds(unit, level, rider) {
   if (!unit) return;
   const sim = unit.sim, audio = game.audio;
   if (unit.prevDoorState !== undefined && sim.doorState !== unit.prevDoorState && level > 0.3) {
-    if (sim.doorState === "opening") audio.doorsOpening(CONFIG.train.doorTime);
-    if (sim.doorState === "closing") audio.doorsClosing(CONFIG.train.doorTime);
+    const hearsVoice = unit === rider || walkerOnPlatformOf(unit);
+    if (sim.doorState === "opening") {
+      audio.doorsOpening(CONFIG.train.doorTime);
+      if (hearsVoice) {
+        const terminal = sim.dockedStation() === unit.route.last;
+        audio.announce(terminal ? PHRASES.terminal() : PHRASES.letOff(), { chime: terminal });
+      }
+    }
+    if (sim.doorState === "closing") {
+      if (hearsVoice) audio.announce(PHRASES.doorsClosing(), { chime: false });
+      audio.doorsClosing(CONFIG.train.doorTime);
+    }
   }
   unit.prevDoorState = sim.doorState;
   if (sim.isStopped && (unit.prevAccel ?? 0) < -0.3 && sim.accel >= -0.3 && level > 0.3) audio.airHiss(0.35);
@@ -727,9 +730,8 @@ function loop(now) {
     level = Math.pow(clamp(1 - d / 230, 0, 1), 1.5);
     view = "exterior";
   }
-  updateStateSounds(focus, level);
+  updateStateSounds(focus, level, rider);
   updateOnboardAnnouncements(rider);
-  updatePlatformAnnouncements();
   const fs = focus?.sim;
   audio.update({
     dt,

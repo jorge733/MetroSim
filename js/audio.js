@@ -14,7 +14,8 @@
      · clic del manipulador, golpe del inversor
      · avisador y motor de puertas, golpe de cierre
      · escape de aire del freno, alarma de emergencia, impacto
-     · gong + voz sintetizada para anuncios de estación
+     · gong + anuncios con las frases reales del Metro de Santiago
+       (grabaciones propias en audio/voz/ o, si no hay, voz sintetizada)
 
    El navegador exige un gesto del usuario para iniciar audio: start() se
    llama desde el clic que inicia la partida.
@@ -80,6 +81,7 @@ export class AudioSystem {
 
     this.pickVoice();
     if ("speechSynthesis" in window) speechSynthesis.onvoiceschanged = () => this.pickVoice();
+    this.loadVoiceClips();
   }
 
   stop() {
@@ -323,26 +325,111 @@ export class AudioSystem {
   }
 
   /* ---------------------------------------------------------------------
-     Megafonía con voz sintetizada
+     Megafonía
+     Cada anuncio es una lista de "fragmentos" { key, text }:
+       · Si existen grabaciones en audio/voz/ (ver audio/voz/LEEME.md y
+         manifest.json) se reproducen encadenadas, con un filtro que imita
+         el altavoz del tren.
+       · Si falta alguna, se usa la mejor voz sintetizada del navegador,
+         priorizando voces neuronales de Chile y de Latinoamérica.
      --------------------------------------------------------------------- */
+
+  /** Elige la voz más realista disponible (las neuronales "Natural"/"Online" suenan mucho mejor). */
   pickVoice() {
     if (!("speechSynthesis" in window)) return;
-    const voices = speechSynthesis.getVoices();
-    this.voice = voices.find(v => v.lang === "es-ES") || voices.find(v => v.lang?.startsWith("es")) || null;
+    const female = /catalina|helena|laura|elvira|dalia|paloma|sabina|luc[ií]a|elena|m[oó]nica|paulina|camila|ximena|valentina|female|mujer/i;
+    const score = (v) => {
+      const lang = (v.lang || "").toLowerCase();
+      if (!lang.startsWith("es")) return -1;
+      let s = 10;
+      if (lang === "es-cl") s += 100;                                  // español de Chile
+      else if (/es-(419|us|mx|ar|co|pe)/.test(lang)) s += 60;          // latinoamericano
+      else if (lang === "es-es") s += 35;
+      if (/natural|online|neural/i.test(v.name)) s += 70;              // voces neuronales
+      if (/google/i.test(v.name)) s += 20;
+      if (female.test(v.name)) s += 15;                                // la voz del Metro es femenina
+      return s;
+    };
+    const ranked = speechSynthesis.getVoices().map(v => ({ v, s: score(v) })).filter(x => x.s >= 0).sort((a, b) => b.s - a.s);
+    this.voice = ranked[0]?.v || null;
   }
 
-  announce(text) {
+  /** Lee audio/voz/manifest.json para saber qué grabaciones hay disponibles. */
+  async loadVoiceClips() {
+    this.clipKeys = new Set();
+    this.clips = new Map();
+    try {
+      const res = await fetch("audio/voz/manifest.json", { cache: "no-store" });
+      if (!res.ok) return;
+      const manifest = await res.json();
+      const ext = manifest.extension || "mp3";
+      (manifest.clips || []).forEach(k => this.clipKeys.add(k));
+      // Precarga en segundo plano
+      for (const key of this.clipKeys) {
+        fetch(`audio/voz/${key}.${ext}`)
+          .then(r => (r.ok ? r.arrayBuffer() : Promise.reject()))
+          .then(buf => this.ctx?.decodeAudioData(buf))
+          .then(audio => audio && this.clips.set(key, audio))
+          .catch(() => this.clipKeys.delete(key));
+      }
+    } catch { /* sin grabaciones: se usa voz sintetizada */ }
+  }
+
+  /** Cadena de "altavoz de tren": banda telefónica, algo de compresión y un leve eco. */
+  paChain() {
+    if (this.pa) return this.pa;
+    const ctx = this.ctx;
+    const hp = ctx.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 260;
+    const lp = ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 4200;
+    const peak = ctx.createBiquadFilter(); peak.type = "peaking"; peak.frequency.value = 2000; peak.gain.value = 4;
+    const gain = ctx.createGain(); gain.gain.value = 0.9;
+    const delay = ctx.createDelay(); delay.delayTime.value = 0.045;
+    const fb = ctx.createGain(); fb.gain.value = 0.18;
+    hp.connect(lp).connect(peak).connect(gain).connect(this.master);
+    gain.connect(delay).connect(fb).connect(this.master);
+    this.pa = hp;
+    return hp;
+  }
+
+  /**
+   * Anuncio por megafonía.
+   * @param {Array<{key:string,text:string}>|string} parts  fragmentos del anuncio (o texto libre)
+   * @param {object} opts
+   * @param {boolean} opts.chime  tocar el gong antes
+   */
+  announce(parts, { chime = true } = {}) {
     if (!this.ctx || this.muted) return;
-    this.chime();
+    if (typeof parts === "string") parts = [{ key: null, text: parts }];
+    const lead = chime ? 1.3 : 0.05;
+    if (chime) this.chime();
+
+    // 1. Grabaciones (si están todas los fragmentos)
+    if (parts.every(p => p.key && this.clips?.has(p.key))) {
+      let t = this.ctx.currentTime + lead;
+      const out = this.paChain();
+      for (const p of parts) {
+        const src = this.ctx.createBufferSource();
+        src.buffer = this.clips.get(p.key);
+        src.connect(out);
+        src.start(t);
+        t += src.buffer.duration + 0.08;
+      }
+      return;
+    }
+
+    // 2. Voz sintetizada
     if (!("speechSynthesis" in window)) return;
+    const text = parts.map(p => p.text).join(" ");
     setTimeout(() => {
       if (this.muted || !this.ctx) return;
       speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(text);
-      u.lang = "es-ES";
+      u.lang = this.voice?.lang || "es-CL";
       if (this.voice) u.voice = this.voice;
-      u.rate = 0.95; u.pitch = 1; u.volume = 0.9;
+      u.rate = 0.9;                       // ritmo pausado y tranquilo, como en el Metro
+      u.pitch = 1.05;
+      u.volume = 0.95;
       speechSynthesis.speak(u);
-    }, 1300);
+    }, lead * 1000);
   }
 }
