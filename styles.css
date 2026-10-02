@@ -1,5 +1,5 @@
 /* ==========================================================================
-   MetroSim — Alpha 0.4 · Estilos
+   MetroSim — Alpha 0.6 · Estilos
    1. Base y variables
    2. Pantalla inicial
    3. Pantalla de juego y HUD superior
@@ -10,6 +10,7 @@
    8. Responsive
    9. Alpha 0.3: sonido, inversor y viajeros
    10. Alpha 0.4: Línea 3, señales, horarios y pasajero a pie
+   11. Alpha 0.6: tarjeta bip!, boletería, fundido de cabina
    ========================================================================== */
 
 /* ---------- 1. Base y variables ---------- */
@@ -648,4 +649,112 @@ kbd {
 
 @media (max-width: 980px) {
   .signal-panel { display: none; }
+}
+
+/* ---------- 11. Alpha 0.6: tarjeta bip!, boletería, fundido de cabina ---------- */
+.card-pill {
+  align-self: center;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: #e1251b;
+  color: #fff;
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: .3px;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 4px 16px #0006;
+}
+.card-pill.low { background: #5a1a1a; box-shadow: 0 0 0 2px #ff6b6b inset; }
+
+.ticket-panel {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: #0008;
+  backdrop-filter: blur(3px);
+  z-index: 5;
+}
+.ticket-card {
+  display: grid;
+  gap: 8px;
+  width: min(94vw, 460px);
+  max-height: 92vh;
+  overflow: auto;
+  padding: 18px;
+  border-radius: 16px;
+  border-top: 6px solid #e1251b;
+  background: #0b131c;
+  border-left: 1px solid var(--panel-border);
+  border-right: 1px solid var(--panel-border);
+  border-bottom: 1px solid var(--panel-border);
+}
+.ticket-head { display: flex; align-items: center; gap: 12px; }
+.ticket-head-text { display: grid; flex: 1; }
+.ticket-head-text strong { font-size: 18px; }
+.bip-logo {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 36px;
+  border-radius: 9px;
+  background: #e1251b;
+  font-weight: 900;
+  font-size: 18px;
+}
+.ticket-close { width: 34px; height: 34px; border: 1px solid #ffffff33; border-radius: 8px; background: transparent; color: #dfe7f0; cursor: pointer; }
+.ticket-balance {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  padding: 12px;
+  border-radius: 10px;
+  background: #ffffff0a;
+}
+.ticket-balance > div { display: grid; }
+.ticket-balance strong { font-size: 28px; font-variant-numeric: tabular-nums; }
+.ticket-fares { display: grid; gap: 4px; }
+.fare-row { display: flex; justify-content: space-between; padding: 6px 10px; border-radius: 7px; background: #ffffff08; font-size: 13px; }
+.fare-row.current { background: #ffd16622; color: #ffe7a8; font-weight: 700; }
+.ticket-amounts, .ticket-pay { display: flex; flex-wrap: wrap; gap: 6px; }
+.ticket-amounts button, .ticket-pay button {
+  padding: 8px 12px;
+  border: 1px solid #ffffff2a;
+  border-radius: 8px;
+  background: #ffffff0a;
+  color: #f4f7fb;
+  cursor: pointer;
+  font-weight: 700;
+}
+.ticket-amounts button.selected, .ticket-pay button.selected { background: #e1251b; border-color: #e1251b; }
+.ticket-status { min-height: 38px; padding: 8px 10px; border-radius: 8px; background: #ffffff08; font-size: 13px; color: #cfe0f1; }
+.ticket-status.ok { background: #6fe39a1f; color: #c8f5d8; }
+.ticket-status.error { background: #ff4b4b22; color: #ffd0d0; }
+.ticket-actions { display: flex; justify-content: space-between; gap: 8px; }
+.ticket-panel.busy .ticket-actions button { opacity: .5; pointer-events: none; }
+.ticket-panel.busy .ticket-status::after { content: " ⏳"; }
+
+.fade {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: #000;
+  color: #dfe7f0;
+  font-size: 16px;
+  letter-spacing: 1px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .6s;
+  z-index: 6;
+}
+.fade.visible { opacity: 1; }
+
+/* Tarjetas del menú con selector: el botón nunca se sale del recuadro */
+.mode-card-passenger > span:nth-child(2) { min-width: 0; }
+.station-select select { max-width: 100%; }
+.mode-card .go-button { flex-shrink: 0; }
+@media (max-width: 560px) {
+  .mode-card-passenger { flex-wrap: wrap; }
+  .mode-card-passenger .go-button { width: 100%; }
 }

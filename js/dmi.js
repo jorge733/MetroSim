@@ -1,5 +1,5 @@
 /* ==========================================================================
-   MetroSim — Alpha 0.5 · dmi.js
+   MetroSim — Alpha 0.6 · dmi.js
    Pantalla de cabina (DMI) dibujada en un canvas y usada como textura.
    ========================================================================== */
 

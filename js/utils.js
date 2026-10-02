@@ -1,5 +1,5 @@
 /* ==========================================================================
-   MetroSim — Alpha 0.5 · utils.js
+   MetroSim — Alpha 0.6 · utils.js
    Utilidades: matemáticas, formato, materiales, geometría y texturas procedurales.
    ========================================================================== */
 

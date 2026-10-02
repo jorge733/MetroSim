@@ -1,5 +1,5 @@
 /* ==========================================================================
-   MetroSim — Alpha 0.5 · walker.js
+   MetroSim — Alpha 0.6 · walker.js
    Modo Pasajero a pie (primera persona).
 
    Recorrido completo: entras desde la calle a la mezanina, validas en un
@@ -9,7 +9,12 @@
    sales a la calle.
 
    Controles: W A S D / flechas caminar · Shift correr · ratón mirar
-   (clic para capturar, Esc para soltar) · F sentarse · E salir a la calle.
+   (clic para capturar, Esc para soltar) · F sentarse · E interactuar
+   (boletería, tótem de carga, salida a la calle).
+
+   Tarjeta bip!: al cruzar un torniquete desde la zona no pagada se cobra la
+   tarifa del tramo horario; sin saldo, el torniquete no se abre.
+   La escalera mecánica solo sube y te lleva aunque no camines.
 
    Zonas transitables con altura: andenes (y = 1,2), escaleras (rampa),
    mezanina (y = 7,2) con la línea de torniquetes, huecos de puerta y el
@@ -34,12 +39,17 @@ export class Walker {
    * @param {import("./traffic.js").TrafficManager} opts.traffic
    * @param {object} opts.station  estación inicial (del mundo)
    * @param {(type:string, data?:object)=>void} opts.onEvent
+   * @param {() => {ok:boolean}} opts.onValidate  intenta cobrar el pasaje al cruzar un torniquete
    */
-  constructor({ scene, camera, traffic, station, onEvent = () => {} }) {
+  constructor({ scene, camera, traffic, station, onEvent = () => {}, onValidate = () => ({ ok: true }) }) {
     this.scene = scene;
     this.camera = camera;
     this.traffic = traffic;
     this.onEvent = onEvent;
+    this.onValidate = onValidate;
+    this.frozen = false;                 // true mientras hay un panel abierto (boletería, tótem)
+    this.gatePass = false;               // validó en un torniquete y lo está cruzando
+    this.deniedT = 0;
     this.keys = new Set();
     this.holder = new THREE.Object3D();
     this.holder.add(camera);
@@ -62,6 +72,7 @@ export class Walker {
     this.pitch = -0.08;
     this.seat = null;
     this.paid = false;
+    this.gatePass = false;
   }
 
   /* ----- Entrada ----- */
@@ -89,7 +100,7 @@ export class Walker {
   keyDown(key) {
     this.keys.add(key);
     if (key === "f") return this.toggleSeat();
-    if (key === "e") return this.tryExit();
+    if (key === "e") return this.interact();
     return null;
   }
   keyUp(key) { this.keys.delete(key); }
@@ -132,7 +143,7 @@ export class Walker {
     const candidates = [];
 
     // Andenes (salvo la huella de la escalera)
-    const onStairFoot = ax >= MZ.stairX0 - 0.05 && dz >= MZ.stairZ0 && dz <= MZ.stairZ1;
+    const onStairFoot = ax >= MZ.escX0 - 0.05 && dz >= MZ.stairZ0 && dz <= MZ.stairZ1;
     if (ax >= S.platformEdgeX + 0.3 && ax <= S.wallX - 0.35 && Math.abs(dz) <= S.platformHalf - 0.3 && !onStairFoot) candidates.push(S.platformTop);
 
     // Hueco de puerta del tren detenido con puertas abiertas
@@ -141,8 +152,10 @@ export class Walker {
       if (u && this.traffic.doorAtWorldZ(u, z) !== null) candidates.push(S.platformTop);
     }
 
-    // Escaleras (rampa del andén a la mezanina)
-    if (ax >= MZ.stairX0 + 0.05 && ax <= MZ.stairX1 - 0.05 && dz >= MZ.stairZ0 - 0.2 && dz <= MZ.stairZ1 + 0.2) {
+    // Escalera fija y escalera mecánica (rampas del andén a la mezanina)
+    const onStairs = ax >= MZ.stairX0 + 0.05 && ax <= MZ.stairX1 - 0.05;
+    const onEsc = ax >= MZ.escX0 + 0.2 && ax <= MZ.escX1 - 0.2;
+    if ((onStairs || onEsc) && dz >= MZ.stairZ0 - 0.2 && dz <= MZ.stairZ1 + 0.2) {
       const t = clamp((dz - MZ.stairZ0) / (MZ.stairZ1 - MZ.stairZ0), 0, 1);
       candidates.push(S.platformTop + t * (MZ.y - S.platformTop));
     }
@@ -151,8 +164,12 @@ export class Walker {
     if (ax <= S.wallX - 0.3 && dz >= MZ.z0 && dz <= MZ.z1 - 0.35) {
       const nearGates = Math.abs(dz - MZ.gateZ) < 0.65;
       const inGate = MZ.gates.some(g => Math.abs(x - g) < MZ.gateHalf - 0.05);
-      const inKiosk = x < -5.2 && dz > MZ.gateZ + 2.4;
-      if ((!nearGates || inGate) && !inKiosk) candidates.push(MZ.y);
+      const B = MZ.booth;
+      const inBooth = x < B.x1 + 0.1 && dz > B.z0 - 0.15 && dz < B.z1 + 0.1;
+      const inTotem = MZ.totems.some(t => Math.abs(x - t) < 0.45) && Math.abs(dz - MZ.totemZ) < 0.32;
+      let gateOk = !nearGates;
+      if (nearGates && inGate) gateOk = this.paid || this.gatePass || this.tryValidate();
+      if (gateOk && !inBooth && !inTotem) candidates.push(MZ.y);
     }
     // Umbral de la salida a la calle
     if (Math.abs(x) < MZ.exitHalf - 0.2 && dz > MZ.z1 - 0.4 && dz < MZ.z1 + 0.3) candidates.push(MZ.y);
@@ -161,6 +178,15 @@ export class Walker {
     let best = null;
     for (const y of candidates) if (Math.abs(y - fromY) < 0.45 && (best === null || Math.abs(y - fromY) < Math.abs(best - fromY))) best = y;
     return best;
+  }
+
+  /** Intenta validar la tarjeta al entrar en un paso de torniquete desde la zona no pagada. */
+  tryValidate() {
+    if (this.deniedT > 0) return false;
+    const r = this.onValidate();
+    if (r.ok) { this.gatePass = true; return true; }
+    this.deniedT = 1.5;                  // no se reintenta en cada fotograma
+    return false;
   }
 
   /** ¿Se puede estar en (x, z) dentro del tren (coordenadas locales)? */
@@ -209,9 +235,22 @@ export class Walker {
     return Math.abs(this.pos.x) < MZ.exitHalf + 0.5 && this.pos.z - st.z > MZ.z1 - 2.2 ? st : null;
   }
 
-  tryExit() {
+  /** Qué hay al alcance en la mezanina: ventanilla de boletería, tótem o salida. */
+  nearService() {
+    if (this.space !== "world" || Math.abs(this.pos.y - MZ.y) > 0.3 || this.paid) return null;
+    const st = this.stationAt(this.pos.z);
+    if (!st) return null;
+    const dz = this.pos.z - st.z, B = MZ.booth;
+    if (this.pos.x < B.x1 + 1.3 && Math.abs(dz - B.windowZ) < 1.0) return { kind: "boleteria", station: st };
+    if (MZ.totems.some(t => Math.abs(this.pos.x - t) < 0.7) && Math.abs(dz - MZ.totemZ) < 1.3) return { kind: "totem", station: st };
+    return null;
+  }
+
+  interact() {
+    const service = this.nearService();
+    if (service) { this.onEvent("service", service); return null; }
     const st = this.nearExit();
-    if (!st) return { text: "La salida a la calle está en la mezanina, pasados los torniquetes", level: "info" };
+    if (!st) return { text: "Acércate a la boletería, a un tótem de carga o a la salida (en la mezanina)", level: "info" };
     if (this.paid) return { text: "Primero cruza los torniquetes para salir", level: "info" };
     this.onEvent("exit", { station: st });
     return null;
@@ -243,7 +282,19 @@ export class Walker {
 
   /* ----- Paso por fotograma ----- */
   update(dt) {
-    if (!this.seat && dt > 0) this.move(dt);
+    this.deniedT = Math.max(0, this.deniedT - dt);
+    if (!this.seat && dt > 0 && !this.frozen) this.move(dt);
+
+    // Escalera mecánica: avanza (y sube) sola
+    if (this.space === "world" && dt > 0) {
+      const st = this.stationAt(this.pos.z);
+      const ax = Math.abs(this.pos.x), dz = st ? this.pos.z - st.z : -1e9;
+      if (st && ax >= MZ.escX0 + 0.2 && ax <= MZ.escX1 - 0.2 && dz >= MZ.stairZ0 - 0.2 && dz < MZ.stairZ1 + 0.15) {
+        const nz = this.pos.z + MZ.escSpeed * dt;
+        const fy = this.worldFloor(this.pos.x, nz, this.pos.y);
+        if (fy !== null) { this.pos.z = nz; this.pos.y = fy; }
+      }
+    }
 
     // Si se cierran las puertas con el jugador en el umbral, queda del lado del andén
     if (this.space === "world" && Math.abs(this.pos.y - S.platformTop) < 0.3 && Math.abs(this.pos.x) < S.platformEdgeX + 0.3
@@ -268,7 +319,8 @@ export class Walker {
       const st = this.stationAt(this.pos.z);
       if (st) {
         const paid = this.pos.z - st.z < MZ.gateZ;
-        if (paid !== this.paid) { this.paid = paid; this.onEvent(paid ? "gateIn" : "gateOut", { station: st }); }
+        if (paid !== this.paid) { this.paid = paid; this.gatePass = false; this.onEvent(paid ? "gateIn" : "gateOut", { station: st }); }
+        // Si retrocede sin cruzar, el pase validado se conserva (como en la realidad, ya se cobró)
         if (this.moving && this.pos.z - st.z > MZ.z1 - 0.1 && !paid) this.onEvent("exit", { station: st });
       }
     }
@@ -318,16 +370,22 @@ export class Walker {
       return open && rs ? `Puertas abiertas en ${rs.name} · camina hacia una puerta (lado derecho del pasillo) para bajar · F sentarse` : "F sentarse · puedes recorrer los 5 coches por el pasillo";
     }
     if (Math.abs(this.pos.y - MZ.y) < 0.3) {
+      const service = this.nearService();
+      if (service?.kind === "boleteria") return "E · atención en boletería (cargar tarjeta bip!, comprar tarjeta)";
+      if (service?.kind === "totem") return "E · tótem de autoservicio: carga con tarjeta de débito o crédito";
       if (this.nearExit() && !this.paid) return "E (o sigue caminando) para salir a la calle";
       return this.paid
         ? "Zona pagada · escalera izquierda: dir. Plaza Quilicura · derecha: dir. F. Castillo Velasco"
-        : "Pasa por un torniquete para validar tu tarjeta bip!";
+        : "Pasa por un torniquete para validar tu tarjeta bip! · boletería a la izquierda, tótems a la derecha";
     }
-    if (this.pos.y > S.platformTop + 0.3) return "Escalera entre el andén y la mezanina";
+    if (this.pos.y > S.platformTop + 0.3) {
+      const ax = Math.abs(this.pos.x);
+      return ax < MZ.stairX0 ? "Escalera mecánica de subida: te lleva sola" : "Escalera fija entre el andén y la mezanina";
+    }
     const side = this.platformSide();
     const st = this.stationAt(this.pos.z);
     if (st && side && this.openUnit(st, side)) return "El tren tiene las puertas abiertas: camina hacia una puerta para subir";
-    return "Espera el tren detrás de la línea amarilla · la escalera lleva a la mezanina y la salida";
+    return "Espera el tren detrás de la línea amarilla · escalera mecánica y fija hacia la mezanina";
   }
 }
 

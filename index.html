@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>MetroSim — Alpha 0.5</title>
+  <title>MetroSim — Alpha 0.6</title>
   <link rel="stylesheet" href="styles.css">
   <!-- Three.js mediante importmap (CDN). es-module-shims da compatibilidad a navegadores antiguos. -->
   <script async src="https://unpkg.com/es-module-shims@1.10.0/dist/es-module-shims.js"></script>
@@ -27,16 +27,25 @@
       <p class="tagline"><span class="line-dot">3</span> Línea 3 · Metro de Santiago · 21 estaciones · doble vía</p>
 
       <div class="mode-selection">
-        <button class="mode-card" data-mode="driver">
+        <div class="mode-card mode-card-passenger">
           <span class="mode-icon">🚇</span>
-          <span><strong>Modo Conductor</strong><small>Tren de 5 coches. Tu servicio sale de Plaza Quilicura a las 08:01:30. Respeta señales y horario.</small></span>
-          <b>›</b>
-        </button>
+          <span>
+            <strong>Modo Conductor</strong>
+            <small>Tren de 5 coches. Respeta señales y horario; al final haz la maniobra de retorno.</small>
+            <label class="station-select">Servicio
+              <select id="startDirection">
+                <option value="A">Ida · Plaza Quilicura → F. Castillo Velasco (08:01:30)</option>
+                <option value="B">Vuelta · F. Castillo Velasco → Plaza Quilicura (08:03:30)</option>
+              </select>
+            </label>
+          </span>
+          <button class="go-button" data-mode="driver">Conducir ›</button>
+        </div>
         <div class="mode-card mode-card-passenger">
           <span class="mode-icon">🚶</span>
           <span>
             <strong>Modo Pasajero a pie</strong>
-            <small>Entra desde la calle, valida en el torniquete, elige andén y viaja en cualquier sentido.</small>
+            <small>Carga tu tarjeta bip! en la boletería, valida en el torniquete y viaja en cualquier sentido.</small>
             <label class="station-select">Empezar en
               <select id="startStation"></select>
             </label>
@@ -51,11 +60,12 @@
         <span><kbd>Espacio</kbd> emergencia</span>
         <span><kbd>D</kbd> puertas</span>
         <span><kbd>F</kbd> sentarse</span>
+        <span><kbd>T</kbd> cambio de cabina</span>
         <span><kbd>M</kbd> sonido</span>
       </div>
       <p class="start-note">🔊 Con sonido y anuncios. La carga de la línea completa puede tardar unos segundos.</p>
     </main>
-    <p class="version">METROSIM ALPHA 0.5 · DOBLE VÍA · TRENES DE 5 COCHES · MEZANINA</p>
+    <p class="version">METROSIM ALPHA 0.6 · MANIOBRA DE RETORNO · BOLETERÍAS · ESCALERAS MECÁNICAS</p>
   </section>
 
   <!-- =============================== PANTALLA DE CARGA =============================== -->
@@ -83,6 +93,7 @@
           <span id="modeLabel" class="mode-pill">CONDUCTOR</span>
         </div>
         <div class="hud-right">
+          <span id="cardPill" class="card-pill hidden">bip! $0</span>
           <button id="soundButton" class="sound-button">🔊 Sonido</button>
           <div class="hud-clock">
             <span class="hud-label">HORA</span>
@@ -170,9 +181,10 @@
         <span class="help-driver"><kbd>Q</kbd> inversor adelante · <kbd>E</kbd> inversor atrás</span>
         <span class="help-driver"><kbd>Espacio</kbd> emergencia · <kbd>D</kbd> puertas · <kbd>R</kbd> reiniciar</span>
         <span class="help-driver">Arrastrar ratón: mirar · <kbd>C</kbd> centrar · <kbd>V</kbd> vista exterior</span>
+        <span class="help-driver"><kbd>T</kbd> cambio de cabina (al final de la cola de maniobras)</span>
         <span class="help-walker"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> caminar · <kbd>Shift</kbd> correr</span>
         <span class="help-walker">Clic: capturar ratón · <kbd>Esc</kbd> soltar</span>
-        <span class="help-walker"><kbd>F</kbd> sentarse · <kbd>E</kbd> salir a la calle (mezanina)</span>
+        <span class="help-walker"><kbd>F</kbd> sentarse · <kbd>E</kbd> boletería, tótem o salida a la calle</span>
         <span><kbd>M</kbd> sonido</span>
       </div>
 
@@ -186,11 +198,44 @@
         <h2 id="summaryTitle">Fernando Castillo Velasco</h2>
         <ul id="summaryList"></ul>
         <div class="summary-actions">
+          <button id="summaryAlt" class="ghost-button hidden">Otra opción</button>
           <button id="summaryContinue" class="go-button">Seguir</button>
           <button id="summaryMenu" class="ghost-button">Menú</button>
         </div>
       </div>
     </div>
+
+    <!-- Boletería / tótem de autoservicio -->
+    <div id="ticketPanel" class="ticket-panel hidden">
+      <div class="ticket-card">
+        <header class="ticket-head">
+          <span class="bip-logo">bip!</span>
+          <div class="ticket-head-text">
+            <span class="small-label" id="ticketKicker">BOLETERÍA</span>
+            <strong id="ticketTitle">—</strong>
+          </div>
+          <button id="ticketClose" class="ticket-close" aria-label="Cerrar">✕</button>
+        </header>
+        <div class="ticket-balance">
+          <div><span class="small-label">SALDO</span><strong id="ticketBalance">$0</strong></div>
+          <span id="ticketCardNo" class="station-sub">—</span>
+        </div>
+        <span class="small-label">TARIFAS</span>
+        <div id="ticketFares" class="ticket-fares"></div>
+        <span class="small-label">MONTO A CARGAR</span>
+        <div id="ticketAmounts" class="ticket-amounts"></div>
+        <span class="small-label">MEDIO DE PAGO</span>
+        <div id="ticketPay" class="ticket-pay"></div>
+        <p id="ticketStatus" class="ticket-status">—</p>
+        <footer class="ticket-actions">
+          <button id="ticketBuy" class="ghost-button">Comprar tarjeta</button>
+          <button id="ticketConfirm" class="go-button">Cargar</button>
+        </footer>
+      </div>
+    </div>
+
+    <!-- Fundido a negro (cambio de cabina) -->
+    <div id="fade" class="fade"><span id="fadeText"></span></div>
 
     <button id="backButton" class="back-button">← Menú</button>
   </section>

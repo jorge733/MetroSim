@@ -1,5 +1,5 @@
 /* ==========================================================================
-   MetroSim — Alpha 0.5 · config.js
+   MetroSim — Alpha 0.6 · config.js
    Configuración global: Línea 3 del Metro de Santiago, geometría de
    estaciones y trenes, mando, horarios y demanda.
 
@@ -15,7 +15,7 @@
    las combinaciones son reales.
    ========================================================================== */
 
-export const VERSION = "ALPHA 0.5";
+export const VERSION = "ALPHA 0.6";
 
 /* ---------- Línea ---------- */
 export const LINE = {
@@ -86,8 +86,14 @@ export const CONFIG = {
     gates: [-2.75, -1.65, -0.55, 0.55, 1.65, 2.75],   // ejes de los pasos de torniquete
     gateHalf: 0.27,                    // medio ancho de paso
     stairZ0: 20, stairZ1: 34,          // escalera desde el andén (abajo) hasta la mezanina (arriba)
-    stairX0: 6.1, stairX1: 8.3,        // |x| de la escalera (pegada al muro)
+    stairX0: 7.0, stairX1: 8.3,        // |x| de la escalera fija (pegada al muro)
+    escX0: 5.6, escX1: 6.85,           // |x| de la escalera mecánica de subida
+    escSpeed: 0.5,                     // m/s de avance de la escalera mecánica (a lo largo del andén)
     exitHalf: 1.6,                     // medio ancho de la salida a la calle
+    // Boletería (zona no pagada, lado −X) y tótems de autoservicio (lado +X)
+    booth: { x0: -7.9, x1: -5.3, z0: 46.5, z1: 51.7, windowZ: 47.6 },
+    totems: [5.0, 6.3], totemZ: 51.0,
+    queue: [[-4.6, 47.6], [-4.6, 48.4], [-4.6, 49.2], [-4.6, 50.0], [-3.8, 50.8], [-3.0, 50.8], [-2.2, 50.8]],
   },
   tunnel: { radius: 5.6, centerY: 1.6, floorY: -0.05 },   // túnel de doble vía (como el NATM de la L3)
   catenary: { contactY: 4.55 },        // catenaria rígida 1500 V CC
@@ -128,7 +134,36 @@ export const CONFIG = {
   },
   defaultSpeedLimit: 70,
   renderRadius: 420,
+  turnback: {
+    cabChangeTime: 40,                 // segundos que tarda un conductor automático en cambiar de cabina
+    crossoverFrom: 80, crossoverTo: 135,   // tramo del cambio de vía tras cada terminal (m desde el centro de la estación)
+  },
 };
+
+/* ---------- Tarjeta bip! y tarifas ----------
+   Valores de REFERENCIA para el juego (pesos chilenos). Las tarifas reales de
+   Metro cambian con el tiempo: ajústalas aquí si quieres que coincidan con
+   las vigentes. Los tramos horarios siguen el esquema punta / valle / baja. */
+export const FARES = {
+  cardPrice: 1550,                     // precio de una tarjeta bip! nueva
+  startBalance: 350,                   // saldo inicial de la tarjeta del jugador
+  maxBalance: 25000,
+  loadAmounts: [1000, 2000, 3000, 5000, 10000],
+  bands: [
+    { id: "punta", label: "Hora punta", price: 870, ranges: [[7, 9], [18, 20]] },
+    { id: "valle", label: "Hora valle", price: 790, ranges: [[6.5, 7], [9, 18], [20, 20.75]] },
+    { id: "baja",  label: "Hora baja",  price: 710, ranges: [[6, 6.5], [20.75, 23]] },
+  ],
+};
+
+/** Tramo tarifario vigente a una hora (s). Fuera de servicio se usa el de hora baja. */
+export function fareBandAt(clockSeconds) {
+  const h = (clockSeconds / 3600) % 24;
+  return FARES.bands.find(b => b.ranges.some(([a, c]) => h >= a && h < c)) || FARES.bands.at(-1);
+}
+
+/** Formato de pesos chilenos: 2350 → "$2.350". */
+export const formatCLP = (n) => "$" + Math.round(n).toLocaleString("es-CL");
 
 /* ---------- Estaciones (coordenadas del mundo) ---------- */
 let acc = 0;

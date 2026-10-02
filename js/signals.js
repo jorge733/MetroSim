@@ -1,5 +1,5 @@
 /* ==========================================================================
-   MetroSim — Alpha 0.5 · signals.js
+   MetroSim — Alpha 0.6 · signals.js
    Señalización lateral con bloqueo automático de 3 aspectos.
 
    · Cada señal protege el cantón (bloque) que empieza en ella y termina en

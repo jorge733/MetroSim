@@ -1,5 +1,5 @@
 /* ==========================================================================
-   MetroSim — Alpha 0.5 · sim.js
+   MetroSim — Alpha 0.6 · sim.js
    Simulación de un tren (lógica pura, sin gráficos) y conducción automática.
 
    Principio: el tren del jugador y los trenes automáticos usan EXACTAMENTE la
@@ -227,12 +227,14 @@ export class TrainSim {
    Respeta señales, horario y espera a que suban/bajen los viajeros.
 
    Estados:
+     depot    → esperando en la cola de maniobras/cocheras hasta su hora de entrada
      running  → hacia la parada de la estación objetivo (frena ante señales rojas)
      dwell    → puertas abiertas en estación
      closing  → cerrando puertas
      ready    → puertas cerradas, esperando hora de salida y señal de salida
-     retire   → tras la última estación, hacia la vía de retirada
-     retired  → fuera de servicio (el tráfico lo elimina)
+     retire   → tras la última estación, hacia el fondo de la cola de maniobras
+     retired  → al final de la cola: el tráfico le cambia de cabina y de vía
+                (maniobra de retorno) o lo retira a cocheras
    ========================================================================== */
 
 export class AutoDriver {
@@ -244,15 +246,17 @@ export class AutoDriver {
    * @param {(type:string, data?:object)=>void} opts.onEvent
    * @param {() => boolean} opts.isBoardingBusy  true mientras suben o bajan viajeros
    * @param {number} opts.targetIndex            estación hacia la que se dirige
+   * @param {number|null} opts.holdUntil         hora hasta la que espera en cocheras antes de arrancar
    */
-  constructor(sim, { trip = null, signals = null, onEvent = () => {}, isBoardingBusy = () => false, targetIndex = 0 } = {}) {
+  constructor(sim, { trip = null, signals = null, onEvent = () => {}, isBoardingBusy = () => false, targetIndex = 0, holdUntil = null } = {}) {
     this.sim = sim;
     this.trip = trip;
     this.signals = signals;
     this.onEvent = onEvent;
     this.isBoardingBusy = isBoardingBusy;
     this.targetIndex = targetIndex;
-    this.state = "running";
+    this.state = holdUntil !== null ? "depot" : "running";
+    this.holdUntil = holdUntil;
     this.timer = 0;
     this.extraWait = 0;
     this.brakeTarget = null;
@@ -272,6 +276,10 @@ export class AutoDriver {
     const sim = this.sim;
     const last = this.stations.length - 1;
     switch (this.state) {
+      case "depot":
+        sim.autoDemand = -1.05;
+        if (clock >= this.holdUntil) this.state = "running";
+        break;
       case "running": {
         sim.autoDemand = this.runDemand(this.target.stopZ, true);
         const d = sim.position - this.target.stopZ;

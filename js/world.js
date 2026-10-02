@@ -1,5 +1,5 @@
 /* ==========================================================================
-   MetroSim — Alpha 0.5 · world.js
+   MetroSim — Alpha 0.6 · world.js
    Mundo 3D fijo de la Línea 3 (doble vía): vías, catenaria rígida, túnel de
    doble vía, 21 estaciones con andenes laterales, escaleras, mezanina con
    torniquetes y salida a la calle, pantallas de próximo tren y topes.
@@ -7,15 +7,18 @@
    Sección transversal de una estación (x):
      muro −8,5 | andén vía 2 | borde −3,55 | vía 2 (x=−2) | columnas x=0 |
      vía 1 (x=+2) | borde +3,55 | andén vía 1 | muro +8,5
-   A lo largo (z relativo al centro): andenes ±50 · escaleras +20…+34 ·
-   mezanina +34…+52 a 7,2 m de altura · torniquetes en +44 · salida en +52.
+   A lo largo (z relativo al centro): andenes ±50 · escalera fija y escalera
+   mecánica +20…+34 · mezanina +34…+52 a 7,2 m de altura · torniquetes en +44
+   · boletería, tótems de carga y salida a la calle tras los torniquetes.
+   En las colas tras cada terminal hay un cambio de vía para la maniobra de
+   retorno y un cartel de FIN DE MANIOBRA.
 
    Rendimiento: estaciones lejanas ocultas, pool fijo de 3 luces que sigue a
    la cámara, piezas repetidas instanciadas y texturas comunes compartidas.
    ========================================================================== */
 
 import * as THREE from "three";
-import { CONFIG, STATIONS, WORLD, LINE } from "./config.js";
+import { CONFIG, STATIONS, WORLD, LINE, FARES, formatCLP } from "./config.js";
 import { ROUTE_A, ROUTE_B } from "./route.js";
 import {
   std, glow, addBox, addBoxSpan, addPlane, makeCanvas, toTexture, tunnelTexture, concreteTexture,
@@ -93,6 +96,21 @@ function createWorldMaterials() {
     bufferWhite: std(0xeeeeee, { rough: 0.5 }),
     bufferLamp: glow(0xff2a2a),
     street: glow(0xffffff, { map: toTexture(street) }),
+    escSteps: std(0xffffff, { map: toTexture(escalatorStepsCanvas(), 1, 38), metal: 0.6, rough: 0.4 }),
+    escRail: std(0x0d0d0d, { rough: 0.4 }),
+    escSkirt: std(0x2b3036, { metal: 0.6, rough: 0.35 }),
+    comb: std(0xd8b23a, { metal: 0.6, rough: 0.4 }),
+    boothFrame: std(0xb7bec5, { metal: 0.65, rough: 0.3 }),
+    boothPanel: std(0x8b5a2b, { rough: 0.6 }),
+    boothGlass: std(0xcfe8f5, { metal: 0.1, rough: 0.05, transparent: true, opacity: 0.25, depthWrite: false, side: THREE.DoubleSide }),
+    boothInside: std(0x59626b, { rough: 0.8 }),
+    boothLight: glow(0xfff4e0),
+    reader: glow(0x2ee07a),
+    fareBoard: glow(0xffffff, { map: toTexture(fareBoardCanvas()) }),
+    totemScreen: glow(0xffffff, { map: toTexture(totemScreenCanvas()) }),
+    stanchion: std(0xc9cfd4, { metal: 0.8, rough: 0.25 }),
+    belt: std(0x1d3f95, { rough: 0.6 }),
+    endBoard: glow(0xffffff, { map: toTexture(signCanvas("FIN DE MANIOBRA", "#c41e2a", 512, 128, "800 50px Arial")) }),
     // Carteles compartidos
     exitUp: glow(0xffffff, { map: toTexture(signCanvas("↑  SALIDA")) }),
     exitStreet: glow(0xffffff, { map: toTexture(signCanvas("SALIDA A LA CALLE", "#1f7a3c", 1024, 128, "800 60px Arial")) }),
@@ -107,6 +125,58 @@ function createWorldMaterials() {
 }
 
 
+/** Rebote de luz simulado: el material se ilumina un poco con su propia textura. */
+function addBounce(mat, amount) {
+  mat.emissive.setScalar(amount);
+  mat.emissiveMap = mat.map;
+  return mat;
+}
+
+/* ---------- Texturas de la mezanina ---------- */
+function escalatorStepsCanvas() {
+  const c = makeCanvas(64, 64), g = c.getContext("2d");
+  g.fillStyle = "#4a4f54"; g.fillRect(0, 0, 64, 64);
+  g.fillStyle = "#2a2e32";
+  for (let x = 2; x < 64; x += 5) g.fillRect(x, 0, 2, 64);          // ranuras
+  g.fillStyle = "#e1b62d"; g.fillRect(0, 0, 4, 64); g.fillRect(60, 0, 4, 64);   // bordes amarillos
+  g.fillStyle = "#1a1d20"; g.fillRect(0, 56, 64, 8);                 // contrahuella
+  return c;
+}
+
+/** Tablero de tarifas por tramo horario (valores de config.js). */
+function fareBoardCanvas() {
+  const c = makeCanvas(512, 384), g = c.getContext("2d");
+  g.fillStyle = "#f4f2ec"; g.fillRect(0, 0, 512, 384);
+  g.fillStyle = "#c41e2a"; g.fillRect(0, 0, 512, 70);
+  g.fillStyle = "#fff"; g.font = "800 34px Arial"; g.textBaseline = "middle"; g.textAlign = "left";
+  g.fillText("TARIFAS · tarjeta bip!", 22, 36);
+  const hh = (h) => `${String(Math.floor(h)).padStart(2, "0")}:${String(Math.round((h % 1) * 60)).padStart(2, "0")}`;
+  FARES.bands.forEach((b, i) => {
+    const y = 110 + i * 92;
+    g.fillStyle = "#1b2430"; g.font = "800 28px Arial"; g.textAlign = "left";
+    g.fillText(b.label.toUpperCase(), 22, y);
+    g.font = "500 18px Arial"; g.fillStyle = "#4b5560";
+    g.fillText(b.ranges.map(([a, z]) => `${hh(a)}–${hh(z)}`).join(" · "), 22, y + 30);
+    g.font = "900 34px Arial"; g.fillStyle = "#1b2430"; g.textAlign = "right";
+    g.fillText(formatCLP(b.price), 490, y + 10);
+  });
+  g.font = "600 17px Arial"; g.fillStyle = "#4b5560"; g.textAlign = "left";
+  g.fillText(`Tarjeta nueva ${formatCLP(FARES.cardPrice)} · combinaciones sin costo`, 22, 362);
+  return c;
+}
+
+function totemScreenCanvas() {
+  const c = makeCanvas(256, 320), g = c.getContext("2d");
+  g.fillStyle = "#0c2f6b"; g.fillRect(0, 0, 256, 320);
+  g.fillStyle = "#ffffff"; g.font = "800 40px Arial"; g.textAlign = "center"; g.textBaseline = "middle";
+  g.fillText("CARGA", 128, 60); g.fillText("TU", 128, 105);
+  g.fillStyle = "#e1251b"; g.fillRect(58, 135, 140, 64);
+  g.fillStyle = "#fff"; g.font = "900 44px Arial"; g.fillText("bip!", 128, 168);
+  g.font = "600 18px Arial"; g.fillStyle = "#cfe0f1";
+  g.fillText("Débito o crédito", 128, 238); g.fillText("Toca la pantalla", 128, 266);
+  return c;
+}
+
 /* ==========================================================================
    Clase World
    ========================================================================== */
@@ -115,6 +185,13 @@ export class World {
   constructor(scene) {
     this.scene = scene;
     this.M = createWorldMaterials();
+    // Rebote de luz en muros, andenes, mezanina y techos
+    this.M.stationWalls.forEach(m => addBounce(m, 0.2));
+    addBounce(this.M.platform, 0.16);
+    addBounce(this.M.deck, 0.2);
+    this.M.ceiling.emissive.setHex(0x101317);
+    this.M.soffit.emissive.setHex(0x30343a);
+    this.escalatorTexture = this.M.escSteps.map;
     this.stations = [];
     this.gates = [];
 
@@ -126,7 +203,11 @@ export class World {
     // Pool de luces de estación: 3 luces reales que siguen a la cámara
     this.lightSpots = [];
     STATIONS.forEach(st => {
-      this.lightSpots.push(new THREE.Vector3(0, 6.0, st.z - 30), new THREE.Vector3(0, 6.0, st.z + 5), new THREE.Vector3(0, 9.9, st.z + 43));
+      this.lightSpots.push(
+        new THREE.Vector3(0, 6.0, st.z - 30), new THREE.Vector3(0, 6.0, st.z + 2),
+        new THREE.Vector3(0, 6.3, st.z + 27),                      // escaleras y zona bajo la mezanina
+        new THREE.Vector3(0, 9.9, st.z + 43),                      // mezanina
+      );
     });
     this.lights = Array.from({ length: 3 }, () => {
       const l = new THREE.PointLight(0xeef4ff, 85, 60, 1.6);
@@ -143,8 +224,10 @@ export class World {
     for (let i = 0; i < bounds.length; i += 2) buildTunnelSegment(this.scene, this.M, bounds[i], bounds[i + 1]);
   }
 
-  /** Visibilidad por distancia y recolocación del pool de luces. */
-  update(camera) {
+  /** Visibilidad por distancia, pool de luces y escaleras mecánicas en marcha. */
+  update(camera, dt = 0) {
+    // Los peldaños avanzan (la textura se desplaza a lo largo de la rampa)
+    this.escalatorTexture.offset.y -= dt * MZ.escSpeed * 38 / 15.2;
     const cz = camera.z, R = CONFIG.renderRadius;
     for (const s of this.stations) s.group.visible = Math.abs(s.st.z - cz) < R;
 
@@ -169,7 +252,11 @@ export class World {
     for (const gate of this.gates) {
       if (Math.abs(gate.z - cameraZ) > 120) continue;
       const near = agents.some(a => Math.abs(a.y - MZ.y) < 1 && Math.abs(a.x - gate.x) < 0.4 && Math.abs(a.z - gate.z) < 1.1);
-      const target = near ? 1 : 0;
+      if (gate.flashT > 0) {
+        gate.flashT -= dt;
+        gate.validator.setHex(gate.flashT > 0 ? gate.flashColor : 0x37d67a);
+      }
+      const target = near && !gate.locked ? 1 : 0;
       if (target === 1 && gate.open < 0.05) opened.push(gate);
       gate.open += Math.sign(target - gate.open) * Math.min(Math.abs(target - gate.open), dt * 5);
       const a = gate.open * Math.PI / 2;
@@ -177,6 +264,19 @@ export class World {
       gate.flaps[1].rotation.y = -a;
     }
     return opened;
+  }
+
+  /** Destello del validador de un torniquete (verde = validado, rojo = rechazado). */
+  flashValidator(gate, ok) {
+    gate.flashColor = ok ? 0x6dff9a : 0xff2a2a;
+    gate.flashT = 0.8;
+  }
+
+  /** Torniquete más cercano a una posición de mundo. */
+  nearestGate(pos) {
+    let best = null, bd = Infinity;
+    for (const g of this.gates) { const d = Math.hypot(g.x - pos.x, g.z - pos.z); if (d < bd) { bd = d; best = g; } }
+    return best;
   }
 
   /**
@@ -243,7 +343,9 @@ function buildTunnelSegment(scene, M, zA, zB) {
   const cut = Math.acos(below / T.radius);
   const geo = new THREE.CylinderGeometry(T.radius, T.radius, len, 48, 1, true, cut, Math.PI * 2 - cut * 2);
   geo.rotateX(Math.PI / 2);
-  const arch = new THREE.Mesh(geo, std(0xffffff, { map: toTexture(M.tunnelCanvas, 12, len / 1.5), rough: 0.95, side: THREE.BackSide }));
+  const archMat = std(0xffffff, { map: toTexture(M.tunnelCanvas, 12, len / 1.5), rough: 0.95, side: THREE.BackSide });
+  addBounce(archMat, 0.05);                                       // el túnel no queda negro absoluto
+  const arch = new THREE.Mesh(geo, archMat);
   arch.position.set(0, T.centerY, mid);
   scene.add(arch);
 
@@ -359,7 +461,7 @@ function buildStation(scene, M, st, gates) {
     };
     hang(side > 0 ? M.dirA : M.dirB, side * 5.6, 4.7, z - 28, 3.2);
     hang(side > 0 ? M.dirA : M.dirB, side * 5.6, 4.7, z + 2, 3.2);
-    hang(M.exitUp, side * 7.2, 4.9, z + MZ.stairZ0 - 2, 1.8);
+    hang(M.exitUp, side * 6.6, 4.9, z + MZ.stairZ0 - 2.5, 2.4);
 
     // Pantalla de próximo tren (una por andén, con su sentido)
     const pidCanvas = makeCanvas(512, 160);
@@ -392,16 +494,21 @@ function buildStation(scene, M, st, gates) {
   return { st, group, pids };
 }
 
-/** Escalera fija entre el andén (y = 1,2) y la mezanina (y = 7,2), pegada al muro. */
+/** Escalera fija y escalera mecánica de subida entre el andén (y = 1,2) y la mezanina (y = 7,2). */
 function buildStairs(group, M, side, z) {
   const z0 = z + MZ.stairZ0, z1 = z + MZ.stairZ1;
   const y0 = S.platformTop, y1 = MZ.y;
+  const len = Math.hypot(z1 - z0, y1 - y0), ang = Math.atan2(y1 - y0, z1 - z0);
+  const sloped = (w, h, mat, x, yOff) => {
+    const b = addBox(group, w, h, len, mat, x, (y0 + y1) / 2 + yOff, (z0 + z1) / 2);
+    b.rotation.x = -ang;
+    return b;
+  };
+
+  /* --- Escalera fija (pegada al muro) --- */
   const x0 = MZ.stairX0, x1 = MZ.stairX1, w = x1 - x0, xc = side * (x0 + w / 2);
   const steps = 34, run = (z1 - z0) / steps, rise = (y1 - y0) / steps;
-
-  // Peldaños instanciados (una sola llamada de dibujo)
-  const geo = new THREE.BoxGeometry(w, rise, run);
-  const treads = new THREE.InstancedMesh(geo, M.stair, steps);
+  const treads = new THREE.InstancedMesh(new THREE.BoxGeometry(w, rise, run), M.stair, steps);
   const noses = new THREE.InstancedMesh(new THREE.BoxGeometry(w, 0.012, 0.05), M.stairNose, steps);
   const m = new THREE.Matrix4();
   for (let i = 0; i < steps; i++) {
@@ -411,19 +518,28 @@ function buildStairs(group, M, side, z) {
   }
   treads.computeBoundingSphere(); noses.computeBoundingSphere();
   group.add(treads, noses);
+  sloped(0.05, 0.05, M.steel, side * (x1 - 0.05), 1.0);                       // pasamanos junto al muro
 
-  // Cierre lateral bajo la escalera y barandal de vidrio
+  /* --- Escalera mecánica de subida --- */
+  const e0 = MZ.escX0, e1 = MZ.escX1, ew = e1 - e0, exc = side * (e0 + ew / 2);
+  sloped(ew - 0.3, 0.04, M.escSteps, exc, 0.02);                               // banda de peldaños (se mueve)
+  [e0 + 0.08, e1 - 0.08].forEach(xe => {
+    sloped(0.12, 0.25, M.escSkirt, side * xe, 0.12);                           // zócalo
+    sloped(0.03, 0.85, M.balustrade, side * xe, 0.6);                          // balaustrada de vidrio
+    sloped(0.09, 0.06, M.escRail, side * xe, 1.05);                            // pasamanos de goma
+  });
+  // Peines (placas de embarque) abajo y arriba
+  addBoxSpan(group, exc, ew, y0, y0 + 0.02, z0 - 1.2, z0, M.comb);
+  addBoxSpan(group, exc, ew, y1, y1 + 0.02, z1, z1 + 1.0, M.comb);
+  addPlane(group, 0.9, 0.22, glow(0xffffff, { map: toTexture(signCanvas("↑ SUBIDA", "#1f7a3c", 256, 64, "800 34px Arial")) }), exc, y0 + 2.3, z0 - 1.4, Math.PI);
+
+  // Cierre lateral bajo la escalera mecánica (lado del andén)
   const shape = new THREE.Shape();
   shape.moveTo(0, y0); shape.lineTo(z1 - z0, y0); shape.lineTo(z1 - z0, y1); shape.closePath();
-  const side1 = new THREE.Mesh(new THREE.ShapeGeometry(shape), M.portal);
-  side1.rotation.y = -Math.PI / 2;
-  side1.position.set(side * (x0 - 0.02), 0, z0);
-  group.add(side1);
-  const len = Math.hypot(z1 - z0, y1 - y0), ang = Math.atan2(y1 - y0, z1 - z0);
-  const glass = addBox(group, 0.02, 1.0, len, M.balustrade, side * (x0 - 0.03), (y0 + y1) / 2 + 0.5, (z0 + z1) / 2);
-  glass.rotation.x = -ang;
-  const rail = addBox(group, 0.05, 0.05, len, M.steel, side * (x0 - 0.03), (y0 + y1) / 2 + 1.0, (z0 + z1) / 2);
-  rail.rotation.x = -ang;
+  const sidePanel = new THREE.Mesh(new THREE.ShapeGeometry(shape), M.escSkirt);
+  sidePanel.rotation.y = -Math.PI / 2;
+  sidePanel.position.set(side * (e0 - 0.02), 0, z0);
+  group.add(sidePanel);
 }
 
 /** Mezanina: losa elevada con barandal, torniquetes, boletería y salida a la calle. */
@@ -437,7 +553,7 @@ function buildMezzanine(group, M, st, nameMat, gates) {
   for (let x = -6; x <= 6; x += 3) addBoxSpan(group, x, 0.3, y - 0.36, y - 0.34, za + 1, zb - 1, M.fixture);
 
   // Barandal de vidrio en el borde que da a los andenes (salvo las llegadas de escalera)
-  const segs = [[-MZ.stairX0, MZ.stairX0]];
+  const segs = [[-MZ.escX0, MZ.escX0]];
   segs.forEach(([x0, x1]) => {
     addBoxSpan(group, (x0 + x1) / 2, x1 - x0, y, y + 1.05, za + 0.02, za + 0.06, M.balustrade);
     addBoxSpan(group, (x0 + x1) / 2, x1 - x0, y + 1.05, y + 1.1, za, za + 0.08, M.steel);
@@ -454,7 +570,6 @@ function buildMezzanine(group, M, st, nameMat, gates) {
     const x0 = cabinetEdges[i], x1 = cabinetEdges[i + 1];
     addBoxSpan(group, (x0 + x1) / 2, x1 - x0, y, y + 1.0, zg - 0.6, zg + 0.6, M.gateCabinet);
     addBoxSpan(group, (x0 + x1) / 2, x1 - x0 + 0.02, y + 1.0, y + 1.04, zg - 0.62, zg + 0.62, M.gateTop);
-    addBoxSpan(group, (x0 + x1) / 2, 0.14, y + 1.04, y + 1.09, zg + 0.35, zg + 0.5, M.validator);   // validador bip!
   }
   // Aletas de cada paso (se abren al pasar)
   gx.forEach(g => {
@@ -466,22 +581,18 @@ function buildMezzanine(group, M, st, nameMat, gates) {
       group.add(pivot);
       return pivot;
     });
-    // Las dos aletas giran hacia la zona pagada
-    gates.push({ x: g, z: zg, flaps, open: 0, station: st });
+    // Validador bip! propio de cada paso (destella verde o rojo)
+    const vMat = glow(0x37d67a);
+    addBoxSpan(group, g + gh + 0.12, 0.16, y + 1.04, y + 1.1, zg + 0.3, zg + 0.5, vMat);
+    gates.push({ x: g, z: zg, flaps, open: 0, station: st, validator: vMat.color, flashT: 0 });
   });
 
   // Cartel de orientación sobre los torniquetes (mirando a quien entra de la calle)
   addPlane(group, 7.2, 0.45, M.toPlatforms, 0, y + 2.6, zg + 0.8, 0);
   addPlane(group, 3.2, 0.8, nameMat, 0, y + 2.6, zg - 0.8, Math.PI);
 
-  // Boletería y tótems de carga en la zona no pagada
-  addBoxSpan(group, -6.6, 2.6, y, y + 2.4, zg + 2.5, zb - 0.3, M.kiosk);
-  addBoxSpan(group, -5.29, 0.02, y + 1.0, y + 1.9, zg + 3.2, zb - 1.0, M.balustrade);
-  addPlane(group, 2.6, 0.33, M.ticketOffice, -5.28, y + 2.2, (zg + 2.5 + zb - 0.3) / 2, Math.PI / 2);
-  [5.0, 6.3].forEach(x => {
-    addBoxSpan(group, x, 0.7, y, y + 1.7, zb - 1.0, zb - 0.5, M.kiosk);
-    addBoxSpan(group, x, 0.5, y + 1.0, y + 1.5, zb - 1.02, zb - 1.0, M.kioskScreen);
-  });
+  buildTicketOffice(group, M, z);
+  buildTotems(group, M, z);
 
   // Muro final con la salida a la calle
   const ex = MZ.exitHalf, top = S.ceilingY;
@@ -489,6 +600,67 @@ function buildMezzanine(group, M, st, nameMat, gates) {
   addBoxSpan(group, 0, ex * 2, y + 2.7, top, zb, zb + 0.3, M.portal);
   addPlane(group, ex * 2, 2.7, M.street, 0, y + 1.35, zb + 0.32, Math.PI);
   addPlane(group, ex * 2 + 0.4, 0.3, M.exitStreet, 0, y + 2.95, zb - 0.01, Math.PI);
+}
+
+/** Boletería: cabina con ventanilla, mostrador, lector, tablero de tarifas y fila con postes. */
+function buildTicketOffice(group, M, z) {
+  const B = MZ.booth, y = MZ.y;
+  const bx0 = B.x0, bx1 = B.x1, bz0 = z + B.z0, bz1 = z + B.z1, wz = z + B.windowZ;
+  const top = y + 2.5;
+  const win0 = wz - 0.7, win1 = wz + 0.7;
+  // Fachada frontal (+X) con ventanilla de atención
+  addBoxSpan(group, bx1, 0.08, y, y + 1.0, bz0, bz1, M.boothFrame);
+  addBoxSpan(group, bx1, 0.08, y + 1.0, y + 2.0, bz0, win0, M.boothPanel);
+  addBoxSpan(group, bx1, 0.08, y + 1.0, y + 2.0, win1, bz1, M.boothPanel);
+  addBoxSpan(group, bx1, 0.03, y + 1.0, y + 2.0, win0, win1, M.boothGlass);
+  addBoxSpan(group, bx1, 0.1, y + 2.0, top, bz0, bz1, M.boothFrame);
+  // Laterales, techo e interior
+  addBoxSpan(group, (bx0 + bx1) / 2, bx1 - bx0, y, top, bz0 - 0.05, bz0, M.boothPanel);
+  addBoxSpan(group, (bx0 + bx1) / 2, bx1 - bx0, y, top, bz1, bz1 + 0.05, M.boothPanel);
+  addBoxSpan(group, (bx0 + bx1) / 2, bx1 - bx0 + 0.1, top, top + 0.08, bz0 - 0.05, bz1 + 0.05, M.boothFrame);
+  addBoxSpan(group, (bx0 + bx1) / 2, 1.0, top - 0.05, top - 0.03, wz - 0.6, wz + 0.6, M.boothLight);
+  addBoxSpan(group, bx1 - 0.45, 0.6, y, y + 0.78, win0, win1, M.boothInside);      // mesa del cajero
+  addBoxSpan(group, bx1 - 0.6, 0.05, y + 0.78, y + 1.15, wz - 0.25, wz + 0.25, M.kioskScreen);   // monitor
+  // Repisa exterior con lector de tarjetas
+  addBoxSpan(group, bx1 + 0.15, 0.3, y + 0.98, y + 1.03, win0, win1, M.boothFrame);
+  addBoxSpan(group, bx1 + 0.2, 0.14, y + 1.03, y + 1.06, wz + 0.25, wz + 0.45, M.reader);
+  // Rótulo y tablero de tarifas
+  addPlane(group, 2.4, 0.3, M.ticketOffice, bx1 + 0.06, y + 2.25, (bz0 + bz1) / 2, Math.PI / 2);
+  addPlane(group, 1.6, 1.2, M.fareBoard, bx1 + 0.05, y + 1.5, (win1 + bz1) / 2 + 0.3, Math.PI / 2);
+  // Fila: postes con cinta
+  const posts = [[-4.0, 46.9], [-4.0, 48.3], [-4.0, 49.7], [-4.0, 50.6]];
+  posts.forEach(([px, pz], i) => {
+    addBox(group, 0.06, 1.0, 0.06, M.stanchion, px, y + 0.5, z + pz);
+    addBox(group, 0.3, 0.04, 0.3, M.stanchion, px, y + 0.02, z + pz);
+    if (i > 0) addBoxSpan(group, px, 0.02, y + 0.9, y + 0.96, z + posts[i - 1][1], z + pz, M.belt);
+  });
+}
+
+/** Tótems de autocarga de la tarjeta bip!. */
+function buildTotems(group, M, z) {
+  const y = MZ.y, tz = z + MZ.totemZ;
+  MZ.totems.forEach(x => {
+    addBoxSpan(group, x, 0.75, y, y + 1.85, tz - 0.25, tz + 0.25, M.kiosk);
+    const screen = addPlane(group, 0.52, 0.65, M.totemScreen, x, y + 1.35, tz - 0.255, Math.PI);
+    screen.rotation.x = -0.12;
+    addBoxSpan(group, x, 0.22, y + 0.9, y + 0.95, tz - 0.34, tz - 0.25, M.reader);   // lector NFC
+    addBoxSpan(group, x, 0.75, y + 1.85, y + 2.05, tz - 0.25, tz + 0.25, M.boothPanel);
+  });
+}
+
+/** Cambio de vía (escape) entre dos vías en una cola de maniobras. */
+function buildCrossover(scene, M, zFrom, zTo, xFrom, xTo) {
+  const dz = zTo - zFrom, dx = xTo - xFrom, len = Math.hypot(dx, dz), ang = Math.atan2(dx, dz);
+  const g = new THREE.Group();
+  g.position.set((xFrom + xTo) / 2, 0, (zFrom + zTo) / 2);
+  g.rotation.y = ang;
+  scene.add(g);
+  [-0.7175, 0.7175].forEach(x => {
+    addBox(g, 0.07, 0.11, len, M.rail, x, 0.2, 0);
+    addBox(g, 0.075, 0.02, len, M.railHead, x, CONFIG.track.railTop - 0.01, 0);
+  });
+  for (let t = -len / 2; t < len / 2; t += 0.75) addBox(g, 2.6, 0.12, 0.24, M.sleeper, 0, 0.09, t);
+  [-1, 1].forEach(e => addBox(g, 0.5, 0.35, 0.8, M.bufferRed, 1.6, 0.2, e * (len / 2 - 2)));   // motores de aguja
 }
 
 /** Muro plano con hueco en forma de bóveda del túnel. */
@@ -521,7 +693,19 @@ function buildTrackEnds(scene, M) {
   front.position.set(0, T.centerY, WORLD.end);
   scene.add(back, front);
 
+  // Cambios de vía tras cada terminal (de la cola de una vía al andén de la otra)
+  const T0 = CONFIG.turnback;
+  const pq = STATIONS[0].z, fcv = STATIONS.at(-1).z;
+  buildCrossover(scene, M, fcv - T0.crossoverTo, fcv - T0.crossoverFrom, ROUTE_A.trackX, ROUTE_B.trackX);
+  buildCrossover(scene, M, pq + T0.crossoverTo, pq + T0.crossoverFrom, ROUTE_B.trackX, ROUTE_A.trackX);
+
   [ROUTE_A, ROUTE_B].forEach(route => {
+    // Cartel de FIN DE MANIOBRA donde debe detenerse el testero
+    const endZ = route.toWorldZ(route.track.retireZ);
+    const sx = route.trackX + route.dir * 1.6;
+    addBox(scene, 0.08, 2.2, 0.08, M.steel, sx, 1.1, endZ);
+    addPlane(scene, 1.2, 0.3, M.endBoard, sx, 2.4, endZ, route.dir === 1 ? 0 : Math.PI);
+
     const g = new THREE.Group();
     g.position.set(route.trackX, 0, route.toWorldZ(route.track.bumperZ - 0.6));
     g.rotation.y = route.dir === 1 ? 0 : Math.PI;

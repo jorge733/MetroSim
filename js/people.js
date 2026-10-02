@@ -1,10 +1,12 @@
 /* ==========================================================================
-   MetroSim — Alpha 0.5 · people.js
+   MetroSim — Alpha 0.6 · people.js
    Viajeros (NPC) compartidos por todos los modos, trenes y ambos sentidos.
 
    Recorrido de un viajero en una estación:
-     calle → mezanina → torniquete → escalera → andén de su sentido → espera
-     → sube al tren → viaja → baja → escalera → torniquete → calle
+     calle → (a veces fila en la boletería) → torniquete → escalera fija →
+     andén de su sentido → espera → sube al tren → viaja → baja →
+     escalera mecánica (quieto sobre los peldaños) → torniquete → calle
+   Cada estación dibujada tiene además un cajero en la boletería.
 
    Dos niveles de detalle:
      · Cerca de la cámara: personas 3D articuladas (caminan, suben escaleras,
@@ -153,12 +155,16 @@ function benchSpots(st, side) {
   return spots;
 }
 
-const stairTop = (st, side) => V(side * 7.2, MZ.y, st.z + MZ.stairZ1 + 0.4);
-const stairBottom = (st, side) => V(side * 7.2, S.platformTop, st.z + MZ.stairZ0 - 0.4);
+const stairX = (MZ.stairX0 + MZ.stairX1) / 2, escX = (MZ.escX0 + MZ.escX1) / 2;
+const stairTop = (st, side) => V(side * stairX, MZ.y, st.z + MZ.stairZ1 + 0.4);
+const stairBottom = (st, side) => V(side * stairX, S.platformTop, st.z + MZ.stairZ0 - 0.4);
 const streetDoor = (st) => V(rand(-1.2, 1.2), MZ.y, st.z + MZ.z1 - 0.3);
 
-/** Recorrido desde la calle hasta el andén de un lado (pasando por un torniquete). */
-function pathFromStreet(st, side, spot) {
+/** Punto marcado como tramo de escalera mecánica (el viajero va quieto). */
+function onEscalator(v) { v.esc = true; return v; }
+
+/** Recorrido desde la zona no pagada hasta el andén de un lado (torniquete + escalera fija). */
+function pathFromGates(st, side, spot) {
   const g = pick(MZ.gates);
   return [
     V(g, MZ.y, st.z + MZ.gateZ + 0.9), V(g, MZ.y, st.z + MZ.gateZ - 0.9),
@@ -166,14 +172,22 @@ function pathFromStreet(st, side, spot) {
   ];
 }
 
-/** Recorrido desde el andén hasta la calle. */
+/** Recorrido desde el andén hasta la calle (escalera mecánica de subida). */
 function pathToStreet(st, side, from) {
   const g = pick(MZ.gates);
   return [
-    V(side * rand(4.4, 5.4), S.platformTop, from.z),
-    stairBottom(st, side), stairTop(st, side),
+    V(side * rand(4.0, 4.8), S.platformTop, from.z),
+    V(side * escX, S.platformTop, st.z + MZ.stairZ0 - 1.0),
+    onEscalator(V(side * escX, MZ.y, st.z + MZ.stairZ1 + 0.6)),
     V(g, MZ.y, st.z + MZ.gateZ - 0.9), V(g, MZ.y, st.z + MZ.gateZ + 0.9), streetDoor(st),
   ];
+}
+
+/** Posición de la fila de la boletería para el puesto i. */
+function queueSlot(st, i) {
+  const q = MZ.queue, last = q.length - 1;
+  const [x, z] = q[Math.min(i, last)];
+  return V(x + Math.max(0, i - last) * 0.8, MZ.y, st.z + z);
 }
 
 
@@ -198,6 +212,9 @@ export class PeopleSystem {
       materialized: false,
       benches: { 1: benchSpots(st, 1), "-1": benchSpots(st, -1) },
       spawnTimer: rand(1, 5),
+      queue: [],                                  // viajeros en la fila de la boletería
+      serveT: null,                               // tiempo restante de atención al primero
+      clerk: null,
     }));
     traffic.isBusyFor = (unit) => this.isBusy(unit);
   }
@@ -286,11 +303,51 @@ export class PeopleSystem {
       p.root.position.copy(spot.pos);
       this.settleWaiting(p);
     } else {
-      p.state = "arriving";
       p.root.position.copy(streetDoor(st));
-      this.walk(p, pathFromStreet(st, side, spot.pos), () => this.settleWaiting(p));
+      if (Math.random() < 0.18) {
+        // Pasa primero por la boletería a cargar su tarjeta
+        p.state = "queue";
+        p.queueIndex = -1;
+        this.stations[st.index].queue.push(p);
+      } else {
+        p.state = "arriving";
+        this.walk(p, pathFromGates(st, side, spot.pos), () => this.settleWaiting(p));
+      }
     }
     return p;
+  }
+
+  /** Mueve la fila de la boletería y atiende al primero. */
+  updateQueue(ss, dt) {
+    const st = ss.st;
+    ss.queue.forEach((p, i) => {
+      if (p.queueIndex === i) return;
+      p.queueIndex = i;
+      p.atSlot = false;
+      this.walk(p, [queueSlot(st, i)], () => {
+        p.atSlot = true;
+        p.targetYaw = i === 0 ? -Math.PI / 2 : Math.PI;          // el primero mira a la ventanilla
+      });
+    });
+    const first = ss.queue[0];
+    if (!first || !first.atSlot) return;
+    if (ss.serveT === null) ss.serveT = rand(6, 12);
+    ss.serveT -= dt;
+    if (ss.serveT > 0) return;
+    ss.serveT = null;
+    ss.queue.shift();
+    first.state = "arriving";
+    this.walk(first, pathFromGates(st, first.side, first.spot.pos), () => this.settleWaiting(first));
+  }
+
+  /** Cajero sentado dentro de la boletería. */
+  spawnClerk(ss) {
+    const st = ss.st;
+    const p = this.newPerson(st, -1);
+    p.state = "clerk";
+    p.root.rotation.y = p.targetYaw = Math.PI / 2;               // mirando a la ventanilla (+X)
+    this.sitAt(p, V(MZ.booth.x1 - 0.85, MZ.y, st.z + MZ.booth.windowZ), MZ.y + 0.48);
+    ss.clerk = p;
   }
 
   settleWaiting(p) {
@@ -370,7 +427,7 @@ export class PeopleSystem {
   }
 
   walk(p, points, onArrive) {
-    p.path = points.map(v => v.clone());
+    p.path = points.map(v => { const c = v.clone(); c.esc = v.esc; return c; });
     p.onArrive = onArrive;
     p.pose = "walk";
   }
@@ -453,6 +510,7 @@ export class PeopleSystem {
      --------------------------------------------------------------------- */
   materializeStation(ss) {
     ss.materialized = true;
+    this.spawnClerk(ss);
     [1, -1].forEach(side => {
       const n = Math.round(ss.waiting[side]);
       for (let i = 0; i < n; i++) this.spawnWaiting(ss.st, side, true);
@@ -464,9 +522,12 @@ export class PeopleSystem {
     const count = { 1: 0, "-1": 0 };
     for (const p of this.people) {
       if (p.space !== "world" || p.station !== ss.st) continue;
-      if (p.state === "waiting" || p.state === "arriving" || p.state === "toDoor") count[p.side]++;
+      if (p.state === "waiting" || p.state === "arriving" || p.state === "toDoor" || p.state === "queue") count[p.side]++;
       this.remove(p);
     }
+    ss.queue = [];
+    ss.serveT = null;
+    ss.clerk = null;
     ss.waiting[1] = count[1];
     ss.waiting[-1] = count[-1];
   }
@@ -558,9 +619,12 @@ export class PeopleSystem {
       if (ss.spawnTimer > 0) continue;
       ss.spawnTimer = rand(0.5, 1.2) * 60 / Math.max(1, demand * 14);
       const side = Math.random() < 0.5 ? 1 : -1;
-      const now = this.people.filter(p => p.station === ss.st && p.side === side && p.space === "world" && (p.state === "arriving" || p.state === "waiting" || p.state === "toDoor")).length;
+      const now = this.people.filter(p => p.station === ss.st && p.side === side && p.space === "world" && (p.state === "arriving" || p.state === "waiting" || p.state === "toDoor" || p.state === "queue")).length;
       if (now < this.targetWaiting(ss.st, side, clock)) this.spawnWaiting(ss.st, side, false);
     }
+
+    // Filas de las boleterías
+    for (const ss of this.stations) if (ss.materialized && ss.queue.length) this.updateQueue(ss, dt);
 
     // 3. Intercambio de viajeros en trenes con puertas abiertas
     for (const u of units) {
@@ -628,7 +692,10 @@ export class PeopleSystem {
       const target = p.path[0], pos = p.root.position;
       const dx = target.x - pos.x, dz = target.z - pos.z;
       const dist = Math.hypot(dx, dz);
-      const step = p.speed * dt * (Math.abs(target.y - pos.y) > 0.3 ? 0.75 : 1);   // más lento en escaleras
+      const onEsc = !!target.esc && Math.abs(target.y - pos.y) > 0.05;
+      p.riding = onEsc;
+      const step = onEsc ? CONFIG.mezzanine.escSpeed * dt                           // la escalera mecánica los lleva
+        : p.speed * dt * (Math.abs(target.y - pos.y) > 0.3 ? 0.75 : 1);             // más lento en escaleras fijas
       if (dist <= step) {
         pos.set(target.x, target.y, target.z);
         p.path.shift();
@@ -654,7 +721,8 @@ export class PeopleSystem {
     const m = p.mesh;
     const ease = Math.min(1, dt * 10);
     const to = (obj, x) => { obj.rotation.x += (x - obj.rotation.x) * ease; };
-    switch (p.pose) {
+    const pose = p.riding ? "stand" : p.pose;
+    switch (pose) {
       case "walk": {
         p.phase += dt * p.speed * 5.4;
         const s = Math.sin(p.phase);

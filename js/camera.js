@@ -1,5 +1,5 @@
 /* ==========================================================================
-   MetroSim — Alpha 0.5 · camera.js
+   MetroSim — Alpha 0.6 · camera.js
    Cámara: puntos de vista (cabina, salón, exterior) y mirada con el ratón.
    ========================================================================== */
 
@@ -25,6 +25,12 @@ export class CameraRig {
     this.dragging = false;
     this.tmp = new THREE.Vector3();
     train.add(camera);
+  }
+
+  /** Engancha la cámara a otro tren (tras la maniobra de retorno). */
+  setTrain(train) {
+    this.train = train;
+    train.add(this.camera);
   }
 
   setView(view) { this.view = view; this.recenter(); }

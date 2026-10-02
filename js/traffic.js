@@ -1,5 +1,5 @@
 /* ==========================================================================
-   MetroSim — Alpha 0.5 · traffic.js
+   MetroSim — Alpha 0.6 · traffic.js
    Gestor de tráfico: todos los trenes de la Línea 3 en ambos sentidos.
 
    · Cada ruta (sentido) tiene su horario y sus señales. Los servicios entran
@@ -8,11 +8,15 @@
      ruta) + conductor (AutoDriver o el jugador) + modelo 3D + plazas.
    · syncVisuals() convierte la posición de la ruta a coordenadas del mundo:
      la vía 2 circula hacia +Z, así que su tren va girado 180°.
+   · Maniobra de retorno: al llegar al fondo de la cola de maniobras tras una
+     terminal, el tren cambia de cabina, pasa por el cambio de vía a la vía
+     contraria y toma el siguiente servicio del sentido opuesto. Si no hay
+     servicio próximo, se retira a cocheras.
    ========================================================================== */
 
 import * as THREE from "three";
 import { CONFIG } from "./config.js";
-import { ROUTES } from "./route.js";
+import { ROUTES, oppositeRoute } from "./route.js";
 import { TrainSim, AutoDriver } from "./sim.js";
 import { buildTrain, buildTrainSlots, TRAIN_LAYOUT } from "./train.js";
 
@@ -45,8 +49,9 @@ export class TrafficManager {
    * @param {boolean} opts.isPlayer      tren conducido por el jugador
    * @param {object|number} opts.start   estación de la ruta o coordenada de la ruta
    * @param {number} opts.targetIndex    primera estación objetivo del ATO
+   * @param {number|null} opts.holdUntil espera en cocheras hasta esta hora
    */
-  createUnit(trip, { isPlayer = false, start = null, targetIndex = 0 } = {}) {
+  createUnit(trip, { isPlayer = false, start = null, targetIndex = 0, holdUntil = null } = {}) {
     const route = trip.route;
     const unit = {
       id: trip.id, trip, route, isPlayer,
@@ -59,19 +64,63 @@ export class TrafficManager {
     };
     unit.sim = new TrainSim(route, (type, data) => this.onUnitEvent(unit, type, data), start ?? route.track.depotZ);
     unit.prevPos = unit.sim.position;
-    unit.model = buildTrain({ routeId: route.id, cab: isPlayer });
-    unit.group = unit.model.group;
-    unit.group.rotation.y = route.dir === 1 ? 0 : Math.PI;
-    this.placeGroup(unit);
-    this.scene.add(unit.group);
-    unit.ato = isPlayer ? null : new AutoDriver(unit.sim, {
-      trip, signals: this.signals.get(route.id), targetIndex,
-      onEvent: (type, data) => this.onUnitEvent(unit, `ato:${type}`, data),
-      isBoardingBusy: () => this.isBusyFor(unit),
-    });
+    this.buildModel(unit);
+    unit.ato = isPlayer ? null : this.makeDriver(unit, targetIndex, holdUntil);
     this.started.add(trip.id);
     this.units.push(unit);
     return unit;
+  }
+
+  /** Modelo 3D según la ruta (indicador de destino y orientación). */
+  buildModel(unit) {
+    unit.model = buildTrain({ routeId: unit.route.id, cab: unit.isPlayer });
+    unit.group = unit.model.group;
+    unit.group.rotation.y = unit.route.dir === 1 ? 0 : Math.PI;
+    this.placeGroup(unit);
+    this.scene.add(unit.group);
+  }
+
+  makeDriver(unit, targetIndex = 0, holdUntil = null) {
+    return new AutoDriver(unit.sim, {
+      trip: unit.trip, signals: this.signals.get(unit.route.id), targetIndex, holdUntil,
+      onEvent: (type, data) => this.onUnitEvent(unit, `ato:${type}`, data),
+      isBoardingBusy: () => this.isBusyFor(unit),
+    });
+  }
+
+  /** Próximo servicio libre del sentido contrario para un tren que termina. */
+  nextTripFor(route, clock, minLead = 90, maxLead = 420) {
+    return this.timetables.get(route.id).trips.find(t => !this.started.has(t.id) && t.departure - clock >= minLead && t.departure - clock <= maxLead) || null;
+  }
+
+  /** ¿Está libre el punto de entrada (cocheras) de una ruta? */
+  depotFree(route) {
+    return !this.units.some(u => u.route === route && u.sim.position > route.first.stopZ + 40);
+  }
+
+  /**
+   * Maniobra de retorno: el tren pasa a la vía contraria con un nuevo servicio.
+   * El extremo trasero pasa a ser el delantero (cambio de cabina).
+   */
+  turnback(unit, trip) {
+    const route = trip.route;
+    this.onUnitEvent(unit, "turnbackStart");
+    this.scene.remove(unit.group);
+    unit.route = route;
+    unit.trip = trip;
+    unit.id = trip.id;
+    unit.slots = buildTrainSlots();
+    unit.delay = 0;
+    unit.dockedIdx = unit.arrivedIdx = null;
+    unit.announced = null;
+    unit.exchangeIdx = null;
+    unit.sim.route = route;
+    unit.sim.reset(route.track.depotZ);
+    unit.prevPos = unit.sim.position;
+    this.buildModel(unit);
+    unit.ato = unit.isPlayer ? null : this.makeDriver(unit, 0, trip.departure - 150);
+    this.started.add(trip.id);
+    this.onUnitEvent(unit, "turnback", { trip });
   }
 
   removeUnit(unit) {
@@ -129,7 +178,16 @@ export class TrafficManager {
       sig.update(units, clock);
     }
 
-    for (const u of [...this.units]) if (u.ato?.state === "retired") this.removeUnit(u);
+    // Trenes al final de la cola de maniobras: cambio de cabina y de vía, o a cocheras
+    for (const u of [...this.units]) {
+      if (u.ato?.state !== "retired") continue;
+      u.retiredFor = (u.retiredFor || 0) + dt;
+      if (u.retiredFor < CONFIG.turnback.cabChangeTime) continue;
+      const other = oppositeRoute(u.route);
+      const trip = this.depotFree(other) ? this.nextTripFor(other, clock) : null;
+      if (trip) { u.retiredFor = 0; this.turnback(u, trip); }
+      else this.removeUnit(u);              // sin servicio próximo o vía contraria ocupada: a cocheras (libera la cola)
+    }
   }
 
   /** Llegadas y salidas reales frente al horario. */

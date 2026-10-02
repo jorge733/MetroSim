@@ -13,7 +13,7 @@ Los módulos ES necesitan un servidor local (no funciona abriendo `index.html` c
 
 Three.js se carga desde CDN, así que hace falta conexión a internet.
 
-## Qué incluye (Alpha 0.5)
+## Qué incluye (Alpha 0.6)
 
 - Las 21 estaciones reales de la L3 (Plaza Quilicura ⇄ Fernando Castillo Velasco) con sus combinaciones.
 - Doble vía con trenes automáticos en ambos sentidos según horario (cada 4 min en punta).
@@ -21,12 +21,17 @@ Three.js se carga desde CDN, así que hace falta conexión a internet.
 - Señalización de bloqueo automático de 3 aspectos y protección por rebase de señal en rojo.
 - Estaciones con andenes laterales, escaleras, mezanina con torniquetes (tarjeta bip!), boletería y salida a la calle.
 - Viajeros que entran desde la calle, validan, esperan en su andén, suben, viajan y bajan.
+- Escaleras mecánicas de subida junto a las escaleras fijas.
+- Tarjeta bip! con saldo persistente: el torniquete cobra según el tramo horario (punta, valle, baja); carga en la boletería (con cajero y fila) o en los tótems de autoservicio.
+- Maniobra de retorno en las terminales: cola de maniobras, cambio de cabina y cambio de vía (jugador y trenes automáticos).
 - Sonido procedural, anuncios de estación con voz y megafonía de andén.
+
+> Las tarifas son valores de referencia configurables en `js/config.js` (`FARES`); revísalos si quieres que coincidan con las vigentes.
 
 ## Modos
 
-- **Conductor:** conduces el servicio L3-0801 desde la cabina respetando señales, límites y horario. Al final recibes un resumen de puntualidad y precisión.
-- **Pasajero a pie:** entras desde la calle a la estación que elijas, validas en el torniquete, bajas al andén del sentido que quieras, viajas y sales donde quieras.
+- **Conductor:** eliges servicio de ida (L3-0801) o de vuelta (L3V-0803) y conduces respetando señales, límites y horario. Al final recibes un resumen y puedes hacer la maniobra de retorno para seguir con el servicio contrario.
+- **Pasajero a pie:** entras desde la calle a la estación que elijas, cargas tu tarjeta bip! si hace falta, validas en el torniquete, bajas al andén del sentido que quieras, viajas y sales donde quieras.
 
 ## Controles
 
@@ -39,6 +44,7 @@ Three.js se carga desde CDN, así que hace falta conexión a internet.
 | Q · E | Inversor adelante / atrás |
 | D | Abrir / cerrar puertas |
 | V · C | Vista exterior · centrar vista |
+| T | Cambio de cabina (en el cartel FIN DE MANIOBRA) |
 | R | Reiniciar servicio |
 
 **Pasajero a pie**
@@ -48,7 +54,7 @@ Three.js se carga desde CDN, así que hace falta conexión a internet.
 | W A S D / flechas | Caminar (Shift: correr) |
 | Clic · Esc | Capturar / soltar el ratón |
 | F | Sentarse / levantarse |
-| E | Salir a la calle (en la mezanina) |
+| E | Boletería, tótem de carga o salida a la calle |
 
 **Ambos:** M sonido · H ayuda.
 
@@ -71,7 +77,8 @@ js/people.js    viajeros (NPC) instanciados
 js/walker.js    pasajero a pie
 js/audio.js     sonido procedural y megafonía
 js/camera.js    vistas del conductor
-js/hud.js       interfaz
+js/hud.js       interfaz (incluye boletería y tótem)
+js/card.js      tarjeta bip! del jugador
 js/utils.js     utilidades y texturas procedurales
 ```
 

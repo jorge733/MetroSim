@@ -1,5 +1,5 @@
 /* ==========================================================================
-   MetroSim — Alpha 0.5 · route.js
+   MetroSim — Alpha 0.6 · route.js
    Rutas: los dos sentidos de circulación de la Línea 3.
 
      Ruta A · vía 1 (x = +2): Plaza Quilicura → Fernando Castillo Velasco
@@ -34,7 +34,9 @@ function makeRoute(dir) {
     end: last.z - tail,                            // fondo de saco tras la terminal de destino
     depotZ: first.z + 200,                         // aparición de trenes que entran en servicio
     rearLimitZ: first.z + tail - L - 2,            // marcha atrás: límite del testero
-    retireZ: last.z - 200,                         // retirada de trenes al terminar
+    // Fin de la cola de maniobras: el testero queda donde, tras cambiar de cabina,
+    // el otro extremo del tren coincide con el punto de entrada de la vía contraria.
+    retireZ: last.z - 200 - L,
     bumperZ: last.z - 300,                         // topera
     railTop: CONFIG.track.railTop,
   };
@@ -77,3 +79,6 @@ export const ROUTE_B = ROUTES[1];
 
 /** Ruta que sale desde el andén de un lado (+1 → A, -1 → B). */
 export const routeForSide = (side) => (side > 0 ? ROUTE_A : ROUTE_B);
+
+/** Ruta del sentido contrario. */
+export const oppositeRoute = (route) => (route === ROUTE_A ? ROUTE_B : ROUTE_A);

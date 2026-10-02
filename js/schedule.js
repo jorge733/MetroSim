@@ -1,5 +1,5 @@
 /* ==========================================================================
-   MetroSim — Alpha 0.5 · schedule.js
+   MetroSim — Alpha 0.6 · schedule.js
    Horario (malla de servicio) de la Línea 3.
 
    · Tiempo de recorrido entre estaciones: estimado con un modelo cinemático

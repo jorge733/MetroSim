@@ -1,11 +1,12 @@
 /* ==========================================================================
-   MetroSim — Alpha 0.5 · hud.js
+   MetroSim — Alpha 0.6 · hud.js
    HUD HTML superpuesto: reloj, esquema de la Línea 3, selector de mando,
    inversor, velocímetro, estación, señal, horario, puertas, panel del
-   pasajero a pie, mensajes y resumen de servicio.
+   pasajero a pie, tarjeta bip!, panel de boletería / tótem, fundido de
+   pantalla, mensajes y resumen de servicio.
    ========================================================================== */
 
-import { STATIONS, NOTCHES, NOTCH_INDEX, WORLD } from "./config.js";
+import { STATIONS, NOTCHES, NOTCH_INDEX, WORLD, FARES, formatCLP, fareBandAt } from "./config.js";
 import { $, clamp, formatClock, formatStopError } from "./utils.js";
 import { formatDelay } from "./schedule.js";
 
@@ -24,7 +25,12 @@ export class Hud {
       lineStrip: $("lineStrip"), lineStripTrain: $("lineStripTrain"),
       message: $("message"),
       summary: $("summary"), summaryKicker: $("summaryKicker"), summaryTitle: $("summaryTitle"), summaryList: $("summaryList"),
-      summaryContinue: $("summaryContinue"), summaryMenu: $("summaryMenu"),
+      summaryContinue: $("summaryContinue"), summaryMenu: $("summaryMenu"), summaryAlt: $("summaryAlt"),
+      cardPill: $("cardPill"), fade: $("fade"), fadeText: $("fadeText"),
+      ticket: $("ticketPanel"), ticketKicker: $("ticketKicker"), ticketTitle: $("ticketTitle"),
+      ticketBalance: $("ticketBalance"), ticketCardNo: $("ticketCardNo"), ticketFares: $("ticketFares"),
+      ticketAmounts: $("ticketAmounts"), ticketPay: $("ticketPay"), ticketStatus: $("ticketStatus"),
+      ticketConfirm: $("ticketConfirm"), ticketClose: $("ticketClose"), ticketBuy: $("ticketBuy"),
     };
     this.signalLamps = [...document.querySelectorAll(".signal-head i")];
     this.buildNotchList();
@@ -65,6 +71,7 @@ export class Hud {
   setMode(mode) {
     const driver = mode === "driver";
     this.setText(this.el.modeLabel, driver ? "CONDUCTOR" : "PASAJERO A PIE");
+    this.el.cardPill.classList.toggle("hidden", driver);
     this.el.selector.classList.toggle("hidden", !driver);
     this.el.driver.classList.toggle("hidden", !driver);
     this.el.passenger.classList.toggle("hidden", driver);
@@ -120,9 +127,10 @@ export class Hud {
       this.setText(e.nextStation, info.next.name);
       this.setText(e.distance, `${Math.max(0, Math.round(info.distance))} m`);
     } else {
-      this.setText(e.stationTitle, "FIN DE LÍNEA");
-      this.setText(e.nextStation, "VÍA DE RETIRADA");
-      this.setText(e.distance, `${Math.max(0, Math.round(sim.position - sim.route.track.bumperZ))} m a la topera`);
+      const d = Math.round(sim.position - sim.route.track.retireZ);
+      this.setText(e.stationTitle, "COLA DE MANIOBRAS");
+      this.setText(e.nextStation, "FIN DE MANIOBRA");
+      this.setText(e.distance, Math.abs(d) <= 15 && sim.isStopped ? "En posición · pulsa T para cambiar de cabina" : `${d} m · detente en el cartel`);
     }
 
     // Precisión de parada (±10 m en la escala)
@@ -167,6 +175,7 @@ export class Hud {
      data: { clock, worldZ, title, station, sub, hint, highlight }
      --------------------------------------------------------------------- */
   updatePassenger(data) {
+    this.lastClock = data.clock;
     const e = this.el;
     this.setText(e.clock, formatClock(data.clock));
     this.updateStrip(data.worldZ, data.highlight);
@@ -188,7 +197,8 @@ export class Hud {
   }
 
   /**
-   * @param {object} s  { kicker, title, rows: [[etiqueta, valor]], continueLabel, onContinue, onMenu }
+   * @param {object} s  { kicker, title, rows: [[etiqueta, valor]], continueLabel, onContinue, onMenu,
+   *                      altLabel?, onAlt? }
    */
   showSummary(s) {
     const e = this.el;
@@ -204,11 +214,121 @@ export class Hud {
     e.summaryContinue.textContent = s.continueLabel;
     e.summaryContinue.onclick = () => { this.hideSummary(); s.onContinue(); };
     e.summaryMenu.onclick = () => { this.hideSummary(); s.onMenu(); };
+    e.summaryAlt.classList.toggle("hidden", !s.altLabel);
+    if (s.altLabel) { e.summaryAlt.textContent = s.altLabel; e.summaryAlt.onclick = () => { this.hideSummary(); s.onAlt(); }; }
     e.summary.classList.remove("hidden");
     if (document.pointerLockElement) document.exitPointerLock?.();
   }
 
   hideSummary() { this.el.summary.classList.add("hidden"); }
+
+  /* ---------------------------------------------------------------------
+     Tarjeta bip!, boletería y tótem
+     --------------------------------------------------------------------- */
+  setCard(card) {
+    this.setText(this.el.cardPill, card.hasCard ? `bip! ${formatCLP(card.balance)}` : "bip! · sin tarjeta");
+    this.el.cardPill.classList.toggle("low", card.hasCard && card.balance < fareBandAt(0 + (this.lastClock || 0)).price);
+  }
+
+  /**
+   * Abre el panel de atención.
+   * @param {object} o
+   * @param {"boleteria"|"totem"} o.kind
+   * @param {object} o.station
+   * @param {import("./card.js").BipCard} o.card
+   * @param {number} o.clock
+   * @param {(amount:number, method:string)=>Promise<string>} o.onLoad  realiza la carga; devuelve el texto de resultado
+   * @param {()=>Promise<string>} o.onBuyCard
+   * @param {()=>void} o.onClose
+   */
+  openTicketPanel(o) {
+    const e = this.el;
+    const booth = o.kind === "boleteria";
+    this.ticketBusy = false;
+    this.setText(e.ticketKicker, booth ? "BOLETERÍA · ATENCIÓN PRESENCIAL" : "TÓTEM DE AUTOSERVICIO");
+    this.setText(e.ticketTitle, o.station.name);
+    const refresh = () => {
+      this.setText(e.ticketBalance, o.card.hasCard ? formatCLP(o.card.balance) : "—");
+      this.setText(e.ticketCardNo, o.card.hasCard ? `Tarjeta bip! ${o.card.maskedNumber} · ${o.card.trips} viajes` : "No tienes tarjeta bip!");
+      this.setCard(o.card);
+    };
+    refresh();
+
+    // Tarifas vigentes, con el tramo actual resaltado
+    const band = fareBandAt(o.clock);
+    e.ticketFares.replaceChildren(...FARES.bands.map(b => {
+      const row = document.createElement("div");
+      row.className = "fare-row" + (b === band ? " current" : "");
+      row.innerHTML = "<span></span><b></b>";
+      row.firstChild.textContent = b.label + (b === band ? " · ahora" : "");
+      row.lastChild.textContent = formatCLP(b.price);
+      return row;
+    }));
+
+    // Importes
+    let amount = FARES.loadAmounts[1];
+    e.ticketAmounts.replaceChildren(...FARES.loadAmounts.map(a => {
+      const btn = document.createElement("button");
+      btn.textContent = formatCLP(a);
+      btn.className = "amount" + (a === amount ? " selected" : "");
+      btn.onclick = () => {
+        amount = a;
+        [...e.ticketAmounts.children].forEach(c => c.classList.toggle("selected", c === btn));
+      };
+      return btn;
+    }));
+
+    // Medio de pago: la boletería acepta efectivo y tarjeta; el tótem, solo tarjeta bancaria
+    let method = booth ? "efectivo" : "debito";
+    const methods = booth ? [["efectivo", "Efectivo"], ["debito", "Débito / crédito"]] : [["debito", "Débito / crédito"]];
+    e.ticketPay.replaceChildren(...methods.map(([id, label]) => {
+      const btn = document.createElement("button");
+      btn.textContent = label;
+      btn.className = "pay" + (id === method ? " selected" : "");
+      btn.onclick = () => { method = id; [...e.ticketPay.children].forEach(c => c.classList.toggle("selected", c === btn)); };
+      return btn;
+    }));
+
+    e.ticketBuy.classList.toggle("hidden", !booth);
+    e.ticketBuy.textContent = o.card.hasCard ? `Comprar otra tarjeta (${formatCLP(FARES.cardPrice)})` : `Comprar tarjeta bip! (${formatCLP(FARES.cardPrice)})`;
+    this.setText(e.ticketStatus, booth ? "El cajero te atiende. Elige el monto a cargar." : "Toca un monto y acerca tu tarjeta bancaria al lector.");
+    e.ticketStatus.className = "ticket-status";
+
+    const run = async (fn) => {
+      if (this.ticketBusy) return;
+      this.ticketBusy = true;
+      e.ticket.classList.add("busy");
+      try {
+        const msg = await fn();
+        this.setText(e.ticketStatus, msg);
+        e.ticketStatus.className = "ticket-status ok";
+      } catch (err) {
+        this.setText(e.ticketStatus, err.message || String(err));
+        e.ticketStatus.className = "ticket-status error";
+      }
+      refresh();
+      this.ticketBusy = false;
+      e.ticket.classList.remove("busy");
+    };
+    e.ticketConfirm.onclick = () => run(() => o.onLoad(amount, method, (t) => this.setText(e.ticketStatus, t)));
+    e.ticketBuy.onclick = () => run(() => o.onBuyCard((t) => this.setText(e.ticketStatus, t)));
+    const close = () => { if (this.ticketBusy) return; e.ticket.classList.add("hidden"); o.onClose(); };
+    e.ticketClose.onclick = close;
+    this.closeTicket = close;
+    e.ticket.classList.remove("hidden");
+    if (document.pointerLockElement) document.exitPointerLock?.();
+  }
+
+  get ticketOpen() { return !this.el.ticket.classList.contains("hidden"); }
+
+  /* ---------------------------------------------------------------------
+     Fundido a negro (cambio de cabina)
+     --------------------------------------------------------------------- */
+  fadeOut(text) {
+    this.setText(this.el.fadeText, text);
+    this.el.fade.classList.add("visible");
+  }
+  fadeIn() { this.el.fade.classList.remove("visible"); }
   get summaryOpen() { return !this.el.summary.classList.contains("hidden"); }
 }
 

@@ -1,5 +1,5 @@
 /* ==========================================================================
-   MetroSim — Alpha 0.5 · train.js
+   MetroSim — Alpha 0.6 · train.js
    Tren AS-2014 de 5 coches (simplificado): exterior, intercirculación,
    salones de viajeros, pantógrafos y cabina de conducción.
 
