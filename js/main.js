@@ -173,7 +173,7 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A) {
   if (mode === "driver") traffic.started.add(playerTrip.id);
 
   /* --- Calentamiento: el motor simula 45 min de servicio para que la línea ya tenga trenes --- */
-  const people = new PeopleSystem(scene, traffic, warmStart);
+  const people = new PeopleSystem(scene, traffic, engine.passengers);    // muestra visible de los pasajeros del motor
   game.people = people;
   engine.runUntil(CONFIG.startTime, { onStep: (step, t) => people.update(step, t, { cameraZ: 1e9, render: false }) });
   game.clock = engine.time;
@@ -803,7 +803,7 @@ function loop(now) {
   if (player) {
     const info = getRouteInfo(player);
     updateCabVisuals(dt, player, info);
-    hud.updateDriver(player.sim, info, { clock: game.clock, onboard: people.onboardCount(player), boardingBusy: people.isBusy(player) });
+    hud.updateDriver(player.sim, info, { clock: game.clock, onboard: people.onboardCount(player), boardingBusy: engine.isBoarding(player) });
   } else {
     hud.updatePassenger(walkerHudData());
   }
@@ -862,7 +862,7 @@ function walkerHudData() {
   const side = w.platformSide();
   if (side) {
     const route = routeForSide(side);
-    return { ...base, title: `ANDÉN · ${route.label.toUpperCase()}${combos}`, station: st.name, sub: `Próximo tren: ${nextTrainText(st, side)}`, highlight: st };
+    return { ...base, title: `ANDÉN · ${route.label.toUpperCase()}${combos}`, station: st.name, sub: `Próximo tren: ${nextTrainText(st, side)} · ~${Math.round(game.engine.passengers.waitingAt(st, side))} personas esperando`, highlight: st };
   }
   return {
     ...base,

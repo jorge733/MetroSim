@@ -8,10 +8,13 @@
      escalera mecánica (quieto sobre los peldaños) → torniquete → calle
    Cada estación dibujada tiene además un cajero en la boletería.
 
-   Dos niveles de detalle:
-     · Cerca de la cámara: personas 3D articuladas (caminan, suben escaleras,
-       se sientan, se agarran a la barra...).
-     · Lejos: solo cifras (esperando en cada andén / a bordo de cada tren).
+   Las CIFRAS reales (cuánta gente espera en cada andén y va en cada tren)
+   las lleva el motor (engine/passengers.js). Este módulo solo dibuja una
+   MUESTRA de esa gente cerca de la cámara:
+     · en un andén se ven ~12 % de los que esperan (máx. 20);
+     · en un tren, ~12 % de los que viajan (máx. 70).
+   Cerca de la cámara son personas 3D articuladas (caminan, suben escaleras,
+   se sientan, se agarran a la barra...); lejos no se dibuja nadie.
 
    Sin atravesar objetos: en el andén caminan por el pasillo libre entre la
    línea amarilla y las columnas (stationLayout.js) y solo se apartan de él
@@ -36,6 +39,9 @@ const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const wrapAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const S = CONFIG.station, MZ = CONFIG.mezzanine, F = CONFIG.train.floorY;
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
+
+/** Parte de la gente real (motor) que se dibuja. */
+const VISIBLE_SHARE = 0.12;
 
 const PALETTE = {
   shirt: [0x2f4f7f, 0x8a2b2b, 0x3f6e46, 0xd9d4c7, 0x1d1f24, 0x6b4f8a, 0xc7862f, 0x5f6f7a, 0xa33f6b, 0x2d6c78, 0xe5e5e5, 0x7a6450],
@@ -203,17 +209,18 @@ function queueSlot(st, i) {
 export class PeopleSystem {
   /**
    * @param {THREE.Scene} scene
-   * @param {import("./traffic.js").TrafficManager} traffic
+   * @param {import("./engine/traffic.js").TrafficManager} traffic
+   * @param {import("./engine/passengers.js").PassengerFlow} flow  cifras reales del motor
    */
-  constructor(scene, traffic, clock) {
+  constructor(scene, traffic, flow) {
     this.scene = scene;
     this.traffic = traffic;
+    this.flow = flow;
     this.renderer = new PeopleRenderer(scene, CONFIG.people.capacity);
     this.people = [];
     this.time = 0;
     this.stations = STATIONS.map(st => ({
       st,
-      waiting: { 1: this.targetWaiting(st, 1, clock), "-1": this.targetWaiting(st, -1, clock) },
       materialized: false,
       benches: { 1: benchSpots(st, 1), "-1": benchSpots(st, -1) },
       spawnTimer: rand(1, 5),
@@ -221,23 +228,29 @@ export class PeopleSystem {
       serveT: null,                               // tiempo restante de atención al primero
       clerk: null,
     }));
-    traffic.isBusyFor = (unit) => this.isBusy(unit);
+    // Las puertas no se cierran mientras un viajero dibujado esté subiendo o bajando
+    traffic.boardingChecks.push((unit) => this.isBusy(unit));
   }
 
   /* ----- Consultas ----- */
 
-  /** Viajeros que esperan en un andén: ninguno en el andén de llegada de una terminal. */
-  targetWaiting(st, side, clock) {
+  /** Viajeros dibujados esperando en un andén: muestra de la gente real (ninguno en el andén de llegada de una terminal). */
+  targetWaiting(st, side) {
     const route = routeForSide(side);
     if (route.stationOf(st) === route.last) return 0;
-    return Math.round(CONFIG.people.maxWaitingPerSide * demandAt(clock));
+    return Math.min(CONFIG.people.maxWaitingPerSide, Math.round(this.flow.waitingAt(st, side) * VISIBLE_SHARE));
+  }
+
+  /** Viajeros dibujados a bordo de un tren: muestra de su carga real. */
+  targetOnboard(unit) {
+    return Math.min(CONFIG.people.maxVisibleOnboard, Math.round((unit.load || 0) * VISIBLE_SHARE));
   }
 
   npcsOf(unit) { return this.people.filter(p => p.unit === unit && p.space === "train"); }
 
+  /** Gente real a bordo (cifra del motor). */
   onboardCount(unit) {
-    if (!unit) return 0;
-    return unit.materialized ? this.npcsOf(unit).length + (unit.hiddenLoad || 0) : unit.load;
+    return unit ? Math.round(unit.load || 0) : 0;
   }
 
   isBusy(unit) {
@@ -478,11 +491,8 @@ export class PeopleSystem {
       V(side * 3.7, S.platformTop, doorWorld.z + rand(-0.25, 0.25)),
     ], () => {
       if (unit.sim.doorState !== "open" || !this.traffic.units.includes(unit)) return this.abortBoarding(p);
-      // Tren lleno de viajeros dibujados: pasa a la cuenta oculta
-      if (this.npcsOf(unit).length >= CONFIG.people.maxVisibleOnboard) {
-        unit.hiddenLoad = (unit.hiddenLoad || 0) + 1;
-        return this.remove(p);
-      }
+      // Ya hay bastantes viajeros dibujados en el tren: este "entra" y deja de dibujarse
+      if (this.npcsOf(unit).length >= CONFIG.people.maxVisibleOnboard) return this.remove(p);
       p.unit = null;
       this.toTrain(p, unit);
       p.root.position.set(1.3, F, doorLocal + rand(-0.2, 0.2));
@@ -538,24 +548,17 @@ export class PeopleSystem {
     ss.materialized = true;
     this.spawnClerk(ss);
     [1, -1].forEach(side => {
-      const n = Math.round(ss.waiting[side]);
+      const n = this.targetWaiting(ss.st, side);
       for (let i = 0; i < n; i++) this.spawnWaiting(ss.st, side, true);
     });
   }
 
   dematerializeStation(ss) {
     ss.materialized = false;
-    const count = { 1: 0, "-1": 0 };
-    for (const p of this.people) {
-      if (p.space !== "world" || p.station !== ss.st) continue;
-      if (p.state === "waiting" || p.state === "arriving" || p.state === "toDoor" || p.state === "queue") count[p.side]++;
-      this.remove(p);
-    }
+    for (const p of this.people) if (p.space === "world" && p.station === ss.st) this.remove(p);
     ss.queue = [];
     ss.serveT = null;
     ss.clerk = null;
-    ss.waiting[1] = count[1];
-    ss.waiting[-1] = count[-1];
   }
 
   materializeUnit(unit) {
@@ -564,52 +567,38 @@ export class PeopleSystem {
     const docked = sim.dockedStation();
     const next = sim.nextStation();
     const fromIndex = docked ? docked.index : next ? next.index - 1 : unit.route.last.index;
-    const visible = Math.min(unit.load, CONFIG.people.maxVisibleOnboard);
-    let placed = 0;
-    for (let i = 0; i < visible; i++) if (this.spawnOnboard(unit, fromIndex)) placed++;
-    unit.hiddenLoad = unit.load - placed;
+    const visible = this.targetOnboard(unit);
+    for (let i = 0; i < visible; i++) this.spawnOnboard(unit, fromIndex);
   }
 
   dematerializeUnit(unit) {
     unit.materialized = false;
-    const npcs = this.npcsOf(unit);
-    unit.load = npcs.length + (unit.hiddenLoad || 0);
-    unit.hiddenLoad = 0;
-    npcs.forEach(p => this.remove(p));
+    this.npcsOf(unit).forEach(p => this.remove(p));
     this.people.filter(p => p.state === "toDoor" && p.unit === unit).forEach(p => this.abortBoarding(p));
   }
 
-  /** Quita todos los viajeros de un tren (retirada del servicio o reinicio). */
-  clearUnit(unit, load = 0) {
+  /** Quita todos los viajeros dibujados de un tren (retirada del servicio o maniobra de retorno). */
+  clearUnit(unit) {
     this.npcsOf(unit).forEach(p => this.remove(p));
     this.people.filter(p => p.unit === unit && p.state === "toDoor").forEach(p => this.abortBoarding(p));
     unit.slots.forEach(s => { if (s.occupant && s.occupant !== "player") s.occupant = null; });
-    unit.load = load;
-    unit.hiddenLoad = 0;
     unit.exchangeIdx = null;
     unit.materialized = false;
   }
 
-  /** Intercambio "por cifras" en una parada. */
-  abstractExchange(unit, rs) {
-    const route = unit.route, st = rs.world, side = route.side;
-    const ss = this.stations[st.index];
-    const remaining = route.last.index - rs.index;
-    const load = this.onboardCount(unit);
-    const alight = rs === route.last ? load : Math.round(load * clamp(1.6 / Math.max(1, remaining), 0, 0.6));
-    const board = rs === route.last ? 0 : Math.min(Math.floor(ss.waiting[side]), Math.max(0, CONFIG.people.maxOnboard - (load - alight)));
-    ss.waiting[side] -= board;
-
-    if (unit.materialized) {
-      const npcs = this.npcsOf(unit).sort((a, b) => (b.dest === st.index) - (a.dest === st.index));
-      const fromNpcs = Math.min(alight, npcs.length);
-      npcs.slice(0, fromNpcs).forEach(p => this.remove(p));
-      unit.hiddenLoad = Math.max(0, (unit.hiddenLoad || 0) - (alight - fromNpcs));
-      for (let i = 0; i < board; i++) {
-        if (this.npcsOf(unit).length >= CONFIG.people.maxVisibleOnboard || !this.spawnOnboard(unit, rs.index)) unit.hiddenLoad++;
-      }
-    } else {
-      unit.load = load - alight + board;
+  /**
+   * Con las puertas abiertas en un andén que no se dibuja, la muestra visible
+   * del tren se ajusta poco a poco a su carga real (bajan primero los que
+   * iban a esta estación).
+   */
+  reconcileUnit(unit, st) {
+    const npcs = this.npcsOf(unit).filter(p => p.state === "onboard");
+    const target = this.targetOnboard(unit);
+    if (npcs.length > target) {
+      const p = npcs.find(q => q.dest === st.index) || npcs[0];
+      this.remove(p);
+    } else if (npcs.length < target) {
+      this.spawnOnboard(unit, unit.route.stationOf(st).index);
     }
   }
 
@@ -635,18 +624,15 @@ export class PeopleSystem {
       else if (d > R + 40 && u.materialized) this.dematerializeUnit(u);
     }
 
-    // 2. Llegada de viajeros desde la calle según la demanda horaria
+    // 2. Llegada de viajeros desde la calle (hasta la muestra de la gente real que espera)
     for (const ss of this.stations) {
-      if (!ss.materialized) {
-        [1, -1].forEach(side => { ss.waiting[side] = Math.min(this.targetWaiting(ss.st, side, clock), ss.waiting[side] + (demand * 6 / 60) * dt); });
-        continue;
-      }
+      if (!ss.materialized) continue;
       ss.spawnTimer -= dt;
       if (ss.spawnTimer > 0) continue;
       ss.spawnTimer = rand(0.5, 1.2) * 60 / Math.max(1, demand * 14);
       const side = Math.random() < 0.5 ? 1 : -1;
       const now = this.people.filter(p => p.station === ss.st && p.side === side && p.space === "world" && (p.state === "arriving" || p.state === "waiting" || p.state === "toDoor" || p.state === "queue")).length;
-      if (now < this.targetWaiting(ss.st, side, clock)) this.spawnWaiting(ss.st, side, false);
+      if (now < this.targetWaiting(ss.st, side)) this.spawnWaiting(ss.st, side, false);
     }
 
     // Filas de las boleterías
@@ -667,16 +653,16 @@ export class PeopleSystem {
         continue;
       }
       const st = rs.world, ss = this.stations[st.index];
-      if (!(u.materialized && ss.materialized)) {
-        if (u.exchangeIdx !== rs.index) { u.exchangeIdx = rs.index; this.abstractExchange(u, rs); }
+      if (!ss.materialized) {
+        // Andén sin dibujar: solo se ajusta la muestra visible del tren (un viajero cada ~0,3 s)
+        if (u.materialized) {
+          u.reconcileT = (u.reconcileT || 0) - dt;
+          if (u.reconcileT <= 0) { u.reconcileT = 0.3; this.reconcileUnit(u, st); }
+        }
         continue;
       }
-      if (u.exchangeIdx !== rs.index) {
-        u.exchangeIdx = rs.index;
-        // Los viajeros "ocultos" también bajan en proporción
-        const remaining = u.route.last.index - rs.index;
-        u.hiddenLoad = rs === u.route.last ? 0 : Math.round((u.hiddenLoad || 0) * (1 - clamp(1.6 / Math.max(1, remaining), 0, 0.6)));
-      }
+      if (!u.materialized) continue;
+      u.exchangeIdx = rs.index;
       const terminal = rs === u.route.last;
       for (const p of this.people) {
         if (p.pending) continue;

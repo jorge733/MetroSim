@@ -87,6 +87,11 @@ MetroSim.game.engine.command("control.release", { trainId: "L3-1405" })   // lib
 
 Al retener un tren, el siguiente se queda detenido ante la señal en rojo: causa y efecto.
 
+Los **pasajeros** también son cifras reales del motor: llega gente a cada andén según la hora y la estación
+(las de combinación mueven más), en cada parada primero bajan y luego suben a un ritmo limitado por las puertas,
+y el tren no cierra mientras haya intercambio. Un tren atrasado encuentra más gente, tarda más y se atrasa más;
+el de atrás va más vacío (trenes en racimo). Los viajeros dibujados son solo una muestra de esas cifras.
+
 Se puede ejecutar sin gráficos:
 
 ```
@@ -114,6 +119,7 @@ js/engine/            MOTOR (sin Three.js)
   state.js            estado explícito de cada tren
   eta.js              llegadas estimadas desde la posición real
   commands.js         buzón de órdenes (roles → motor)
+  passengers.js       pasajeros lógicos: demanda, subidas y bajadas
   events.js           bus de eventos del motor
   format.js           utilidades puras
 js/render/            dibujo del estado del motor

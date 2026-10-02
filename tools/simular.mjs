@@ -13,7 +13,7 @@
    Si esto funciona, el "cerebro" del Metro es independiente del dibujo 3D.
    ========================================================================== */
 
-import { CONFIG } from "../js/config.js";
+import { CONFIG, STATIONS } from "../js/config.js";
 import { MetroEngine } from "../js/engine/engine.js";
 import { ROUTES } from "../js/engine/route.js";
 import { formatClock } from "../js/engine/format.js";
@@ -36,7 +36,9 @@ function screens(name) {
       const tag = Math.abs(delay) <= CONFIG.schedule.punctualWindow ? "" : ` (${delay > 0 ? "+" : "−"}${Math.abs(delay)} s)`;
       return `${a.id} ${formatClock(a.at)}${tag}`;
     });
-    lines.push(`    Dir. ${route.last.name.padEnd(26)} ${next.join(" · ") || "sin trenes previstos"}`);
+    const st = STATIONS.find(s => s.name === name);
+    const waiting = Math.round(engine.passengers.waitingAt(st, route.side));
+    lines.push(`    Dir. ${route.last.name.padEnd(26)} ${String(waiting).padStart(3)} esperando · ${next.join(" · ") || "sin trenes previstos"}`);
   }
   return lines.join("\n");
 }
@@ -55,6 +57,8 @@ for (let next = CONFIG.startTime + every; next <= until; next += every) {
   console.log(engine.report() + "\n" + screens(stationArg) + "\n");
 }
 
+const t = engine.passengers.totals;
+console.log(`Viajeros: ${Math.round(t.boarded)} subidas · ${Math.round(t.alighted)} bajadas`);
 console.log("Cambios de estado: " + Object.entries(changes).map(([k, n]) => `${k} ${n}`).join(" · "));
 const simulated = (until - CONFIG.startTime + 45 * 60) / 60;
 console.log(`Simulados ${Math.round(simulated)} min de servicio en ${((Date.now() - started) / 1000).toFixed(1)} s.`);

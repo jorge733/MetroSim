@@ -303,7 +303,8 @@ export class AutoDriver {
         const dep = this.scheduledDeparture();
         const timeOk = clock - this.arrivedAt >= minDwell && (dep === null || clock >= dep - CONFIG.train.doorTime - 3);
         if (!timeOk || sim.doorState !== "open" || this.held) break;
-        if (this.isBoardingBusy() && this.extraWait < 20) { this.extraWait += dt; break; }
+        // Mientras sube o baja gente se espera (hasta 45 s más): con mucha gente, la parada se alarga
+        if (this.isBoardingBusy() && this.extraWait < 45) { this.extraWait += dt; break; }
         sim.toggleDoors({ automatic: true });
         this.onEvent("doorsClosing", { station: this.target });
         this.state = "closing";

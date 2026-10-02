@@ -44,7 +44,9 @@ export class TrafficManager {
     this.onUnitEvent = onUnitEvent;
     this.units = [];
     this.started = new Set();          // servicios ya iniciados (o reservados para el jugador)
-    this.isBusyFor = () => false;      // lo conecta el sistema de viajeros
+    // Comprobaciones de "aún sube o baja gente" (pasajeros lógicos del motor y,
+    // si hay dibujo, los viajeros visibles): el ATO no cierra puertas mientras alguna diga que sí
+    this.boardingChecks = [];
   }
 
   /** Avisa de un suceso de un tren: al receptor directo y por el bus. */
@@ -88,9 +90,12 @@ export class TrafficManager {
     return new AutoDriver(unit.sim, {
       trip: unit.trip, signals: this.signals.get(unit.route.id), targetIndex, holdUntil,
       onEvent: (type, data) => this.notify(unit, `ato:${type}`, data),
-      isBoardingBusy: () => this.isBusyFor(unit),
+      isBoardingBusy: () => this.isBoarding(unit),
     });
   }
+
+  /** ¿Está subiendo o bajando gente de este tren? */
+  isBoarding(unit) { return this.boardingChecks.some(check => check(unit)); }
 
   /** Próximo servicio libre del sentido contrario para un tren que termina. */
   nextTripFor(route, clock, minLead = 90, maxLead = 420) {
@@ -113,6 +118,8 @@ export class TrafficManager {
     unit.trip = trip;
     unit.id = trip.id;
     unit.delay = 0;
+    unit.load = 0;                                   // en la terminal bajaron todos
+    unit.pax = null;
     unit.dockedIdx = unit.arrivedIdx = null;
     unit.announced = null;
     unit.exchangeIdx = null;

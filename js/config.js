@@ -114,8 +114,7 @@ export const CONFIG = {
   },
   track: { tail: 320, railTop: 0.27 }, // metros de cola de maniobra tras cada terminal
   people: {
-    maxWaitingPerSide: 20,             // viajeros esperando en cada andén
-    maxOnboard: 260,                   // capacidad total del tren (5 coches)
+    maxWaitingPerSide: 20,             // máx. de viajeros DIBUJADOS esperando en cada andén (las cifras reales: engine/passengers.js)
     maxVisibleOnboard: 70,             // máximo de viajeros dibujados por tren (el resto se cuenta)
     activeRadius: 330,                 // solo se dibujan viajeros a esta distancia de la cámara
     capacity: 700,                     // máximo de personas dibujadas a la vez

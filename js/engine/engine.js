@@ -16,6 +16,8 @@
          "train:event"  { unit, type, data }   sucesos de cada tren
          "train:state"  { unit, from, to, time } cambio de estado (state.js)
      · llegadas estimadas desde la posición real de los trenes (eta.js)
+     · pasajeros lógicos (passengers.js): gente esperando en cada andén,
+       subidas y bajadas que alargan las paradas
      · buzón de órdenes (commands.js): los roles mandan órdenes con
        engine.command(tipo, datos) y el resultado llega por "command:result"
      · estado legible de toda la red (snapshot / report)
@@ -34,6 +36,7 @@ import { formatClock } from "./format.js";
 import { TRAIN_STATES } from "./state.js";
 import { estimateArrival } from "./eta.js";
 import { CommandQueue } from "./commands.js";
+import { PassengerFlow } from "./passengers.js";
 
 export class MetroEngine {
   /**
@@ -59,7 +62,12 @@ export class MetroEngine {
       onUnitEvent: (u, t, d) => this.onUnitEvent(u, t, d),
     });
     this.commands = new CommandQueue(this);
+    this.passengers = new PassengerFlow(startTime);
+    this.traffic.boardingChecks.push(u => this.passengers.isBusy(u));
   }
+
+  /** ¿Está subiendo o bajando gente de este tren (lógica o visible)? */
+  isBoarding(unit) { return this.traffic.isBoarding(unit); }
 
   /* ----- Órdenes (roles) ----- */
 
@@ -86,6 +94,7 @@ export class MetroEngine {
   step() {
     this.commands.process();
     this.traffic.update(this.clock.step, this.clock.time);
+    this.passengers.update(this.clock.step, this.clock.time, this.trains);
     this.clock.tick();
   }
 
@@ -112,6 +121,7 @@ export class MetroEngine {
     while (this.clock.time < time) {
       this.commands.process();
       this.traffic.update(step, this.clock.time);
+      this.passengers.update(step, this.clock.time, this.trains);
       onStep?.(step, this.clock.time);
       this.clock.time += step;
     }
@@ -147,7 +157,7 @@ export class MetroEngine {
     const lines = [`${formatClock(this.time)} · ${this.trains.length} trenes en la red`];
     for (const t of this.snapshot()) {
       const delay = t.delay === null ? "" : ` · ${t.delay >= 0 ? "+" : "−"}${Math.abs(Math.round(t.delay))} s`;
-      lines.push(`  ${t.id.padEnd(9)} ${t.direction.padEnd(34)} ${t.location.padEnd(42)} ${String(t.kmh).padStart(3)} km/h · ${t.state}${delay}`);
+      lines.push(`  ${t.id.padEnd(9)} ${t.direction.padEnd(34)} ${t.location.padEnd(42)} ${String(t.kmh).padStart(3)} km/h · ${String(t.load).padStart(3)} pax · ${t.state}${delay}`);
     }
     return lines.join("\n");
   }
@@ -174,7 +184,7 @@ export function describeTrain(u) {
     state: u.isPlayer ? `${label} (jugador)` : label,
     doors: sim.doorState,
     delay: u.arrivedIdx === null && u.dockedIdx === null ? null : u.delay,
-    load: u.load,
+    load: Math.round(u.load || 0),
     position: sim.position,
   };
 }
