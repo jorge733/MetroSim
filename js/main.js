@@ -390,8 +390,11 @@ function onKeyDown(event) {
 
   if (key === "c") return game.rig.recenter();
   if (key === "v") {
-    game.rig.setView(game.rig.view === "exterior" ? "cab" : "exterior");
-    return hud.showMessage(game.rig.view === "exterior" ? "Vista exterior" : "Vista de cabina", "info", 1200);
+    // Ciclo de vistas del conductor: cabina → interior del tren (salón) → exterior
+    const next = { cab: "saloon", saloon: "exterior", exterior: "cab" }[game.rig.view] || "cab";
+    game.rig.setView(next);
+    const label = { cab: "Vista de cabina", saloon: "Vista interior del tren", exterior: "Vista exterior" }[next];
+    return hud.showMessage(label, "info", 1200);
   }
   // Mando del tren: el rol de Conductor envía órdenes al motor (la respuesta llega en onCommandResult)
   if (game.driverRole.handleKey(key, event.repeat)) return;
