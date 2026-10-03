@@ -16,7 +16,7 @@ const CSS = `
 .intro canvas{position:absolute;inset:0;width:100%;height:100%}
 .intro-content{position:relative;height:100%;display:grid;place-content:center;justify-items:center;gap:14px;padding:16px;text-align:center}
 .intro-content>*{opacity:0;transform:translateY(14px);animation:introIn .9s forwards}
-.intro-logo{display:grid;place-items:center;width:84px;height:84px;border-radius:22px;background:#e1251b;font:900 50px Inter,system-ui,sans-serif;color:#fff;box-shadow:0 0 60px #e1251b88;animation-delay:.4s!important}
+.intro-logo{display:block;width:150px;height:auto;margin:0 auto;filter:drop-shadow(0 0 40px #e1251b77);animation-delay:.4s!important}
 .intro-title{font:800 clamp(46px,9vw,92px)/1 Inter,system-ui,sans-serif;letter-spacing:-3px;color:#fff;text-shadow:0 8px 40px #000;animation-delay:1s!important}
 .intro-sub{color:#c9d5e2;font-size:15px;letter-spacing:1px;animation-delay:1.6s!important}
 .intro-dot{display:inline-grid;place-items:center;width:22px;height:22px;margin-right:6px;border-radius:50%;background:${LINE.color};color:#fff;font-weight:900;font-size:12px}
@@ -111,7 +111,7 @@ export function playIntro({ isMuted = () => false } = {}) {
   root.innerHTML = `
     <canvas></canvas>
     <div class="intro-content">
-      <div class="intro-logo">M</div>
+      <img class="intro-logo" src="logo.svg" alt="MetroSim">
       <h1 class="intro-title">MetroSim</h1>
       <p class="intro-sub">Bienvenido al Metro de Santiago · 7 líneas</p>
       <div class="intro-line"></div>

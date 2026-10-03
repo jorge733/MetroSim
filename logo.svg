@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 130">
+  <!-- Logotipo de MetroSim: óvalo gris con los tres rombos rojos del Metro de Santiago -->
+  <ellipse cx="100" cy="65" rx="91" ry="58" fill="#fff" stroke="#3d4248" stroke-width="10"/>
+  <path fill="#e1251b" d="M56 27l21 38-21 38-21-38zM100 27l21 38-21 38-21-38zM144 27l21 38-21 38-21-38z"/>
+</svg>
