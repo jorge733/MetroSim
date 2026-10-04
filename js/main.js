@@ -181,7 +181,7 @@ function startGame(mode) {
   setTimeout(() => buildGame(mode, stationIndex, audio, direction), 40);
 }
 
-function buildGame(mode, stationIndex, audio, direction = ROUTE_A) {
+function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = {}) {
   resetTrainAssets();
 
   /* --- Render --- */
@@ -272,7 +272,8 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A) {
     walker.attach(renderer.domElement);
     game.walker = walker;
     scene.add(game.trainLights);
-    goToStreet(STATIONS[stationIndex], { initial: true });     // la partida empieza en la calle
+    if (opts.transferFrom) arriveByTransfer(STATIONS[stationIndex], opts.transferFrom);   // llega por el pasillo de combinación
+    else goToStreet(STATIONS[stationIndex]);     // la partida empieza en la calle
     game.missions.ensure(missionCtx());
   }
 
@@ -294,7 +295,11 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A) {
 
   hud.setCard(card);
   hud.setBank(bank);
-  hud.showMessage(mode === "driver"
+  if (opts.transferFrom) {
+    $("controlsHelp").classList.add("hidden");
+    hud.fadeIn();
+    hud.showMessage(`Combinación desde la Línea ${opts.transferFrom} · ${STATIONS[stationIndex].name} · ${LINE.name.charAt(0) + LINE.name.slice(1).toLowerCase()} · sigues en zona pagada`, "ok", 6000);
+  } else hud.showMessage(mode === "driver"
     ? `Servicio ${playerTrip.id} · ${direction.label} · salida ${formatClock(playerTrip.departure)} · cada estación bien servida te paga en tu cuenta`
     : `Calle de ${STATIONS[stationIndex].name} · cuenta ${bank.label} · W/S caminar · A/D girar · Shift correr · J misiones`, "info", 7000);
 
@@ -695,8 +700,14 @@ function onWalkerEvent(type, data) {
     case "alighted":
       if (data.station) hud.showMessage(`Has bajado en ${data.station.name}`, "ok", 3500);
       break;
-    case "exit":
-      goToStreet(data.station);
+    case "transfer":
+      transferLine(data.lineId, data.station);
+      break;
+    case "surface":
+      arriveStreet(data.station);
+      break;
+    case "descend":
+      descendFromStreet(data.station);
       break;
     case "street":
       onStreetTarget(data);
@@ -804,67 +815,113 @@ function report(list) {
 }
 
 /**
- * Sale a la calle de una estación (desde la mezanina, o al empezar la partida).
- * Al llegar avisa a las misiones ("llegaste a X").
+ * Al empezar la partida el pasajero aparece en la calle de su estación
+ * (lo único que se "teletransporta": el inicio). Después todo se camina.
  */
-function goToStreet(st, { initial = false } = {}) {
-  if (game.transition) return;
+function goToStreet(st) {
   const walker = game.walker;
-  const finish = () => {
-    if (!game) return;
-    game.city.load(st, game.clock);
-    walker.enterStreet(st);
-    game.city.enter();
-    walker.frozen = false;
-    walker.keys.clear();
-    if (!initial) {
-      const ride = game.ride;
-      if (ride.origin && ride.origin !== st) {
-        const mins = Math.max(1, Math.round((game.clock - ride.boardedClock) / 60));
-        hud.showMessage(`Llegaste a ${st.name} desde ${ride.origin.name} · ${Math.abs(st.index - ride.origin.index)} estaciones · ${mins} min${ride.fare ? ` · pasaje ${formatCLP(ride.fare.price)}` : ""}`, "ok", 4200);
-      } else {
-        const lm = game.city.landmark;
-        hud.showMessage(`Sales a la calle en ${st.name}${lm ? ` · enfrente: ${lm.name}` : ""}`, "info", 4200);
-      }
-      const msgs = game.missions.notify("street", { station: st, ride }, missionCtx());
-      setTimeout(() => game && report(msgs), msgs.length ? 2500 : 0);
-    }
-    game.ride = { origin: null, boardedClock: null };
-    hud.fadeIn();
-    game.transition = false;
-  };
-  if (initial) return finish();
-  game.transition = true;
-  walker.frozen = true;
-  hud.fadeOut(`Subiendo a la calle · ${st.name}`);
-  setTimeout(finish, 700);
+  game.city.load(st, game.clock);
+  walker.enterStreet(st);
+  game.city.enter();
+  walker.frozen = false;
+  walker.keys.clear();
+  game.ride = { origin: null, boardedClock: null };
 }
 
-/** Baja de la calle a la mezanina de la estación. */
-function goUnderground(st) {
-  if (game.transition) return;
-  const walker = game.walker;
+/** Subió caminando la escalera de salida y llegó a la vereda: avisos y misiones ("llegaste a X"). */
+function arriveStreet(st) {
+  const ride = game.ride;
+  if (ride.origin && ride.origin !== st) {
+    const mins = Math.max(1, Math.round((game.clock - ride.boardedClock) / 60));
+    hud.showMessage(`Llegaste a ${st.name} desde ${ride.origin.name} · ${Math.abs(st.index - ride.origin.index)} estaciones · ${mins} min${ride.fare ? ` · pasaje ${formatCLP(ride.fare.price)}` : ""}`, "ok", 4200);
+  } else {
+    const lm = game.city.landmark;
+    hud.showMessage(`Sales a la calle en ${st.name}${lm ? ` · enfrente: ${lm.name}` : ""}`, "info", 4200);
+  }
+  const msgs = game.missions.notify("street", { station: st, ride }, missionCtx());
+  setTimeout(() => game && report(msgs), msgs.length ? 2500 : 0);
+  game.ride = { origin: null, boardedClock: null };
+}
+
+/** Entró por la boca del acceso: baja caminando hacia la mezanina. */
+function descendFromStreet(st) {
+  hud.showMessage(card.hasCard
+    ? `${st.name} · saldo bip! ${card.label} · abajo: boletería a la izquierda, tótems a la derecha`
+    : `${st.name} · aún no tienes tarjeta bip!: cómprala en la boletería de la mezanina (izquierda)`, "info", 5000);
+}
+
+/**
+ * Luz del día en la salida: la calle se construye y se ve en cuanto el
+ * pasajero se acerca a la salida de la mezanina, y el cielo, la niebla y la
+ * luz pasan de a poco del Metro a la calle mientras sube la escalera.
+ */
+function updateOutdoor(walker) {
+  const city = game.city;
+  let f = 0;
+  if (walker.space === "street") f = 1;
+  else if (walker.space === "world") {
+    const st = walker.stationAt(walker.pos.z);
+    const dz = st ? walker.pos.z - st.z : -1e9;
+    if (st && dz > CONFIG.mezzanine.gateZ && walker.pos.y > CONFIG.mezzanine.y - 0.3) {
+      if (city.station !== st) city.load(st, game.clock);
+      const top = CONFIG.exit.streetY + 0.1;
+      f = THREE.MathUtils.clamp(0.08 + 0.92 * (walker.pos.y - CONFIG.mezzanine.y) / (top - CONFIG.mezzanine.y), 0.08, 1);
+    }
+  }
+  if (Math.abs(f - (city.outdoor ?? -1)) > 0.004) city.setOutdoor(f);
+}
+
+/**
+ * Combinación a pie: el pasajero recorre el pasillo de la mezanina y pasa a
+ * la otra línea en la misma estación. Solo se dibuja una línea a la vez
+ * (GPU integrada), así que el mundo se reconstruye con la nueva línea; la
+ * cuenta, la tarjeta bip! y las misiones (guardadas por línea) se conservan,
+ * y se llega a su mezanina en zona pagada (no se vuelve a pagar).
+ */
+function transferLine(lineId, st) {
+  const line = lineById(lineId);
+  if (!game || game.transition || !line) return;
+  const target = line.stations.find(s => s.name === st.name);
+  if (!target) { game.walker.transferring = false; return; }
+  const fromId = LINE.id;
   game.transition = true;
-  walker.frozen = true;
-  walker.keys.clear();
-  hud.fadeOut(`Bajando a la estación ${st.name}`);
+  game.walker.frozen = true;
+  game.walker.keys.clear();
+  hud.fadeOut(`Combinación · Línea ${lineId} · ${st.name}`);
   setTimeout(() => {
     if (!game) return;
-    game.city.leave();
-    walker.enterStation(st);
-    walker.frozen = false;
-    hud.fadeIn();
-    game.transition = false;
-    hud.showMessage(card.hasCard
-      ? `${st.name} · saldo bip! ${card.label} · boletería a la izquierda, tótems a la derecha`
-      : `${st.name} · aún no tienes tarjeta bip!: cómprala en la boletería (izquierda)`, "info", 5000);
+    stopGame();
+    // Mismo arranque que "Entrar" en la pantalla de inicio, pero en la otra línea
+    paxLineSelect.value = line.id;
+    fillStations(line);
+    stationSelect.value = String(target.index);
+    saveSetting("metrosim.line", line.id);
+    useLine(line);
+    startScreen.classList.add("hidden");
+    loadingScreen.classList.remove("hidden");
+    const audio = new AudioSystem();
+    audio.muted = muted;
+    audio.start();
+    setTimeout(() => buildGame("passenger", target.index, audio, ROUTE_A, { transferFrom: fromId }), 40);
   }, 700);
+}
+
+/** Llega a la mezanina por el pasillo de combinación (zona pagada, mirando hacia los andenes). */
+function arriveByTransfer(st) {
+  const walker = game.walker;
+  walker.enterStation(st);
+  const T = CONFIG.mezzanine.transfer;
+  walker.pos.set(CONFIG.station.wallX - 1.4, CONFIG.mezzanine.y, st.z + (T.z0 + T.z1) / 2);
+  walker.yaw = Math.PI / 2;                 // de espaldas al pasillo, mirando al centro
+  walker.paid = true;
+  walker.transferring = true;               // no vuelve a entrar al pasillo hasta alejarse
+  game.ride = { origin: null, boardedClock: null };
 }
 
 /** Interacción en la calle (E): acceso al Metro, un local o el hito. */
 function onStreetTarget(target) {
   const st = game.walker.station;
-  if (target.kind === "access") return goUnderground(st);
+  if (target.kind === "access") return hud.showMessage("Camina hacia la escalera para bajar a la estación", "info");
   if (target.kind === "shop") return openShop(target.shop, st);
   if (target.kind === "landmark") return takePhoto(target.landmark, st);
 }
@@ -1156,6 +1213,7 @@ function loop(now) {
 
   // Calle de la estación: autos, peatones y cielo (en la calle no se oyen los trenes)
   const inStreet = !!walker && walker.space === "street";
+  if (game.city && walker) updateOutdoor(walker);
   if (game.city) game.city.update(dt, inStreet ? walker.pos : null, game.clock);
   game.missionT = (game.missionT || 0) - dt;
   if (game.missions && game.missionT <= 0) {

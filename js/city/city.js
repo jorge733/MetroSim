@@ -15,20 +15,25 @@
    Solo existe UNA calle a la vez (la de la estación donde estás): al salir
    en otra estación se descarga la anterior y se construye la nueva.
 
-   Se dibuja lejos del túnel (x = STREET.originX) para no superponerse con
-   la estación subterránea; las coordenadas del jugador en la calle son del
-   mundo, y aquí se pasan a locales (lx, lz).
+   Se dibuja JUSTO ENCIMA de la estación (config.js · CONFIG.exit): la boca
+   del acceso queda sobre la escalera de salida de la mezanina, y se sale o
+   se entra al Metro caminando, sin teletransporte. Las coordenadas del
+   jugador son del mundo, y aquí se pasan a locales (lx, lz).
+   Mientras el pasajero sube hacia la calle, la luz del día y el cielo
+   aparecen de a poco (setOutdoor).
    ========================================================================== */
 
 import * as THREE from "three";
 import { std, glow, addBox, makeCanvas, toTexture } from "../utils.js";
-import { LINE, LINE_COLORS } from "../config.js";
+import { CONFIG, LINE, LINE_COLORS } from "../config.js";
 import { STREET, streetPlan, seededRandom } from "./plan.js";
 import { buildLandmark } from "./landmarks.js";
 import { cityMaterials, genericBuilding, signMaterial, facingPlane, streetLamp, tree, bench, addMesh } from "./kit.js";
 
 const S = STREET;
-const GROUND = 0;
+/** Origen de la calle en el mundo: justo encima de la estación, con la boca del acceso sobre su escalera de salida. */
+const EXIT = CONFIG.exit;
+const originOf = (st) => ({ x: EXIT.streetX, y: EXIT.streetY, z: st.z + EXIT.streetDz });
 
 /** Logotipo del Metro de Santiago (óvalo con tres rombos rojos) para el tótem. */
 function metroLogoTexture() {
@@ -101,8 +106,9 @@ export class City {
     const M = this.M = cityMaterials(night);
     const rnd = seededRandom(station.name + "#city");
     const g = this.group = new THREE.Group();
-    g.position.set(S.originX, GROUND, station.z);
-    g.visible = this.active;
+    this.origin = originOf(station);
+    g.position.set(this.origin.x, this.origin.y, this.origin.z);
+    g.visible = (this.outdoor || 0) > 0;
     this.scene.add(g);
     this.blocks = [];                       // rectángulos no transitables (coordenadas locales)
     this.walkRects = [{ x0: -S.walkHalf + 0.35, x1: S.walkHalf - 0.35, z0: -S.halfLen, z1: S.halfLen }];
@@ -137,37 +143,45 @@ export class City {
     this.station = null;
   }
 
-  /** El jugador sale a la calle: cielo de día o de noche en vez del túnel. */
-  enter() {
-    if (this.active) return;
-    this.active = true;
-    this.savedBg = this.scene.background;
-    this.savedFog = this.scene.fog;
-    this.scene.fog = new THREE.Fog(this.sky.color.getHex(), 70, 330);
-    this.scene.background = this.sky.color.clone();
-    if (this.group) this.group.visible = true;
+  /** El jugador está en la calle: cielo de día o de noche en vez del túnel. */
+  enter() { this.setOutdoor(1); }
+
+  /** El jugador está bajo tierra, lejos de la salida: la calle no se dibuja. */
+  leave() { this.setOutdoor(0); }
+
+  /**
+   * Cuánto "afuera" está el jugador (0 = en la estación … 1 = en la calle).
+   * Mientras sube por la escalera de salida la calle ya se ve por la boca y
+   * la luz del día, el cielo y la niebla pasan poco a poco del Metro a la calle.
+   */
+  setOutdoor(f) {
+    if (!this.base) this.base = { bg: this.scene.background.clone(), fog: this.scene.fog.color.clone(), near: this.scene.fog.near, far: this.scene.fog.far };
+    this.outdoor = f;
+    this.active = f >= 1;
+    if (this.group) this.group.visible = f > 0;
+    this.applySky();
   }
 
-  leave() {
-    if (!this.active) return;
-    this.active = false;
-    this.scene.background = this.savedBg;
-    this.scene.fog = this.savedFog;
-    if (this.group) this.group.visible = false;
+  /** Fondo, niebla y luces según la hora y cuánto afuera está el jugador. */
+  applySky() {
+    const f = this.outdoor || 0, sky = this.sky;
+    if (!this.base || !sky) return;
+    this.scene.background.copy(this.base.bg).lerp(sky.color, f);
+    this.scene.fog.color.copy(this.base.fog).lerp(sky.color, f);
+    this.scene.fog.near = this.base.near + (70 - this.base.near) * f;
+    this.scene.fog.far = this.base.far + (330 - this.base.far) * f;
+    if (this.hemi) {
+      const k = f > 0 ? 0.5 + 0.5 * f : 0;               // la luz del día entra por la boca del acceso
+      this.hemi.intensity = (0.25 + 1.0 * sky.day) * k;
+      this.sun.intensity = 2.4 * sky.day * k;
+      this.sun.color.setHex(sky.dusk > 0.4 ? 0xffb37a : 0xfff1dc);
+    }
   }
 
   /** Ajusta el cielo y el sol a la hora del juego. */
   setTime(clock) {
-    const sky = this.sky = skyAt(clock);
-    if (this.hemi) {
-      this.hemi.intensity = 0.25 + 1.0 * sky.day;
-      this.sun.intensity = 2.4 * sky.day;
-      this.sun.color.setHex(sky.dusk > 0.4 ? 0xffb37a : 0xfff1dc);
-    }
-    if (this.active) {
-      this.scene.background.copy(sky.color);
-      this.scene.fog.color.copy(sky.color);
-    }
+    this.sky = skyAt(clock);
+    this.applySky();
   }
 
   /* ---------------------------------------------------------------------
@@ -219,13 +233,15 @@ export class City {
       addBox(g, W - 0.1, 0.02, 0.05, M.yellow, a.x, y + rise + 0.01, z + run / 2 - 0.03);
     }
     addBox(g, W, 0.1, 1.2, granite, a.x, -3.05, z0 + 0.6);                     // descanso
-    // Muros revestidos del pozo de la escalera y muro de fondo con cartel
+    // Muros revestidos del pozo de la escalera. Desde el descanso la escalera
+    // sigue bajando hacia la mezanina (world.js · buildExitPassage), así que
+    // no hay muro de fondo: solo una viga con el cartel, colgada sobre el paso.
     addBox(g, 0.12, 3.3, L, tile, x0 + 0.06, -1.55, a.z);
     addBox(g, 0.12, 3.3, L, tile, x1 - 0.06, -1.55, a.z);
-    addBox(g, W, 3.6, 0.12, tile, a.x, -1.3, z0 + 0.06);
+    addBox(g, W, 0.5, 0.2, tile, a.x, -0.05, z0 + 0.1);
     const down = signMaterial("↓  METRO · " + this.station.name, { bg: "#1b1f24", font: "800 64px Arial" });
     const back = new THREE.Mesh(new THREE.PlaneGeometry(W - 0.3, 0.42), down);
-    back.position.set(a.x, -1.2, z0 + 0.13);
+    back.position.set(a.x, -0.3, z0 + 0.21);
     g.add(back);
     addBox(g, W - 0.4, 0.05, 0.25, M.lampOn, a.x, -0.55, z0 + 0.3);           // luminaria del descanso
     // Pasamanos interiores (bajan con la escalera)
@@ -564,10 +580,10 @@ export class City {
 
   /** @param {THREE.Vector3} playerPos  posición del jugador (mundo) o null */
   update(dt, playerPos, clock) {
-    if (!this.group || !this.active) return;
+    if (!this.group || !this.group.visible) return;
     this.timeT -= dt;
     if (this.timeT <= 0) { this.timeT = 20; this.setTime(clock); }
-    const lx = playerPos ? playerPos.x - S.originX : 1e9, lz = playerPos ? playerPos.z - this.station.z : 1e9;
+    const lx = playerPos ? playerPos.x - this.origin.x : 1e9, lz = playerPos ? playerPos.z - this.origin.z : 1e9;
 
     // Vehículos: frenan ante el jugador y ante el de adelante
     for (const c of this.vehicles) {
@@ -612,7 +628,7 @@ export class City {
      Consultas del jugador (coordenadas del mundo)
      --------------------------------------------------------------------- */
 
-  local(wx, wz) { return { lx: wx - S.originX, lz: wz - this.station.z }; }
+  local(wx, wz) { return { lx: wx - this.origin.x, lz: wz - this.origin.z }; }
 
   /** ¿Se puede pisar (wx, wz)? */
   walkable(wx, wz) {
@@ -623,15 +639,15 @@ export class City {
     return !this.blocks.some(b => lx > b.x0 - 0.25 && lx < b.x1 + 0.25 && lz > b.z0 - 0.25 && lz < b.z1 + 0.25);
   }
 
-  /** Altura del suelo (vereda o calzada). */
+  /** Altura del suelo (vereda o calzada), en coordenadas del mundo. */
   floorAt(wx) {
-    const { lx } = this.local(wx, this.station.z);
-    return Math.abs(lx) > S.roadHalf ? 0.1 : 0;
+    const { lx } = this.local(wx, this.origin.z);
+    return this.origin.y + (Math.abs(lx) > S.roadHalf ? 0.1 : 0);
   }
 
-  /** Punto donde aparece el jugador al salir del Metro (mundo) y hacia dónde mira. */
+  /** Punto donde aparece el jugador al empezar la partida (mundo) y hacia dónde mira. */
   spawn() {
-    return { x: S.originX + S.spawn.x, y: 0.1, z: this.station.z + S.spawn.z, yaw: Math.PI / 2 };          // mirando hacia la avenida y el hito
+    return { x: this.origin.x + S.spawn.x, y: this.origin.y + 0.1, z: this.origin.z + S.spawn.z, yaw: Math.PI / 2 };   // mirando hacia la avenida y el hito
   }
 
   /** Lo que hay al alcance: acceso al Metro, un local o el hito. */
@@ -649,11 +665,11 @@ export class City {
     return null;
   }
 
-  /** ¿Pisó la boca de la escalera? (bajar caminando) */
+  /** ¿Entró en la boca de la escalera? Desde ahí se baja caminando (el pasajero pasa a la estación). */
   atAccessMouth(wpos) {
     const { lx, lz } = this.local(wpos.x, wpos.z);
     const a = S.access;
-    return Math.abs(lx - a.x) < a.halfX - 0.1 && lz < a.z + a.mouthZ + 0.15 && lz > a.z + a.mouthZ - 1.6;
+    return Math.abs(lx - a.x) < a.halfX - 0.3 && lz < a.z + a.mouthZ - 0.2 && lz > a.z + a.mouthZ - 1.6;
   }
 
   hint(wpos) {

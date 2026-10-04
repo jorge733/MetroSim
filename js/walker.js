@@ -41,6 +41,7 @@ import { TRAIN_LAYOUT } from "./engine/consist.js";
 import { clamp } from "./utils.js";
 import { platformSolidAt, isArrivalOnly } from "./stationLayout.js";
 import { Elevator, inElevatorShaft } from "./elevators.js";
+import { STREET } from "./city/plan.js";
 
 const EYE = 1.62;
 const WALK = 1.4, RUN = 3.2, BACK = 0.75;        // m/s: caminar, correr, retroceder
@@ -49,6 +50,8 @@ const TURN = 1.7, TURN_RUN = 1.25;                // rad/s de giro (corriendo se
 const LOOK = 0.9;                                 // rad/s al mirar arriba / abajo
 const S = CONFIG.station, MZ = CONFIG.mezzanine, F = CONFIG.train.floorY, EV = CONFIG.elevator;
 const EV_ZC = (EV.z0 + EV.z1) / 2, LEVEL_Y = [S.platformTop, MZ.y];
+/** dz de la boca del acceso (vereda): ahí el pasajero pasa de la estación a la calle, caminando. */
+const EXIT_TOP = CONFIG.exit.streetDz + STREET.access.z + STREET.access.halfZ;
 
 export class Walker {
   /**
@@ -147,7 +150,26 @@ export class Walker {
 
   /** Estación cuyo vestíbulo contiene la coordenada z (o null). */
   stationAt(z) {
-    return STATIONS.find(st => Math.abs(z - st.z) <= S.hallHalf) || null;
+    // (incluye la escalera de salida, que sigue más allá del vestíbulo hasta la calle)
+    return STATIONS.find(st => z - st.z >= -S.hallHalf && z - st.z <= EXIT_TOP + 1) || null;
+  }
+
+  /**
+   * Suelo de la salida a la calle (pasillo, primer tramo, descanso y la
+   * escalera del acceso) en (x, dz), o null. Es un solo recorrido continuo.
+   */
+  exitFloor(ax, dz) {
+    const EX = CONFIG.exit;
+    if (dz >= MZ.z1 - 0.4 && dz <= EX.corridorZ1 && ax <= MZ.exitHalf - 0.3) return MZ.y;            // pasillo
+    if (ax > EX.halfW - 0.3) return null;
+    if (dz >= EX.corridorZ1 && dz <= EX.flightZ1) return MZ.y + EX.rise * (dz - EX.corridorZ1) / (EX.flightZ1 - EX.corridorZ1);
+    const lz = dz - EX.streetDz, a = STREET.access;                                                     // coordenadas de la calle
+    const yTop = EX.streetY + 0.1, yLand = MZ.y + EX.rise;
+    const zBot = a.z - a.halfZ + 0.7, zTop = a.z + a.halfZ - 0.2;                                      // pie y cabeza de los peldaños del acceso
+    if (lz < zBot && dz >= EX.flightZ1) return yLand;                                                   // descanso
+    if (lz <= zTop) return yLand + (yTop - yLand) * (lz - zBot) / (zTop - zBot);
+    if (dz <= EXIT_TOP + 1) return yTop;                                                                // boca, ya en la vereda
+    return null;
   }
 
   /** Lado del andén en el que está (+1 / −1) o 0 si no está en un andén. */
@@ -218,8 +240,9 @@ export class Walker {
       if (nearGates && inGate) gateOk = this.paid || this.gatePass || this.tryValidate();
       if (gateOk && !inBooth && !inTotem && !inShaft) candidates.push(MZ.y);
     }
-    // Umbral de la salida a la calle
-    if (Math.abs(x) < MZ.exitHalf - 0.2 && dz > MZ.z1 - 0.4 && dz < MZ.z1 + 0.3) candidates.push(MZ.y);
+    // Salida a la calle: puerta, pasillo y escaleras hasta la vereda
+    const ey = this.exitFloor(ax, dz);
+    if (ey !== null) candidates.push(ey);
 
     // Se elige el nivel más cercano a la altura actual, si es alcanzable
     let best = null;
@@ -340,6 +363,16 @@ export class Walker {
     this.seat = null;
   }
 
+  /**
+   * ¿Está en la boca del pasillo de combinación de la estación (mezanina, muro +X)?
+   * @param {number} minX  |x| desde el que cuenta (más bajo = "cerca", más alto = "dentro")
+   */
+  atTransfer(st, minX) {
+    if (!st?.combos.length || Math.abs(this.pos.y - MZ.y) > 0.3) return false;
+    const T = MZ.transfer, dz = this.pos.z - st.z;
+    return this.pos.x > minX && dz > T.z0 + 0.2 && dz < T.z1 - 0.2;
+  }
+
   /** Junto a la salida a la calle. */
   nearExit() {
     if (this.space !== "world" || Math.abs(this.pos.y - MZ.y) > 0.3) return null;
@@ -373,8 +406,7 @@ export class Walker {
     const st = this.nearExit();
     if (!st) return { text: "Acércate a la boletería, a un tótem de carga o a la salida (en la mezanina)", level: "info" };
     if (this.paid) return { text: "Primero cruza los torniquetes para salir", level: "info" };
-    this.onEvent("exit", { station: st });
-    return null;
+    return { text: "Sigue por el pasillo y sube la escalera: arriba está la calle", level: "info" };
   }
 
   /* ----- Cambios de espacio ----- */
@@ -407,12 +439,30 @@ export class Walker {
     if (!this.seat && dt > 0 && !this.frozen) this.move(dt);
     if (this.seat || this.frozen) { this.speed = 0; this.turnRate = 0; this.moving = false; }   // sentado o en un panel: quieto
 
-    // En la calle: solo caminar; al pisar la boca del acceso se baja a la estación
+    // En la calle: al entrar en la boca del acceso se sigue caminando escalera abajo (ya dentro de la estación)
     if (this.space === "street") {
       this.pos.y = this.city.floorAt(this.pos.x);
-      if (this.moving && !this.descending && this.city.atAccessMouth(this.pos)) { this.descending = true; this.onEvent("street", { kind: "access" }); }
+      if (this.moving && this.city.atAccessMouth(this.pos) && this.stationAt(this.pos.z)) {
+        this.space = "world";
+        this.paid = false;
+        this.gatePass = false;
+        this.onEvent("descend", { station: this.station });
+      }
       this.updateCamera();
       return;
+    }
+
+    // Escalera de salida: al llegar a la vereda se está en la calle (sin cortes)
+    if (this.space === "world" && this.city) {
+      const st = this.stationAt(this.pos.z);
+      if (st && this.pos.z - st.z > EXIT_TOP && Math.abs(this.pos.x) < CONFIG.exit.halfW && this.pos.y > MZ.y + CONFIG.exit.rise + 2) {
+        this.space = "street";
+        this.station = st;
+        this.paid = false;
+        this.onEvent("surface", { station: st });
+        this.updateCamera();
+        return;
+      }
     }
 
     // Escalera mecánica: avanza (y sube) sola
@@ -466,7 +516,12 @@ export class Walker {
         const paid = this.pos.z - st.z < MZ.gateZ;
         if (paid !== this.paid) { this.paid = paid; this.gatePass = false; this.onEvent(paid ? "gateIn" : "gateOut", { station: st }); }
         // Si retrocede sin cruzar, el pase validado se conserva (como en la realidad, ya se cobró)
-        if (this.moving && this.pos.z - st.z > MZ.z1 - 0.1 && !paid) this.onEvent("exit", { station: st });
+        // Pasillo de combinación: al entrar en él se pasa a la otra línea
+        if (this.transferring && !this.atTransfer(st, 6.0)) this.transferring = false;   // se alejó: se rearma
+        if (this.moving && !this.transferring && this.atTransfer(st, 7.9)) {
+          this.transferring = true;
+          this.onEvent("transfer", { station: st, lineId: st.combos[0] });
+        }
       }
     }
 
@@ -559,16 +614,24 @@ export class Walker {
     }
     if (lift) return lift.el.openAt(lift.level) ? "Ascensor con las puertas abiertas · entra y pulsa E" : "E · llamar al ascensor";
     if (Math.abs(this.pos.y - MZ.y) < 0.3) {
+      const here0 = this.stationAt(this.pos.z);
+      if (this.atTransfer(here0, 6.0)) return `Pasillo de combinación · sigue caminando para cambiarte a la Línea ${here0.combos[0]}`;
       const service = this.nearService();
       if (service?.kind === "boleteria") return "E · atención en boletería (cargar tarjeta bip!, comprar tarjeta)";
       if (service?.kind === "totem") return "E · tótem de autoservicio: carga con tarjeta de débito o crédito";
-      if (this.nearExit() && !this.paid) return "E (o sigue caminando) para salir a la calle";
+      if (this.nearExit() && !this.paid) return "Salida · sigue por el pasillo y sube la escalera hacia la calle";
       const here = this.stationAt(this.pos.z);
       const closed = here && [1, -1].find(sd => isArrivalOnly(here, sd));
       if (this.paid && closed) return `Estación terminal · baja por la escalera ${closed > 0 ? "izquierda" : "derecha"} (la otra es solo de salida)`;
       return this.paid
         ? `Zona pagada · escalera izquierda: dir. ${ROUTE_B.last.short} · derecha: dir. ${ROUTE_A.last.short}`
         : "Pasa por un torniquete para validar tu tarjeta bip! · boletería a la izquierda, tótems a la derecha";
+    }
+    const hereSt = this.stationAt(this.pos.z);
+    if (hereSt && this.pos.z - hereSt.z > MZ.z1) {
+      return this.pos.y > MZ.y + 0.3
+        ? `Escalera de salida · arriba está la calle de ${hereSt.name} · abajo, la mezanina`
+        : "Pasillo de salida · sube la escalera hacia la calle";
     }
     if (this.pos.y > S.platformTop + 0.3) {
       const ax = Math.abs(this.pos.x);

@@ -245,6 +245,43 @@ export function directionMapCanvas(dest, side) {
   return c;
 }
 
+/** Cartel del pasillo de combinación: "COMBINACIÓN LÍNEA N →" con la insignia de esa línea. */
+export function transferSignCanvas(lineId) {
+  const W = 1024, H = 192, c = makeCanvas(W, H), g = c.getContext("2d");
+  g.fillStyle = "#1d2228"; g.fillRect(0, 0, W, H);
+  g.fillStyle = LINE_COLORS[lineId] || "#777"; g.fillRect(0, H - 20, W, 20);
+  drawLineBadge(g, lineId, 100, 86, 62);
+  g.fillStyle = "#fff"; g.font = "800 66px Arial"; g.textAlign = "left"; g.textBaseline = "middle";
+  g.fillText(`COMBINACIÓN LÍNEA ${lineId}`, 190, 74);
+  g.fillStyle = "#aab4bf"; g.font = "600 30px Arial";
+  g.fillText("Pasillo de conexión · sin volver a pagar", 192, 136);
+  g.fillStyle = "#ffd23f"; g.font = "900 96px Arial"; g.textAlign = "right";
+  g.fillText("→", W - 40, 86);
+  return c;
+}
+
+/** Fondo del pasillo de combinación: un túnel peatonal iluminado que se pierde a lo lejos. */
+export function transferCorridorCanvas(lineId) {
+  const W = 512, H = 512, c = makeCanvas(W, H), g = c.getContext("2d");
+  const color = LINE_COLORS[lineId] || "#777";
+  g.fillStyle = "#c9ccc8"; g.fillRect(0, 0, W, H);
+  const vx = W / 2, vy = H * 0.46, fw = 70, fh = 90;               // punto de fuga y boca del fondo
+  const quad = (pts, fill) => { g.fillStyle = fill; g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.closePath(); g.fill(); };
+  quad([[0, 0], [W, 0], [vx + fw, vy - fh], [vx - fw, vy - fh]], "#e9ece9");                 // techo
+  quad([[0, H], [W, H], [vx + fw, vy + fh], [vx - fw, vy + fh]], "#8d918f");                 // piso
+  quad([[0, 0], [vx - fw, vy - fh], [vx - fw, vy + fh], [0, H]], "#d8dbd6");                 // muro izquierdo
+  quad([[W, 0], [vx + fw, vy - fh], [vx + fw, vy + fh], [W, H]], "#d3d6d1");                 // muro derecho
+  // Franja del color de la línea a lo largo de los muros
+  quad([[0, H * 0.42], [vx - fw, vy - 10], [vx - fw, vy + 4], [0, H * 0.5]], color);
+  quad([[W, H * 0.42], [vx + fw, vy - 10], [vx + fw, vy + 4], [W, H * 0.5]], color);
+  // Luminarias del techo
+  g.fillStyle = "#fffbe8";
+  for (let k = 0; k < 6; k++) { const t = k / 6, y = (vy - fh) * t + 2, w = (1 - t) * 60 + 8; g.fillRect(vx - w / 2, y, w, 6 * (1 - t) + 2); }
+  g.fillStyle = "#f7f9fb"; g.fillRect(vx - fw, vy - fh, fw * 2, fh * 2);                     // luz del fondo
+  addNoise(g, W, H, 10);
+  return c;
+}
+
 /** Posición horizontal (0..1) de una estación en el plano de línea. */
 export function lineMapU(st) {
   const x0 = 90 / 2048, x1 = 1 - 90 / 2048;

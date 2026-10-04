@@ -168,6 +168,12 @@ const stairX = (MZ.stairX0 + MZ.stairX1) / 2, escX = (MZ.escX0 + MZ.escX1) / 2;
 const stairTop = (st, side) => V(side * stairX, MZ.y, st.z + MZ.stairZ1 + 0.4);
 const stairBottom = (st, side) => V(side * stairX, S.platformTop, st.z + MZ.stairZ0 - 0.4);
 const streetDoor = (st) => V(rand(-1.2, 1.2), MZ.y, st.z + MZ.z1 - 0.3);
+/* Escalera de salida a la calle (world.js · buildExitPassage): pie del primer tramo y descanso */
+const EXIT = CONFIG.exit;
+const exitFoot = (st, x) => V(x, MZ.y, st.z + EXIT.corridorZ1 - 0.3);
+const exitLanding = (st, x) => V(x, MZ.y + EXIT.rise, st.z + EXIT.flightZ1 + 0.5);
+/** Desde la puerta de la mezanina hasta el descanso de la escalera (ahí se pierden de vista hacia la calle). */
+const upToStreet = (st) => { const x = rand(-0.7, 0.7); return [exitFoot(st, x), exitLanding(st, x)]; };
 
 /** Punto marcado como tramo de escalera mecánica (el viajero va quieto). */
 function onEscalator(v) { v.esc = true; return v; }
@@ -208,7 +214,7 @@ function pathFromGates(st, side, spot, el = null) {
 /** Recorrido desde el andén hasta la calle (pasillo + escalera mecánica de subida o ascensor). */
 function pathToStreet(st, side, from, el = null) {
   const g = pick(MZ.gates);
-  const out = [V(g, MZ.y, st.z + MZ.gateZ - 0.9), V(g, MZ.y, st.z + MZ.gateZ + 0.9), streetDoor(st)];
+  const out = [V(g, MZ.y, st.z + MZ.gateZ - 0.9), V(g, MZ.y, st.z + MZ.gateZ + 0.9), streetDoor(st), ...upToStreet(st)];
   if (el) return [lane(side, from.z), lane(side, st.z + EV_ZC), ...liftLeg(st, side, el, 0), ...out];
   return [
     lane(side, from.z), lane(side, st.z + MZ.stairZ0 - 2.5),
@@ -377,15 +383,18 @@ export class PeopleSystem {
       p.root.position.copy(spot.pos);
       this.settleWaiting(p);
     } else {
-      p.root.position.copy(streetDoor(st));
+      const x = rand(-0.7, 0.7);
+      const fromStreet = [exitFoot(st, x), streetDoor(st)];            // baja desde la calle por la escalera
+      p.root.position.copy(exitLanding(st, x));
       if (Math.random() < 0.18) {
         // Pasa primero por la boletería a cargar su tarjeta
+        p.root.position.copy(streetDoor(st));
         p.state = "queue";
         p.queueIndex = -1;
         this.stations[st.index].queue.push(p);
       } else {
         p.state = "arriving";
-        this.walk(p, pathFromGates(st, side, spot.pos, this.liftFor(st, side, true)), () => this.settleWaiting(p));
+        this.walk(p, [...fromStreet, ...pathFromGates(st, side, spot.pos, this.liftFor(st, side, true))], () => this.settleWaiting(p));
       }
     }
     return p;

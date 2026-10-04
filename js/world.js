@@ -24,7 +24,7 @@ import { Elevator, ElevatorSystem } from "./elevators.js";
 import { PLATFORM_COLUMNS, PLATFORM_BENCHES, COLUMN_X, BENCH_X, PID_OFFSETS, isArrivalOnly } from "./stationLayout.js";
 import {
   std, glow, addBox, addBoxSpan, addPlane, makeCanvas, toTexture, tunnelTexture, concreteTexture,
-  terrazzoTexture, tileTexture, stationNameCanvas, lineMapCanvas, directionMapCanvas, lineMapU, signCanvas, stopBoardCanvas,
+  terrazzoTexture, tileTexture, stationNameCanvas, lineMapCanvas, directionMapCanvas, transferSignCanvas, transferCorridorCanvas, lineMapU, signCanvas, stopBoardCanvas,
   milepostCanvas, formatClock,
 } from "./utils.js";
 
@@ -127,6 +127,9 @@ function createWorldMaterials() {
     ticketOffice: glow(0xffffff, { map: toTexture(signCanvas("BOLETERÍA · CARGA TU TARJETA bip!", "#c41e2a", 1024, 128, "800 48px Arial")) }),
     stopBoard: glow(0xffffff, { map: toTexture(stopBoardCanvas()) }),
     lineMap: glow(0xffffff, { map: toTexture(lineMapCanvas()) }),
+    // Escalera de salida a la calle (mismos acabados que el acceso de la calle, city/city.js)
+    passageTile: std(0xe9e4da, { rough: 0.35, emissive: 0x3a3833 }),
+    passageGranite: std(0x8d8a86, { rough: 0.55, emissive: 0x1c1b1a }),
     // Planos de dirección de cada andén (en la mezanina, antes de bajar)
     dirMapA: glow(0xffffff, { map: toTexture(directionMapCanvas(ROUTE_A.last.world || ROUTE_A.last, "DERECHA")) }),
     dirMapB: glow(0xffffff, { map: toTexture(directionMapCanvas(ROUTE_B.last.world || ROUTE_B.last, "IZQUIERDA")) }),
@@ -220,6 +223,7 @@ export class World {
         new THREE.Vector3(0, 6.0, st.z - 30), new THREE.Vector3(0, 6.0, st.z + 2),
         new THREE.Vector3(0, 6.3, st.z + 27),                      // escaleras y zona bajo la mezanina
         new THREE.Vector3(0, 9.9, st.z + 43),                      // mezanina
+        new THREE.Vector3(0, 9.6, st.z + 57),                      // pasillo y escalera de salida
       );
     });
     this.lights = Array.from({ length: 3 }, () => {
@@ -418,7 +422,11 @@ function buildStation(scene, M, st, gates, elevators) {
 
   // Solera y techo del vestíbulo
   addBoxSpan(group, 0, S.wallX * 2, -0.15, -0.05, z + hall, z - hall, M.hallFloor);
-  addBoxSpan(group, 0, S.wallX * 2 + 0.6, S.ceilingY, S.ceilingY + 0.2, z + hall, z - hall, M.ceiling);
+  // (con un corte sobre la escalera de salida, que sube por encima del techo hacia la calle)
+  const cutX = MZ.exitHalf + 0.15, cutZ = z + CONFIG.exit.corridorZ1;
+  addBoxSpan(group, 0, S.wallX * 2 + 0.6, S.ceilingY, S.ceilingY + 0.2, cutZ, z - hall, M.ceiling);
+  [[-S.wallX - 0.3, -cutX], [cutX, S.wallX + 0.3]].forEach(([x0, x1]) =>
+    addBoxSpan(group, (x0 + x1) / 2, x1 - x0, S.ceilingY, S.ceilingY + 0.2, z + hall, cutZ, M.ceiling));
 
   // Columnas centrales entre las dos vías; bajo la mezanina terminan en su losa
   for (let off = -50; off <= 50; off += 10) {
@@ -535,11 +543,86 @@ function buildStation(scene, M, st, gates, elevators) {
   });
 
   buildMezzanine(group, M, st, nameMat, gates);
+  if (st.combos.length) buildTransfer(group, M, st);
 
-  // Muros de boca de túnel
-  [z + hall, z - hall].forEach(endZ => group.add(makePortalWall(M.portal, endZ)));
+  buildExitPassage(group, M, z);
+
+  // Muros de boca de túnel (el del lado de la salida, con el paso de la escalera)
+  group.add(makePortalWall(M.portal, z + hall, true));
+  group.add(makePortalWall(M.portal, z - hall));
 
   return { st, group, pids };
+}
+
+/**
+ * Salida a la calle (sin teletransporte): pasillo desde la puerta de la
+ * mezanina y primer tramo de escalera hasta el descanso. Desde el descanso
+ * sigue la escalera del acceso de la calle (city/city.js), construida justo
+ * encima: el muro de cerámica, los peldaños de granito y las narices
+ * amarillas son los mismos, así que se ve un solo recorrido continuo.
+ */
+function buildExitPassage(group, M, z) {
+  const EX = CONFIG.exit, y0 = MZ.y, ex = MZ.exitHalf, hw = EX.halfW;
+  const za = z + MZ.z1 + 0.3, zc = z + EX.corridorZ1, zf = z + EX.flightZ1;
+  const y1 = y0 + EX.rise, H = 2.9;
+  const tile = M.passageTile, granite = M.passageGranite;
+
+  /* Pasillo a nivel de mezanina */
+  addBoxSpan(group, 0, ex * 2, y0 - 0.3, y0, za - 0.3, zc, M.deck);
+  [-1, 1].forEach(s => addBoxSpan(group, s * (ex + 0.08), 0.16, y0, y0 + 2.75, za, zc, tile));
+  addBoxSpan(group, 0, ex * 2 + 0.3, y0 + 2.7, y0 + 2.85, za, zc, M.soffit);
+  addBoxSpan(group, 0, 0.3, y0 + 2.67, y0 + 2.7, za + 0.4, zc - 0.4, M.fixture);
+  // Remate donde el pasillo se angosta al ancho de la escalera y frente sobre ella
+  [-1, 1].forEach(s => addBoxSpan(group, s * (hw + ex + 0.16) / 2, ex + 0.16 - hw, y0, y1 + H, zc - 0.15, zc, tile));
+  addBoxSpan(group, 0, hw * 2, y0 + 2.75, y0 + H + 0.15, zc - 0.15, zc, tile);
+
+  /* Primer tramo: 14 peldaños de granito con nariz amarilla */
+  const steps = 14, run = (zf - zc) / steps, rise = EX.rise / steps;
+  const treads = new THREE.InstancedMesh(new THREE.BoxGeometry(hw * 2, rise, run), granite, steps);
+  const noses = new THREE.InstancedMesh(new THREE.BoxGeometry(hw * 2 - 0.1, 0.02, 0.05), M.stairNose, steps);
+  const m = new THREE.Matrix4();
+  for (let i = 0; i < steps; i++) {
+    const top = y0 + rise * (i + 1);
+    m.makeTranslation(0, top - rise / 2, zc + run * (i + 0.5)); treads.setMatrixAt(i, m);
+    m.makeTranslation(0, top + 0.01, zc + run * i + 0.03); noses.setMatrixAt(i, m);
+  }
+  treads.computeBoundingSphere(); noses.computeBoundingSphere();
+  group.add(treads, noses);
+
+  // Muros, techo inclinado y bajo-escalera (piezas paralelas a la escalera)
+  const len = Math.hypot(zf - zc, EX.rise), ang = Math.atan2(EX.rise, zf - zc);
+  const sloped = (w, h, mat, x, yMid) => { const b = addBox(group, w, h, len, mat, x, yMid, (zc + zf) / 2); b.rotation.x = -ang; return b; };
+  [-1, 1].forEach(s => addBoxSpan(group, s * (hw + 0.07), 0.14, y0, y1 + H + 0.2, zc, zf, tile));
+  sloped(hw * 2 + 0.3, 0.15, M.soffit, 0, (y0 + y1) / 2 + H + 0.07);
+  sloped(hw * 2, 0.3, granite, 0, (y0 + y1) / 2 - 0.3);
+  sloped(0.3, 0.03, M.fixture, 0, (y0 + y1) / 2 + H - 0.01);
+  [-1, 1].forEach(s => sloped(0.05, 0.05, M.steel, s * (hw - 0.12), (y0 + y1) / 2 + 0.9));   // pasamanos
+  // Cartel de salida al pie de la escalera
+  addPlane(group, 2.2, 0.3, M.exitStreet, 0, y0 + 2.45, zc - 0.17, Math.PI);
+}
+
+/**
+ * Pasillo de combinación en la mezanina (zona pagada, muro +X): marco de
+ * acero, boca del pasillo peatonal con la franja del color de la otra línea
+ * y cartel "COMBINACIÓN LÍNEA N". Al recorrerlo el pasajero pasa a la otra
+ * línea (main.js → transferLine); aquí solo se dibuja.
+ */
+function buildTransfer(group, M, st) {
+  const T = MZ.transfer, lineId = st.combos[0];
+  const y = MZ.y, x = S.wallX - 0.02, z0 = st.z + T.z0, z1 = st.z + T.z1, zc = (z0 + z1) / 2, w = z1 - z0;
+  const rot = -Math.PI / 2;                                              // mira hacia el centro de la estación
+  addPlane(group, w, T.h, glow(0xffffff, { map: toTexture(transferCorridorCanvas(lineId)) }), x, y + T.h / 2, zc, rot);
+  // Marco
+  [z0 - 0.08, z1 + 0.08].forEach(pz => addBox(group, 0.2, T.h + 0.1, 0.16, M.steel, x - 0.08, y + (T.h + 0.1) / 2, pz));
+  addBox(group, 0.2, 0.16, w + 0.32, M.steel, x - 0.08, y + T.h + 0.08, zc);
+  // Umbral con franja táctil amarilla
+  addBoxSpan(group, x - 0.45, 0.9, y, y + 0.015, z0, z1, M.platformEdge);
+  // Cartel sobre la boca, y otro colgado visible desde los torniquetes
+  const sign = glow(0xffffff, { map: toTexture(transferSignCanvas(lineId)) });
+  addPlane(group, w + 0.3, (w + 0.3) * 192 / 1024, sign, x - 0.03, y + T.h + 0.45, zc, rot);
+  const hx = 5.0, hy = y + 2.75, hz = st.z + 42.9, hw = 2.6;
+  addPlane(group, hw, hw * 192 / 1024, sign, hx, hy, hz, 0);
+  [-1, 1].forEach(s => addBox(group, 0.03, S.ceilingY - hy, 0.03, M.steel, hx + s * (hw / 2 - 0.1), (S.ceilingY + hy) / 2, hz - 0.02));
 }
 
 /** Escalera fija y escalera mecánica de subida entre el andén (y = 1,2) y la mezanina (y = 7,2). */
@@ -652,7 +735,6 @@ function buildMezzanine(group, M, st, nameMat, gates) {
   const ex = MZ.exitHalf, top = S.ceilingY;
   [[-wx, -ex], [ex, wx]].forEach(([x0, x1]) => addBoxSpan(group, (x0 + x1) / 2, x1 - x0, y, top, zb, zb + 0.3, M.portal));
   addBoxSpan(group, 0, ex * 2, y + 2.7, top, zb, zb + 0.3, M.portal);
-  addPlane(group, ex * 2, 2.7, M.street, 0, y + 1.35, zb + 0.32, Math.PI);
   addPlane(group, ex * 2 + 0.4, 0.3, M.exitStreet, 0, y + 2.95, zb - 0.01, Math.PI);
 }
 
@@ -718,7 +800,7 @@ function buildCrossover(scene, M, zFrom, zTo, xFrom, xTo) {
 }
 
 /** Muro plano con hueco en forma de bóveda del túnel. */
-function makePortalWall(mat, z) {
+function makePortalWall(mat, z, exitNotch = false) {
   const T = CONFIG.tunnel;
   const below = T.centerY - T.floorY;
   const halfChord = Math.sqrt(T.radius ** 2 - below ** 2);
@@ -729,6 +811,14 @@ function makePortalWall(mat, z) {
   shape.absarc(0, T.centerY, T.radius, aLeft, aRight, true);
   shape.lineTo(S.wallX + 0.3, T.floorY);
   shape.lineTo(S.wallX + 0.3, S.ceilingY + 0.2);
+  if (exitNotch) {
+    // Paso de la escalera de salida (que cruza este muro por encima del túnel)
+    const nx = CONFIG.exit.halfW + 0.2;
+    shape.lineTo(nx, S.ceilingY + 0.2);
+    shape.lineTo(nx, MZ.y + 1.2);
+    shape.lineTo(-nx, MZ.y + 1.2);
+    shape.lineTo(-nx, S.ceilingY + 0.2);
+  }
   shape.lineTo(-S.wallX - 0.3, S.ceilingY + 0.2);
   shape.closePath();
   const mesh = new THREE.Mesh(new THREE.ShapeGeometry(shape, 24), mat);

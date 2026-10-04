@@ -83,10 +83,23 @@ export const CONFIG = {
     escX0: 5.6, escX1: 6.85,           // |x| de la escalera mecánica de subida
     escSpeed: 0.5,                     // m/s de avance de la escalera mecánica (a lo largo del andén)
     exitHalf: 1.6,                     // medio ancho de la salida a la calle
+    // Pasillo de combinación (muro +X, zona pagada, entre la escalera y el ascensor)
+    transfer: { z0: 36.4, z1: 39.2, h: 2.6 },
     // Boletería (zona no pagada, lado −X) y tótems de autoservicio (lado +X)
     booth: { x0: -7.9, x1: -5.3, z0: 46.5, z1: 51.7, windowZ: 47.6 },
     totems: [5.0, 6.3], totemZ: 51.0,
     queue: [[-4.6, 47.6], [-4.6, 48.4], [-4.6, 49.2], [-4.6, 50.0], [-3.8, 50.8], [-3.0, 50.8], [-2.2, 50.8]],
+  },
+  // Salida a la calle SIN teletransporte: desde la puerta de la mezanina (z = +52) un pasillo y un
+  // primer tramo de escalera suben hasta un descanso; desde ahí sigue la escalera del acceso de la
+  // calle (city/city.js), que está construida justo encima de la estación. Cotas z relativas al centro.
+  exit: {
+    halfW: 1.25,                       // medio ancho de la escalera (igual que la del acceso de la calle)
+    corridorZ1: 56,                    // fin del pasillo a nivel de mezanina (empieza en la puerta, +52)
+    flightZ1: 62.4,                    // fin del primer tramo de escalera = inicio del descanso
+    rise: 3.0,                         // desnivel del primer tramo (mezanina → descanso)
+    // Calle: su origen local (centro de la vereda del acceso en x=9,6) queda en estas cotas del mundo
+    streetX: -9.6, streetY: 13.2, streetDz: 65.6,
   },
   // Ascensor de accesibilidad (uno por andén, zona pagada): andén ↔ mezanina. Cotas como la mezanina.
   elevator: {
