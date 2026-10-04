@@ -80,7 +80,8 @@ export class AudioSystem {
     this.rumble = this.noiseLayer(this.brown, "lowpass", 150, 0.7);
     this.fan = this.noiseLayer(this.white, "bandpass", 480, 0.7);
     // Calle: rumor del tránsito (grave) y siseo de neumáticos
-    this.traffic = this.noiseLayer(this.brown, "lowpass", 380, 0.5);
+    this.traffic = this.noiseLayer(this.white, "bandpass", 520, 0.5);   // rumor lejano (no grave, para no confundirse con el tren)
+    this.trafficWander = 0;
     this.tyres = this.noiseLayer(this.white, "bandpass", 900, 0.4);
 
     // Motor de tracción: diente de sierra grave + armónico, filtrados
@@ -202,6 +203,21 @@ export class AudioSystem {
      --------------------------------------------------------------------- */
   update(s) {
     if (!this.ctx) return;
+    // En la calle no se oye NADA del tren ni del túnel: solo la ciudad
+    if (s.street) {
+      for (const layer of [this.rolling, this.rumble, this.fan, this.motor, this.motor2, this.carrier, this.squeal]) this.set(layer.gain.gain, 0, 0.15);
+      this.jointDistance = 0;
+      this.overspeedTimer = 0;
+      const busy = s.streetBusy ?? 1;
+      this.trafficWander = clamp(this.trafficWander + (Math.random() - 0.5) * s.dt * 0.8, -0.3, 0.3);   // el tránsito sube y baja
+      this.set(this.traffic.gain.gain, (0.03 + 0.05 * busy) * (1 + this.trafficWander), 0.5);
+      this.set(this.tyres.gain.gain, (0.006 + Math.random() * 0.004) * (0.5 + busy), 0.3);
+      this.set(this.crowdGain.gain, clamp(s.crowd, 0, 1) * 0.13, 0.4);
+      return;
+    }
+    this.set(this.traffic.gain.gain, 0, 0.3);
+    this.set(this.tyres.gain.gain, 0, 0.3);
+
     const kmh = s.speedKmh, k = clamp(kmh / 70, 0, 1);
     const inside = s.view !== "exterior";
     const L = s.level ?? 1;                                                          // atenuación por distancia
@@ -210,12 +226,8 @@ export class AudioSystem {
     // Rodadura y túnel
     this.set(this.rolling.gain.gain, k > 0 ? (0.04 + k * 0.32) * (inside ? 0.85 : 1.1) * L : 0);
     this.set(this.rolling.filter.frequency, 220 + kmh * 24);
-    this.set(this.rumble.gain.gain, s.street ? 0 : (0.05 + k * 0.5 * L) * (s.inStation ? 0.45 : 1));
-    this.set(this.fan.gain.gain, s.street ? 0 : inside ? 0.022 : 0.004);
-    // Rumor de la ciudad (más bajo de noche, cuando hay menos tránsito)
-    const busy = s.streetBusy ?? 1;
-    this.set(this.traffic.gain.gain, s.street ? 0.11 + 0.12 * busy : 0, 0.4);
-    this.set(this.tyres.gain.gain, s.street ? (0.01 + Math.random() * 0.008) * (0.5 + busy) : 0, 0.3);
+    this.set(this.rumble.gain.gain, (0.05 + k * 0.5 * L) * (s.inStation ? 0.45 : 1));
+    this.set(this.fan.gain.gain, inside ? 0.022 : 0.004);
 
     // Motor: activo con tracción o con freno eléctrico (regenerativo) por encima de ~4 km/h
     const effort = Math.abs(s.accel);
