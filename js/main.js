@@ -1,5 +1,5 @@
 /* ==========================================================================
-   MetroSim — Alpha 0.6 · main.js
+   MetroSim — Alpha 0.9 · main.js
    Punto de entrada: crea la partida y une todos los sistemas.
 
    Arquitectura:  ENTRADA DEL JUGADOR → MOTOR → ESTADO → RENDER / UI / AUDIO
@@ -39,11 +39,20 @@
      camera.js    vistas del conductor
      hud.js       interfaz HTML (incluye boletería y tótem)
      card.js      tarjeta bip! del jugador
+     economy.js   cuenta bancaria (débito), sueldo del conductor por estación
+     missions.js  misiones del pasajero (compras, turismo, encargos, contrarreloj...)
+     city/        la calle de cada estación: plan.js (locales), catalog.js (hitos),
+                  landmarks.js (modelos de los hitos), kit.js (piezas), city.js (calle 3D)
      scoring.js   puntaje del conductor: parada, horario, confort, rachas y récord
      announcements.js  frases reales de megafonía del Metro de Santiago
 
    Principio: Conductor y Pasajero comparten el MISMO mundo, el MISMO tráfico
    y los MISMOS viajeros. Solo cambia qué controla el jugador.
+
+   Ciclo de juego (Alpha 0.9): como Conductor ganas sueldo en tiempo real en
+   cada estación (cuenta bancaria compartida); como Pasajero empiezas en la
+   calle de la estación elegida, cumples misiones y gastas ese dinero en la
+   bip!, sus cargas y los locales de la calle.
 
    Hora: la partida empieza a la HORA LOCAL real del computador y el reloj
    del motor se mantiene sincronizado con ella (si el juego se pausa o la
@@ -75,6 +84,9 @@ import { AudioSystem } from "./audio.js";
 import { CameraRig } from "./camera.js";
 import { Hud } from "./hud.js";
 import { DriverScore } from "./scoring.js";
+import { BankAccount, BANK_NAME, stationWage, shiftBonus } from "./economy.js";
+import { MissionSystem } from "./missions.js";
+import { City } from "./city/city.js";
 
 const startScreen = $("startScreen");
 const loadingScreen = $("loadingScreen");
@@ -87,6 +99,8 @@ let muted = loadMuted();
 hud.setSound(!muted);
 const card = new BipCard();               // la tarjeta bip! del jugador (saldo persistente)
 hud.setCard(card);
+const bank = new BankAccount();           // cuenta bancaria con tarjeta de débito (compartida por los dos modos)
+hud.setBank(bank);
 const directionSelect = $("startDirection");
 
 // Introducción de bienvenida (solo al abrir la página)
@@ -146,7 +160,7 @@ window.addEventListener("resize", onResize);
 if (wantsTouch()) document.body.classList.add("touch-mode");
 
 // Acceso de depuración desde la consola: MetroSim.game.traffic, etc.
-window.MetroSim = { get game() { return game; }, CONFIG, get STATIONS() { return STATIONS; }, get ROUTES() { return ROUTES; }, LINES };
+window.MetroSim = { get game() { return game; }, bank, card, CONFIG, get STATIONS() { return STATIONS; }, get ROUTES() { return ROUTES; }, LINES };
 
 
 /* ==========================================================================
@@ -243,8 +257,11 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A) {
     player.group.add(game.trainLights);
     game.lightsUnit = player;
   } else {
+    const city = new City(scene);
+    game.city = city;
+    game.missions = new MissionSystem(ROUTE_A.line, STATIONS);
     const walker = new Walker({
-      scene, camera, traffic, station: STATIONS[stationIndex],
+      scene, camera, traffic, station: STATIONS[stationIndex], city,
       onEvent: (t, d) => onWalkerEvent(t, d),
       onValidate: () => validateFare(),
       benches: (st, side) => game.people.stations[st.index].benches[side],
@@ -253,6 +270,8 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A) {
     walker.attach(renderer.domElement);
     game.walker = walker;
     scene.add(game.trainLights);
+    goToStreet(STATIONS[stationIndex], { initial: true });     // la partida empieza en la calle
+    game.missions.ensure(missionCtx());
   }
 
   // Precompila los shaders para evitar tirones la primera vez que se ve cada cosa
@@ -269,9 +288,10 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A) {
   onResize();
 
   hud.setCard(card);
+  hud.setBank(bank);
   hud.showMessage(mode === "driver"
-    ? `Servicio ${playerTrip.id} · ${direction.label} · salida ${formatClock(playerTrip.departure)} · abre puertas (D) para el embarque`
-    : `${STATIONS[stationIndex].name} · saldo bip! ${card.label} · clic para mirar con el ratón`, "info", 6000);
+    ? `Servicio ${playerTrip.id} · ${direction.label} · salida ${formatClock(playerTrip.departure)} · cada estación bien servida te paga en tu cuenta`
+    : `Calle de ${STATIONS[stationIndex].name} · cuenta ${bank.label} · J misiones · clic para mirar con el ratón`, "info", 7000);
 
   game.raf = requestAnimationFrame(loop);
 }
@@ -378,11 +398,15 @@ function onKeyDown(event) {
   if (["arrowup", "arrowdown", "arrowleft", "arrowright", " "].includes(key)) event.preventDefault();
   if (hud.summaryOpen) return;
   if (hud.ticketOpen) { if (key === "escape" || key === "e") hud.closeTicket(); return; }
+  if (hud.storeOpen) { if (key === "escape" || key === "e") hud.closeStore(); return; }
+  if (hud.missionsOpen) { if (key === "escape" || key === "j") hud.closeMissions(); return; }
 
   if (key === "m") return toggleSound();
   if (key === "h") return hud.toggleHelp();
 
   if (game.walker) {
+    if (game.transition) return;
+    if (key === "j") return openMissionBoard();
     const result = game.walker.keyDown(key);
     if (result) hud.showMessage(result.text, result.level);
     return;
@@ -518,7 +542,13 @@ function onPlayerEvent(type, data) {
       const p = punctuality(data.delay);
       const sc = game.score.arrival(stop, data.delay);
       const streak = sc.streak >= 2 ? ` · ¡RACHA ${sc.streak}!` : "";
-      hud.showMessage(`${data.station.name} · parada ${gradeStop(stop)} · llegada ${formatDelay(data.delay)} (${p.text}) · +${sc.gained} pts${streak}`, p.cls === "ontime" ? "ok" : "warn", 4500);
+      // Sueldo de la estación: se deposita al instante (las faltas del tramo se descuentan)
+      const wage = stationWage({ gained: sc.gained, perfect: sc.perfect, deductions: game.wageDeductions });
+      game.wageDeductions = 0;
+      game.shiftPay += wage.pay;
+      if (wage.pay > 0) { bank.deposit(wage.pay, `Sueldo · ${data.station.name}`, { wage: true }); hud.setBank(bank); hud.moneyFloat(wage.pay); }
+      const discount = wage.discount ? ` (−${formatCLP(wage.discount)} por faltas)` : "";
+      hud.showMessage(`${data.station.name} · parada ${gradeStop(stop)} · llegada ${formatDelay(data.delay)} (${p.text}) · +${sc.gained} pts${streak} · sueldo +${formatCLP(wage.pay)}${discount}`, p.cls === "ontime" ? "ok" : "warn", 5000);
       break;
     }
     case "departedStation":
@@ -561,7 +591,12 @@ function punctuality(delay) {
 
 /** Puntaje nuevo para un servicio (récord por línea y sentido). */
 function newScore(route) {
-  const score = new DriverScore(`${route.line}.${route.id}`, (ev) => hud.updateScore(ev));
+  game.wageDeductions = 0;                 // puntos de falta desde la última estación (se descuentan del sueldo)
+  game.shiftPay = 0;                       // sueldo ganado en este servicio
+  const score = new DriverScore(`${route.line}.${route.id}`, (ev) => {
+    if (ev.points < 0 && game) game.wageDeductions += -ev.points;
+    hud.updateScore(ev);
+  });
   hud.updateScore({ total: 0, streak: 0, multiplier: 1, points: 0, best: score.best?.total });
   return score;
 }
@@ -573,6 +608,9 @@ function showDriverSummary() {
   const w = CONFIG.schedule.punctualWindow;
   const punctual = s.arrivals.filter(d => Math.abs(d) <= w).length;
   const avgStop = s.stops.length ? s.stops.reduce((a, b) => a + b, 0) / s.stops.length : 0;
+  // Bono solo si se sirvió al menos la mitad de la línea (no vale empezar a mitad de camino)
+  const bonus = s.arrivals.length >= (STATIONS.length - 1) / 2 ? shiftBonus(sc.grade()) : 0;
+  if (bonus) { bank.deposit(bonus, `Bono de servicio ${game.player.trip.id} (nota ${sc.grade()})`, { wage: true }); hud.setBank(bank); hud.moneyFloat(bonus); }
   hud.showSummary({
     kicker: `SERVICIO ${game.player.trip.id} COMPLETADO`,
     title: spokenName(game.player.route.last.name),
@@ -588,6 +626,9 @@ function showDriverSummary() {
       ["Estaciones perfectas · mejor racha", `${sc.perfects} · ${sc.bestStreak}`],
       ["PUNTAJE", `${sc.total} pts · nota ${sc.grade()}`],
       [record ? "★ ¡NUEVO RÉCORD!" : "Récord de este servicio", record ? `antes ${prevBest} pts` : `${prevBest} pts`],
+      ["Sueldo por estaciones", formatCLP(game.shiftPay)],
+      [`Bono de fin de servicio (nota ${sc.grade()})`, formatCLP(bonus)],
+      [`Saldo en tu cuenta ${BANK_NAME}`, bank.label],
     ],
     continueLabel: "Maniobra de retorno",
     onContinue: () => hud.showMessage("Cierra puertas (D), avanza a la cola de maniobras y detente en el cartel FIN DE MANIOBRA. Luego pulsa T", "info", 9000),
@@ -646,29 +687,12 @@ function onWalkerEvent(type, data) {
     case "alighted":
       if (data.station) hud.showMessage(`Has bajado en ${data.station.name}`, "ok", 3500);
       break;
-    case "exit": {
-      if (hud.summaryOpen) return;
-      const st = data.station;
-      const rows = [["Estación de salida", st.name]];
-      if (ride.origin && ride.origin !== st) {
-        rows.unshift(["Estación de origen", ride.origin.name]);
-        rows.push(["Tiempo de viaje", `${Math.round((game.clock - ride.boardedClock) / 60)} min`]);
-        rows.push(["Estaciones recorridas", String(Math.abs(st.index - ride.origin.index))]);
-      }
-      if (ride.fare) rows.push(["Pasaje pagado", `${formatCLP(ride.fare.price)} (${ride.fare.label.toLowerCase()})`]);
-      rows.push(["Saldo bip!", card.label]);
-      rows.push(["Combinaciones aquí", st.combos.length ? st.combos.map(c => `Línea ${c}`).join(", ") : "ninguna"]);
-      rows.push(["Hora", formatClock(game.clock).slice(0, 5)]);
-      hud.showSummary({
-        kicker: "HAS SALIDO A LA CALLE",
-        title: st.name,
-        rows,
-        continueLabel: "Volver a entrar",
-        onContinue: () => { game.walker.enterStation(st); game.ride = { origin: null, boardedClock: null }; },
-        onMenu: stopGame,
-      });
+    case "exit":
+      goToStreet(data.station);
       break;
-    }
+    case "street":
+      onStreetTarget(data);
+      break;
   }
 }
 
@@ -689,8 +713,8 @@ function validateFare() {
   game.audio.deny();
   if (gate) game.world.flashValidator(gate, false);
   hud.showMessage(r.reason === "nocard"
-    ? "No tienes tarjeta bip!: cómprala en la boletería"
-    : `Saldo insuficiente (${formatCLP(card.balance)}) · pasaje ${formatCLP(band.price)} · carga en la boletería o en un tótem`, "alert", 4000);
+    ? "No tienes tarjeta bip!: cómprala en la boletería (a la izquierda) con tu tarjeta de débito"
+    : `Saldo bip! insuficiente (${formatCLP(card.balance)}) · pasaje ${formatCLP(band.price)} · carga en la boletería o en un tótem${bank.balance < 1000 ? " · tu cuenta está baja: haz un turno de Conductor" : ""}`, "alert", 5000);
   return { ok: false };
 }
 
@@ -701,15 +725,17 @@ function openService({ kind, station }) {
   walker.keys.clear();
   const booth = kind === "boleteria";
   const delay = (a, b) => wait(a + Math.random() * (b - a));
+  const noFunds = (price) => new Error(`Fondos insuficientes en tu cuenta (${bank.label}) para pagar ${formatCLP(price)}. Gana dinero en el modo Conductor: cada estación bien servida te paga.`);
   hud.openTicketPanel({
-    kind, station, card, clock: game.clock,
+    kind, station, card, bank, clock: game.clock,
     onLoad: async (amount, method, progress) => {
       if (!card.hasCard) throw new Error(booth ? "No tienes tarjeta: compra una primero" : "Este tótem no vende tarjetas: ve a la boletería");
       if (card.balance + amount > FARES.maxBalance) throw new Error(`El saldo máximo de la tarjeta es ${formatCLP(FARES.maxBalance)}`);
+      if (!bank.canPay(amount)) throw noFunds(amount);
       if (booth) {
-        progress(method === "efectivo" ? "Entregas el dinero al cajero…" : "El cajero te acerca el lector de tarjetas…");
+        progress("El cajero te acerca el lector de tarjetas…");
         await delay(1200, 2000);
-        progress(method === "efectivo" ? "El cajero cuenta el dinero…" : "Procesando pago… aprobado");
+        progress("Procesando pago… aprobado");
         await delay(900, 1400);
       } else {
         progress("Acerca tu tarjeta de débito o crédito al lector…");
@@ -721,21 +747,196 @@ function openService({ kind, station }) {
       progress("Acerca tu tarjeta bip! al lector…");
       await delay(700, 1000);
       const loaded = card.load(amount);
+      bank.charge(loaded, `Carga bip! · ${station.name}`);
       game?.audio.loadOk();
       hud.setCard(card);
-      return `Carga realizada: ${formatCLP(loaded)} · nuevo saldo ${formatCLP(card.balance)} · comprobante impreso`;
+      hud.moneyFloat(-loaded);
+      return `Carga realizada: ${formatCLP(loaded)} · nuevo saldo bip! ${formatCLP(card.balance)} · cuenta ${bank.label}`;
     },
     onBuyCard: async (progress) => {
+      if (!bank.canPay(FARES.cardPrice)) throw noFunds(FARES.cardPrice);
       progress("El cajero prepara una tarjeta bip! nueva…");
       await delay(1500, 2200);
       card.buyNew();
+      bank.charge(FARES.cardPrice, `Tarjeta bip! nueva · ${station.name}`);
       game?.audio.loadOk();
       hud.setCard(card);
-      return `Tarjeta bip! nueva ${card.maskedNumber} · pagaste ${formatCLP(FARES.cardPrice)} · saldo $0: recuerda cargarla`;
+      hud.moneyFloat(-FARES.cardPrice);
+      return `Tarjeta bip! nueva ${card.maskedNumber} · pagaste ${formatCLP(FARES.cardPrice)} con débito · saldo bip! $0: recuerda cargarla`;
     },
     onClose: () => { if (game?.walker) { game.walker.frozen = false; game.walker.keys.clear(); } },
   });
 }
+
+/* ==========================================================================
+   Calle, locales, fotos y misiones (modo Pasajero)
+   ========================================================================== */
+
+/** Contexto para las misiones: dónde está el jugador, la hora y su bip!. */
+function missionCtx() {
+  const w = game.walker;
+  const station = w.space === "world" ? (w.stationAt(w.pos.z) || w.station) : w.station;
+  return { station, clock: game.clock, card };
+}
+
+/** Muestra los avisos de las misiones uno tras otro y paga las recompensas. */
+function report(list) {
+  if (!list?.length) return;
+  list.forEach((m, i) => setTimeout(() => game && hud.showMessage(m.text, m.level, 5000), i * 4300));
+  for (const m of list) {
+    if (m.completed) {
+      bank.deposit(m.completed.reward, `Misión cumplida: ${m.completed.title}`);
+      hud.setBank(bank);
+      hud.moneyFloat(m.completed.reward);
+      game.audio.loadOk();
+    }
+    if (m.failed) game.audio.deny();
+  }
+  hud.updateTracker(game.missions);
+}
+
+/**
+ * Sale a la calle de una estación (desde la mezanina, o al empezar la partida).
+ * Al llegar avisa a las misiones ("llegaste a X").
+ */
+function goToStreet(st, { initial = false } = {}) {
+  if (game.transition) return;
+  const walker = game.walker;
+  const finish = () => {
+    if (!game) return;
+    game.city.load(st, game.clock);
+    walker.enterStreet(st);
+    game.city.enter();
+    walker.frozen = false;
+    walker.keys.clear();
+    if (!initial) {
+      const ride = game.ride;
+      if (ride.origin && ride.origin !== st) {
+        const mins = Math.max(1, Math.round((game.clock - ride.boardedClock) / 60));
+        hud.showMessage(`Llegaste a ${st.name} desde ${ride.origin.name} · ${Math.abs(st.index - ride.origin.index)} estaciones · ${mins} min${ride.fare ? ` · pasaje ${formatCLP(ride.fare.price)}` : ""}`, "ok", 4200);
+      } else {
+        const lm = game.city.landmark;
+        hud.showMessage(`Sales a la calle en ${st.name}${lm ? ` · enfrente: ${lm.name}` : ""}`, "info", 4200);
+      }
+      const msgs = game.missions.notify("street", { station: st, ride }, missionCtx());
+      setTimeout(() => game && report(msgs), msgs.length ? 2500 : 0);
+    }
+    game.ride = { origin: null, boardedClock: null };
+    hud.fadeIn();
+    game.transition = false;
+  };
+  if (initial) return finish();
+  game.transition = true;
+  walker.frozen = true;
+  hud.fadeOut(`Subiendo a la calle · ${st.name}`);
+  setTimeout(finish, 700);
+}
+
+/** Baja de la calle a la mezanina de la estación. */
+function goUnderground(st) {
+  if (game.transition) return;
+  const walker = game.walker;
+  game.transition = true;
+  walker.frozen = true;
+  walker.keys.clear();
+  hud.fadeOut(`Bajando a la estación ${st.name}`);
+  setTimeout(() => {
+    if (!game) return;
+    game.city.leave();
+    walker.enterStation(st);
+    walker.frozen = false;
+    hud.fadeIn();
+    game.transition = false;
+    hud.showMessage(card.hasCard
+      ? `${st.name} · saldo bip! ${card.label} · boletería a la izquierda, tótems a la derecha`
+      : `${st.name} · aún no tienes tarjeta bip!: cómprala en la boletería (izquierda)`, "info", 5000);
+  }, 700);
+}
+
+/** Interacción en la calle (E): acceso al Metro, un local o el hito. */
+function onStreetTarget(target) {
+  const st = game.walker.station;
+  if (target.kind === "access") return goUnderground(st);
+  if (target.kind === "shop") return openShop(target.shop, st);
+  if (target.kind === "landmark") return takePhoto(target.landmark, st);
+}
+
+/** Foto del hito de la estación. */
+function takePhoto(lm, st) {
+  game.audio.shutter();
+  hud.photoFlash();
+  hud.showMessage(`📷 ${lm.photo || lm.name}`, "ok", 4500);
+  const msgs = game.missions.notify("photo", { station: st }, missionCtx());
+  setTimeout(() => game && report(msgs), msgs.length ? 2200 : 0);
+}
+
+/** Local de la calle (o el cajero automático del banco). */
+function openShop(shop, st) {
+  const walker = game.walker;
+  walker.frozen = true;
+  walker.keys.clear();
+  const onClose = () => { if (game?.walker) { game.walker.frozen = false; game.walker.keys.clear(); } };
+
+  if (shop.kind === "banco") {
+    hud.openStore({
+      icon: "🏧", kicker: `CAJERO AUTOMÁTICO · ${st.name}`, title: BANK_NAME, bank,
+      rows: () => [
+        ["Saldo disponible", bank.label],
+        ["Ganado como conductor (total)", formatCLP(bank.earned)],
+        ...bank.history.slice(0, 8).map(h => [`${h.date.slice(5)} · ${h.concept}`, `${h.amount > 0 ? "+" : "−"}${formatCLP(Math.abs(h.amount))}`]),
+      ],
+      status: bank.history.length ? "Últimos movimientos de tu cuenta." : "Aún no tienes movimientos. Gana dinero en el modo Conductor.",
+      onBuy: async () => "",
+      onClose,
+    });
+    return;
+  }
+
+  hud.openStore({
+    icon: shop.icon, kicker: `${shop.label.toUpperCase()} · ${st.name}`, title: shop.name, bank,
+    items: () => [...game.missions.actionsAt(st, shop.kind).map(a => ({ name: a.label, action: a.id })), ...shop.items],
+    status: "Elige lo que quieras comprar: pagas con tu tarjeta de débito.",
+    onBuy: async (item) => {
+      if (item.action) {
+        const msgs = game.missions.notify("action", { station: st, shop: shop.kind, action: item.action }, missionCtx());
+        report(msgs);
+        return item.action === "pickup" ? "Te entregan el paquete. ¡Llévalo con cuidado!" : "Entregaste el paquete. ¡Muchas gracias!";
+      }
+      if (!bank.canPay(item.price)) throw new Error(`Fondos insuficientes (${bank.label}) para ${formatCLP(item.price)}. Gana dinero en el modo Conductor: cada estación bien servida te paga.`);
+      await wait(450);
+      bank.charge(item.price, `${shop.name}: ${item.name}`);
+      bank.addToBag(item.name);
+      game?.audio.cash();
+      hud.moneyFloat(-item.price);
+      report(game.missions.notify("buy", { station: st, shop: shop.kind, item }, missionCtx()));
+      return `Compraste ${item.name} por ${formatCLP(item.price)} · saldo ${bank.label}`;
+    },
+    onClose,
+  });
+}
+
+/** Tablero de misiones (J). */
+function openMissionBoard() {
+  const walker = game.walker, ms = game.missions;
+  walker.frozen = true;
+  walker.keys.clear();
+  ms.ensure(missionCtx());
+  hud.openMissions({
+    missions: ms,
+    onAccept: (i) => {
+      const m = ms.accept(i, missionCtx());
+      if (m) hud.showMessage(`Misión aceptada: ${m.icon} ${m.title}`, "ok", 3500);
+      // Si ya estás en la calle de la estación del primer paso, ese paso cuenta como cumplido
+      if (walker.space === "street" && ms.step?.kind === "arrive" && !ms.step.fare && !ms.step.deadline) report(ms.notify("street", { station: walker.station, ride: {} }, missionCtx()));
+      else report(ms.tick(missionCtx()));
+      hud.updateTracker(ms);
+    },
+    onAbandon: () => { ms.abandon(missionCtx()); hud.updateTracker(ms); },
+    onShuffle: () => ms.shuffle(missionCtx()),
+    onClose: () => { if (game?.walker) { game.walker.frozen = false; game.walker.keys.clear(); } },
+  });
+}
+
 
 /* ==========================================================================
    Megafonía y sonidos de estado
@@ -933,11 +1134,21 @@ function loop(now) {
   game.pidTimer -= dt;
   if (game.pidTimer <= 0) { game.pidTimer = 1; world.updatePids(cameraZ, game.clock, (st, side) => traffic.arrivalsFor(st, routeForSide(side), game.clock)); }
 
+  // Calle de la estación: autos, peatones y cielo (en la calle no se oyen los trenes)
+  const inStreet = !!walker && walker.space === "street";
+  if (game.city) game.city.update(dt, inStreet ? walker.pos : null, game.clock);
+  game.missionT = (game.missionT || 0) - dt;
+  if (game.missions && game.missionT <= 0) {
+    game.missionT = 1;
+    report(game.missions.tick(missionCtx()));
+    hud.updateTracker(game.missions);
+  }
+
   // 4. Luces del tren en foco (la interior sigue al pasajero a lo largo del tren)
-  const focus = focusUnit(cameraZ);
+  const focus = inStreet ? null : focusUnit(cameraZ);
   if (focus && focus !== game.lightsUnit) { focus.group.add(game.trainLights); game.lightsUnit = focus; }
   if (walker && walker.unit) game.innerLight.position.z = walker.pos.z;
-  game.lineMap.update(player || walker.unit || focus, game.elapsed);
+  game.lineMap.update(player || walker.unit || focus || null, game.elapsed);
 
   // 5. Sonido
   let level = 1, view = "cab", rider = null;
@@ -958,10 +1169,11 @@ function loop(now) {
     accel: fs ? fs.accel : 0,
     braking: fs ? fs.isBraking : false,
     level: focus ? level : 0,
-    inStation: STATIONS.some(s => Math.abs(cameraZ - s.z) < CONFIG.station.hallHalf),
+    inStation: !inStreet && STATIONS.some(s => Math.abs(cameraZ - s.z) < CONFIG.station.hallHalf),
+    street: inStreet,
     view,
     overspeed: !!player && player.sim.speedKmh > player.sim.currentLimit() + 2,
-    crowd: people.crowdLevel(cameraWorld) * (view === "cab" ? 0.5 : 1),
+    crowd: inStreet ? 0.25 : people.crowdLevel(cameraWorld) * (view === "cab" ? 0.5 : 1),
   });
 
   // 6. HUD
@@ -1006,6 +1218,16 @@ function nextTrainText(st, side) {
 function walkerHudData() {
   const w = game.walker, clock = game.clock;
   const base = { clock, worldZ: w.worldZ, hint: w.hint() };
+  if (w.space === "street") {
+    const lm = game.city.landmark, band = fareBandAt(clock);
+    return {
+      ...base,
+      title: `CALLE${lm ? " · " + lm.name.toUpperCase() : ""}`,
+      station: w.station.name,
+      sub: `Cuenta ${bank.label} · bip! ${card.label} · pasaje ahora ${formatCLP(band.price)} (${band.label.toLowerCase()})`,
+      highlight: w.station,
+    };
+  }
   if (w.unit) {
     const sim = w.unit.sim;
     const docked = sim.isStopped ? sim.dockedStation() : null;

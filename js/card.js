@@ -1,7 +1,9 @@
 /* ==========================================================================
-   MetroSim — Alpha 0.6 · card.js
+   MetroSim — Alpha 0.9 · card.js
    Tarjeta bip! del jugador: saldo, cobro de pasajes y cargas.
 
+   · Alpha 0.9: un jugador nuevo NO tiene tarjeta: la compra en la boletería
+     y la carga pagando con su tarjeta de débito (economy.js).
    · El saldo se guarda en el navegador (localStorage) y se conserva entre
      partidas. Si el navegador no permite guardar, funciona igual en memoria.
    · El pasaje se cobra al cruzar un torniquete según el tramo horario
@@ -16,8 +18,8 @@ const KEY = "metrosim.bip";
 export class BipCard {
   constructor() {
     const saved = this.read();
-    this.hasCard = saved?.hasCard ?? true;
-    this.balance = saved?.balance ?? FARES.startBalance;
+    this.hasCard = saved?.hasCard ?? false;
+    this.balance = saved?.balance ?? 0;
     this.number = saved?.number ?? BipCard.newNumber();
     this.trips = saved?.trips ?? 0;
   }

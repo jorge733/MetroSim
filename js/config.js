@@ -21,7 +21,7 @@
    las combinaciones son reales.
    ========================================================================== */
 
-export const VERSION = "ALPHA 0.7";
+export const VERSION = "ALPHA 0.9";
 
 /* ---------- Colores oficiales de las líneas ---------- */
 export const LINE_COLORS = {
@@ -138,7 +138,7 @@ export const CONFIG = {
    las vigentes. Los tramos horarios siguen el esquema punta / valle / baja. */
 export const FARES = {
   cardPrice: 1550,                     // precio de una tarjeta bip! nueva
-  startBalance: 350,                   // saldo inicial de la tarjeta del jugador
+  startBalance: 0,                     // (Alpha 0.9) el jugador empieza sin tarjeta: la compra y la carga con su débito
   maxBalance: 25000,
   loadAmounts: [1000, 2000, 3000, 5000, 10000],
   bands: [

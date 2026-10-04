@@ -1,6 +1,11 @@
 /* ==========================================================================
-   MetroSim — Alpha 0.6 · walker.js
+   MetroSim — Alpha 0.9 · walker.js
    Modo Pasajero a pie (primera persona).
+
+   Alpha 0.9: la partida empieza en la CALLE de la estación elegida
+   (city/city.js). Desde ahí se baja por la boca del acceso a la mezanina,
+   y al salir de una estación se aparece en su calle. Espacios del jugador:
+   "street" (calle), "world" (estación) y "train" (dentro de un tren).
 
    Recorrido completo: entras desde la calle a la mezanina, validas en un
    torniquete ("bip!"), bajas por la escalera al andén del sentido que
@@ -49,8 +54,10 @@ export class Walker {
    * @param {() => {ok:boolean}} opts.onValidate  intenta cobrar el pasaje al cruzar un torniquete
    * @param {(st, side:number) => Array} opts.benches  bancos de un andén (compartidos con los viajeros)
    * @param {(x, y, z, fromX, fromZ, unit) => boolean} opts.isCrowded  ¿hay otro viajero en el camino?
+   * @param {import("./city/city.js").City} [opts.city]  calle de la estación (modo calle)
    */
-  constructor({ scene, camera, traffic, station, onEvent = () => {}, onValidate = () => ({ ok: true }), benches = () => [], isCrowded = () => false }) {
+  constructor({ scene, camera, traffic, station, onEvent = () => {}, onValidate = () => ({ ok: true }), benches = () => [], isCrowded = () => false, city = null }) {
+    this.city = city;
     this.benches = benches;
     this.isCrowded = isCrowded;
     this.scene = scene;
@@ -84,6 +91,24 @@ export class Walker {
     this.seat = null;
     this.paid = false;
     this.gatePass = false;
+  }
+
+  /** Sale a la calle de la estación (la calle ya debe estar construida en this.city). */
+  enterStreet(st) {
+    this.leaveSeat();
+    if (this.space === "train") this.unit.group.remove(this.holder);
+    this.space = "street";
+    this.unit = null;
+    this.station = st;
+    this.scene.add(this.holder);
+    const sp = this.city.spawn();
+    this.pos = new THREE.Vector3(sp.x, sp.y, sp.z);
+    this.yaw = sp.yaw;
+    this.pitch = 0.02;
+    this.seat = null;
+    this.paid = false;
+    this.gatePass = false;
+    this.descending = false;
   }
 
   /* ----- Entrada ----- */
@@ -136,7 +161,7 @@ export class Walker {
   }
 
   get worldPos() {
-    if (this.space === "world") return this.pos;
+    if (this.space !== "train") return this.pos;
     return this.unit.group.localToWorld(this.tmp.copy(this.pos));
   }
   get worldZ() { return this.worldPos.z; }
@@ -224,6 +249,7 @@ export class Walker {
    */
   toggleSeat() {
     if (this.seat) { this.leaveSeat(); return { text: "Te levantas", level: "info" }; }
+    if (this.space === "street") return { text: "Estás en la calle: los bancos para esperar el tren están en los andenes", level: "info" };
     return this.space === "train" ? this.sitInTrain() : this.sitOnBench();
   }
 
@@ -287,6 +313,12 @@ export class Walker {
   }
 
   interact() {
+    if (this.space === "street") {
+      const target = this.city.nearest(this.pos);
+      if (!target) return { text: "Acércate a la puerta de un local, al acceso del Metro o al hito de enfrente", level: "info" };
+      this.onEvent("street", target);
+      return null;
+    }
     const service = this.nearService();
     if (service) { this.onEvent("service", service); return null; }
     const st = this.nearExit();
@@ -324,6 +356,14 @@ export class Walker {
   update(dt) {
     this.deniedT = Math.max(0, this.deniedT - dt);
     if (!this.seat && dt > 0 && !this.frozen) this.move(dt);
+
+    // En la calle: solo caminar; al pisar la boca del acceso se baja a la estación
+    if (this.space === "street") {
+      this.pos.y = this.city.floorAt(this.pos.x);
+      if (this.moving && !this.descending && this.city.atAccessMouth(this.pos)) { this.descending = true; this.onEvent("street", { kind: "access" }); }
+      this.updateCamera();
+      return;
+    }
 
     // Escalera mecánica: avanza (y sube) sola
     if (this.space === "world" && dt > 0) {
@@ -365,7 +405,10 @@ export class Walker {
       }
     }
 
-    // Cámara
+    this.updateCamera();
+  }
+
+  updateCamera() {
     this.holder.position.copy(this.pos);
     if (this.seat) this.holder.position.y = this.seat.seatY - 0.62;
     const bob = this.moving ? Math.sin(this.stepPhase) * 0.025 : 0;
@@ -388,6 +431,11 @@ export class Walker {
     const dz = (-Math.cos(this.yaw) * f - Math.sin(this.yaw) * r) * speed;
     const { x, z, y } = this.pos;
 
+    if (this.space === "street") {
+      const tries = [[dx, dz], [dx, 0], [0, dz]];
+      for (const [mx, mz] of tries) if (this.city.walkable(x + mx, z + mz)) { this.pos.x += mx; this.pos.z += mz; return; }
+      return;
+    }
     const unit = this.space === "train" ? this.unit : null;
     const free = (nx, nz) => !this.isCrowded(nx, y, nz, x, z, unit);      // no se atraviesa a otros viajeros
     if (this.space === "train") {
@@ -405,6 +453,7 @@ export class Walker {
 
   /** Texto de ayuda contextual para el HUD. */
   hint() {
+    if (this.space === "street") return this.city.hint(this.pos);
     if (this.seat) return this.space === "train" ? "F levantarse" : "Sentado en el banco · F levantarse para subir al tren";
     if (this.space === "train") {
       const rs = this.unit.sim.dockedStation();

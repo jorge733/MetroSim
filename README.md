@@ -13,7 +13,30 @@ Los módulos ES necesitan un servidor local (no funciona abriendo `index.html` c
 
 Three.js se carga desde CDN, así que hace falta conexión a internet.
 
-## Qué incluye (Alpha 0.8)
+## Qué incluye (Alpha 0.9)
+
+- **Economía compartida**: tienes una cuenta bancaria con tarjeta de débito (Banco Andino, ficticio) que vale
+  para los dos modos. Empiezas con $3.000 y sin tarjeta bip!.
+- **Sueldo del conductor en tiempo real**: cada estación bien servida te deposita al instante un sueldo
+  (base + puntos de la estación + bono por estación perfecta). Las faltas del tramo se descuentan de ese pago.
+  Al completar el servicio (habiendo servido al menos media línea) recibes un bono según la nota (S…D).
+- **La ciudad**: el modo Pasajero empieza en la **calle** de la estación elegida. Avenida con autos y micros
+  que frenan si te cruzas, veredas con peatones, faroles, paradero y locales (panadería, almacén, farmacia,
+  kiosko, cajero automático y otros según la estación). Cielo, sol y faroles según la hora real.
+- **Hitos por estación**: enfrente del acceso está lo icónico de cada estación: Mall Plaza Egaña, Costanera
+  Center (Tobalaba), La Moneda, Casa Central de la U. de Chile, Plaza Baquedano, Cerro Santa Lucía, Estación
+  Central, Catedral (Plaza de Armas), Mercado Central (Puente Cal y Canto), Bellas Artes, Quinta Normal,
+  Estadio Nacional, Templo Votivo de Maipú, Los Dominicos y más (20 en total). Las demás estaciones tienen
+  calle genérica; para sumar una basta una entrada en `js/city/catalog.js`.
+- **Compras**: en cada local eliges productos con su precio y pagas con débito. La bip! se compra y se carga en
+  la boletería o en los tótems, también con débito. El cajero automático muestra saldo y movimientos.
+- **Misiones** (tecla J): compras con tema (pan para la once, almuerzo, remedios, flores…), turismo (sacar una
+  foto del hito), encargos (retirar un paquete en un kiosko y entregarlo en otra estación), contrarreloj,
+  viaje económico (sin tarifa punta) y turno de conductor. La primera misión de cada línea es un tutorial:
+  comprar la bip!, cargarla, viajar y comprar pan. Las misiones dan recompensas pequeñas: el dinero de verdad
+  se gana conduciendo.
+
+### Alpha 0.8
 
 - **Puntaje del conductor**: cada estación suma puntos por precisión de parada, puntualidad y confort (sin tirones
   ni paradas bruscas). Las estaciones perfectas seguidas forman una racha (hasta ×2). Las faltas restan. Al final
@@ -46,9 +69,9 @@ Three.js se carga desde CDN, así que hace falta conexión a internet.
 
 ## Modos
 
-- **Conductor:** eliges servicio de ida o de vuelta (sale ~1,5 min después de la hora actual) y conduces respetando señales, límites y horario. Al final recibes un resumen y puedes hacer la maniobra de retorno para seguir con el servicio contrario.
+- **Conductor:** eliges servicio de ida o de vuelta (sale ~1,5 min después de la hora actual) y conduces respetando señales, límites y horario. Cada estación te paga en tu cuenta. Al final recibes un resumen con tu sueldo y el bono, y puedes hacer la maniobra de retorno para seguir con el servicio contrario.
 - **Centro de Control:** supervisas toda la red (L3 y L6) en un esquema en tiempo real: trenes coloreados según su estado, ficha de cada tren, indicadores por línea (puntualidad, retraso máximo, gente esperando), registro de incidencias, botones para retener o liberar trenes y para activar o apagar la regulación de intervalos.
-- **Pasajero a pie:** entras desde la calle a la estación que elijas, cargas tu tarjeta bip! si hace falta, validas en el torniquete, bajas al andén del sentido que quieras, viajas y sales donde quieras.
+- **Pasajero a pie:** apareces en la calle de la estación que elijas, frente a su hito. Bajas por el acceso, compras y cargas tu bip! con débito, validas en el torniquete, viajas y sales a la calle de otra estación para cumplir tus misiones.
 
 ## Controles
 
@@ -71,13 +94,14 @@ Three.js se carga desde CDN, así que hace falta conexión a internet.
 | W A S D / flechas | Caminar (Shift: correr) |
 | Clic · Esc | Capturar / soltar el ratón |
 | F | Sentarse / levantarse (en el tren o en un banco del andén) |
-| E | Boletería, tótem de carga o salida a la calle |
+| E | Boletería, tótem, salida a la calle · en la calle: entrar a un local, bajar al Metro o sacar una foto del hito |
+| J | Misiones |
 
 **Ambos:** M sonido · H ayuda.
 
 **Celular o tablet:** aparecen controles táctiles (mejor con el teléfono en horizontal). Conductor: ▲ / ▼ mando,
 EMERGENCIA, Puertas, Inversor, Vista y Cabina; arrastra la pantalla para mirar. Pasajero: joystick a la izquierda
-para caminar (al borde corre), arrastra a la derecha para mirar, botones E (usar), F (sentarse) y Correr.
+para caminar (al borde corre), arrastra a la derecha para mirar, botones E (usar), F (sentarse), Misiones y Correr.
 Para probarlos en el computador, abre la página con `?touch=1` al final de la dirección.
 
 ## Arquitectura
@@ -176,6 +200,14 @@ js/announcements.js   frases reales de megafonía del Metro de Santiago
 js/camera.js          vistas del conductor
 js/hud.js             interfaz (incluye boletería y tótem)
 js/card.js            tarjeta bip! del jugador
+js/economy.js         cuenta bancaria (débito), sueldo del conductor y bono de servicio
+js/missions.js        misiones del pasajero (sin Three.js)
+js/city/              la calle de cada estación
+  plan.js             locales de cada estación y lo que venden (sin Three.js)
+  catalog.js          hitos de las estaciones (sin Three.js)
+  landmarks.js        modelos procedurales de los hitos
+  kit.js              piezas de ciudad: fachadas, árboles, faroles, letreros
+  city.js             la calle 3D: avenida, autos, peatones, locales, cielo
 js/intro.js           introducción de bienvenida
 js/utils.js           utilidades y texturas procedurales
 tools/simular.mjs     ejecuta el motor sin navegador

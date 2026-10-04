@@ -79,6 +79,9 @@ export class AudioSystem {
     this.rolling = this.noiseLayer(this.white, "lowpass", 400, 0.8);
     this.rumble = this.noiseLayer(this.brown, "lowpass", 150, 0.7);
     this.fan = this.noiseLayer(this.white, "bandpass", 480, 0.7);
+    // Calle: rumor del tránsito (grave) y siseo de neumáticos
+    this.traffic = this.noiseLayer(this.brown, "lowpass", 380, 0.5);
+    this.tyres = this.noiseLayer(this.white, "bandpass", 900, 0.4);
 
     // Motor de tracción: diente de sierra grave + armónico, filtrados
     this.motor = this.toneLayer("sawtooth", 60, "lowpass", 900, 1.2);
@@ -193,7 +196,8 @@ export class AudioSystem {
 
   /* ---------------------------------------------------------------------
      Actualización continua
-     state: { velocity, speedKmh, accel, braking, inStation, view, overspeed, crowd, dt, level }
+     state: { velocity, speedKmh, accel, braking, inStation, view, overspeed, crowd, dt, level, street }
+     street: el jugador está en la calle (sin túnel; se oye el tránsito).
      level (0..1): volumen del tren según la distancia (1 = vas dentro).
      --------------------------------------------------------------------- */
   update(s) {
@@ -206,8 +210,10 @@ export class AudioSystem {
     // Rodadura y túnel
     this.set(this.rolling.gain.gain, k > 0 ? (0.04 + k * 0.32) * (inside ? 0.85 : 1.1) * L : 0);
     this.set(this.rolling.filter.frequency, 220 + kmh * 24);
-    this.set(this.rumble.gain.gain, (0.05 + k * 0.5 * L) * (s.inStation ? 0.45 : 1));
-    this.set(this.fan.gain.gain, inside ? 0.022 : 0.004);
+    this.set(this.rumble.gain.gain, s.street ? 0 : (0.05 + k * 0.5 * L) * (s.inStation ? 0.45 : 1));
+    this.set(this.fan.gain.gain, s.street ? 0 : inside ? 0.022 : 0.004);
+    this.set(this.traffic.gain.gain, s.street ? 0.16 : 0, 0.4);
+    this.set(this.tyres.gain.gain, s.street ? 0.012 + Math.random() * 0.006 : 0, 0.3);
 
     // Motor: activo con tracción o con freno eléctrico (regenerativo) por encima de ~4 km/h
     const effort = Math.abs(s.accel);
@@ -337,6 +343,21 @@ export class AudioSystem {
     this.tone(1800, { duration: 0.08, gain: 0.08, wave: 'square', attack: 0.002 });
     this.tone(2400, { start: 0.12, duration: 0.1, gain: 0.08, wave: 'square', attack: 0.002 });
     this.burst({ start: 0.35, duration: 0.6, gain: 0.04, type: 'bandpass', freq: 3200, q: 3, attack: 0.02 });   // impresora
+  }
+
+  /** Caja registradora: pago aprobado en un local de la calle. */
+  cash() {
+    if (!this.ctx) return;
+    this.tone(2200, { duration: 0.07, gain: 0.07, wave: "square", attack: 0.002 });
+    this.tone(3300, { start: 0.09, duration: 0.25, gain: 0.06, wave: "triangle", attack: 0.002 });
+    this.burst({ start: 0.05, duration: 0.18, gain: 0.05, type: "bandpass", freq: 1500, q: 2 });
+  }
+
+  /** Obturador de la cámara de fotos. */
+  shutter() {
+    if (!this.ctx) return;
+    this.burst({ duration: 0.05, gain: 0.12, type: "highpass", freq: 2500, attack: 0.002 });
+    this.burst({ start: 0.09, duration: 0.06, gain: 0.1, type: "highpass", freq: 1800, attack: 0.002 });
   }
 
   /** Gong de megafonía (ding-dong). */

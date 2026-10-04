@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>MetroSim — Alpha 0.8</title>
+  <title>MetroSim — Alpha 0.9</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="styles.css">
   <!-- Three.js mediante importmap (CDN). es-module-shims da compatibilidad a navegadores antiguos. -->
@@ -33,7 +33,7 @@
           <span class="mode-icon">🚇</span>
           <span>
             <strong>Modo Conductor</strong>
-            <small>Tren de 5 coches. Respeta señales y horario; al final haz la maniobra de retorno.</small>
+            <small>Tren de 5 coches. Respeta señales y horario: cada estación bien servida te paga al instante en tu cuenta.</small>
             <label class="station-select">Línea
               <select id="driverLine"></select>
             </label>
@@ -50,7 +50,7 @@
           <span class="mode-icon">🚶</span>
           <span>
             <strong>Modo Pasajero a pie</strong>
-            <small>Carga tu tarjeta bip! en la boletería, valida en el torniquete y viaja en cualquier sentido.</small>
+            <small>Empiezas en la calle de la estación. Cumple misiones: compra tu bip!, viaja, visita los hitos y gasta lo que ganas como conductor.</small>
             <label class="station-select">Línea
               <select id="paxLine"></select>
             </label>
@@ -77,11 +77,12 @@
         <span><kbd>D</kbd> puertas</span>
         <span><kbd>F</kbd> sentarse</span>
         <span><kbd>T</kbd> cambio de cabina</span>
+        <span><kbd>J</kbd> misiones</span>
         <span><kbd>M</kbd> sonido</span>
       </div>
       <p class="start-note">🔊 Con sonido y anuncios. La carga de la línea completa puede tardar unos segundos.</p>
     </main>
-    <p class="version">METROSIM ALPHA 0.8 · 7 LÍNEAS · PUNTAJE · INCIDENTES · CENTRO DE CONTROL · MANIOBRA DE RETORNO · BOLETERÍAS</p>
+    <p class="version">METROSIM ALPHA 0.9 · CIUDAD Y MISIONES · SUELDO DEL CONDUCTOR · 7 LÍNEAS · PUNTAJE · INCIDENTES · CENTRO DE CONTROL · MANIOBRA DE RETORNO · BOLETERÍAS</p>
   </section>
 
   <!-- =============================== PANTALLA DE CARGA =============================== -->
@@ -109,6 +110,7 @@
           <span id="modeLabel" class="mode-pill">CONDUCTOR</span>
         </div>
         <div class="hud-right">
+          <div id="bankPill" class="bank-pill" title="Tu cuenta bancaria (tarjeta de débito)"><span class="hud-label">CUENTA</span><strong id="bankAmount">$0</strong><span id="moneyFloat" class="money-float"></span></div>
           <span id="cardPill" class="card-pill hidden">bip! $0</span>
           <div id="scorePill" class="score-pill hidden">
             <span class="hud-label">PUNTAJE</span>
@@ -197,6 +199,13 @@
       </div>
       <div id="crosshair" class="crosshair hidden"></div>
 
+      <!-- Misión activa (modo pasajero) -->
+      <div id="missionTracker" class="mission-tracker hidden">
+        <span class="hud-label">MISIÓN · J ver todas</span>
+        <strong id="trackerTitle">—</strong>
+        <ol id="trackerSteps"></ol>
+      </div>
+
       <!-- Ayuda de controles -->
       <div id="controlsHelp" class="controls-help">
         <span class="hud-label">CONTROLES · H ocultar</span>
@@ -207,7 +216,8 @@
         <span class="help-driver"><kbd>T</kbd> cambio de cabina (al final de la cola de maniobras)</span>
         <span class="help-walker"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> caminar · <kbd>Shift</kbd> correr</span>
         <span class="help-walker">Clic: capturar ratón · <kbd>Esc</kbd> soltar</span>
-        <span class="help-walker"><kbd>F</kbd> sentarse · <kbd>E</kbd> boletería, tótem o salida a la calle</span>
+        <span class="help-walker"><kbd>F</kbd> sentarse · <kbd>E</kbd> boletería, tótem, locales, acceso o foto</span>
+        <span class="help-walker"><kbd>J</kbd> misiones</span>
         <span><kbd>M</kbd> sonido</span>
       </div>
 
@@ -256,6 +266,50 @@
         </footer>
       </div>
     </div>
+
+    <!-- Local de la calle / cajero automático -->
+    <div id="storePanel" class="ticket-panel hidden">
+      <div class="ticket-card store-card">
+        <header class="ticket-head">
+          <span class="store-icon" id="storeIcon">🛒</span>
+          <div class="ticket-head-text">
+            <span class="small-label" id="storeKicker">LOCAL</span>
+            <strong id="storeTitle">—</strong>
+          </div>
+          <button id="storeClose" class="ticket-close" aria-label="Cerrar">✕</button>
+        </header>
+        <div class="ticket-balance">
+          <div><span class="small-label">TU CUENTA · DÉBITO</span><strong id="storeBalance">$0</strong></div>
+          <span id="storeCardNo" class="station-sub">—</span>
+        </div>
+        <div id="storeList" class="store-list"></div>
+        <p id="storeStatus" class="ticket-status">—</p>
+      </div>
+    </div>
+
+    <!-- Tablero de misiones -->
+    <div id="missionPanel" class="ticket-panel hidden">
+      <div class="ticket-card mission-card">
+        <header class="ticket-head">
+          <span class="store-icon">🎯</span>
+          <div class="ticket-head-text">
+            <span class="small-label">MISIONES · J o Esc para cerrar</span>
+            <strong id="missionPanelTitle">Misiones</strong>
+          </div>
+          <button id="missionClose" class="ticket-close" aria-label="Cerrar">✕</button>
+        </header>
+        <div id="missionActive" class="mission-active"></div>
+        <span class="small-label">DISPONIBLES</span>
+        <div id="missionOffers" class="mission-offers"></div>
+        <footer class="ticket-actions">
+          <button id="missionShuffle" class="ghost-button">Otras misiones</button>
+          <span id="missionStats" class="station-sub"></span>
+        </footer>
+      </div>
+    </div>
+
+    <!-- Destello de la cámara de fotos -->
+    <div id="photoFlash" class="photo-flash"></div>
 
     <!-- Fundido a negro (cambio de cabina) -->
     <div id="fade" class="fade"><span id="fadeText"></span></div>

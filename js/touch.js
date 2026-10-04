@@ -10,7 +10,8 @@
      Conductor  ▲ / ▼ mando · EMERGENCIA · Puertas · Inversor adelante /
                 atrás · Vista · Cambio de cabina. Arrastrar la pantalla: mirar.
      Pasajero   joystick a la izquierda para caminar (al borde: correr),
-                arrastrar a la derecha para mirar · E interactuar · F sentarse.
+                arrastrar a la derecha para mirar · E interactuar · F sentarse ·
+                Misiones (J).
    ========================================================================== */
 
 /** ¿Hay que mostrar los controles táctiles? */
@@ -162,7 +163,7 @@ export class TouchControls {
       this.running = !this.running;
       this.runBtn.classList.toggle("on", this.running);
     });
-    col.append(this.button("E · Usar", "e"), this.button("F · Sentarse", "f"), this.runBtn);
+    col.append(this.button("E · Usar", "e"), this.button("F · Sentarse", "f"), this.button("🎯 Misiones", "j"), this.runBtn);
     this.root.append(this.stick, col);
 
     // Joystick (mitad izquierda) y mirada (mitad derecha) sobre el lienzo 3D

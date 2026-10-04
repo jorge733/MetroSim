@@ -1,14 +1,18 @@
 /* ==========================================================================
-   MetroSim — Alpha 0.6 · hud.js
+   MetroSim — Alpha 0.9 · hud.js
    HUD HTML superpuesto: reloj, esquema de la línea activa, selector de mando,
    inversor, velocímetro, estación, señal, horario, puertas, panel del
    pasajero a pie, tarjeta bip!, panel de boletería / tótem, fundido de
    pantalla, mensajes y resumen de servicio.
+   Alpha 0.9: saldo de la cuenta bancaria (ambos modos) con el sueldo que
+   sube flotando, locales de la calle y cajero, tablero y seguimiento de
+   misiones y destello de la cámara de fotos.
    ========================================================================== */
 
 import { STATIONS, LINE, NOTCHES, NOTCH_INDEX, WORLD, FARES, formatCLP, fareBandAt } from "./config.js";
 import { $, clamp, formatClock, formatStopError } from "./utils.js";
 import { formatDelay } from "./engine/schedule.js";
+import { BANK_NAME } from "./economy.js";
 
 export class Hud {
   constructor() {
@@ -32,6 +36,13 @@ export class Hud {
       ticketBalance: $("ticketBalance"), ticketCardNo: $("ticketCardNo"), ticketFares: $("ticketFares"),
       ticketAmounts: $("ticketAmounts"), ticketPay: $("ticketPay"), ticketStatus: $("ticketStatus"),
       ticketConfirm: $("ticketConfirm"), ticketClose: $("ticketClose"), ticketBuy: $("ticketBuy"),
+      bankPill: $("bankPill"), bankAmount: $("bankAmount"), moneyFloat: $("moneyFloat"),
+      tracker: $("missionTracker"), trackerTitle: $("trackerTitle"), trackerSteps: $("trackerSteps"),
+      store: $("storePanel"), storeIcon: $("storeIcon"), storeKicker: $("storeKicker"), storeTitle: $("storeTitle"),
+      storeBalance: $("storeBalance"), storeCardNo: $("storeCardNo"), storeList: $("storeList"), storeStatus: $("storeStatus"), storeClose: $("storeClose"),
+      missions: $("missionPanel"), missionActive: $("missionActive"), missionOffers: $("missionOffers"),
+      missionShuffle: $("missionShuffle"), missionStats: $("missionStats"), missionClose: $("missionClose"),
+      photoFlash: $("photoFlash"),
     };
     this.signalLamps = [...document.querySelectorAll(".signal-head i")];
     this.buildNotchList();
@@ -87,6 +98,7 @@ export class Hud {
     this.setText(this.el.modeLabel, driver ? "CONDUCTOR" : "PASAJERO A PIE");
     this.el.cardPill.classList.toggle("hidden", driver);
     this.el.scorePill.classList.toggle("hidden", !driver);
+    this.el.tracker.classList.toggle("hidden", driver);
     this.el.selector.classList.toggle("hidden", !driver);
     this.el.driver.classList.toggle("hidden", !driver);
     this.el.passenger.classList.toggle("hidden", driver);
@@ -271,6 +283,7 @@ export class Hud {
    * @param {"boleteria"|"totem"} o.kind
    * @param {object} o.station
    * @param {import("./card.js").BipCard} o.card
+   * @param {import("./economy.js").BankAccount} o.bank  cuenta con la que se paga
    * @param {number} o.clock
    * @param {(amount:number, method:string)=>Promise<string>} o.onLoad  realiza la carga; devuelve el texto de resultado
    * @param {()=>Promise<string>} o.onBuyCard
@@ -284,7 +297,9 @@ export class Hud {
     this.setText(e.ticketTitle, o.station.name);
     const refresh = () => {
       this.setText(e.ticketBalance, o.card.hasCard ? formatCLP(o.card.balance) : "—");
-      this.setText(e.ticketCardNo, o.card.hasCard ? `Tarjeta bip! ${o.card.maskedNumber} · ${o.card.trips} viajes` : "No tienes tarjeta bip!");
+      const bip = o.card.hasCard ? `Tarjeta bip! ${o.card.maskedNumber} · ${o.card.trips} viajes` : "No tienes tarjeta bip!";
+      this.setText(e.ticketCardNo, `${bip} · tu cuenta: ${formatCLP(o.bank.balance)}`);
+      this.setBank(o.bank);
       this.setCard(o.card);
     };
     refresh();
@@ -301,7 +316,7 @@ export class Hud {
     }));
 
     // Importes
-    let amount = FARES.loadAmounts[1];
+    let amount = FARES.loadAmounts[0];
     e.ticketAmounts.replaceChildren(...FARES.loadAmounts.map(a => {
       const btn = document.createElement("button");
       btn.textContent = formatCLP(a);
@@ -313,9 +328,9 @@ export class Hud {
       return btn;
     }));
 
-    // Medio de pago: la boletería acepta efectivo y tarjeta; el tótem, solo tarjeta bancaria
-    let method = booth ? "efectivo" : "debito";
-    const methods = booth ? [["efectivo", "Efectivo"], ["debito", "Débito / crédito"]] : [["debito", "Débito / crédito"]];
+    // Medio de pago: tu tarjeta de débito (se descuenta de tu cuenta bancaria)
+    let method = "debito";
+    const methods = [["debito", `Débito ${BANK_NAME} ${o.bank.maskedNumber}`]];
     e.ticketPay.replaceChildren(...methods.map(([id, label]) => {
       const btn = document.createElement("button");
       btn.textContent = label;
@@ -326,7 +341,7 @@ export class Hud {
 
     e.ticketBuy.classList.toggle("hidden", !booth);
     e.ticketBuy.textContent = o.card.hasCard ? `Comprar otra tarjeta (${formatCLP(FARES.cardPrice)})` : `Comprar tarjeta bip! (${formatCLP(FARES.cardPrice)})`;
-    this.setText(e.ticketStatus, booth ? "El cajero te atiende. Elige el monto a cargar." : "Toca un monto y acerca tu tarjeta bancaria al lector.");
+    this.setText(e.ticketStatus, booth ? "El cajero te atiende. Elige el monto a cargar; pagas con tu tarjeta de débito." : "Toca un monto y acerca tu tarjeta de débito al lector.");
     e.ticketStatus.className = "ticket-status";
 
     const run = async (fn) => {
@@ -355,6 +370,184 @@ export class Hud {
   }
 
   get ticketOpen() { return !this.el.ticket.classList.contains("hidden"); }
+
+  /* ---------------------------------------------------------------------
+     Cuenta bancaria
+     --------------------------------------------------------------------- */
+  setBank(bank) {
+    this.setText(this.el.bankAmount, formatCLP(bank.balance));
+    this.el.bankPill.classList.toggle("low", bank.balance < 1000);
+  }
+
+  /** Cifra que sube junto al saldo (+$350 sueldo / −$2.100 compra). */
+  moneyFloat(amount) {
+    const f = this.el.moneyFloat;
+    f.textContent = amount >= 0 ? `+${formatCLP(amount)}` : `−${formatCLP(-amount)}`;
+    f.className = `money-float ${amount >= 0 ? "gain" : "loss"}`;
+    void f.offsetWidth;                                  // reinicia la animación
+    f.classList.add("show");
+  }
+
+  /* ---------------------------------------------------------------------
+     Misiones
+     --------------------------------------------------------------------- */
+
+  /** Seguimiento de la misión activa (arriba a la izquierda). */
+  updateTracker(missions) {
+    const e = this.el, m = missions.active;
+    const key = m ? `${m.id}:${m.step}` : "none";
+    if (key === this.trackerKey) return;
+    this.trackerKey = key;
+    if (!m) {
+      this.setText(e.trackerTitle, "Sin misión activa");
+      const li = document.createElement("li");
+      li.textContent = "Pulsa J para elegir una misión";
+      e.trackerSteps.replaceChildren(li);
+      return;
+    }
+    this.setText(e.trackerTitle, `${m.icon} ${m.title}`);
+    e.trackerSteps.replaceChildren(...m.steps.map((s, i) => {
+      const li = document.createElement("li");
+      li.textContent = s.text;
+      li.className = i < m.step ? "done" : i === m.step ? "current" : "";
+      return li;
+    }));
+  }
+
+  /**
+   * Tablero de misiones.
+   * @param {object} o  { missions, onAccept(i), onAbandon(), onShuffle(), onClose() }
+   */
+  openMissions(o) {
+    const e = this.el;
+    const render = () => {
+      const ms = o.missions, m = ms.active;
+      if (m) {
+        e.missionActive.replaceChildren(this.missionCard(m, { active: true, button: "Abandonar", onClick: () => { o.onAbandon(); render(); } }));
+      } else {
+        const p = document.createElement("p");
+        p.className = "station-sub";
+        p.textContent = "No tienes una misión activa: elige una de la lista.";
+        e.missionActive.replaceChildren(p);
+      }
+      e.missionOffers.replaceChildren(...ms.offers.map((off, i) => this.missionCard(off, {
+        button: m ? "Cambiar a esta" : "Aceptar",
+        onClick: () => { o.onAccept(i); render(); },
+      })));
+      this.setText(e.missionStats, `Cumplidas: ${ms.completed} · fallidas: ${ms.failed}`);
+    };
+    render();
+    e.missionShuffle.onclick = () => { o.onShuffle(); render(); };
+    const close = () => { e.missions.classList.add("hidden"); o.onClose(); };
+    e.missionClose.onclick = close;
+    this.closeMissions = close;
+    e.missions.classList.remove("hidden");
+    if (document.pointerLockElement) document.exitPointerLock?.();
+  }
+
+  missionCard(m, { active = false, button, onClick }) {
+    const card = document.createElement("div");
+    card.className = "mission-item" + (active ? " active" : "");
+    card.innerHTML = '<div class="mission-item-head"><b></b><span class="mission-reward"></span></div><p></p><ol></ol><button class="go-button"></button>';
+    card.querySelector("b").textContent = `${m.icon} ${m.title}`;
+    card.querySelector(".mission-reward").textContent = `+${formatCLP(m.reward)}`;
+    card.querySelector("p").textContent = m.brief;
+    card.querySelector("ol").replaceChildren(...m.steps.map((s, i) => {
+      const li = document.createElement("li");
+      li.textContent = s.text;
+      if (active) li.className = i < m.step ? "done" : i === m.step ? "current" : "";
+      return li;
+    }));
+    const btn = card.querySelector("button");
+    btn.textContent = button;
+    if (active) btn.className = "ghost-button";
+    btn.onclick = onClick;
+    return card;
+  }
+
+  get missionsOpen() { return !this.el.missions.classList.contains("hidden"); }
+
+  /* ---------------------------------------------------------------------
+     Locales de la calle y cajero automático
+     --------------------------------------------------------------------- */
+
+  /**
+   * @param {object} o
+   *   icon, kicker, title, bank, status (texto inicial)
+   *   items: () => [{ name, price, note?, action? }]   productos y acciones de misión
+   *   rows:  () => [[texto, valor]]                     en vez de productos (movimientos del cajero)
+   *   onBuy(item) → Promise<string>   compra o acción; el texto es el resultado
+   *   onClose()
+   */
+  openStore(o) {
+    const e = this.el;
+    this.storeBusy = false;
+    e.storeIcon.textContent = o.icon;
+    this.setText(e.storeKicker, o.kicker);
+    this.setText(e.storeTitle, o.title);
+    const refresh = () => {
+      this.setText(e.storeBalance, formatCLP(o.bank.balance));
+      this.setText(e.storeCardNo, `${BANK_NAME} · débito ${o.bank.maskedNumber}`);
+      this.setBank(o.bank);
+    };
+    const build = () => {
+      if (o.rows) {
+        e.storeList.replaceChildren(...o.rows().map(([k, v]) => {
+          const row = document.createElement("div");
+          row.className = "fare-row";
+          row.innerHTML = "<span></span><b></b>";
+          row.firstChild.textContent = k;
+          row.lastChild.textContent = v;
+          return row;
+        }));
+        return;
+      }
+      e.storeList.replaceChildren(...o.items().map(item => {
+        const btn = document.createElement("button");
+        btn.className = "store-item" + (item.action ? " mission" : "") + (!item.action && item.price > o.bank.balance ? " expensive" : "");
+        btn.innerHTML = "<span></span><b></b>";
+        btn.firstChild.textContent = item.name + (item.note ? ` · ${item.note}` : "");
+        btn.lastChild.textContent = item.action ? "misión" : formatCLP(item.price);
+        btn.onclick = () => run(item);
+        return btn;
+      }));
+    };
+    const run = async (item) => {
+      if (this.storeBusy) return;
+      this.storeBusy = true;
+      e.store.classList.add("busy");
+      try {
+        this.setText(e.storeStatus, await o.onBuy(item));
+        e.storeStatus.className = "ticket-status ok";
+      } catch (err) {
+        this.setText(e.storeStatus, err.message || String(err));
+        e.storeStatus.className = "ticket-status error";
+      }
+      refresh();
+      build();
+      this.storeBusy = false;
+      e.store.classList.remove("busy");
+    };
+    refresh();
+    build();
+    this.setText(e.storeStatus, o.status || "—");
+    e.storeStatus.className = "ticket-status";
+    const close = () => { if (this.storeBusy) return; e.store.classList.add("hidden"); o.onClose(); };
+    e.storeClose.onclick = close;
+    this.closeStore = close;
+    e.store.classList.remove("hidden");
+    if (document.pointerLockElement) document.exitPointerLock?.();
+  }
+
+  get storeOpen() { return !this.el.store.classList.contains("hidden"); }
+
+  /** Destello blanco de la cámara de fotos. */
+  photoFlash() {
+    const f = this.el.photoFlash;
+    f.classList.remove("show");
+    void f.offsetWidth;
+    f.classList.add("show");
+  }
 
   /* ---------------------------------------------------------------------
      Fundido a negro (cambio de cabina)
