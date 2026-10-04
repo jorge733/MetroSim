@@ -5,6 +5,14 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>MetroSim 1.0</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <!-- App instalable (PWA): manifiesto, color de la barra e íconos para iPhone -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#05080e">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="MetroSim">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
   <link rel="stylesheet" href="styles.css">
   <!-- Three.js mediante importmap (CDN). es-module-shims da compatibilidad a navegadores antiguos. -->
   <script async src="https://unpkg.com/es-module-shims@1.10.0/dist/es-module-shims.js"></script>
@@ -71,6 +79,8 @@
       </div>
 
       <button id="shopButton" class="shop-launch">🛒 <b>Tienda Metro</b> <span>licencias · libreas · contratos · mi depto · colección</span></button>
+
+      <button id="installButton" class="shop-launch install-launch" hidden>📲 <b>Instalar MetroSim</b> <span>como app · pantalla completa · funciona sin internet</span></button>
 
       <div class="start-keys">
         <span><kbd>W</kbd><kbd>S</kbd> mando / caminar</span>

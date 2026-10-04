@@ -11,7 +11,14 @@ Los módulos ES necesitan un servidor local (no funciona abriendo `index.html` c
 - **VS Code:** extensión *Live Server* → clic derecho en `index.html` → *Open with Live Server*.
 - **Node:** `npx serve .` y abrir la dirección que indique.
 
-Three.js se carga desde CDN, así que hace falta conexión a internet.
+Three.js se carga desde CDN, así que la primera vez hace falta conexión a internet.
+
+## Instalar como app (PWA)
+
+MetroSim es instalable: en la pantalla inicial aparece **📲 Instalar MetroSim** (Chrome, Edge, Android). En iPhone/iPad:
+Compartir → *Agregar a inicio*. Se abre a pantalla completa y, tras la primera partida con internet, **funciona sin conexión**
+(el service worker `sw.js` guarda el juego, Three.js y las voces). La instalación necesita `https` o `localhost`.
+Los íconos están en `icons/` (los PNG se generan desde `icons/icon.svg`).
 
 ## Qué incluye (versión 1.0 · estable)
 
@@ -162,6 +169,9 @@ node tools/simular.mjs 09:00 10 "ÑUÑOA"         # pantallas de andén de otra 
 ```
 index.html            pantallas y HUD
 styles.css            estilos
+manifest.webmanifest  manifiesto de la app instalable (PWA)
+sw.js                 service worker: instalación y juego sin conexión
+icons/                íconos de la app (icon.svg y PNG generados)
 js/engine/            MOTOR (sin Three.js)
   engine.js           MetroEngine: red de líneas con un reloj común; informe de estado
   network.js          las 7 líneas de la red (estaciones reales) y combinaciones
@@ -210,6 +220,7 @@ js/city/              la calle de cada estación
   kit.js              piezas de ciudad: fachadas, árboles, faroles, letreros
   city.js             la calle 3D: avenida, autos, peatones, locales, cielo
 js/intro.js           introducción de bienvenida
+js/pwa.js             registro del service worker y botón "Instalar MetroSim"
 js/utils.js           utilidades y texturas procedurales
 tools/simular.mjs     ejecuta el motor sin navegador
 ```

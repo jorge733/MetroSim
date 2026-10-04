@@ -67,6 +67,7 @@ import { LINES, lineById } from "./engine/network.js";
 import { BipCard } from "./card.js";
 import { PHRASES } from "./announcements.js";
 import { playIntro } from "./intro.js";
+import { setupPWA } from "./pwa.js";
 import { $, clamp, formatClock, formatStopError, gradeStop } from "./utils.js";
 import { formatDelay, makeTrip } from "./engine/schedule.js";
 import { MetroEngine } from "./engine/engine.js";
@@ -109,6 +110,8 @@ const directionSelect = $("startDirection");
 
 // Introducción de bienvenida (solo al abrir la página)
 playIntro({ isMuted: () => muted });
+// App instalable: service worker (sin conexión) y botón "Instalar MetroSim"
+setupPWA($("installButton"));
 const wait = (ms) => new Promise(r => setTimeout(r, ms));
 /** Lo comprado en la Tienda Metro (licencias, libreas, contratos, depto, recuerdos). */
 const inventory = new Inventory();

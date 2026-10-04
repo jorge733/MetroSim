@@ -1115,3 +1115,8 @@ kbd {
   .shop-item-buy { width: 100%; }
   .shop-item-buy button { width: 100%; }
 }
+
+/* ---------- Botón para instalar la app (PWA) ---------- */
+.install-launch { margin-top: 6px; border-color: #4fd6ff55; background: linear-gradient(90deg, #4fd6ff1a, #3ddc8414); }
+.install-launch:hover { border-color: #4fd6ff; }
+.install-launch[hidden] { display: none; }

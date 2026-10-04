@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Ícono de la app MetroSim (PWA): fondo oscuro, logo centrado dentro de la
+       zona segura de los íconos "maskable" (círculo del 80 %) y franja con los
+       colores de las 7 líneas. Los PNG de esta carpeta se generan desde aquí. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#16243a"/>
+      <stop offset="1" stop-color="#05080e"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <g transform="translate(256 228) scale(1.42) translate(-100 -65)">
+    <ellipse cx="100" cy="65" rx="91" ry="58" fill="#fff" stroke="#3d4248" stroke-width="10"/>
+    <path fill="#e1251b" d="M56 27l21 38-21 38-21-38zM100 27l21 38-21 38-21-38zM144 27l21 38-21 38-21-38z"/>
+  </g>
+  <g transform="translate(116 352)">
+    <rect x="0" width="40" height="14" rx="3" fill="#e1251b"/>
+    <rect x="40" width="40" height="14" fill="#f4b400"/>
+    <rect x="80" width="40" height="14" fill="#8b5a2b"/>
+    <rect x="120" width="40" height="14" fill="#1d3f95"/>
+    <rect x="160" width="40" height="14" fill="#3c86c6"/>
+    <rect x="200" width="40" height="14" fill="#00965e"/>
+    <rect x="240" width="40" height="14" rx="3" fill="#9b26b6"/>
+  </g>
+</svg>

@@ -1,0 +1,21 @@
+{
+  "id": "./",
+  "name": "MetroSim · Metro de Santiago",
+  "short_name": "MetroSim",
+  "description": "Simulador 3D del Metro de Santiago: conduce, viaja a pie, recorre la ciudad y supervisa las 7 líneas.",
+  "lang": "es-CL",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "landscape",
+  "background_color": "#05080e",
+  "theme_color": "#05080e",
+  "categories": ["games", "simulation", "travel"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
