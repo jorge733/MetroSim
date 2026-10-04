@@ -21,7 +21,7 @@
    las combinaciones son reales.
    ========================================================================== */
 
-export const VERSION = "ALPHA 0.9";
+export const VERSION = "1.0";
 
 /* ---------- Colores oficiales de las líneas ---------- */
 export const LINE_COLORS = {

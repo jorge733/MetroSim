@@ -13,7 +13,7 @@ Los módulos ES necesitan un servidor local (no funciona abriendo `index.html` c
 
 Three.js se carga desde CDN, así que hace falta conexión a internet.
 
-## Qué incluye (Alpha 0.9)
+## Qué incluye (versión 1.0 · estable)
 
 - **Economía compartida**: tienes una cuenta bancaria con tarjeta de débito (Banco Andino, ficticio) que vale
   para los dos modos. Empiezas con $3.000 y sin tarjeta bip!.
