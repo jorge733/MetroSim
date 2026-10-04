@@ -421,8 +421,8 @@ function onKeyDown(event) {
     // Ciclo de vistas del conductor: cabina → interior del tren (salón) → exterior
     const next = { cab: "saloon", saloon: "exterior", exterior: "cab" }[game.rig.view] || "cab";
     game.rig.setView(next);
-    const label = { cab: "Vista de cabina", saloon: "Vista interior del tren", exterior: "Vista exterior" }[next];
-    return hud.showMessage(label, "info", 1200);
+    const label = { cab: "Vista de cabina", saloon: "Vista interior del tren", exterior: "Vista exterior · arrastra para girar · Shift+arrastrar desplaza · rueda zoom · C encuadre inicial" }[next];
+    return hud.showMessage(label, "info", next === "exterior" ? 4500 : 1200);
   }
   // Mando del tren: el rol de Conductor envía órdenes al motor (la respuesta llega en onCommandResult)
   if (game.driverRole.handleKey(key, event.repeat)) return;
@@ -1123,7 +1123,7 @@ function loop(now) {
   // 2. Cámara / jugador
   if (player) {
     game.trainViews.sync(traffic.units, player.group.position.z);
-    game.rig.update(player.sim, game.elapsed);
+    game.rig.update(player.sim, game.elapsed, dt);
   } else {
     walker.update(dt);
     game.trainViews.sync(traffic.units, walker.worldZ);
