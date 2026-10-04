@@ -321,27 +321,150 @@ export class City {
     }
   }
 
+  /**
+   * Peatones con piernas y brazos articulados. Cada uno elige destinos en
+   * su vereda (puntos al azar, puertas de locales, el acceso al Metro),
+   * camina hacia ellos esquivando faroles, árboles, kiosko, a los demás
+   * peatones y al jugador, se detiene un rato y elige otro destino.
+   */
   buildPedestrians(g, rnd) {
     this.walkers = [];
-    const shirts = [0x2d5f9a, 0x9a2d2d, 0x3b3b3b, 0xe0d6c3, 0x4a7a3a, 0x7a4a8a, 0xc98b2c, 0x1f2a36];
+    const shirts = [0x2d5f9a, 0x9a2d2d, 0x3b3b3b, 0xe0d6c3, 0x4a7a3a, 0x7a4a8a, 0xc98b2c, 0x1f2a36, 0xb8b8b8];
+    const pants = [0x262a33, 0x30435e, 0x3d3229, 0x1b1b1d, 0x55585e];
     const skin = [0xe6c3a0, 0xc99a72, 0x8d5b3a, 0xf1d6bd];
-    const bodyGeo = new THREE.CylinderGeometry(0.22, 0.2, 0.95, 8);
-    const legGeo = new THREE.CylinderGeometry(0.2, 0.17, 0.85, 8);
-    const headGeo = new THREE.SphereGeometry(0.14, 10, 8);
-    const legMat = std(0x262a33);
-    const paths = [7.95, -10.4, -11.3, 7.95];      // por fuera de árboles, faroles y kiosko
-    for (let i = 0; i < 16; i++) {
+    const hair = [0x1a1410, 0x3b2a1e, 0x6b4a2b, 0x9a9a9a, 0x2a2018];
+    const torsoGeo = new THREE.CylinderGeometry(0.2, 0.17, 0.62, 8);
+    const legGeo = new THREE.CylinderGeometry(0.075, 0.06, 0.82, 6);
+    legGeo.translate(0, -0.41, 0);                           // pivote en la cadera
+    const armGeo = new THREE.CylinderGeometry(0.05, 0.045, 0.6, 6);
+    armGeo.translate(0, -0.3, 0);                            // pivote en el hombro
+    const headGeo = new THREE.SphereGeometry(0.12, 10, 8);
+    const hairGeo = new THREE.SphereGeometry(0.125, 10, 6, 0, Math.PI * 2, 0, Math.PI * 0.55);
+    const shoeGeo = new THREE.BoxGeometry(0.11, 0.07, 0.22);
+    shoeGeo.translate(0, -0.84, 0.04);
+    const shoeMat = std(0x141414);
+    const rand = (a) => a[Math.floor(rnd() * a.length)];
+
+    for (let i = 0; i < 18; i++) {
       const p = new THREE.Group();
-      addMesh(p, legGeo, legMat, 0, 0.45, 0);
-      addMesh(p, bodyGeo, std(shirts[Math.floor(rnd() * shirts.length)], { rough: 0.9 }), 0, 1.33, 0);
-      addMesh(p, headGeo, std(skin[Math.floor(rnd() * skin.length)]), 0, 1.95, 0);
-      const x = paths[i % paths.length];
-      const dir = rnd() < 0.5 ? 1 : -1;
-      const z = (rnd() - 0.5) * 2 * (S.halfLen - 4);
-      p.position.set(x, 0.1, z);
-      p.rotation.y = dir > 0 ? 0 : Math.PI;
+      const s = 0.9 + rnd() * 0.2;                           // estatura
+      const body = new THREE.Group();
+      body.scale.setScalar(s);
+      p.add(body);
+      const pantMat = std(rand(pants), { rough: 0.9 }), shirtMat = std(rand(shirts), { rough: 0.9 }), skinMat = std(rand(skin));
+      const legs = [-0.1, 0.1].map(x => {
+        const leg = addMesh(body, legGeo, pantMat, x, 0.9, 0);
+        addMesh(leg, shoeGeo, shoeMat, 0, 0, 0);
+        return leg;
+      });
+      addMesh(body, torsoGeo, shirtMat, 0, 1.22, 0);
+      const arms = [-0.25, 0.25].map(x => addMesh(body, armGeo, shirtMat, x, 1.5, 0));
+      addMesh(body, headGeo, skinMat, 0, 1.68, 0);
+      addMesh(body, hairGeo, std(rand(hair)), 0, 1.7, -0.015);
+      const side = i % 2 ? 1 : -1;
+      const ped = { mesh: p, legs, arms, side, x: 0, z: 0, yaw: 0, vx: 0, vz: 0, speed: 1.05 + rnd() * 0.45, phase: rnd() * 6, wait: rnd() * 3, target: null, stuck: 0 };
+      const start = this.randomSidewalkPoint(side, rnd);
+      ped.x = start.x; ped.z = start.z;
+      ped.yaw = rnd() * Math.PI * 2;
+      p.position.set(ped.x, 0.1, ped.z);
       g.add(p);
-      this.walkers.push({ mesh: p, x, z, dir, speed: 1.1 + rnd() * 0.5, phase: rnd() * 6 });
+      this.walkers.push(ped);
+    }
+    this.pedRnd = rnd;
+  }
+
+  /** ¿Puede pisar un peatón el punto local (lx, lz)? (veredas y explanada, sin obstáculos) */
+  pedFree(lx, lz, margin = 0.35) {
+    if (Math.abs(lx) < S.roadHalf + 0.3) return false;      // no se baja a la calzada
+    if (!this.walkRects.some(r => lx >= r.x0 && lx <= r.x1 && lz >= r.z0 && lz <= r.z1)) return false;
+    return !this.blocks.some(b => lx > b.x0 - margin && lx < b.x1 + margin && lz > b.z0 - margin && lz < b.z1 + margin);
+  }
+
+  randomSidewalkPoint(side, rnd = Math.random) {
+    for (let k = 0; k < 30; k++) {
+      const x = side * (S.roadHalf + 0.9 + rnd() * (S.walkHalf - S.roadHalf - 1.6));
+      const z = (rnd() - 0.5) * 2 * (S.halfLen - 3);
+      if (this.pedFree(x, z, 0.5)) return { x, z };
+    }
+    return { x: side * 10, z: 0 };
+  }
+
+  /** Próximo destino: un punto de la vereda, la puerta de un local o el acceso al Metro. */
+  pickPedTarget(p) {
+    const r = this.pedRnd();
+    if (p.side > 0 && r < 0.35) {
+      const shop = this.plan.shops[Math.floor(this.pedRnd() * this.plan.shops.length)];
+      return { x: shop.door.x - 0.2, z: shop.door.z + (this.pedRnd() - 0.5), wait: 2 + this.pedRnd() * 5 };
+    }
+    if (p.side > 0 && r < 0.45) return { x: S.access.x, z: S.access.z + S.access.mouthZ + 1.2, wait: 1 + this.pedRnd() * 2 };
+    const pt = this.randomSidewalkPoint(p.side, this.pedRnd);
+    return { ...pt, wait: this.pedRnd() < 0.4 ? 1 + this.pedRnd() * 4 : 0 };
+  }
+
+  updatePedestrians(dt, plx, plz) {
+    const list = this.walkers;
+    for (const p of list) {
+      if (!p.target) p.target = this.pickPedTarget(p);
+      let dx = p.target.x - p.x, dz = p.target.z - p.z;
+      const dist = Math.hypot(dx, dz);
+      let moving = false;
+
+      if (dist < 0.4 || p.stuck > 4) {
+        // Llegó (o no puede llegar): espera un poco y elige otro destino
+        p.wait -= dt;
+        if (p.wait <= 0 || p.stuck > 4) { p.target = this.pickPedTarget(p); p.wait = p.target.wait; p.stuck = 0; }
+      } else {
+        // Dirección deseada + separación de los demás y del jugador
+        let fx = dx / dist, fz = dz / dist;
+        const push = (ox, oz, radius, k) => {
+          const ax = p.x - ox, az = p.z - oz, d = Math.hypot(ax, az);
+          if (d > 0.001 && d < radius) { const f = k * (1 - d / radius) / d; fx += ax * f; fz += az * f; }
+        };
+        for (const o of list) if (o !== p) push(o.x, o.z, 1.1, 1.6);
+        push(plx, plz, 1.5, 3);
+        const fl = Math.hypot(fx, fz) || 1;
+        fx /= fl; fz /= fl;
+        // Si el camino recto choca con algo, prueba girando a uno y otro lado
+        const step = p.speed * dt;
+        let moved = false;
+        for (const a of [0, 0.5, -0.5, 1.0, -1.0, 1.6, -1.6]) {
+          const c = Math.cos(a), s = Math.sin(a);
+          const mx = fx * c - fz * s, mz = fx * s + fz * c;
+          const nx = p.x + mx * step, nz = p.z + mz * step;
+          if (this.pedFree(nx, nz) && Math.hypot(nx - plx, nz - plz) > 0.55) {
+            p.vx += (mx * p.speed - p.vx) * Math.min(1, dt * 6);
+            p.vz += (mz * p.speed - p.vz) * Math.min(1, dt * 6);
+            moved = true;
+            break;
+          }
+        }
+        if (!moved) { p.vx *= 0.8; p.vz *= 0.8; p.stuck += dt; }
+        else p.stuck = Math.max(0, p.stuck - dt);
+        const nx = p.x + p.vx * dt, nz = p.z + p.vz * dt;
+        if (this.pedFree(nx, nz, 0.2)) { p.x = nx; p.z = nz; }
+        moving = Math.hypot(p.vx, p.vz) > 0.2;
+      }
+      if (!moving) { p.vx *= 0.85; p.vz *= 0.85; }
+
+      // Orientación suave hacia donde camina (o hacia el destino si está quieto)
+      const sp = Math.hypot(p.vx, p.vz);
+      if (sp > 0.15) {
+        const want = Math.atan2(p.vx, p.vz);
+        let d = want - p.yaw;
+        d = Math.atan2(Math.sin(d), Math.cos(d));
+        p.yaw += d * Math.min(1, dt * 7);
+      }
+
+      // Paso: piernas y brazos opuestos, balanceo del cuerpo
+      const gait = Math.min(1, sp / 1.1);
+      p.phase += dt * (5.5 + sp * 2.5) * (gait > 0.05 ? 1 : 0);
+      const swing = Math.sin(p.phase) * 0.55 * gait;
+      p.legs[0].rotation.x = swing;
+      p.legs[1].rotation.x = -swing;
+      p.arms[0].rotation.x = -swing * 0.8;
+      p.arms[1].rotation.x = swing * 0.8;
+      p.mesh.position.set(p.x, 0.1 + Math.abs(Math.cos(p.phase)) * 0.035 * gait, p.z);
+      p.mesh.rotation.y = p.yaw;
     }
   }
 
@@ -377,13 +500,8 @@ export class City {
       c.mesh.rotation.y = dir > 0 ? 0 : Math.PI;
     }
 
-    // Peatones: van y vuelven por la vereda, con un leve balanceo
-    for (const p of this.walkers) {
-      p.z += p.dir * p.speed * dt;
-      if (Math.abs(p.z) > S.halfLen - 2) { p.dir = -Math.sign(p.z); p.mesh.rotation.y = p.dir > 0 ? 0 : Math.PI; }
-      p.phase += dt * 7 * p.speed;
-      p.mesh.position.set(p.x, 0.1 + Math.abs(Math.sin(p.phase)) * 0.04, p.z);
-    }
+    // Peatones: caminan a sus destinos esquivando obstáculos, a los demás y al jugador
+    this.updatePedestrians(dt, lx, lz);
   }
 
   /* ---------------------------------------------------------------------
@@ -397,6 +515,7 @@ export class City {
     if (!this.group) return false;
     const { lx, lz } = this.local(wx, wz);
     if (!this.walkRects.some(r => lx >= r.x0 && lx <= r.x1 && lz >= r.z0 && lz <= r.z1)) return false;
+    if (this.walkers?.some(p => Math.hypot(p.x - lx, p.z - lz) < 0.45)) return false;   // no se atraviesa a los peatones
     return !this.blocks.some(b => lx > b.x0 - 0.25 && lx < b.x1 + 0.25 && lz > b.z0 - 0.25 && lz < b.z1 + 0.25);
   }
 
