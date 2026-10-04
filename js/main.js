@@ -61,7 +61,7 @@
 
 import * as THREE from "three";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
-import { CONFIG, STATIONS, NOTCH_INDEX, FARES, spokenName, fareBandAt, formatCLP, demandAt } from "./config.js";
+import { CONFIG, STATIONS, LINE, NOTCH_INDEX, FARES, spokenName, fareBandAt, formatCLP, demandAt } from "./config.js";
 import { ROUTES, ROUTE_A, ROUTE_B, routeForSide, oppositeRoute, setActiveLine } from "./engine/route.js";
 import { LINES, lineById } from "./engine/network.js";
 import { BipCard } from "./card.js";
@@ -279,6 +279,9 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A) {
   renderer.compile(scene, camera);
 
   hud.setMode(mode);
+  // La ayuda de controles se muestra al empezar y se oculta sola (H la vuelve a mostrar)
+  $("controlsHelp").classList.remove("hidden");
+  setTimeout(() => game && $("controlsHelp").classList.add("hidden"), 12000);
 
   // Controles táctiles (celular / tablet): cada botón equivale a su tecla
   if (wantsTouch()) {
@@ -1072,7 +1075,11 @@ function updateCabVisuals(dt, unit, info) {
   setLamp(model.lamps.emergency, sim.emergency && blink);
 
   game.dmiTimer -= dt;
-  if (game.dmiTimer <= 0) { model.dmi.draw(sim, info); game.dmiTimer = 1 / 12; }
+  if (game.dmiTimer <= 0) {
+    model.dmi.draw(sim, info);
+    model.status?.draw(sim, info, { clock: game.clock, onboard: game.people.onboardCount(unit), trip: unit.trip, lineColor: LINE.color });
+    game.dmiTimer = 1 / 12;
+  }
 }
 
 /** Tren "en foco": el del jugador, aquel en el que va el pasajero o el que se acerca a él. */

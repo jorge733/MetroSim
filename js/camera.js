@@ -9,7 +9,7 @@ import { clamp } from "./utils.js";
 
 // Puntos de vista en coordenadas locales del tren.
 export const VIEWS = {
-  cab:      { pos: new THREE.Vector3(-0.3, 2.5, 1.7),  yaw: 0,    pitch: -0.07, yawLimit: 1.4,     pitchLimit: 0.7 },
+  cab:      { pos: new THREE.Vector3(0, 2.52, 1.95),   yaw: 0,    pitch: -0.12, yawLimit: 1.4,     pitchLimit: 0.7 },   // puesto central
   saloon:   { pos: new THREE.Vector3(0.45, 2.85, 10.6), yaw: 0.85, pitch: -0.08, yawLimit: Math.PI, pitchLimit: 0.8 },
   exterior: { pos: new THREE.Vector3(3.0, 3.1, -11),   target: new THREE.Vector3(0, 1.8, 5) },
 };

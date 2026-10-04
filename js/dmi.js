@@ -148,3 +148,79 @@ export class CabDisplay {
   }
 }
 
+
+/**
+ * Pantalla de estado (derecha del pupitre): recorrido de la línea con la
+ * posición del tren, próximas estaciones con su hora prevista, hora y
+ * viajeros a bordo. Complementa a la DMI (velocidad y señal).
+ */
+export class CabStatusDisplay {
+  constructor() {
+    this.canvas = makeCanvas(640, 360);
+    this.ctx = this.canvas.getContext("2d");
+    this.texture = new THREE.CanvasTexture(this.canvas);
+    this.texture.colorSpace = THREE.SRGBColorSpace;
+    this.texture.anisotropy = 4;
+  }
+
+  /** @param {{clock:number, onboard:number, trip:object, lineColor:string}} extra */
+  draw(sim, info, extra) {
+    const g = this.ctx, Wd = 640, Hd = 360, route = sim.route, sts = route.stations;
+    const color = extra.lineColor || "#8b5a2b";
+    g.fillStyle = "#070b10"; g.fillRect(0, 0, Wd, Hd);
+    g.strokeStyle = "#1f2a35"; g.lineWidth = 4; g.strokeRect(2, 2, Wd - 4, Hd - 4);
+
+    // Cabecera: destino y hora
+    g.fillStyle = color; g.fillRect(14, 14, Wd - 28, 40);
+    g.fillStyle = "#ffffff"; g.font = "800 20px Arial"; g.textAlign = "left"; g.textBaseline = "middle";
+    g.fillText(`→ ${route.last.short}`, 26, 35);
+    const h = Math.floor(extra.clock / 3600) % 24, m = Math.floor(extra.clock / 60) % 60, s = Math.floor(extra.clock) % 60;
+    g.textAlign = "right"; g.font = "800 22px Arial";
+    g.fillText(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`, Wd - 26, 35);
+
+    // Recorrido: barra con todas las estaciones y el tren
+    const x0 = 30, x1 = Wd - 30, y = 84;
+    g.fillStyle = "#26323e"; g.fillRect(x0, y - 3, x1 - x0, 6);
+    const first = sts[0].stopZ, last = sts.at(-1).stopZ, span = last - first || 1;
+    const px = (z) => x0 + clamp((z - first) / span, 0, 1) * (x1 - x0);
+    const next = info.docked || info.next;
+    for (const st of sts) {
+      const passed = next && route.stationOf ? st.index < next.index : false;
+      g.fillStyle = passed ? "#4a5560" : st === next ? "#ffd166" : "#e8eef5";
+      g.beginPath(); g.arc(px(st.stopZ), y, st === next ? 6 : 4, 0, Math.PI * 2); g.fill();
+    }
+    g.fillStyle = color; g.fillRect(x0, y - 3, Math.max(0, px(sim.position) - x0), 6);
+    g.fillStyle = "#ffffff"; g.beginPath(); g.moveTo(px(sim.position) + 9, y); g.lineTo(px(sim.position) - 5, y - 8); g.lineTo(px(sim.position) - 5, y + 8); g.fill();
+
+    // Próximas estaciones con hora prevista
+    g.textBaseline = "alphabetic";
+    g.fillStyle = "#8b9bab"; g.font = "700 13px Arial"; g.textAlign = "left";
+    g.fillText("PRÓXIMAS ESTACIONES", 26, 122);
+    const startIdx = next ? sts.indexOf(next) : sts.length;
+    const upcoming = sts.slice(startIdx, startIdx + 5);
+    upcoming.forEach((st, i) => {
+      const yy = 152 + i * 34;
+      if (i === 0) { g.fillStyle = "#1a2633"; g.fillRect(18, yy - 24, Wd - 36, 32); }
+      g.fillStyle = i === 0 ? "#ffd166" : "#e8eef5";
+      g.font = `${i === 0 ? 800 : 600} 19px Arial`; g.textAlign = "left";
+      g.fillText(st.name.length > 26 ? st.short : st.name, 30, yy);
+      if (st.combos?.length) {
+        let cx = 360;
+        for (const c of st.combos) { g.fillStyle = "#3a4654"; g.beginPath(); g.arc(cx, yy - 6, 11, 0, Math.PI * 2); g.fill(); g.fillStyle = "#fff"; g.font = "800 11px Arial"; g.textAlign = "center"; g.fillText(c, cx, yy - 2); cx += 26; }
+      }
+      const arr = extra.trip?.arr?.[st.index];
+      if (arr != null) {
+        const hh = Math.floor(arr / 3600) % 24, mm = Math.floor(arr / 60) % 60;
+        g.fillStyle = "#9fb0c2"; g.font = "700 17px Arial"; g.textAlign = "right";
+        g.fillText(`${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`, Wd - 30, yy);
+      }
+    });
+    if (!upcoming.length) { g.fillStyle = "#e8eef5"; g.font = "700 19px Arial"; g.textAlign = "left"; g.fillText("Fin de servicio · maniobra de retorno", 30, 152); }
+
+    // Pie: viajeros a bordo
+    g.fillStyle = "#8b9bab"; g.font = "600 14px Arial"; g.textAlign = "left";
+    g.fillText(`A BORDO: ${extra.onboard ?? 0} VIAJEROS`, 26, Hd - 16);
+    g.textAlign = "right"; g.fillText(`LÍMITE ${info.limit} KM/H`, Wd - 26, Hd - 16);
+    this.texture.needsUpdate = true;
+  }
+}

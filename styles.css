@@ -977,3 +977,6 @@ kbd {
   .bank-pill { padding: 5px 8px; }
   .bank-pill strong { font-size: 14px; }
 }
+
+/* Esquema de línea bajo la barra superior (no se monta sobre el nombre de la línea) */
+#gameScreen .line-strip { top: 76px; }

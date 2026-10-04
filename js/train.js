@@ -18,8 +18,8 @@ import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { CONFIG, LINE } from "./config.js";
 import { ROUTE_A, ROUTE_B } from "./engine/route.js";
-import { std, glow, addBox, addBoxSpan, addPlane, toTexture, lineMapCanvas, destinationCanvas } from "./utils.js";
-import { CabDisplay } from "./dmi.js";
+import { std, glow, addBox, addBoxSpan, addPlane, toTexture, makeCanvas, lineMapCanvas, destinationCanvas } from "./utils.js";
+import { CabDisplay, CabStatusDisplay } from "./dmi.js";
 import { CAR_TYPES, CONSIST, carToTrainZ, TRAIN_LAYOUT } from "./engine/consist.js";
 
 const T = CONFIG.train;
@@ -421,90 +421,159 @@ export function buildTrainSlots() {
 
 /* ==========================================================================
    Cabina de conducción (solo tren del jugador)
+   Puesto de conducción central, como en los trenes modernos del Metro:
+     · parabrisas con marco de goma, montantes y parasol
+     · pupitre envolvente con capota de instrumentos y DOS pantallas:
+       izquierda la DMI (velocidad, señal, parada) y derecha la pantalla de
+       estado (próxima estación, puertas, horario, viajeros)
+     · a la izquierda el manipulador combinado (tracción/freno) y la llave
+       del inversor; a la derecha botoneras de puertas, seta de emergencia
+       con collarín amarillo y radio con microteléfono
+     · fila de pilotos sobre la capota (puertas cerradas, tracción, freno,
+       emergencia) y paneles de techo
    ========================================================================== */
+
+const addMesh = (parent, geo, m, x = 0, y = 0, z = 0) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); parent.add(o); return o; };
 
 function buildCab(group, mat) {
   const F = T.floorY, R = T.roofY, W = T.halfWidth;
   const wsY0 = F + 0.85, wsY1 = R - 0.2;
+  const charcoal = std(0x2b3036, { rough: 0.8 });
+  const panel = std(0x1c2126, { rough: 0.6, metal: 0.2 });
+  const trim = std(0x6b747d, { metal: 0.6, rough: 0.35 });
+  const rubber = std(0x0a0c0e, { rough: 0.95 });
+  const label = (text, w = 0.1) => {
+    const c = makeCanvas(256, 64), g = c.getContext("2d");
+    g.fillStyle = "#1c2126"; g.fillRect(0, 0, 256, 64);
+    g.fillStyle = "#cfd8e2"; g.font = "700 34px Arial"; g.textAlign = "center"; g.textBaseline = "middle";
+    g.fillText(text, 128, 34);
+    return new THREE.Mesh(new THREE.PlaneGeometry(w, w / 4), glow(0xffffff, { map: toTexture(c) }));
+  };
 
+  // Paredes laterales con ventanilla, suelo y techo
   const cabOpenings = [{ z0: 0.6, z1: 2.2, y0: F + 0.85, y1: F + 1.75 }];
   [-1, 1].forEach(side => {
     buildPanelWall(group, { x: side * (W - 0.06), thickness: 0.04, mat: mat.cabLining, zStart: 0.06, zEnd: 2.68, yBottom: F, yTop: R - 0.03, openings: cabOpenings });
-    addBoxSpan(group, side * (W - 0.12), 0.1, wsY0, wsY1, 0.04, 0.16, mat.black);
+    // Marco de goma de la ventanilla lateral
+    addBoxSpan(group, side * (W - 0.09), 0.03, F + 0.82, F + 0.86, 0.58, 2.22, rubber);
+    addBoxSpan(group, side * (W - 0.09), 0.03, F + 1.74, F + 1.78, 0.58, 2.22, rubber);
+    // Montante del parabrisas (más delgado que antes: no tapa la vía)
+    addBoxSpan(group, side * (W - 0.1), 0.07, wsY0, wsY1, 0.03, 0.12, rubber);
   });
   addBoxSpan(group, 0, W * 2 - 0.04, F - 0.05, F, 0, 2.7, mat.cabFloor);
   addBoxSpan(group, 0, W * 2 - 0.1, R - 0.05, R - 0.01, 0.02, 2.68, mat.cabLining);
-  addBoxSpan(group, 0, W * 2 - 0.1, wsY1, R - 0.01, 0.02, 0.2, mat.black);
-  addBoxSpan(group, 0, 0.6, R - 0.07, R - 0.05, 1.3, 1.9, mat.light);
+  addBoxSpan(group, 0, W * 2 - 0.1, wsY1, R - 0.01, 0.02, 0.22, rubber);                 // dintel del parabrisas
+  addBoxSpan(group, 0, W * 2 - 0.1, wsY0 - 0.04, wsY0, 0.02, 0.12, rubber);              // marco inferior
+  addBoxSpan(group, 0, 0.7, R - 0.07, R - 0.05, 1.4, 2.1, mat.light);                    // plafón
 
-  // Pupitre
-  const deskTopY = F + 0.72;
-  addBoxSpan(group, 0, W * 2 - 0.14, F, deskTopY, 0.1, 0.95, mat.desk);
+  // Pupitre envolvente
+  const deskTopY = F + 0.74;
+  addBoxSpan(group, 0, W * 2 - 0.14, F, deskTopY, 0.12, 0.98, charcoal);
+  addBoxSpan(group, 0, W * 2 - 0.14, deskTopY - 0.02, deskTopY + 0.02, 0.96, 1.04, trim);   // borde de apoyo de las manos
   const desk = new THREE.Group();
-  desk.position.set(0, deskTopY + 0.05, 0.52);
-  desk.rotation.x = 0.3;
+  desk.position.set(0, deskTopY + 0.05, 0.56);
+  desk.rotation.x = 0.26;
   group.add(desk);
-  addBox(desk, W * 2 - 0.14, 0.04, 0.92, mat.deskTop, 0, 0, 0);
+  addBox(desk, W * 2 - 0.14, 0.04, 0.9, mat.deskTop, 0, 0, 0);
+  addBox(desk, 0.62, 0.006, 0.6, panel, -0.68, 0.023, 0.02);                             // placa del lado izquierdo
+  addBox(desk, 0.62, 0.006, 0.6, panel, 0.68, 0.023, 0.02);                              // placa del lado derecho
 
-  // Capota de instrumentos con pantalla DMI
+  // Capota de instrumentos con dos pantallas
   const hood = new THREE.Group();
-  hood.position.set(-0.3, F + 0.86, 0.3);
-  hood.rotation.x = -0.28;
+  hood.position.set(0, F + 0.97, 0.2);
+  hood.rotation.x = -0.38;
   group.add(hood);
-  addBox(hood, 0.7, 0.44, 0.1, mat.desk, 0, 0, 0);
-  addBox(hood, 0.74, 0.04, 0.2, mat.desk, 0, 0.23, -0.04);
-  const dmi = new CabDisplay();
-  const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.3375), glow(0xffffff, { map: dmi.texture }));
-  screen.position.z = 0.051;
-  hood.add(screen);
+  addBox(hood, 1.3, 0.36, 0.12, charcoal, 0, 0, 0);
+  addBox(hood, 1.34, 0.04, 0.2, charcoal, 0, 0.19, -0.05);                                // visera antirreflejos
+  const screens = {};
+  [["dmi", -0.31, 0.1], ["status", 0.31, -0.1]].forEach(([key, x, rotY]) => {
+    const bezel = new THREE.Group();
+    bezel.position.set(x, -0.01, 0.061);
+    bezel.rotation.y = rotY;
+    hood.add(bezel);
+    addBox(bezel, 0.56, 0.33, 0.02, rubber, 0, 0, 0);
+    const display = key === "dmi" ? new CabDisplay() : new CabStatusDisplay();
+    const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.52, 0.2925), glow(0xffffff, { map: display.texture }));
+    screen.position.z = 0.011;
+    bezel.add(screen);
+    screens[key] = display;
+  });
 
-  // Manipulador combinado
-  addBox(desk, 0.24, 0.06, 0.46, mat.panelGrey, -0.95, 0.05, 0.05);
-  const lever = new THREE.Group();
-  lever.position.set(-0.95, 0.08, 0.05);
-  desk.add(lever);
-  const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.2, 8), mat.pole);
-  rod.position.y = 0.1;
-  lever.add(rod);
-  addBox(lever, 0.16, 0.05, 0.06, std(0x151515, { rough: 0.4 }), 0, 0.21, 0);
-
-  // Inversor
-  addBox(desk, 0.16, 0.03, 0.16, mat.panelGrey, -0.7, 0.035, -0.2);
-  const reverserKey = new THREE.Group();
-  reverserKey.position.set(-0.7, 0.06, -0.2);
-  desk.add(reverserKey);
-  addBox(reverserKey, 0.025, 0.035, 0.08, std(0xd7b740, { metal: 0.7, rough: 0.3 }), 0, 0.025, 0);
-  ["F", "N", "R"].forEach((_, i) => addBox(desk, 0.012, 0.004, 0.012, glow([0x6fe39a, 0xffffff, 0xffb547][i]), -0.7 + (i - 1) * 0.06, 0.052, -0.29));
-
-  // Pilotos y botones de puertas
+  // Fila de pilotos sobre la capota (con su rótulo)
   const lampDefs = {
-    doorsClosed: { x: 0.18, color: 0x2a74ff },
-    doorLeft:    { x: -0.55, color: 0x35e06f, button: true },
-    doorRight:   { x: 0.55, color: 0x35e06f, button: true },
-    traction:    { x: 0.28, color: 0x4fd6ff },
-    brake:       { x: 0.38, color: 0xffb547 },
-    emergency:   { x: 0.48, color: 0xff3030 },
+    doorsClosed: { x: -0.42, color: 0x2a74ff, text: "PUERTAS" },
+    traction:    { x: -0.14, color: 0x4fd6ff, text: "TRACCIÓN" },
+    brake:       { x: 0.14, color: 0xffb547, text: "FRENO" },
+    emergency:   { x: 0.42, color: 0xff3030, text: "EMERG." },
+    doorLeft:    { color: 0x35e06f, button: true, x: 0.5, z: 0.12 },
+    doorRight:   { color: 0x35e06f, button: true, x: 0.66, z: 0.12 },
   };
   const lamps = {};
   for (const [key, def] of Object.entries(lampDefs)) {
     const m = new THREE.MeshBasicMaterial({ color: def.color, toneMapped: false });
-    const r = def.button ? 0.026 : 0.02;
-    const lamp = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.03, 16), m);
-    lamp.position.set(def.x, 0.035, def.button ? 0.18 : -0.2);
-    desk.add(lamp);
+    let lamp;
+    if (def.button) {
+      lamp = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.025, 20), m);
+      lamp.position.set(def.x, 0.04, def.z);
+      desk.add(lamp);
+      addMesh(desk, new THREE.CylinderGeometry(0.036, 0.036, 0.012, 20), trim, def.x, 0.028, def.z);
+    } else {
+      lamp = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.03, 0.012), m);
+      lamp.position.set(def.x * 0.85, 0.215, -0.01);
+      hood.add(lamp);
+      const l = label(def.text, 0.12);
+      l.position.set(def.x * 0.85, 0.215, 0.009);
+      l.rotation.x = -Math.PI / 2 + 0.35;
+      l.position.y += 0.02; l.position.z -= 0.05;
+      hood.add(l);
+    }
     lamps[key] = { material: m, on: new THREE.Color(def.color), off: new THREE.Color(def.color).multiplyScalar(0.12) };
   }
-  const mushroom = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.04, 0.05, 20), std(0xd41f1f, { rough: 0.35 }));
-  mushroom.position.set(0.95, 0.05, 0.15);
-  desk.add(mushroom);
-  addBox(desk, 0.36, 0.08, 0.22, mat.panelGrey, 0.8, 0.06, -0.2);
-  addBox(desk, 0.18, 0.005, 0.08, glow(0x52ff9a), 0.76, 0.102, -0.22);
+  const dl = label("PUERTAS DCHA.", 0.26); dl.rotation.x = -Math.PI / 2; dl.position.set(0.58, 0.028, 0.22); desk.add(dl);
 
-  // Panel de techo y parasol
-  addBoxSpan(group, 0, 1.4, R - 0.18, R - 0.05, 0.2, 0.6, mat.panelGrey);
-  for (let i = 0; i < 6; i++) addBoxSpan(group, -0.55 + i * 0.22, 0.05, R - 0.2, R - 0.18, 0.5, 0.53, glow(i % 3 ? 0x2f9d58 : 0xffb547));
-  const visor = addBox(group, 0.7, 0.012, 0.32, std(0x0c1014, { transparent: true, opacity: 0.85 }), -0.3, wsY1 - 0.06, 0.32);
-  visor.rotation.x = -0.25;
+  // Manipulador combinado (izquierda): base con guía y palanca con empuñadura en T
+  addBox(desk, 0.2, 0.05, 0.42, std(0x3a4148, { metal: 0.4, rough: 0.5 }), -0.72, 0.045, 0.06);
+  addBox(desk, 0.03, 0.052, 0.36, rubber, -0.72, 0.05, 0.06);                               // ranura
+  const lever = new THREE.Group();
+  lever.position.set(-0.72, 0.08, 0.06);
+  desk.add(lever);
+  const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.018, 0.2, 10), mat.pole);
+  rod.position.y = 0.1;
+  lever.add(rod);
+  const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.024, 0.18, 14), std(0x121417, { rough: 0.5 }));
+  grip.rotation.z = Math.PI / 2;
+  grip.position.y = 0.21;
+  lever.add(grip);
+  const ml = label("TRACCIÓN · FRENO", 0.22); ml.rotation.x = -Math.PI / 2; ml.position.set(-0.72, 0.026, 0.32); desk.add(ml);
 
-  return { lever, reverserKey, lamps, dmi };
+  // Inversor (llave)
+  addMesh(desk, new THREE.CylinderGeometry(0.06, 0.06, 0.02, 24), std(0x3a4148, { metal: 0.4 }), -0.42, 0.035, -0.12);
+  const reverserKey = new THREE.Group();
+  reverserKey.position.set(-0.42, 0.05, -0.12);
+  desk.add(reverserKey);
+  addBox(reverserKey, 0.025, 0.04, 0.09, std(0xd7b740, { metal: 0.7, rough: 0.3 }), 0, 0.025, 0);
+  addMesh(reverserKey, new THREE.CylinderGeometry(0.022, 0.022, 0.012, 16), std(0xd7b740, { metal: 0.7, rough: 0.3 }), 0, 0.045, 0.05);
+  ["R", "N", "F"].forEach((_, i) => addBox(desk, 0.014, 0.004, 0.014, glow([0xffb547, 0xffffff, 0x6fe39a][i]), -0.42 + (i - 1) * 0.07, 0.048, -0.22));
+
+  // Seta de emergencia con collarín amarillo (derecha)
+  addMesh(desk, new THREE.CylinderGeometry(0.055, 0.055, 0.012, 24), std(0xf2c230, { rough: 0.5 }), 0.94, 0.03, 0.02);
+  addMesh(desk, new THREE.CylinderGeometry(0.012, 0.012, 0.04, 10), trim, 0.94, 0.05, 0.02);
+  const mushroom = addMesh(desk, new THREE.SphereGeometry(0.04, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), std(0xd41f1f, { rough: 0.35 }), 0.94, 0.065, 0.02);
+  mushroom.scale.y = 0.7;
+  const el = label("EMERGENCIA", 0.16); el.rotation.x = -Math.PI / 2; el.position.set(0.94, 0.028, 0.12); desk.add(el);
+
+  // Radio con pantalla pequeña y microteléfono
+  addBox(desk, 0.3, 0.06, 0.18, std(0x3a4148, { metal: 0.3 }), 0.72, 0.05, -0.2);
+  addBox(desk, 0.12, 0.005, 0.06, glow(0x52ff9a), 0.66, 0.082, -0.22);
+  const handset = addBox(desk, 0.05, 0.035, 0.17, std(0x121417, { rough: 0.6 }), 0.83, 0.095, -0.2);
+  handset.rotation.y = 0.1;
+
+  // Panel de techo con interruptores y parasol enrollable
+  addBoxSpan(group, 0, 1.2, R - 0.18, R - 0.05, 0.3, 0.7, mat.panelGrey);
+  for (let i = 0; i < 6; i++) addBoxSpan(group, -0.5 + i * 0.2, 0.05, R - 0.2, R - 0.18, 0.6, 0.63, glow(i % 3 ? 0x2f9d58 : 0xffb547));
+  addBoxSpan(group, 0, W * 2 - 0.4, wsY1 - 0.04, wsY1 + 0.02, 0.16, 0.24, std(0x30363c, { rough: 0.7 }));   // tubo del parasol
+  const visor = addBox(group, 1.1, 0.008, 0.08, std(0x0c1014, { transparent: true, opacity: 0.6, depthWrite: false }), 0, wsY1 - 0.09, 0.2);
+  visor.rotation.x = -1.2;
+
+  return { lever, reverserKey, lamps, dmi: screens.dmi, status: screens.status };
 }
