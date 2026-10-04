@@ -30,6 +30,11 @@ export const PHRASES = {
     { key: `estacion-${st.id}`, text: `${spokenName(st.name)}${st.combos.length ? "," : "."}` },
     ...combos(st),
   ],
+  /** Justo antes de llegar: "<nombre>[, combinación a línea N]." (mismas grabaciones, sin "Próxima estación") */
+  arriving: (st) => [
+    { key: `estacion-${st.id}`, text: `${spokenName(st.name)}${st.combos.length ? "," : "."}` },
+    ...combos(st),
+  ],
   doorsClosing: () => [{ key: "cierre-puertas", text: "Se inicia el cierre de puertas." }],
   letOff: () => [{ key: "permite-bajar", text: "Permite bajar antes de subir." }],
   terminal: () => [

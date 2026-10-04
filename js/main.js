@@ -764,8 +764,14 @@ function updateOnboardAnnouncements(unit) {
     unit.announced.safetyDone = false;
     game.audio.announce(PHRASES.nextStation(next));
   }
-  // De vez en cuando, en plena marcha, el mensaje de seguridad
   const remaining = sim.position - next.stopZ;
+  // Justo antes de llegar: "<nombre>[, combinación a línea N]"
+  if (unit.announced.next === next.id && unit.announced.arriving !== next.id
+      && remaining < 250 && remaining > 15 && sim.speedKmh > 10) {
+    unit.announced.arriving = next.id;
+    game.audio.announce(PHRASES.arriving(next));
+  }
+  // De vez en cuando, en plena marcha, el mensaje de seguridad
   if (!unit.announced.safetyDone && sim.speedKmh > 45 && remaining > 500 && next.index % 4 === 2) {
     unit.announced.safetyDone = true;
     game.audio.announce(PHRASES.safety());
