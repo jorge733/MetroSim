@@ -471,16 +471,16 @@ function buildCab(group, mat) {
   addBoxSpan(group, 0, W * 2 - 0.14, F, deskTopY, 0.12, 0.98, charcoal);
   addBoxSpan(group, 0, W * 2 - 0.14, deskTopY - 0.02, deskTopY + 0.02, 0.96, 1.04, trim);   // borde de apoyo de las manos
   const desk = new THREE.Group();
-  desk.position.set(0, deskTopY + 0.05, 0.56);
-  desk.rotation.x = 0.26;
+  desk.position.set(0, deskTopY + 0.04, 0.68);   // la tabla empieza detrás de las pantallas (no las tapa)
+  desk.rotation.x = 0.14;
   group.add(desk);
-  addBox(desk, W * 2 - 0.14, 0.04, 0.9, mat.deskTop, 0, 0, 0);
-  addBox(desk, 0.62, 0.006, 0.6, panel, -0.68, 0.023, 0.02);                             // placa del lado izquierdo
-  addBox(desk, 0.62, 0.006, 0.6, panel, 0.68, 0.023, 0.02);                              // placa del lado derecho
+  addBox(desk, W * 2 - 0.14, 0.04, 0.7, mat.deskTop, 0, 0, 0);
+  addBox(desk, 0.62, 0.006, 0.5, panel, -0.68, 0.023, 0.02);                             // placa del lado izquierdo
+  addBox(desk, 0.62, 0.006, 0.5, panel, 0.68, 0.023, 0.02);                              // placa del lado derecho
 
   // Capota de instrumentos con dos pantallas
   const hood = new THREE.Group();
-  hood.position.set(0, F + 0.97, 0.2);
+  hood.position.set(0, F + 1.04, 0.18);
   hood.rotation.x = -0.38;
   group.add(hood);
   addBox(hood, 1.3, 0.36, 0.12, charcoal, 0, 0, 0);
@@ -488,7 +488,7 @@ function buildCab(group, mat) {
   const screens = {};
   [["dmi", -0.31, 0.1], ["status", 0.31, -0.1]].forEach(([key, x, rotY]) => {
     const bezel = new THREE.Group();
-    bezel.position.set(x, -0.01, 0.061);
+    bezel.position.set(x, -0.01, 0.1);              // adelantada: el borde interior no se hunde en la capota
     bezel.rotation.y = rotY;
     hood.add(bezel);
     addBox(bezel, 0.56, 0.33, 0.02, rubber, 0, 0, 0);
