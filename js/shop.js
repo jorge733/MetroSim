@@ -18,6 +18,7 @@
 
 import { LINES } from "./engine/network.js";
 import { formatCLP } from "./config.js";
+import { isCreator } from "./creator.js";
 
 const KEY = "metrosim.owned";
 
@@ -87,7 +88,8 @@ export class Inventory {
     try { localStorage.setItem(KEY, JSON.stringify({ owned: [...this.owned], livery: this.livery, albums: [...this.albums] })); } catch { /* sin almacenamiento */ }
   }
 
-  has(id) { return this.owned.has(id) || id === "livery-clasica"; }
+  /** ¿Lo tiene? En Modo Creador, todo. */
+  has(id) { return isCreator() || this.owned.has(id) || id === "livery-clasica"; }
 
   /**
    * Compra con la cuenta. Devuelve { ok, text }.

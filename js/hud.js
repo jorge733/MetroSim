@@ -530,7 +530,7 @@ export class Hud {
       }
       e.storeList.replaceChildren(...o.items().map(item => {
         const btn = document.createElement("button");
-        btn.className = "store-item" + (item.action ? " mission" : "") + (!item.action && item.price > o.bank.balance ? " expensive" : "");
+        btn.className = "store-item" + (item.action ? " mission" : "") + (!item.action && !o.bank.canPay(item.price) ? " expensive" : "");
         btn.innerHTML = "<span></span><b></b>";
         btn.firstChild.textContent = item.name + (item.note ? ` · ${item.note}` : "");
         btn.lastChild.textContent = item.action ? "misión" : formatCLP(item.price);

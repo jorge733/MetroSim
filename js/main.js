@@ -68,6 +68,7 @@ import { BipCard } from "./card.js";
 import { PHRASES } from "./announcements.js";
 import { playIntro } from "./intro.js";
 import { setupPWA } from "./pwa.js";
+import { setupCreator } from "./creator.js";
 import { $, clamp, formatClock, formatStopError, gradeStop } from "./utils.js";
 import { formatDelay, makeTrip } from "./engine/schedule.js";
 import { MetroEngine } from "./engine/engine.js";
@@ -112,6 +113,8 @@ const directionSelect = $("startDirection");
 playIntro({ isMuted: () => muted });
 // App instalable: service worker (sin conexión) y botón "Instalar MetroSim"
 setupPWA($("installButton"));
+// Modo Creador (?creador): todo desbloqueado y gratis para el creador del juego
+setupCreator($("creatorBadge"));
 const wait = (ms) => new Promise(r => setTimeout(r, ms));
 /** Lo comprado en la Tienda Metro (licencias, libreas, contratos, depto, recuerdos). */
 const inventory = new Inventory();
@@ -1029,7 +1032,7 @@ function openShop(shop, st) {
       rows: () => [
         ["Saldo disponible", bank.label],
         ["Ganado como conductor (total)", formatCLP(bank.earned)],
-        ...bank.history.slice(0, 8).map(h => [`${h.date.slice(5)} · ${h.concept}`, `${h.amount > 0 ? "+" : "−"}${formatCLP(Math.abs(h.amount))}`]),
+        ...bank.history.slice(0, 8).map(h => [`${h.date.slice(5)} · ${h.concept}`, h.amount === 0 ? "gratis" : `${h.amount > 0 ? "+" : "−"}${formatCLP(Math.abs(h.amount))}`]),
       ],
       status: bank.history.length ? "Últimos movimientos de tu cuenta." : "Aún no tienes movimientos. Gana dinero en el modo Conductor.",
       onBuy: async () => "",

@@ -16,6 +16,7 @@
    ========================================================================== */
 
 import { formatCLP } from "./config.js";
+import { isCreator } from "./creator.js";
 
 const KEY = "metrosim.bank";
 
@@ -98,12 +99,17 @@ export class BankAccount {
     return amount;
   }
 
-  canPay(amount) { return this.balance >= amount; }
+  canPay(amount) { return isCreator() || this.balance >= amount; }
 
   /** Cargo con la tarjeta de débito. Devuelve { ok, reason }. */
   charge(amount, concept) {
     amount = Math.round(amount);
     if (!this.canPay(amount)) return { ok: false, reason: "funds" };
+    if (isCreator()) {                      // Modo Creador: queda registrado pero no se descuenta
+      this.record(0, `${concept} · gratis (creador)`);
+      this.save();
+      return { ok: true };
+    }
     this.balance -= amount;
     this.record(-amount, concept);
     this.save();

@@ -12,6 +12,7 @@
    ========================================================================== */
 
 import { FARES, formatCLP } from "./config.js";
+import { isCreator } from "./creator.js";
 
 const KEY = "metrosim.bip";
 
@@ -45,6 +46,7 @@ export class BipCard {
 
   /** Cobra un pasaje. Devuelve { ok, reason }. */
   pay(fare) {
+    if (isCreator()) { this.trips++; this.save(); return { ok: true }; }   // Modo Creador: pasa gratis
     if (!this.hasCard) return { ok: false, reason: "nocard" };
     if (this.balance < fare) return { ok: false, reason: "balance" };
     this.balance -= fare;

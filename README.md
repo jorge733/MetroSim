@@ -74,6 +74,16 @@ Los íconos están en `icons/` (los PNG se generan desde `icons/icon.svg`).
 
 > Las tarifas son valores de referencia configurables en `js/config.js` (`FARES`); revísalos si quieres que coincidan con las vigentes.
 
+## Modo Creador
+
+Acceso completo y gratis para el creador del juego: toda la Tienda Metro desbloqueada (licencias, libreas, contratos,
+depto con muebles y recuerdos) y compras, pasajes y cargas sin costo. Tu saldo y lo que compraste de verdad no se tocan.
+
+1. Define la clave (una sola vez; en el código queda solo su huella SHA-256):
+   `node tools/clave-creador.mjs "una frase larga y secreta"`
+2. Abre el juego con `?creador` al final de la dirección y escribe la clave. Queda activo en ese navegador.
+3. Para apagarlo: botón **🛠️ Modo Creador activo** en la pantalla inicial, o abre con `?creador=off`.
+
 ## Modos
 
 - **Conductor:** eliges servicio de ida o de vuelta (sale ~1,5 min después de la hora actual) y conduces respetando señales, límites y horario. Cada estación te paga en tu cuenta. Al final recibes un resumen con tu sueldo y el bono, y puedes hacer la maniobra de retorno para seguir con el servicio contrario.
@@ -221,6 +231,7 @@ js/city/              la calle de cada estación
   city.js             la calle 3D: avenida, autos, peatones, locales, cielo
 js/intro.js           introducción de bienvenida
 js/pwa.js             registro del service worker y botón "Instalar MetroSim"
+js/creator.js         Modo Creador (todo desbloqueado y gratis, con clave)
 js/utils.js           utilidades y texturas procedurales
 tools/simular.mjs     ejecuta el motor sin navegador
 ```

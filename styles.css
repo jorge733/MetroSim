@@ -1120,3 +1120,8 @@ kbd {
 .install-launch { margin-top: 6px; border-color: #4fd6ff55; background: linear-gradient(90deg, #4fd6ff1a, #3ddc8414); }
 .install-launch:hover { border-color: #4fd6ff; }
 .install-launch[hidden] { display: none; }
+
+/* ---------- Modo Creador ---------- */
+.creator-launch { margin-top: 6px; border-color: #3ddc8477; background: linear-gradient(90deg, #3ddc841f, #ffd23f14); }
+.creator-launch:hover { border-color: #3ddc84; }
+.creator-launch[hidden] { display: none; }
