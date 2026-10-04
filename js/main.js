@@ -61,7 +61,7 @@
 
 import * as THREE from "three";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
-import { CONFIG, STATIONS, NOTCH_INDEX, FARES, spokenName, fareBandAt, formatCLP } from "./config.js";
+import { CONFIG, STATIONS, NOTCH_INDEX, FARES, spokenName, fareBandAt, formatCLP, demandAt } from "./config.js";
 import { ROUTES, ROUTE_A, ROUTE_B, routeForSide, oppositeRoute, setActiveLine } from "./engine/route.js";
 import { LINES, lineById } from "./engine/network.js";
 import { BipCard } from "./card.js";
@@ -258,6 +258,7 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A) {
     game.lightsUnit = player;
   } else {
     const city = new City(scene);
+    city.sound = (type, data) => game?.audio.cityEvent(type, data);     // autos, bocinas, pájaros...
     game.city = city;
     game.missions = new MissionSystem(ROUTE_A.line, STATIONS);
     const walker = new Walker({
@@ -1171,6 +1172,7 @@ function loop(now) {
     level: focus ? level : 0,
     inStation: !inStreet && STATIONS.some(s => Math.abs(cameraZ - s.z) < CONFIG.station.hallHalf),
     street: inStreet,
+    streetBusy: inStreet ? clamp(demandAt(game.clock) * 1.4 + 0.15, 0.15, 1) : 0,
     view,
     overspeed: !!player && player.sim.speedKmh > player.sim.currentLimit() + 2,
     crowd: inStreet ? 0.25 : people.crowdLevel(cameraWorld) * (view === "cab" ? 0.5 : 1),

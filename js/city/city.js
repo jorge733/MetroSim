@@ -9,6 +9,8 @@
      estación no tiene, edificios genéricos.
    · Peatones que caminan por las veredas.
    · Cielo, sol y faroles según la hora real del juego (día, atardecer, noche).
+   · Sonidos de ciudad: autos y micros que pasan, bocinas, pájaros de día y
+     alguna sirena lejana (avisa por this.sound; los produce audio.js).
 
    Solo existe UNA calle a la vez (la de la estación donde estás): al salir
    en otra estación se descarga la anterior y se construye la nueva.
@@ -19,14 +21,47 @@
    ========================================================================== */
 
 import * as THREE from "three";
-import { std, glow, addBox } from "../utils.js";
-import { LINE } from "../config.js";
+import { std, glow, addBox, makeCanvas, toTexture } from "../utils.js";
+import { LINE, LINE_COLORS } from "../config.js";
 import { STREET, streetPlan, seededRandom } from "./plan.js";
 import { buildLandmark } from "./landmarks.js";
 import { cityMaterials, genericBuilding, signMaterial, facingPlane, streetLamp, tree, bench, addMesh } from "./kit.js";
 
 const S = STREET;
 const GROUND = 0;
+
+/** Logotipo del Metro de Santiago (óvalo con tres rombos rojos) para el tótem. */
+function metroLogoTexture() {
+  const c = makeCanvas(512, 368), g = c.getContext("2d");
+  g.fillStyle = "#f4f4f2"; g.fillRect(0, 0, 512, 368);
+  g.fillStyle = "#ffffff"; g.strokeStyle = "#3d4248"; g.lineWidth = 22;
+  g.beginPath(); g.ellipse(256, 150, 200, 122, 0, 0, Math.PI * 2); g.fill(); g.stroke();
+  g.fillStyle = "#e1251b";
+  for (const cx of [160, 256, 352]) {
+    g.beginPath(); g.moveTo(cx, 66); g.lineTo(cx + 46, 150); g.lineTo(cx, 234); g.lineTo(cx - 46, 150); g.closePath(); g.fill();
+  }
+  g.fillStyle = "#1b1f24"; g.font = "900 70px Arial"; g.textAlign = "center"; g.textBaseline = "middle";
+  g.fillText("METRO", 256, 325);
+  const t = toTexture(c);
+  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  return t;
+}
+
+/** Insignias circulares de las líneas que pasan por la estación (la activa y sus combinaciones). */
+function lineBadgesTexture(ids) {
+  const s = 128, c = makeCanvas(s * ids.length + 32, s + 16), g = c.getContext("2d");
+  g.fillStyle = "#1b1f24"; g.fillRect(0, 0, c.width, c.height);
+  ids.forEach((id, i) => {
+    const cx = 16 + s * i + s / 2, cy = c.height / 2;
+    g.fillStyle = LINE_COLORS[id] || "#888"; g.beginPath(); g.arc(cx, cy, s * 0.42, 0, Math.PI * 2); g.fill();
+    g.fillStyle = "#ffffff"; g.font = `900 ${id.length > 1 ? 50 : 66}px Arial`; g.textAlign = "center"; g.textBaseline = "middle";
+    g.fillText(id, cx, cy + 3);
+  });
+  const t = toTexture(c);
+  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  return t;
+}
+
 const LANES = [{ x: -5.2, dir: 1 }, { x: -1.9, dir: 1 }, { x: 1.9, dir: -1 }, { x: 5.2, dir: -1 }];
 
 /** Hora (s) → luz del día: sol (0..1), color del cielo y si es de noche. */
@@ -46,6 +81,9 @@ export class City {
     this.active = false;
     this.station = null;
     this.timeT = 0;
+    /** (tipo, datos) => void · sonidos puntuales de la calle (lo conecta main.js con audio.js) */
+    this.sound = null;
+    this.hornT = 8; this.birdT = 3; this.sirenT = 60;
   }
 
   /* ---------------------------------------------------------------------
@@ -140,7 +178,7 @@ export class City {
     const L = 2 * 330;
     addBox(g, S.roadHalf * 2, 0.1, L, M.asphalt, 0, -0.05, 0);
     [-1, 1].forEach(s => {
-      addBox(g, S.walkHalf - S.roadHalf, 0.2, L, M.sidewalk, s * (S.roadHalf + S.walkHalf) / 2, 0.0, 0);   // vereda (borde a y = 0,1)
+      if (s < 0) addBox(g, S.walkHalf - S.roadHalf, 0.2, L, M.sidewalk, s * (S.roadHalf + S.walkHalf) / 2, 0.0, 0);   // vereda (borde a y = 0,1)
       addBox(g, 0.3, 0.22, L, M.curb, s * (S.roadHalf + 0.15), 0.0, 0);
     });
     // Líneas de pista y bandejón central
@@ -148,41 +186,93 @@ export class City {
     for (let z = -330; z < 330; z += 9) [-3.55, 3.55].forEach(x => addBox(g, 0.15, 0.02, 4, M.paint, x, 0.01, z));
     // Pasos de cebra junto al acceso y en los extremos
     for (const cz of [-16, 16, -84, 84]) for (let x = -6.4; x <= 6.4; x += 1.1) addBox(g, 0.6, 0.02, 3.2, M.paint, x, 0.012, cz);
-    // Suelo lejano (para que el horizonte no quede vacío)
-    addBox(g, 900, 0.1, L, std(0x5b5a55, { rough: 1 }), 0, -0.2, 0);
+    // Vereda este con el hueco de la escalera del Metro
+    const a = S.access, hx0 = a.x - a.halfX, hx1 = a.x + a.halfX, hz0 = a.z - a.halfZ, hz1 = a.z + a.halfZ;
+    const span = (xa, xb, za, zb) => addBox(g, xb - xa, 0.2, zb - za, M.sidewalk, (xa + xb) / 2, 0.0, (za + zb) / 2);
+    span(S.roadHalf, S.walkHalf, -L / 2, hz0);
+    span(S.roadHalf, S.walkHalf, hz1, L / 2);
+    span(S.roadHalf, hx0, hz0, hz1);
+    span(hx1, S.walkHalf, hz0, hz1);
+    // Suelo lejano (para que el horizonte no quede vacío), sin tapar el pozo de la escalera
+    [-1, 1].forEach(side => addBox(g, 430, 0.1, L, std(0x5b5a55, { rough: 1 }), side * (S.walkHalf + 215), -0.2, 0));
   }
 
-  /** Boca del acceso al Metro: escalera que baja, barandas y tótem con el logo y el nombre. */
+  /**
+   * Acceso al Metro: escalera revestida que baja hacia la mezanina (muros de
+   * cerámica, pasamanos, descanso iluminado con cartel), baranda de acero y
+   * vidrio, franja podotáctil en la boca y tótem del Metro de Santiago con el
+   * logotipo retroiluminado, el nombre de la estación y sus líneas.
+   */
   buildAccess(g, M) {
     const a = S.access;
     const x0 = a.x - a.halfX, x1 = a.x + a.halfX, z0 = a.z - a.halfZ, z1 = a.z + a.halfZ;
-    // Hueco con peldaños que bajan hacia −Z
-    for (let i = 0; i < 10; i++) addBox(g, a.halfX * 2 - 0.2, 0.05, 0.6, M.stone, a.x, 0.06 - i * 0.28, z1 - 0.3 - i * 0.62);
-    addBox(g, a.halfX * 2, 0.02, a.halfZ * 2, M.black, a.x, -2.9, a.z);
-    // Barandas en tres lados (la boca queda abierta hacia +Z)
-    const rail = std(0xc9ced3, { metal: 0.7, rough: 0.3 });
-    addBox(g, 0.08, 1.05, a.halfZ * 2, rail, x0, 0.6, a.z);
-    addBox(g, 0.08, 1.05, a.halfZ * 2, rail, x1, 0.6, a.z);
-    addBox(g, a.halfX * 2, 1.05, 0.08, rail, a.x, 0.6, z0);
-    addBox(g, 0.18, 0.22, a.halfZ * 2, std(0x9a9a9a), x0, 0.15, a.z);
-    addBox(g, 0.18, 0.22, a.halfZ * 2, std(0x9a9a9a), x1, 0.15, a.z);
+    const W = a.halfX * 2, L = a.halfZ * 2;
+    const granite = std(0x8d8a86, { rough: 0.55 });
+    const tile = std(0xe9e4da, { rough: 0.35 });
+    const steel = std(0xd5dade, { metal: 0.85, rough: 0.25 });
+
+    // Peldaños de granito con nariz amarilla (bajan hacia −Z)
+    const n = 14, rise = 3.0 / n, run = (L - 0.9) / n;
+    for (let i = 0; i < n; i++) {
+      const z = z1 - 0.2 - run * (i + 0.5), y = -rise * (i + 1);
+      addBox(g, W - 0.1, rise, run, granite, a.x, y + rise / 2, z);
+      addBox(g, W - 0.1, 0.02, 0.05, M.yellow, a.x, y + rise + 0.01, z + run / 2 - 0.03);
+    }
+    addBox(g, W, 0.1, 1.2, granite, a.x, -3.05, z0 + 0.6);                     // descanso
+    // Muros revestidos del pozo de la escalera y muro de fondo con cartel
+    addBox(g, 0.12, 3.3, L, tile, x0 + 0.06, -1.55, a.z);
+    addBox(g, 0.12, 3.3, L, tile, x1 - 0.06, -1.55, a.z);
+    addBox(g, W, 3.6, 0.12, tile, a.x, -1.3, z0 + 0.06);
+    const down = signMaterial("↓  METRO · " + this.station.name, { bg: "#1b1f24", font: "800 64px Arial" });
+    const back = new THREE.Mesh(new THREE.PlaneGeometry(W - 0.3, 0.42), down);
+    back.position.set(a.x, -1.2, z0 + 0.13);
+    g.add(back);
+    addBox(g, W - 0.4, 0.05, 0.25, M.lampOn, a.x, -0.55, z0 + 0.3);           // luminaria del descanso
+    // Pasamanos interiores (bajan con la escalera)
+    [x0 + 0.2, x1 - 0.2].forEach(x => {
+      const h = addBox(g, 0.05, 0.05, Math.hypot(L - 0.9, 3), steel, x, -1.5 + 0.9, a.z + 0.25);
+      h.rotation.x = Math.atan2(3, L - 0.9);
+    });
+
+    // Remate perimetral de granito y baranda de acero con paneles de vidrio
+    const glass = std(0xbfd8e6, { metal: 0.2, rough: 0.05, transparent: true, opacity: 0.28, depthWrite: false });
+    addBox(g, 0.3, 0.16, L + 0.3, granite, x0 - 0.05, 0.18, a.z - 0.15);
+    addBox(g, 0.3, 0.16, L + 0.3, granite, x1 + 0.05, 0.18, a.z - 0.15);
+    addBox(g, W + 0.4, 0.16, 0.3, granite, a.x, 0.18, z0 - 0.05);
+    const railSide = (x) => {
+      addBox(g, 0.04, 0.85, L - 0.1, glass, x, 0.7, a.z);
+      addBox(g, 0.07, 0.07, L, steel, x, 1.15, a.z);
+      for (let z = z0; z <= z1 + 0.01; z += L / 3) addBox(g, 0.06, 1.0, 0.06, steel, x, 0.68, z);
+    };
+    railSide(x0 - 0.05);
+    railSide(x1 + 0.05);
+    addBox(g, W + 0.1, 0.85, 0.04, glass, a.x, 0.7, z0 - 0.05);
+    addBox(g, W + 0.2, 0.07, 0.07, steel, a.x, 1.15, z0 - 0.05);
+    // Franja podotáctil amarilla delante de la boca
+    addBox(g, W, 0.02, 0.4, M.yellow, a.x, 0.115, z1 + 0.25);
     this.blocks.push({ x0: x0 - 0.3, x1: x1 + 0.3, z0: z0 - 0.3, z1: z1 - 1.0 });   // el último metro de la boca se puede pisar para bajar
-    // Tótem del Metro
-    const tx = x1 + 0.7, tz = z1 + 0.6;
-    addBox(g, 0.16, 3.4, 0.16, M.metal, tx, 1.7, tz);
-    const logo = signMaterial("METRO", { bg: "#e1251b", font: "900 110px Arial" });
-    const sign = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.9, 1.6), [logo, logo, M.metal, M.metal, logo, logo]);
-    sign.position.set(tx, 3.6, tz);
-    g.add(sign);
-    const nameMat = signMaterial(this.station.name, { bg: "#1b1f24", font: "800 80px Arial" });
-    const name = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.42, 2.6), [nameMat, nameMat, M.metal, M.metal, M.metal, M.metal]);
-    name.position.set(tx, 2.75, tz);
-    g.add(name);
-    const badge = signMaterial(`LÍNEA ${LINE.id}`, { bg: LINE.color, font: "900 90px Arial" });
-    const bdg = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.34, 1.3), [badge, badge, M.metal, M.metal, M.metal, M.metal]);
-    bdg.position.set(tx, 2.3, tz);
-    g.add(bdg);
-    this.blocks.push({ x0: tx - 0.25, x1: tx + 0.25, z0: tz - 0.25, z1: tz + 0.25 });
+
+    // Tótem del Metro de Santiago
+    const tx = x1 + 0.75, tz = z1 + 0.7;
+    const totem = new THREE.Group();
+    totem.position.set(tx, 0, tz);
+    g.add(totem);
+    const dark = std(0x2b2f34, { metal: 0.5, rough: 0.45 });
+    addBox(totem, 0.5, 0.12, 0.5, granite, 0, 0.17, 0);
+    addBox(totem, 0.22, 4.1, 0.22, dark, 0, 2.15, 0);
+    const logoMat = glow(0xffffff, { map: metroLogoTexture() });
+    const face = (w, h, mat, y, depth = 0.24) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(depth, h, w), [mat, mat, dark, dark, dark, dark]);
+      m.position.y = y;
+      totem.add(m);
+      return m;
+    };
+    face(1.25, 0.9, logoMat, 4.15, 0.3);                                      // logotipo retroiluminado
+    addBox(totem, 0.34, 0.06, 1.33, dark, 0, 4.63, 0);
+    face(1.7, 0.36, signMaterial(this.station.name, { bg: "#1b1f24", font: "800 76px Arial" }), 3.45);
+    const lines = [LINE.id, ...(this.station.combos || [])];
+    face(0.36 * lines.length + 0.1, 0.36, glow(0xffffff, { map: lineBadgesTexture(lines) }), 3.02);
+    this.blocks.push({ x0: tx - 0.3, x1: tx + 0.3, z0: tz - 0.3, z1: tz + 0.3 });
   }
 
   /** Vereda este: locales en planta baja, kiosko y edificios encima. */
@@ -494,10 +584,24 @@ export class City {
       }
       const target = gap < 3 ? 0 : gap < 14 ? c.vmax * (gap - 3) / 11 : c.vmax;
       c.v += THREE.MathUtils.clamp(target - c.v, -6 * dt, 2.5 * dt);
+      const relBefore = c.z - lz;
       c.z += c.v * dir * dt;
+      // Pasa junto al jugador: zumbido del auto (o motor de la micro)
+      const lateral = Math.abs(c.lane.x - lx);
+      if (this.sound && lateral < 18 && Math.sign(relBefore) !== Math.sign(c.z - lz) && c.v > 2) {
+        this.sound("pass", { bus: c.len > 6, speed: c.v, lateral });
+      }
       if (c.z * dir > 320) c.z -= 640 * dir;
       c.mesh.position.z = c.z;
       c.mesh.rotation.y = dir > 0 ? 0 : Math.PI;
+    }
+
+    // Ambiente: bocinas, pájaros (de día) y alguna sirena a lo lejos
+    if (this.sound) {
+      this.hornT -= dt; this.birdT -= dt; this.sirenT -= dt;
+      if (this.hornT <= 0) { this.hornT = 12 + Math.random() * 30; this.sound("horn", { far: Math.random() < 0.6 }); }
+      if (this.birdT <= 0) { this.birdT = 3 + Math.random() * 7; if (this.sky.day > 0.4) this.sound("birds", {}); }
+      if (this.sirenT <= 0) { this.sirenT = 90 + Math.random() * 150; this.sound("siren", {}); }
     }
 
     // Peatones: caminan a sus destinos esquivando obstáculos, a los demás y al jugador

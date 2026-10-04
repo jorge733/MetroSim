@@ -212,8 +212,10 @@ export class AudioSystem {
     this.set(this.rolling.filter.frequency, 220 + kmh * 24);
     this.set(this.rumble.gain.gain, s.street ? 0 : (0.05 + k * 0.5 * L) * (s.inStation ? 0.45 : 1));
     this.set(this.fan.gain.gain, s.street ? 0 : inside ? 0.022 : 0.004);
-    this.set(this.traffic.gain.gain, s.street ? 0.16 : 0, 0.4);
-    this.set(this.tyres.gain.gain, s.street ? 0.012 + Math.random() * 0.006 : 0, 0.3);
+    // Rumor de la ciudad (más bajo de noche, cuando hay menos tránsito)
+    const busy = s.streetBusy ?? 1;
+    this.set(this.traffic.gain.gain, s.street ? 0.11 + 0.12 * busy : 0, 0.4);
+    this.set(this.tyres.gain.gain, s.street ? (0.01 + Math.random() * 0.008) * (0.5 + busy) : 0, 0.3);
 
     // Motor: activo con tracción o con freno eléctrico (regenerativo) por encima de ~4 km/h
     const effort = Math.abs(s.accel);
@@ -351,6 +353,53 @@ export class AudioSystem {
     this.tone(2200, { duration: 0.07, gain: 0.07, wave: "square", attack: 0.002 });
     this.tone(3300, { start: 0.09, duration: 0.25, gain: 0.06, wave: "triangle", attack: 0.002 });
     this.burst({ start: 0.05, duration: 0.18, gain: 0.05, type: "bandpass", freq: 1500, q: 2 });
+  }
+
+  /* ---------------------------------------------------------------------
+     Sonidos de la calle (city/city.js los pide con city.sound)
+     --------------------------------------------------------------------- */
+  cityEvent(type, o = {}) {
+    if (!this.ctx) return;
+    if (type === "pass") return this.carPass(o);
+    if (type === "horn") return this.horn(o.far);
+    if (type === "birds") return this.birds();
+    if (type === "siren") return this.siren();
+  }
+
+  /** Auto o micro que pasa: zumbido que sube y baja (más fuerte cuanto más cerca y rápido). */
+  carPass({ bus = false, speed = 10, lateral = 4 }) {
+    const near = clamp(1 - lateral / 18, 0.1, 1), v = clamp(speed / 14, 0.3, 1.2);
+    const gain = 0.12 * near * near * v * (bus ? 1.4 : 1);
+    this.burst({ duration: 1.8, gain, type: "bandpass", freq: 900 + speed * 25, endFreq: 260, q: 0.8, attack: 0.7, buffer: this.white });
+    this.burst({ duration: 2.0, gain: gain * 1.6, type: "lowpass", freq: 260, endFreq: 120, q: 0.7, attack: 0.8, buffer: this.brown });
+    if (bus) this.tone(62, { duration: 2.2, gain: 0.05 * near, wave: "sawtooth", attack: 0.8, endFreq: 48 });
+  }
+
+  /** Bocinazo (cerca: doble y fuerte; lejos: uno suave). */
+  horn(far = false) {
+    const g = far ? 0.018 : 0.05, f = 380 + Math.random() * 140;
+    const honk = (start, dur) => {
+      this.tone(f, { start, duration: dur, gain: g, wave: "square", attack: 0.01 });
+      this.tone(f * 1.26, { start, duration: dur, gain: g * 0.8, wave: "square", attack: 0.01 });
+    };
+    honk(0, far ? 0.4 : 0.22);
+    if (!far && Math.random() < 0.6) honk(0.32, 0.3);
+  }
+
+  /** Trinos de pájaros en los árboles. */
+  birds() {
+    const n = 2 + Math.floor(Math.random() * 4), base = 2600 + Math.random() * 1400;
+    for (let i = 0; i < n; i++) {
+      const f = base * (0.9 + Math.random() * 0.25);
+      this.tone(f, { start: i * 0.13, duration: 0.09, gain: 0.018, wave: "sine", attack: 0.005, endFreq: f * 1.35 });
+    }
+  }
+
+  /** Sirena lejana (ambulancia o bomberos) que sube y baja. */
+  siren() {
+    for (let i = 0; i < 6; i++) {
+      this.tone(i % 2 ? 960 : 720, { start: i * 0.7, duration: 0.7, gain: 0.012, wave: "triangle", attack: 0.15, endFreq: i % 2 ? 720 : 960 });
+    }
   }
 
   /** Obturador de la cámara de fotos. */
