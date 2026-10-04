@@ -1,5 +1,5 @@
 /* ==========================================================================
-   MetroSim — Alpha 0.9 · intro.js
+   MetroSim — 1.0 · intro.js
    Introducción cinematográfica (solo al abrir la página).
 
    Escenas, dibujadas en un canvas 2D a pantalla completa:
@@ -10,11 +10,13 @@
         Andes, el perfil de edificios con la Gran Torre, un viaducto por el
         que cruzan trenes de distintas líneas y una avenida con estelas de
         autos. Todo con paralaje: se mueve suavemente con el ratón.
-   Encima aparece la portada: logo, título con letras que caen, contadores
-   (líneas, estaciones, hitos), un plano esquemático de la red que se dibuja
-   línea por línea con trenes recorriéndola, y tarjetas con lo que se puede
-   hacer. "Comenzar" (o cualquier tecla / clic) toca el gong, da la
-   bienvenida por voz y pasa al menú; Esc salta sin sonido.
+   Encima aparece la portada: logo, sello de la versión, título con letras
+   que caen, contadores (líneas, estaciones, hitos, artículos de la tienda),
+   un plano esquemático de la red que se dibuja línea por línea con trenes
+   recorriéndola, y tarjetas con lo que se puede hacer en la 1.0 (cabina,
+   viaje a pie con combinaciones y ascensores, ciudad, libreta de misiones,
+   Tienda Metro y Centro de Control). "Comenzar" (o cualquier tecla / clic)
+   toca el gong, da la bienvenida por voz y pasa al menú; Esc salta sin sonido.
 
    El módulo crea su propio HTML y CSS para no tocar el resto de la interfaz.
    ========================================================================== */
@@ -22,6 +24,8 @@
 import { LINES } from "./engine/network.js";
 import { LANDMARKS } from "./city/catalog.js";
 import { bestSpanishVoice } from "./audio.js";
+import { VERSION, LINE_COLORS } from "./config.js";
+import { LICENSES, LIVERIES, CONTRACTS, FURNITURE } from "./shop.js";
 
 const TUNNEL_TIME = 4.6;           // segundos de viaje por el túnel antes de salir a la ciudad
 
@@ -29,7 +33,7 @@ const CSS = `
 .intro{position:fixed;inset:0;z-index:50;background:#020305;overflow:hidden;transition:opacity .9s;color:#fff;font-family:Inter,system-ui,sans-serif}
 .intro.leaving{opacity:0;pointer-events:none}
 .intro>canvas{position:absolute;inset:0;width:100%;height:100%}
-.intro-ui{position:relative;height:100%;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);align-items:center;gap:28px;padding:28px clamp(16px,5vw,64px);opacity:0;transition:opacity 1.2s}
+.intro-ui{position:relative;height:100%;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);align-items:safe center;overflow-y:auto;gap:28px;padding:28px clamp(16px,5vw,64px);opacity:0;transition:opacity 1.2s}
 .intro.city .intro-ui{opacity:1}
 .intro-left{display:grid;gap:14px;justify-items:start}
 .intro-brand{display:flex;align-items:center;gap:16px}
@@ -38,15 +42,19 @@ const CSS = `
 .intro-title{font-weight:900;font-size:clamp(48px,8vw,104px);line-height:.9;letter-spacing:-3px;text-shadow:0 10px 50px #000c}
 .intro-title span{display:inline-block;opacity:0;transform:translateY(-60px) rotate(-8deg)}
 .intro.city .intro-title span{animation:introDrop .7s cubic-bezier(.2,1.4,.4,1) forwards}
+.intro-brand>div{display:grid;gap:8px;justify-items:start}
 .intro-eyebrow{font-size:12px;letter-spacing:4px;color:#ffd166;font-weight:700}
+.intro-version{display:inline-flex;align-items:center;gap:7px;padding:4px 10px 4px 8px;border:1px solid #ffd16655;border-radius:999px;background:#ffd16614;color:#ffe3a3;font-size:11px;font-weight:800;letter-spacing:2px;opacity:0;transform:translateY(8px);transition:opacity .6s 1.1s,transform .6s 1.1s}
+.intro-version::before{content:"";width:7px;height:7px;border-radius:50%;background:#3ddc84;box-shadow:0 0 8px #3ddc84}
+.intro.city .intro-version{opacity:1;transform:none}
 .intro-sub{max-width:520px;color:#d4dfeb;font-size:clamp(14px,1.5vw,17px);line-height:1.45;text-shadow:0 2px 12px #000}
 .intro-sub .caret{display:inline-block;width:2px;height:1em;margin-left:2px;background:#ffd166;vertical-align:-2px;animation:introBlink .8s steps(2) infinite}
-.intro-stats{display:flex;gap:10px;flex-wrap:wrap}
-.intro-stats div{min-width:92px;padding:10px 14px;border:1px solid #ffffff26;border-radius:12px;background:#08101acc;backdrop-filter:blur(8px)}
+.intro-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;width:min(100%,580px)}
+.intro-stats div{padding:9px 12px;border:1px solid #ffffff26;border-radius:12px;background:#08101acc;backdrop-filter:blur(8px)}
 .intro-stats b{display:block;font-size:26px;font-variant-numeric:tabular-nums}
-.intro-stats small{color:#9fb0c2;font-size:11px;letter-spacing:1px}
-.intro-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;width:min(100%,560px)}
-.intro-cards div{padding:11px 13px;border:1px solid #ffffff1f;border-left:4px solid var(--c);border-radius:11px;background:#08101add;backdrop-filter:blur(8px);color:#c9d5e2;font-size:12px;line-height:1.35;opacity:0;transform:translateX(-24px)}
+.intro-stats small{display:block;color:#9fb0c2;font-size:10.5px;line-height:1.2;letter-spacing:1px}
+.intro-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;width:min(100%,580px)}
+.intro-cards div{padding:9px 12px;border:1px solid #ffffff1f;border-left:4px solid var(--c);border-radius:11px;background:#08101add;backdrop-filter:blur(8px);color:#c9d5e2;font-size:12px;line-height:1.35;opacity:0;transform:translateX(-24px)}
 .intro.city .intro-cards div{animation:introSlide .6s ease-out forwards}
 .intro-cards b{display:block;margin-bottom:3px;color:#fff;font-size:14px}
 .intro-actions{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
@@ -54,7 +62,7 @@ const CSS = `
 .intro-start::after{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 30%,#ffffff55 50%,transparent 70%);transform:translateX(-120%);animation:introShine 2.8s 2s infinite}
 .intro-start:hover{filter:brightness(1.12);transform:translateY(-1px)}
 .intro-hint{color:#8fa0b3;font-size:11px}
-.intro-mapbox{position:relative;justify-self:center;width:min(100%,520px);aspect-ratio:1/1;border:1px solid #ffffff1c;border-radius:22px;background:radial-gradient(circle at 50% 45%,#0e1a28ee,#060b12f2);box-shadow:0 30px 80px #000a;overflow:hidden;opacity:0;transform:perspective(900px) rotateY(-14deg) scale(.92);transition:opacity 1s .6s,transform 1.4s .6s cubic-bezier(.2,1,.3,1)}
+.intro-mapbox{position:relative;justify-self:center;width:min(100%,520px);aspect-ratio:1/1;border:1px solid #ffffff1c;border-radius:22px;background:radial-gradient(circle at 50% 45%,#0e1a28ee,#060b12f2);box-shadow:0 30px 80px #000a;overflow:clip;opacity:0;transform:perspective(900px) rotateY(-14deg) scale(.92);transition:opacity 1s .6s,transform 1.4s .6s cubic-bezier(.2,1,.3,1)}
 .intro.city .intro-mapbox{opacity:1;transform:perspective(900px) rotateY(-6deg)}
 .intro-mapbox canvas{width:100%;height:100%;display:block}
 .intro-maplabel{position:absolute;left:16px;top:12px;font-size:11px;letter-spacing:2px;color:#9fb0c2}
@@ -66,9 +74,20 @@ const CSS = `
 @keyframes introSlide{to{opacity:1;transform:none}}
 @keyframes introBlink{50%{opacity:0}}
 @keyframes introShine{0%{transform:translateX(-120%)}40%,100%{transform:translateX(120%)}}
+@media(max-height:820px) and (min-width:861px){
+  .intro-ui{padding-block:18px}
+  .intro-left{gap:10px}
+  .intro-logo{width:76px}
+  .intro-title{font-size:clamp(44px,6.4vw,80px)}
+  .intro-sub{font-size:14px}
+  .intro-stats div{padding:7px 12px}
+  .intro-stats b{font-size:22px}
+  .intro-cards div{padding:7px 11px;font-size:11.5px}
+  .intro-cards b{font-size:13px;margin-bottom:1px}
+}
 @media(max-width:860px){
   .intro-ui{grid-template-columns:1fr;align-content:start;overflow:auto;gap:16px;padding-top:56px}
-  .intro-mapbox{width:min(100%,360px);order:-1}
+  .intro-mapbox{width:min(100%,360px);order:-1}   /* overflow:clip (no hidden): así su aspect-ratio cuenta para la fila y no se monta sobre el texto */
   .intro-cards{grid-template-columns:1fr}
 }
 `;
@@ -458,12 +477,18 @@ export function playIntro({ isMuted = () => false } = {}) {
 
   const stations = new Set(LINES.flatMap(l => l.stations.map(s => s.name))).size;
   const landmarks = Object.keys(LANDMARKS).length;
+  // Artículos de la Tienda Metro: licencias, libreas de pago, contratos, el depto, sus muebles y un recuerdo por estación de cada línea
+  const shopItems = LICENSES.length + LIVERIES.filter(l => l.price > 0).length + CONTRACTS.length + 1 + FURNITURE.length
+    + LINES.reduce((n, l) => n + l.stations.length, 0);
   const title = "MetroSim".split("").map((ch, i) => `<span style="animation-delay:${0.25 + i * 0.07}s">${ch}</span>`).join("");
+  const C = LINE_COLORS;
   const cards = [
-    ["#e1251b", "🚇 Conduce y gana", "Trenes de 5 coches con señales y horario: cada estación bien servida te paga al instante."],
-    ["#f4b400", "🏙️ Sal a la ciudad", "Calles con sus hitos: Mall Plaza Egaña, La Moneda, Costanera Center, la Catedral…"],
-    ["#00965e", "🎯 Misiones", "Compra tu bip!, viaja, haz encargos, saca fotos y gasta lo que ganas."],
-    ["#9b26b6", "🖥️ Centro de Control", "Supervisa las 7 líneas en tiempo real: retén trenes y regula intervalos."],
+    [C["1"], "🚇 Conduce desde la cabina", "DMI, mandos y señales reales. Cada estación bien servida te paga al instante."],
+    [C["2"], "🚶 Viaja a pie", "Combina entre líneas por los pasillos, usa los ascensores y sal caminando a la calle."],
+    [C["4A"], "🏙️ Sal a la ciudad", `${landmarks} hitos: La Moneda, Costanera Center, la Catedral, el Estadio Nacional…`],
+    [C["5"], "🎯 Libreta de misiones", "Compras, fotos, encargos y contrarreloj. Completar una línea se celebra."],
+    [C["3"], "🛍️ Tienda Metro", "Licencias, libreas para tu tren, contratos con más sueldo, tu depto y recuerdos."],
+    [C["6"], "🖥️ Centro de Control", `Supervisa las ${LINES.length} líneas en tiempo real: retén trenes y regula intervalos.`],
   ];
 
   const root = document.createElement("section");
@@ -473,15 +498,16 @@ export function playIntro({ isMuted = () => false } = {}) {
     <button class="intro-skip">Saltar ›</button>
     <div class="intro-ui">
       <div class="intro-left">
-        <div class="intro-brand"><img class="intro-logo" src="logo.svg" alt="MetroSim"><span class="intro-eyebrow">SIMULADOR · METRO DE SANTIAGO</span></div>
+        <div class="intro-brand"><img class="intro-logo" src="logo.svg" alt="MetroSim"><div><span class="intro-eyebrow">SIMULADOR · METRO DE SANTIAGO</span><span class="intro-version">VERSIÓN ${VERSION} · ESTABLE</span></div></div>
         <h1 class="intro-title">${title}</h1>
         <p class="intro-sub"><span class="typed"></span><span class="caret"></span></p>
         <div class="intro-stats">
           <div><b data-count="${LINES.length}">0</b><small>LÍNEAS</small></div>
           <div><b data-count="${stations}">0</b><small>ESTACIONES</small></div>
           <div><b data-count="${landmarks}">0</b><small>HITOS DE LA CIUDAD</small></div>
+          <div><b data-count="${shopItems}">0</b><small>ARTÍCULOS EN TIENDA</small></div>
         </div>
-        <div class="intro-cards">${cards.map(([c, b, txt], i) => `<div style="--c:${c};animation-delay:${1.6 + i * 0.15}s"><b>${b}</b>${txt}</div>`).join("")}</div>
+        <div class="intro-cards">${cards.map(([c, b, txt], i) => `<div style="--c:${c};animation-delay:${1.6 + i * 0.12}s"><b>${b}</b>${txt}</div>`).join("")}</div>
         <div class="intro-actions"><button class="intro-start">Comenzar ›</button><span class="intro-hint">Pulsa cualquier tecla · Esc para saltar</span></div>
       </div>
       <div class="intro-mapbox">
@@ -499,7 +525,7 @@ export function playIntro({ isMuted = () => false } = {}) {
 
   // Cuando aparece la ciudad: texto que se escribe solo, contadores y plano
   const typed = root.querySelector(".typed");
-  const text = "Conduce, viaja y recorre Santiago. Un Metro vivo que funciona aunque no lo mires: trenes, pasajeros, señales y una ciudad sobre las estaciones.";
+  const text = "Conduce desde la cabina, viaja a pie y recorre Santiago. Un Metro vivo que funciona aunque no lo mires: gana tu sueldo, cumple misiones y gástalo en la Tienda Metro.";
   let typer = 0, counters = 0;
   const onCity = () => {
     map.start();
