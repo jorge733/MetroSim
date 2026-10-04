@@ -26,11 +26,11 @@ export const START_BALANCE = 3000;
 
 /** Sueldo del conductor (pesos). */
 export const WAGE = {
-  base: 120,                 // por cada estación servida
-  perPoint: 0.4,             // por cada punto ganado en la estación
-  perfect: 100,              // estación perfecta (parada, horario y confort)
+  base: 300,                 // por cada estación servida
+  perPoint: 1.0,             // por cada punto ganado en la estación
+  perfect: 250,              // estación perfecta (parada, horario y confort)
   deduction: 0.5,            // pesos descontados por cada punto de falta desde la estación anterior
-  shift: { S: 3000, A: 2000, B: 1200, C: 600, D: 200 },   // bono al completar el servicio, según la nota
+  shift: { S: 8000, A: 5000, B: 3000, C: 1500, D: 500 },   // bono al completar el servicio, según la nota
 };
 
 const round10 = (n) => Math.max(0, Math.round(n / 10) * 10);
