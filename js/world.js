@@ -20,10 +20,11 @@
 import * as THREE from "three";
 import { CONFIG, STATIONS, WORLD, LINE, FARES, formatCLP } from "./config.js";
 import { ROUTE_A, ROUTE_B } from "./engine/route.js";
+import { Elevator, ElevatorSystem } from "./elevators.js";
 import { PLATFORM_COLUMNS, PLATFORM_BENCHES, COLUMN_X, BENCH_X, PID_OFFSETS, isArrivalOnly } from "./stationLayout.js";
 import {
   std, glow, addBox, addBoxSpan, addPlane, makeCanvas, toTexture, tunnelTexture, concreteTexture,
-  terrazzoTexture, tileTexture, stationNameCanvas, lineMapCanvas, lineMapU, signCanvas, stopBoardCanvas,
+  terrazzoTexture, tileTexture, stationNameCanvas, lineMapCanvas, directionMapCanvas, lineMapU, signCanvas, stopBoardCanvas,
   milepostCanvas, formatClock,
 } from "./utils.js";
 
@@ -126,6 +127,9 @@ function createWorldMaterials() {
     ticketOffice: glow(0xffffff, { map: toTexture(signCanvas("BOLETERÍA · CARGA TU TARJETA bip!", "#c41e2a", 1024, 128, "800 48px Arial")) }),
     stopBoard: glow(0xffffff, { map: toTexture(stopBoardCanvas()) }),
     lineMap: glow(0xffffff, { map: toTexture(lineMapCanvas()) }),
+    // Planos de dirección de cada andén (en la mezanina, antes de bajar)
+    dirMapA: glow(0xffffff, { map: toTexture(directionMapCanvas(ROUTE_A.last.world || ROUTE_A.last, "DERECHA")) }),
+    dirMapB: glow(0xffffff, { map: toTexture(directionMapCanvas(ROUTE_B.last.world || ROUTE_B.last, "IZQUIERDA")) }),
     youAreHere: glow(0xd42026),
     noEntry: glow(0xd42026),
     exitOnly: glow(0xffffff, { map: toTexture(signCanvas("SOLO SALIDA · ANDÉN DE LLEGADA", "#b3121f", 512, 128, "800 36px Arial")) }),
@@ -202,10 +206,11 @@ export class World {
     this.escalatorTexture = this.M.escSteps.map;
     this.stations = [];
     this.gates = [];
+    this.elevators = new ElevatorSystem();
 
     buildTrack(scene, this.M);
     this.buildTunnels();
-    STATIONS.forEach(st => this.stations.push(buildStation(scene, this.M, st, this.gates)));
+    STATIONS.forEach(st => this.stations.push(buildStation(scene, this.M, st, this.gates, this.elevators)));
     buildTrackEnds(scene, this.M);
 
     // Pool de luces de estación: 3 luces reales que siguen a la cámara
@@ -234,6 +239,7 @@ export class World {
 
   /** Visibilidad por distancia, pool de luces y escaleras mecánicas en marcha. */
   update(camera, dt = 0) {
+    this.elevators.update(dt);
     // Los peldaños avanzan (la textura se desplaza a lo largo de la rampa)
     this.escalatorTexture.offset.y -= dt * MZ.escSpeed * 38 / 15.2;
     // Marca "usted está aquí" de los planos de andén: parpadea
@@ -400,7 +406,7 @@ function buildTunnelSegment(scene, M, zA, zB) {
    Estaciones
    ========================================================================== */
 
-function buildStation(scene, M, st, gates) {
+function buildStation(scene, M, st, gates, elevators) {
   const z = st.z, hall = S.hallHalf, ph = S.platformHalf;
   const group = new THREE.Group();
   group.name = `station-${st.id}`;
@@ -499,6 +505,25 @@ function buildStation(scene, M, st, gates) {
     // Escalera al andén desde la mezanina
     buildStairs(group, M, side, z);
 
+    // Ascensor de accesibilidad (andén ↔ mezanina, zona pagada): elevators.js
+    elevators.add(new Elevator(group, st, side));
+
+    // Plano de dirección del andén en la mezanina (antes de bajar): sobre la
+    // escalera y junto a la puerta del ascensor, mirando a quien viene de los torniquetes
+    if (!isArrivalOnly(st, side)) {
+      const dirMap = side > 0 ? M.dirMapA : M.dirMapB, mh = 448 / 2048;
+      const board = (w, x, y, zz) => {
+        addPlane(group, w, w * mh, dirMap, x, y, zz, 0);
+        addBox(group, w + 0.08, w * mh + 0.08, 0.04, M.screenHousing, x, y, zz - 0.03);
+        addPlane(group, 0.07 * w / 3, 0.07 * w / 3, M.youAreHere, x + (lineMapU(st) - 0.5) * w, y + w * mh * (0.5 - 250 / 448), zz + 0.005, 0);
+      };
+      const sx = side * (MZ.stairX0 + MZ.escX0) / 2, sz = z + MZ.stairZ1 + 0.9, sy = MZ.y + 2.35;
+      board(3.4, sx, sy, sz);
+      [-1.4, 1.4].forEach(dx => addBox(group, 0.04, S.ceilingY - sy, 0.04, M.steel, sx + dx, (S.ceilingY + sy) / 2, sz - 0.03));
+      const EV = CONFIG.elevator;
+      board(1.5, side * (EV.x0 + EV.x1) / 2, MZ.y + 1.55, z + EV.z1 + 0.08);
+    }
+
     // Terminal: el andén de llegada es solo de salida (barrera en lo alto de la escalera fija)
     if (isArrivalOnly(st, side)) {
       const bz = z + MZ.stairZ1 + 0.35, x0 = MZ.stairX0, x1 = MZ.stairX1;
@@ -571,8 +596,14 @@ function buildMezzanine(group, M, st, nameMat, gates) {
   const za = z + MZ.z0, zb = z + MZ.z1, zg = z + MZ.gateZ;
 
   // Losa y falso techo inferior con luminarias (sobre andenes y vías)
-  addBoxSpan(group, 0, wx * 2, y - 0.3, y, za, zb, M.deck);
-  addBoxSpan(group, 0, wx * 2, y - 0.34, y - 0.3, za, zb, M.soffit);
+  // (con el hueco de los pozos de ascensor junto a cada muro)
+  const EV = CONFIG.elevator, ez0 = z + EV.z0, ez1 = z + EV.z1;
+  const slab = (x0, x1, z0, z1) => {
+    addBoxSpan(group, (x0 + x1) / 2, x1 - x0, y - 0.3, y, z0, z1, M.deck);
+    addBoxSpan(group, (x0 + x1) / 2, x1 - x0, y - 0.34, y - 0.3, z0, z1, M.soffit);
+  };
+  slab(-EV.x0, EV.x0, za, zb);
+  [[-wx, -EV.x0], [EV.x0, wx]].forEach(([x0, x1]) => { slab(x0, x1, za, ez0); slab(x0, x1, ez1, zb); });
   for (let x = -6; x <= 6; x += 3) addBoxSpan(group, x, 0.3, y - 0.36, y - 0.34, za + 1, zb - 1, M.fixture);
 
   // Barandal de vidrio en el borde que da a los andenes (salvo las llegadas de escalera)

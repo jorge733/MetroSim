@@ -88,6 +88,15 @@ export const CONFIG = {
     totems: [5.0, 6.3], totemZ: 51.0,
     queue: [[-4.6, 47.6], [-4.6, 48.4], [-4.6, 49.2], [-4.6, 50.0], [-3.8, 50.8], [-3.0, 50.8], [-2.2, 50.8]],
   },
+  // Ascensor de accesibilidad (uno por andén, zona pagada): andén ↔ mezanina. Cotas como la mezanina.
+  elevator: {
+    x0: 6.6, x1: 8.45,                 // |x| del pozo (pegado al muro; la puerta mira a las vías)
+    z0: 40.2, z1: 42.6,                // extensión a lo largo de la estación
+    doorHalf: 0.55,                    // medio ancho de la puerta
+    doorTime: 1.6,                     // s en abrir / cerrar
+    dwell: 6,                          // s con las puertas abiertas antes de cerrar solas
+    speed: 1.0,                        // m/s de la cabina (6 m de desnivel ≈ 7 s)
+  },
   tunnel: { radius: 5.6, centerY: 1.6, floorY: -0.05 },   // túnel de doble vía (como el NATM de la L3)
   catenary: { contactY: 4.55 },        // catenaria rígida 1500 V CC
   train: {
@@ -107,6 +116,7 @@ export const CONFIG = {
   },
   track: { tail: 320, railTop: 0.27 }, // metros de cola de maniobra tras cada terminal
   people: {
+    liftShare: 0.12,                   // parte de los viajeros dibujados que usa el ascensor (si no va lleno)
     maxWaitingPerSide: 20,             // máx. de viajeros DIBUJADOS esperando en cada andén (las cifras reales: engine/passengers.js)
     maxVisibleOnboard: 70,             // máximo de viajeros dibujados por tren (el resto se cuenta)
     activeRadius: 330,                 // solo se dibujan viajeros a esta distancia de la cámara

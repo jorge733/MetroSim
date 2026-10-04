@@ -439,6 +439,19 @@ export class AudioSystem {
     });
   }
 
+  /** Ascensor: "ding" de llegada a un piso. */
+  elevatorDing() {
+    if (!this.ctx) return;
+    this.tone(1175, { duration: 0.9, gain: 0.09 });
+    this.tone(2350, { duration: 0.4, gain: 0.02 });
+  }
+
+  /** Ascensor: zumbido corto del motor al arrancar. */
+  elevatorHum() {
+    if (!this.ctx) return;
+    this.tone(95, { duration: 1.4, gain: 0.05, wave: "sawtooth", attack: 0.25, endFreq: 110 });
+  }
+
   /* ---------------------------------------------------------------------
      Megafonía
      Cada anuncio es una lista de "fragmentos" { key, text }:

@@ -234,6 +234,7 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A) {
 
   /* --- Calentamiento: el motor simula 45 min de servicio para que la línea ya tenga trenes --- */
   const people = new PeopleSystem(scene, traffic, engine.passengers);    // muestra visible de los pasajeros del motor
+  people.elevators = world.elevators;                                  // algunos viajeros usan el ascensor
   game.people = people;
   engine.runUntil(CONFIG.startTime, { onStep: (step, t) => people.update(step, t, { cameraZ: 1e9, render: false }) });
   game.clock = engine.time;
@@ -262,7 +263,7 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A) {
     game.city = city;
     game.missions = new MissionSystem(ROUTE_A.line, STATIONS);
     const walker = new Walker({
-      scene, camera, traffic, station: STATIONS[stationIndex], city,
+      scene, camera, traffic, station: STATIONS[stationIndex], city, elevators: world.elevators,
       onEvent: (t, d) => onWalkerEvent(t, d),
       onValidate: () => validateFare(),
       benches: (st, side) => game.people.stations[st.index].benches[side],
@@ -1135,6 +1136,14 @@ function loop(now) {
 
   // 3. Mundo, señales, viajeros, torniquetes y pantallas
   world.update(cameraWorld, dt);
+  // Ascensores: "ding" al llegar y zumbido al arrancar (solo los que están cerca)
+  for (const el of world.elevators.list) {
+    if (!el.events.length) continue;
+    if (Math.hypot(el.side * CONFIG.elevator.x0 - cameraWorld.x, el.st.z + CONFIG.elevator.z0 - cameraZ) < 14) {
+      for (const ev of el.events) ev === "chime" ? audio.elevatorDing() : audio.elevatorHum();
+    }
+    el.events.length = 0;
+  }
   game.signalViews.update(cameraZ);
   people.update(dt, game.clock, { cameraZ, hideUnit: player && game.rig.view === "cab" ? player : null });
   deckAgents.length = 0;

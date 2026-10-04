@@ -31,7 +31,7 @@ import { CONFIG, STATIONS, demandAt } from "./config.js";
 import { routeForSide } from "./engine/route.js";
 import { TRAIN_LAYOUT } from "./engine/consist.js";
 import { clamp } from "./utils.js";
-import { PLATFORM_BENCHES, PLATFORM_LANE_X, BENCH_X } from "./stationLayout.js";
+import { PLATFORM_BENCHES, PLATFORM_LANE_X, BENCH_X, isArrivalOnly } from "./stationLayout.js";
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const randInt = (a, b) => Math.floor(rand(a, b + 1));
@@ -172,25 +172,49 @@ const streetDoor = (st) => V(rand(-1.2, 1.2), MZ.y, st.z + MZ.z1 - 0.3);
 /** Punto marcado como tramo de escalera mecánica (el viajero va quieto). */
 function onEscalator(v) { v.esc = true; return v; }
 
-/** Recorrido desde la zona no pagada hasta el andén de un lado (torniquete + escalera fija + pasillo). */
-function pathFromGates(st, side, spot) {
+/* --- Ascensor (elevators.js) --- */
+const EV = CONFIG.elevator, EV_ZC = (EV.z0 + EV.z1) / 2, LEVEL_Y = [S.platformTop, MZ.y];
+const liftFront = (st, side, lv) => V(side * (EV.x0 - 0.9), LEVEL_Y[lv], st.z + EV_ZC + rand(-0.3, 0.3));
+
+/**
+ * Tramo en ascensor del nivel `from` al otro: llega a la puerta, llama y
+ * espera; entra; espera dentro (viaja con la cabina) y sale al llegar.
+ *   wait  el viajero se queda quieto en ese punto hasta que devuelva true
+ *   ride  mientras espera, su altura sigue a la cabina
+ */
+function liftLeg(st, side, el, from) {
+  const to = 1 - from;
+  const front = liftFront(st, side, from);
+  const call = front.clone(); call.wait = () => { el.request(from); return el.openAt(from); };
+  const inside = V(side * rand(EV.x0 + 0.7, EV.x1 - 0.6), LEVEL_Y[from], st.z + EV_ZC + rand(-0.5, 0.5));
+  const ride = inside.clone(); ride.ride = el;
+  ride.wait = () => { if (el.level !== to || el.state === "moving") el.request(to); return el.level === to && el.openAt(to); };
+  return [front, call, inside, ride, liftFront(st, side, to)];
+}
+
+/** Recorrido desde la zona no pagada hasta el andén de un lado (torniquete + escalera fija o ascensor + pasillo). */
+function pathFromGates(st, side, spot, el = null) {
   const g = pick(MZ.gates);
+  const gates = [V(g, MZ.y, st.z + MZ.gateZ + 0.9), V(g, MZ.y, st.z + MZ.gateZ - 0.9)];
+  if (el) return [...gates, ...liftLeg(st, side, el, 1), lane(side, st.z + EV_ZC), lane(side, spot.z), spot.clone()];
   const foot = st.z + MZ.stairZ0 - 2.5;
   return [
-    V(g, MZ.y, st.z + MZ.gateZ + 0.9), V(g, MZ.y, st.z + MZ.gateZ - 0.9),
+    ...gates,
     stairTop(st, side), stairBottom(st, side),
     lane(side, foot), lane(side, spot.z), spot.clone(),
   ];
 }
 
-/** Recorrido desde el andén hasta la calle (pasillo + escalera mecánica de subida). */
-function pathToStreet(st, side, from) {
+/** Recorrido desde el andén hasta la calle (pasillo + escalera mecánica de subida o ascensor). */
+function pathToStreet(st, side, from, el = null) {
   const g = pick(MZ.gates);
+  const out = [V(g, MZ.y, st.z + MZ.gateZ - 0.9), V(g, MZ.y, st.z + MZ.gateZ + 0.9), streetDoor(st)];
+  if (el) return [lane(side, from.z), lane(side, st.z + EV_ZC), ...liftLeg(st, side, el, 0), ...out];
   return [
     lane(side, from.z), lane(side, st.z + MZ.stairZ0 - 2.5),
     V(side * escX, S.platformTop, st.z + MZ.stairZ0 - 1.0),
     onEscalator(V(side * escX, MZ.y, st.z + MZ.stairZ1 + 0.6)),
-    V(g, MZ.y, st.z + MZ.gateZ - 0.9), V(g, MZ.y, st.z + MZ.gateZ + 0.9), streetDoor(st),
+    ...out,
   ];
 }
 
@@ -233,6 +257,20 @@ export class PeopleSystem {
   }
 
   /* ----- Consultas ----- */
+
+  /**
+   * ¿Este viajero usará el ascensor? Una parte de la gente (con maleta,
+   * coche de guagua, movilidad reducida…) lo prefiere, si no va lleno.
+   * @param {boolean} down  true si baja de la mezanina al andén
+   * @returns {import("./elevators.js").Elevator|null}
+   */
+  liftFor(st, side, down) {
+    const el = this.elevators?.at(st, side);
+    if (!el || Math.random() > CONFIG.people.liftShare) return null;
+    if (down && el.downBlocked) return null;
+    const using = this.people.filter(q => q.path?.some(pt => pt.ride === el)).length;
+    return using < 4 ? el : null;
+  }
 
   /** Viajeros dibujados esperando en un andén: muestra de la gente real (ninguno en el andén de llegada de una terminal). */
   targetWaiting(st, side) {
@@ -347,7 +385,7 @@ export class PeopleSystem {
         this.stations[st.index].queue.push(p);
       } else {
         p.state = "arriving";
-        this.walk(p, pathFromGates(st, side, spot.pos), () => this.settleWaiting(p));
+        this.walk(p, pathFromGates(st, side, spot.pos, this.liftFor(st, side, true)), () => this.settleWaiting(p));
       }
     }
     return p;
@@ -373,7 +411,7 @@ export class PeopleSystem {
     ss.serveT = null;
     ss.queue.shift();
     first.state = "arriving";
-    this.walk(first, pathFromGates(st, first.side, first.spot.pos), () => this.settleWaiting(first));
+    this.walk(first, pathFromGates(st, first.side, first.spot.pos, this.liftFor(st, first.side, true)), () => this.settleWaiting(first));
   }
 
   /** Cajero sentado dentro de la boletería. */
@@ -463,7 +501,7 @@ export class PeopleSystem {
   }
 
   walk(p, points, onArrive) {
-    p.path = points.map(v => { const c = v.clone(); c.esc = v.esc; return c; });
+    p.path = points.map(v => { const c = v.clone(); c.esc = v.esc; c.wait = v.wait; c.ride = v.ride; return c; });
     p.onArrive = onArrive;
     p.pose = "walk";
   }
@@ -537,7 +575,7 @@ export class PeopleSystem {
       p.station = station;
       p.side = side;
       p.state = "leaving";
-      this.walk(p, pathToStreet(station, side, p.root.position), () => this.remove(p));
+      this.walk(p, pathToStreet(station, side, p.root.position, this.liftFor(station, side, false)), () => this.remove(p));
     });
   }
 
@@ -704,6 +742,14 @@ export class PeopleSystem {
       const target = p.path[0], pos = p.root.position;
       const dx = target.x - pos.x, dz = target.z - pos.z;
       const dist = Math.hypot(dx, dz);
+      // Punto de espera (ascensor): quieto hasta que se cumpla la condición; dentro de la cabina, viaja con ella
+      if (target.wait && dist < 0.05) {
+        if (target.ride) pos.y = target.ride.y;
+        if (!target.wait()) { p.pose = "stand"; p.riding = false; return; }
+        target.wait = null;
+        if (target.ride) target.y = pos.y = target.ride.y;
+        p.pose = "walk";
+      }
       const onEsc = !!target.esc && Math.abs(target.y - pos.y) > 0.05;
       p.riding = onEsc;
       const step = onEsc ? CONFIG.mezzanine.escSpeed * dt                           // la escalera mecánica los lleva

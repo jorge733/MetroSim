@@ -40,13 +40,15 @@ import { ROUTES, ROUTE_A, ROUTE_B, routeForSide } from "./engine/route.js";
 import { TRAIN_LAYOUT } from "./engine/consist.js";
 import { clamp } from "./utils.js";
 import { platformSolidAt, isArrivalOnly } from "./stationLayout.js";
+import { Elevator, inElevatorShaft } from "./elevators.js";
 
 const EYE = 1.62;
 const WALK = 1.4, RUN = 3.2, BACK = 0.75;        // m/s: caminar, correr, retroceder
 const ACCEL = 2.2, DECEL = 4.5;                   // m/s²: arrancar / detenerse
 const TURN = 1.7, TURN_RUN = 1.25;                // rad/s de giro (corriendo se gira más abierto)
 const LOOK = 0.9;                                 // rad/s al mirar arriba / abajo
-const S = CONFIG.station, MZ = CONFIG.mezzanine, F = CONFIG.train.floorY;
+const S = CONFIG.station, MZ = CONFIG.mezzanine, F = CONFIG.train.floorY, EV = CONFIG.elevator;
+const EV_ZC = (EV.z0 + EV.z1) / 2, LEVEL_Y = [S.platformTop, MZ.y];
 
 export class Walker {
   /**
@@ -60,8 +62,10 @@ export class Walker {
    * @param {(st, side:number) => Array} opts.benches  bancos de un andén (compartidos con los viajeros)
    * @param {(x, y, z, fromX, fromZ, unit) => boolean} opts.isCrowded  ¿hay otro viajero en el camino?
    * @param {import("./city/city.js").City} [opts.city]  calle de la estación (modo calle)
+   * @param {import("./elevators.js").ElevatorSystem} [opts.elevators]  ascensores de las estaciones
    */
-  constructor({ scene, camera, traffic, station, onEvent = () => {}, onValidate = () => ({ ok: true }), benches = () => [], isCrowded = () => false, city = null }) {
+  constructor({ scene, camera, traffic, station, onEvent = () => {}, onValidate = () => ({ ok: true }), benches = () => [], isCrowded = () => false, city = null, elevators = null }) {
+    this.elevators = elevators;
     this.city = city;
     this.benches = benches;
     this.isCrowded = isCrowded;
@@ -178,7 +182,15 @@ export class Walker {
 
     // Andenes (salvo la huella de la escalera)
     const onStairFoot = ax >= MZ.escX0 - 0.05 && dz >= MZ.stairZ0 && dz <= MZ.stairZ1;
-    if (ax >= S.platformEdgeX + 0.3 && ax <= S.wallX - 0.35 && Math.abs(dz) <= S.platformHalf - 0.3 && !onStairFoot && !platformSolidAt(x, dz)) candidates.push(S.platformTop);
+    const inShaft = inElevatorShaft(ax, dz, 0.3);                           // pozo del ascensor (se entra solo por la puerta)
+    if (ax >= S.platformEdgeX + 0.3 && ax <= S.wallX - 0.35 && Math.abs(dz) <= S.platformHalf - 0.3 && !onStairFoot && !inShaft && !platformSolidAt(x, dz)) candidates.push(S.platformTop);
+
+    // Ascensor: cabina (a su altura actual) y umbral de la puerta del piso donde está detenida y abierta
+    const el = this.elevators?.at(st, side);
+    if (el) {
+      if (this.inCabin(ax, dz)) candidates.push(el.y);
+      if (this.inLiftDoor(ax, dz)) for (const lv of [0, 1]) if (el.openAt(lv)) candidates.push(LEVEL_Y[lv]);
+    }
 
     // Hueco de puerta del tren detenido con puertas abiertas
     if (Math.abs(dz) <= S.platformHalf && ax >= S.trackX + 1.0 && ax < S.platformEdgeX + 0.3) {
@@ -204,7 +216,7 @@ export class Walker {
       const inTotem = MZ.totems.some(t => Math.abs(x - t) < 0.45) && Math.abs(dz - MZ.totemZ) < 0.32;
       let gateOk = !nearGates;
       if (nearGates && inGate) gateOk = this.paid || this.gatePass || this.tryValidate();
-      if (gateOk && !inBooth && !inTotem) candidates.push(MZ.y);
+      if (gateOk && !inBooth && !inTotem && !inShaft) candidates.push(MZ.y);
     }
     // Umbral de la salida a la calle
     if (Math.abs(x) < MZ.exitHalf - 0.2 && dz > MZ.z1 - 0.4 && dz < MZ.z1 + 0.3) candidates.push(MZ.y);
@@ -213,6 +225,43 @@ export class Walker {
     let best = null;
     for (const y of candidates) if (Math.abs(y - fromY) < 0.45 && (best === null || Math.abs(y - fromY) < Math.abs(best - fromY))) best = y;
     return best;
+  }
+
+  /** ¿(|x|, dz) dentro de la cabina del ascensor? */
+  inCabin(ax, dz) { return ax > EV.x0 + 0.2 && ax < EV.x1 - 0.4 && dz > EV.z0 + 0.35 && dz < EV.z1 - 0.35; }
+
+  /** ¿(|x|, dz) en el umbral de la puerta del ascensor? */
+  inLiftDoor(ax, dz) { return ax >= EV.x0 - 0.35 && ax <= EV.x0 + 0.25 && Math.abs(dz - EV_ZC) < EV.doorHalf - 0.2; }
+
+  /**
+   * Ascensor al alcance: dentro de la cabina o frente a su puerta.
+   * @returns {{el, inside:boolean, level:number|null}|null}
+   */
+  elevatorNear() {
+    if (this.space !== "world" || !this.elevators) return null;
+    const st = this.stationAt(this.pos.z);
+    if (!st) return null;
+    const el = this.elevators.at(st, Math.sign(this.pos.x) || 1);
+    if (!el) return null;
+    const ax = Math.abs(this.pos.x), dz = this.pos.z - st.z;
+    if (this.inCabin(ax, dz) && Math.abs(this.pos.y - el.y) < 0.5) return { el, inside: true, level: null };
+    const level = Elevator.levelOf(this.pos.y);
+    if (level !== null && ax > EV.x0 - 2.0 && ax <= EV.x0 + 0.25 && Math.abs(dz - EV_ZC) < 1.5) return { el, inside: false, level };
+    return null;
+  }
+
+  /** E junto al ascensor: llamarlo desde el piso o enviarlo al otro nivel desde la cabina. */
+  useElevator({ el, inside, level }) {
+    if (inside) {
+      if (el.state === "moving") return { text: "El ascensor está en marcha…", level: "info" };
+      const target = 1 - el.level;
+      if (target === 0 && el.downBlocked) return { text: "Andén de llegada de la terminal: el ascensor no baja (solo de salida)", level: "warn" };
+      el.request(target);
+      return { text: target ? "Ascensor subiendo a la mezanina…" : "Ascensor bajando al andén…", level: "ok" };
+    }
+    if (el.openAt(level)) return { text: "Las puertas están abiertas: entra y pulsa E para viajar", level: "info" };
+    el.request(level);
+    return { text: el.level === level && el.state !== "moving" ? "Abriendo puertas del ascensor" : "Ascensor llamado · espera a que llegue", level: "ok" };
   }
 
   /** Intenta validar la tarjeta al entrar en un paso de torniquete desde la zona no pagada. */
@@ -317,6 +366,8 @@ export class Walker {
       this.onEvent("street", target);
       return null;
     }
+    const lift = this.elevatorNear();
+    if (lift) return this.useElevator(lift);
     const service = this.nearService();
     if (service) { this.onEvent("service", service); return null; }
     const st = this.nearExit();
@@ -372,6 +423,21 @@ export class Walker {
         const nz = this.pos.z + MZ.escSpeed * dt;
         const fy = this.worldFloor(this.pos.x, nz, this.pos.y);
         if (fy !== null) { this.pos.z = nz; this.pos.y = fy; }
+      }
+    }
+
+    // Ascensor: dentro de la cabina se viaja con ella; en el umbral, las puertas no se cierran
+    if (this.space === "world" && this.elevators) {
+      const st = this.stationAt(this.pos.z);
+      const el = st && this.elevators.at(st, Math.sign(this.pos.x) || 1);
+      if (el) {
+        const ax = Math.abs(this.pos.x), dz = this.pos.z - st.z;
+        if (this.inCabin(ax, dz) && Math.abs(this.pos.y - el.y) < 0.5) {
+          this.pos.y = el.y;
+          // Botón de abrir: al acercarse a la puerta con la cabina detenida, se reabre
+          if (el.state === "idle" && ax < EV.x0 + 0.5) el.request(el.level);
+        }
+        else if (this.inLiftDoor(ax, dz)) el.obstruct();
       }
     }
 
@@ -486,6 +552,12 @@ export class Walker {
       const open = this.unit.sim.doorState === "open";
       return open && rs ? `Puertas abiertas en ${rs.name} · camina hacia una puerta (lado derecho del pasillo) para bajar · F sentarse` : "F sentarse · puedes recorrer los 5 coches por el pasillo";
     }
+    const lift = this.elevatorNear();
+    if (lift?.inside) {
+      if (lift.el.state === "moving") return "Ascensor en marcha…";
+      return (lift.el.level ? "Ascensor en la mezanina · E bajar al andén" : "Ascensor en el andén · E subir a la mezanina") + " · camina a la puerta para salir";
+    }
+    if (lift) return lift.el.openAt(lift.level) ? "Ascensor con las puertas abiertas · entra y pulsa E" : "E · llamar al ascensor";
     if (Math.abs(this.pos.y - MZ.y) < 0.3) {
       const service = this.nearService();
       if (service?.kind === "boleteria") return "E · atención en boletería (cargar tarjeta bip!, comprar tarjeta)";

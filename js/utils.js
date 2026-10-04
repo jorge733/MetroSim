@@ -203,6 +203,48 @@ export function lineMapCanvas() {
   return c;
 }
 
+/**
+ * Plano de dirección de un andén (en la mezanina, antes de bajar): la línea
+ * completa con una flecha hacia la terminal de destino. Uno por sentido,
+ * compartido por todas las estaciones; la marca "usted está aquí" es aparte
+ * (misma escala horizontal que lineMapU).
+ * @param {object} dest  estación terminal hacia la que va el andén
+ * @param {string} side  "IZQUIERDA" / "DERECHA" (escalera vista desde los torniquetes)
+ */
+export function directionMapCanvas(dest, side) {
+  const W = 2048, H = 448, c = makeCanvas(W, H), g = c.getContext("2d");
+  g.fillStyle = "#f4f2ec"; g.fillRect(0, 0, W, H);
+  // Franja superior: dirección del andén
+  g.fillStyle = "#1d2228"; g.fillRect(0, 0, W, 130);
+  g.fillStyle = LINE.color; g.fillRect(0, 130, W, 12);
+  drawLineBadge(g, LINE.id, 75, 65, 46);
+  g.fillStyle = "#fff"; g.textAlign = "left"; g.textBaseline = "middle";
+  fitFont(g, `ANDÉN DIRECCIÓN ${dest.name}`, 800, 72, W - 560);
+  g.fillText(`ANDÉN DIRECCIÓN ${dest.name}`, 150, 68);
+  g.fillStyle = "#ffd23f"; g.font = "800 40px Arial"; g.textAlign = "right";
+  g.fillText(`ESCALERA ${side} ↓`, W - 40, 68);
+
+  // Línea: el tramo hacia el destino resaltado y una flecha en su extremo
+  const x0 = 90, x1 = W - 90, y = 250;
+  const xOf = (st) => x0 + (x1 - x0) * ((STATIONS[0].z - st.z) / WORLD.lineLength);
+  const xd = xOf(dest), dir = xd > W / 2 ? 1 : -1;
+  g.fillStyle = LINE.color; g.fillRect(x0, y - 11, x1 - x0, 22);
+  g.beginPath();
+  g.moveTo(xd + dir * 70, y); g.lineTo(xd + dir * 20, y - 40); g.lineTo(xd + dir * 20, y + 40); g.closePath();
+  g.fill();
+  STATIONS.forEach(st => {
+    const x = xOf(st), end = st === dest;
+    g.fillStyle = "#fff"; g.strokeStyle = LINE.color; g.lineWidth = end ? 12 : 8;
+    g.beginPath(); g.arc(x, y, end ? 24 : 17, 0, Math.PI * 2); g.fill(); g.stroke();
+    st.combos.forEach((id, k) => drawLineBadge(g, id, x, y - 48 - k * 34, 15));
+    g.save(); g.translate(x, y + 34); g.rotate(Math.PI / 4);
+    g.fillStyle = "#1b2430"; g.font = `${end ? 900 : 700} 25px Arial`; g.textAlign = "left";
+    g.fillText(st.short, 0, 0);
+    g.restore();
+  });
+  return c;
+}
+
 /** Posición horizontal (0..1) de una estación en el plano de línea. */
 export function lineMapU(st) {
   const x0 = 90 / 2048, x1 = 1 - 90 / 2048;
