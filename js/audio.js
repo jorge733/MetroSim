@@ -439,6 +439,32 @@ export class AudioSystem {
     });
   }
 
+  /**
+   * Fanfarria de triunfo (libreta de misiones completa): arpegio de trompetas,
+   * acorde final con redoble y unas campanitas brillantes encima.
+   * @param {boolean} grand  versión más larga (todas las líneas completas)
+   */
+  fanfare(grand = false) {
+    if (!this.ctx) return;
+    const C = 523.25, E = 659.25, G = 783.99, C2 = 1046.5;
+    const brass = (f, start, duration, gain = 0.07) => {
+      this.tone(f, { start, duration, gain, wave: "sawtooth", attack: 0.03 });
+      this.tone(f * 2, { start, duration: duration * 0.8, gain: gain * 0.25, wave: "square", attack: 0.03 });
+    };
+    // ta-ta-ta-táaa (sol-sol-sol-do) y subida
+    [[G, 0, 0.14], [G, 0.17, 0.14], [G, 0.34, 0.14], [C2, 0.52, 0.6], [E, 1.2, 0.18], [G, 1.42, 0.18]].forEach(([f, t, d]) => brass(f, t, d));
+    // Acorde final mayor, largo
+    const end = 1.7;
+    [C, E, G, C2].forEach(f => brass(f, end, grand ? 2.6 : 1.8, 0.05));
+    this.tone(C / 2, { start: end, duration: grand ? 2.6 : 1.8, gain: 0.08, wave: "triangle" });
+    // Redoble de tambor (ráfagas de ruido) y platillo
+    for (let i = 0; i < 14; i++) this.burst({ start: end - 0.5 + i * 0.035, duration: 0.03, gain: 0.05 + i * 0.004, type: "bandpass", freq: 1800 });
+    this.burst({ start: end, duration: 1.6, gain: 0.07, type: "highpass", freq: 6000, attack: 0.005 });
+    // Campanitas
+    [C2 * 2, G * 2, E * 2, C2 * 2, G * 4].forEach((f, i) => this.tone(f, { start: end + 0.2 + i * 0.12, duration: 0.5, gain: 0.025 }));
+    if (grand) [C2, E * 2, G * 2, C2 * 2].forEach((f, i) => brass(f, end + 2.0 + i * 0.16, i === 3 ? 1.6 : 0.15, 0.05));
+  }
+
   /** Ascensor: "ding" de llegada a un piso. */
   elevatorDing() {
     if (!this.ctx) return;

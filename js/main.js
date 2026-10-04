@@ -85,7 +85,11 @@ import { CameraRig } from "./camera.js";
 import { Hud } from "./hud.js";
 import { DriverScore } from "./scoring.js";
 import { BankAccount, BANK_NAME, stationWage, shiftBonus } from "./economy.js";
-import { MissionSystem } from "./missions.js";
+import { MissionSystem, MASTERY_REWARD, GRAND_REWARD, lineMastered } from "./missions.js";
+import { celebrate } from "./celebration.js";
+import { Inventory, souvenirId, SOUVENIR_PRICE, ALBUM_REWARD, LICENSES } from "./shop.js";
+import { openShopUI } from "./shopUI.js";
+import { trainLiveryMaterials } from "./train.js";
 import { City } from "./city/city.js";
 
 const startScreen = $("startScreen");
@@ -106,6 +110,8 @@ const directionSelect = $("startDirection");
 // Introducción de bienvenida (solo al abrir la página)
 playIntro({ isMuted: () => muted });
 const wait = (ms) => new Promise(r => setTimeout(r, ms));
+/** Lo comprado en la Tienda Metro (licencias, libreas, contratos, depto, recuerdos). */
+const inventory = new Inventory();
 
 /* --- Selección de línea en la pantalla principal (conductor y pasajero) --- */
 const stationSelect = $("startStation");
@@ -115,10 +121,48 @@ for (const sel of [driverLineSelect, paxLineSelect]) {
   LINES.forEach(l => sel.append(new Option(`${l.name} · ${l.stations[0].short} ⇄ ${l.stations.at(-1).short}`, l.id)));
   sel.value = lineById(savedLine) ? savedLine : "3";
 }
+refreshDriverLines();
 fillDirections(lineById(driverLineSelect.value));
 fillStations(lineById(paxLineSelect.value));
 driverLineSelect.addEventListener("change", () => { fillDirections(lineById(driverLineSelect.value)); saveSetting("metrosim.line", driverLineSelect.value); });
 paxLineSelect.addEventListener("change", () => { fillStations(lineById(paxLineSelect.value)); saveSetting("metrosim.line", paxLineSelect.value); });
+
+/** Líneas del conductor: las que aún no tienen licencia muestran un candado y su precio. */
+function refreshDriverLines() {
+  for (const opt of driverLineSelect.options) {
+    const l = lineById(opt.value), lic = LICENSES.find(x => x.lineId === l.id);
+    const base = `${l.name} · ${l.stations[0].short} ⇄ ${l.stations.at(-1).short}`;
+    opt.textContent = inventory.canDrive(l.id) ? base : `🔒 ${base} · licencia ${formatCLP(lic.price)}`;
+  }
+}
+
+/** Tienda Metro: desde la pantalla de inicio o con K durante el juego. */
+function openStore(opts = {}) {
+  const walker = game?.walker;
+  if (walker) { walker.frozen = true; walker.keys.clear(); }
+  openShopUI({
+    inventory, bank, ...opts,
+    onBought: (item) => {
+      refreshDriverLines();
+      if (game) { game.audio.cash(); hud.setBank(bank); hud.moneyFloat(-item.price); }
+    },
+    onClose: () => { if (game?.walker) { game.walker.frozen = false; game.walker.keys.clear(); } },
+  });
+}
+
+/** Pinta tu tren con la librea elegida en la tienda (solo el tuyo; los demás siguen igual). */
+function applyLivery(unit) {
+  const lv = inventory.currentLivery, shared = trainLiveryMaterials();
+  if (!shared || (lv.body == null && lv.stripe == null)) return;
+  const body = shared.body.clone(), stripe = shared.stripe.clone();
+  if (lv.body != null) body.color.setHex(lv.body);
+  if (lv.metal != null) body.metalness = lv.metal;
+  if (lv.stripe != null) stripe.color.setHex(lv.stripe);
+  unit.group.traverse(o => {
+    if (o.material === shared.body) o.material = body;
+    else if (o.material === shared.stripe) o.material = stripe;
+  });
+}
 
 /** Servicios del conductor: ida y vuelta de la línea elegida. */
 function fillDirections(line) {
@@ -151,6 +195,7 @@ function useLine(line) {
 
 document.querySelectorAll("[data-mode]").forEach(btn => btn.addEventListener("click", () => startGame(btn.dataset.mode)));
 $("backButton").addEventListener("click", stopGame);
+$("shopButton").addEventListener("click", () => openStore());
 $("soundButton").addEventListener("click", toggleSound);
 window.addEventListener("keydown", onKeyDown);
 window.addEventListener("keyup", onKeyUp);
@@ -170,6 +215,10 @@ window.MetroSim = { get game() { return game; }, bank, card, CONFIG, get STATION
 function startGame(mode) {
   if (game) stopGame();
   if (mode === "control") return startControl();
+  if (mode === "driver" && !inventory.canDrive(driverLineSelect.value)) {
+    const lic = LICENSES.find(x => x.lineId === driverLineSelect.value);
+    return openStore({ tab: "driver", notice: `Para conducir la ${lic.name.replace("Licencia ", "")} necesitas su licencia (${formatCLP(lic.price)}). La Línea 3 es gratis: gana ahí tu primer sueldo.` });
+  }
   useLine(lineById(mode === "driver" ? driverLineSelect.value : paxLineSelect.value));
   const stationIndex = Number(stationSelect.value) || 0;
   const direction = directionSelect.value === "B" ? ROUTE_B : ROUTE_A;
@@ -249,6 +298,7 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = {}) {
     const player = traffic.createUnit(playerTrip, { isPlayer: true, start: direction.first });
     player.arrivedIdx = player.dockedIdx = 0;
     game.player = player;
+    applyLivery(player);
     game.score = newScore(direction);
     game.driverRole = new DriverRole(engine, () => game?.player);
     const rig = new CameraRig(camera, player.group);
@@ -412,6 +462,7 @@ function onKeyDown(event) {
   if (hud.missionsOpen) { if (key === "escape" || key === "j") hud.closeMissions(); return; }
 
   if (key === "m") return toggleSound();
+  if (key === "k" && !game.transition) return openStore({ tab: game.walker ? "album" : "driver" });
   if (key === "h") return hud.toggleHelp();
 
   if (game.walker) {
@@ -553,7 +604,7 @@ function onPlayerEvent(type, data) {
       const sc = game.score.arrival(stop, data.delay);
       const streak = sc.streak >= 2 ? ` · ¡RACHA ${sc.streak}!` : "";
       // Sueldo de la estación: se deposita al instante (las faltas del tramo se descuentan)
-      const wage = stationWage({ gained: sc.gained, perfect: sc.perfect, deductions: game.wageDeductions });
+      const wage = stationWage({ gained: sc.gained, perfect: sc.perfect, deductions: game.wageDeductions, mult: inventory.wageMultiplier });
       game.wageDeductions = 0;
       game.shiftPay += wage.pay;
       if (wage.pay > 0) { bank.deposit(wage.pay, `Sueldo · ${data.station.name}`, { wage: true }); hud.setBank(bank); hud.moneyFloat(wage.pay); }
@@ -619,7 +670,7 @@ function showDriverSummary() {
   const punctual = s.arrivals.filter(d => Math.abs(d) <= w).length;
   const avgStop = s.stops.length ? s.stops.reduce((a, b) => a + b, 0) / s.stops.length : 0;
   // Bono solo si se sirvió al menos la mitad de la línea (no vale empezar a mitad de camino)
-  const bonus = s.arrivals.length >= (STATIONS.length - 1) / 2 ? shiftBonus(sc.grade()) : 0;
+  const bonus = s.arrivals.length >= (STATIONS.length - 1) / 2 ? shiftBonus(sc.grade(), inventory.wageMultiplier) : 0;
   if (bonus) { bank.deposit(bonus, `Bono de servicio ${game.player.trip.id} (nota ${sc.grade()})`, { wage: true }); hud.setBank(bank); hud.moneyFloat(bonus); }
   hud.showSummary({
     kicker: `SERVICIO ${game.player.trip.id} COMPLETADO`,
@@ -810,8 +861,35 @@ function report(list) {
       game.audio.loadOk();
     }
     if (m.failed) game.audio.deny();
+    if (m.mastered) setTimeout(() => game && celebrateLine(), 1800);   // tras el aviso de la misión cumplida
   }
   hud.updateTracker(game.missions);
+}
+
+/**
+ * ¡Libreta de misiones completa! Gran premio, fanfarria, anuncio por
+ * megafonía, confeti y medalla de la línea. Si con esta quedan completas
+ * todas las líneas, premio doble: Gran Maestro del Metro de Santiago.
+ */
+function celebrateLine() {
+  const line = LINES.find(l => l.id === LINE.id) || LINE;
+  const grand = LINES.every(l => l.id === line.id || lineMastered(l.id));
+  bank.deposit(MASTERY_REWARD, `Libreta de misiones completa · ${line.name}`);
+  if (grand) bank.deposit(GRAND_REWARD, "Gran Maestro del Metro de Santiago");
+  hud.setBank(bank);
+  hud.moneyFloat(MASTERY_REWARD + (grand ? GRAND_REWARD : 0));
+  const walker = game.walker;
+  walker.frozen = true;
+  walker.keys.clear();
+  game.audio.fanfare(grand);
+  setTimeout(() => game?.audio.announce(grand
+    ? "Estimados pasajeros: Metro de Santiago felicita a nuestro nuevo Gran Maestro, que completó las misiones de todas las líneas de la red. ¡Muchas gracias por viajar con nosotros!"
+    : `Estimados pasajeros: Metro de Santiago felicita a nuestro nuevo Pasajero Ilustre de la ${line.name.charAt(0) + line.name.slice(1).toLowerCase()}. ¡Muchas gracias por viajar con nosotros!`), 4200);
+  celebrate({
+    line, completed: game.missions.completed, reward: MASTERY_REWARD, grand, grandReward: GRAND_REWARD,
+    lines: LINES, isMastered: (id) => id === line.id || lineMastered(id),
+    onClose: () => { if (game?.walker) { game.walker.frozen = false; game.walker.keys.clear(); } },
+  });
 }
 
 /**
@@ -959,7 +1037,12 @@ function openShop(shop, st) {
 
   hud.openStore({
     icon: shop.icon, kicker: `${shop.label.toUpperCase()} · ${st.name}`, title: shop.name, bank,
-    items: () => [...game.missions.actionsAt(st, shop.kind).map(a => ({ name: a.label, action: a.id })), ...shop.items],
+    items: () => [
+      ...game.missions.actionsAt(st, shop.kind).map(a => ({ name: a.label, action: a.id })),
+      // Kiosko: el recuerdo de la estación para el álbum de la Tienda Metro (uno por estación)
+      ...(shop.kind === "kiosko" && !inventory.has(souvenirId(LINE.id, st.name)) ? [{ id: "souvenir", souvenir: true, name: `🎟️ Recuerdo de ${st.name}`, price: SOUVENIR_PRICE }] : []),
+      ...shop.items,
+    ],
     status: "Elige lo que quieras comprar: pagas con tu tarjeta de débito.",
     onBuy: async (item) => {
       if (item.action) {
@@ -970,6 +1053,7 @@ function openShop(shop, st) {
       if (!bank.canPay(item.price)) throw new Error(`Fondos insuficientes (${bank.label}) para ${formatCLP(item.price)}. Gana dinero en el modo Conductor: cada estación bien servida te paga.`);
       await wait(450);
       bank.charge(item.price, `${shop.name}: ${item.name}`);
+      if (item.souvenir) return addSouvenir(st);
       bank.addToBag(item.name);
       game?.audio.cash();
       hud.moneyFloat(-item.price);
@@ -978,6 +1062,25 @@ function openShop(shop, st) {
     },
     onClose,
   });
+}
+
+/** Recuerdo comprado en el kiosko: va al álbum; completar la línea paga un premio. */
+function addSouvenir(st) {
+  game?.audio.cash();
+  hud.moneyFloat(-SOUVENIR_PRICE);
+  inventory.owned.add(souvenirId(LINE.id, st.name));
+  const line = lineById(LINE.id), { have, total } = inventory.album(line);
+  let extra = "";
+  if (have === total && !inventory.albums.has(line.id)) {
+    inventory.albums.add(line.id);
+    bank.deposit(ALBUM_REWARD, `Álbum de recuerdos completo · ${line.name}`);
+    hud.moneyFloat(ALBUM_REWARD);
+    game?.audio.fanfare();
+    extra = ` · 🏆 ¡ÁLBUM DE LA ${line.name} COMPLETO! +${formatCLP(ALBUM_REWARD)}`;
+  }
+  inventory.save();
+  hud.setBank(bank);
+  return `Recuerdo de ${st.name} al álbum (${have}/${total}) · K para ver tu colección${extra}`;
 }
 
 /** Tablero de misiones (J). */

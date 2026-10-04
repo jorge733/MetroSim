@@ -13,6 +13,7 @@ import { STATIONS, LINE, NOTCHES, NOTCH_INDEX, WORLD, FARES, formatCLP, fareBand
 import { $, clamp, formatClock, formatStopError } from "./utils.js";
 import { formatDelay } from "./engine/schedule.js";
 import { BANK_NAME } from "./economy.js";
+import { MISSION_TYPES, MASTERY_REWARD } from "./missions.js";
 
 export class Hud {
   constructor() {
@@ -435,6 +436,7 @@ export class Hud {
         onClick: () => { o.onAccept(i); render(); },
       })));
       this.setText(e.missionStats, `Cumplidas: ${ms.completed} · fallidas: ${ms.failed}`);
+      this.renderMissionBook(ms);
     };
     render();
     e.missionShuffle.onclick = () => { o.onShuffle(); render(); };
@@ -443,6 +445,30 @@ export class Hud {
     this.closeMissions = close;
     e.missions.classList.remove("hidden");
     if (document.pointerLockElement) document.exitPointerLock?.();
+  }
+
+  /** Libreta de la línea: un sello por cada tipo de misión cumplido (completa = celebración). */
+  renderMissionBook(ms) {
+    const e = this.el;
+    if (!e.missionBook) {
+      e.missionBook = document.createElement("div");
+      e.missionBook.className = "mission-book";
+      e.missionStats.before(e.missionBook);
+    }
+    const { done, total } = ms.progress;
+    const head = document.createElement("p");
+    head.className = "mission-book-head";
+    head.textContent = ms.mastered
+      ? "🏆 Libreta completa · eres Pasajero Ilustre de esta línea"
+      : `Libreta de la línea: ${done}/${total} · cumple una misión de cada tipo para completarla (gran premio ${formatCLP(MASTERY_REWARD)})`;
+    const row = document.createElement("ul");
+    row.replaceChildren(...MISSION_TYPES.map(t => {
+      const li = document.createElement("li");
+      li.textContent = `${t.icon} ${t.label}`;
+      if (ms.typesDone.has(t.type)) li.className = "done";
+      return li;
+    }));
+    e.missionBook.replaceChildren(head, row);
   }
 
   missionCard(m, { active = false, button, onClick }) {

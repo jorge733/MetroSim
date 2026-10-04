@@ -44,6 +44,9 @@ export function resetTrainAssets() { ASSETS = null; }
 /** Nombre del destino para el letrero del tren (abreviado si es muy largo). */
 const signName = (st) => (st.name.length <= 20 ? st.name : st.short);
 
+/** Materiales compartidos de carrocería y franja (para pintar el tren del jugador con su librea). */
+export function trainLiveryMaterials() { return ASSETS ? { body: ASSETS.mat.body, stripe: ASSETS.mat.stripe } : null; }
+
 /** Material compartido del plano de línea de los coches (lo anima render/lineMapPanel.js). */
 export function trainLineMapMaterial() { return ASSETS?.mat.lineMap ?? null; }
 

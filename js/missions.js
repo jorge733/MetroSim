@@ -29,6 +29,27 @@ import { formatClock } from "./engine/format.js";
 
 const OFFERS = 3;
 
+/**
+ * Libreta de misiones de cada línea: cumplir al menos una de cada tipo
+ * completa la línea (gran premio y celebración, ver celebration.js).
+ * El tutorial ("Pan para la once") cuenta como Compras.
+ */
+export const MISSION_TYPES = [
+  { type: "compras", icon: "🛍️", label: "Compras" },
+  { type: "turismo", icon: "📷", label: "Turismo" },
+  { type: "encargo", icon: "📦", label: "Encargo" },
+  { type: "contrarreloj", icon: "⏱️", label: "Contrarreloj" },
+  { type: "ahorro", icon: "💰", label: "Ahorro" },
+  { type: "trabajo", icon: "🚇", label: "Trabajo" },
+];
+/** Premio por completar la libreta de una línea, y por completar todas las líneas. */
+export const MASTERY_REWARD = 25000, GRAND_REWARD = 100000;
+
+/** ¿Está completa la libreta de esta línea? (leída de lo guardado, para el premio de todas las líneas) */
+export function lineMastered(lineId) {
+  try { return !!JSON.parse(localStorage.getItem(`metrosim.missions.${lineId}`) || "null")?.mastered; } catch { return false; }
+}
+
 /** Compras con tema: rubro, etiqueta de producto, título y relato. */
 const THEMES = [
   { tag: "pan", kinds: ["panaderia"], title: "Pan para la once", brief: (st, shop) => `En tu casa piden pan para la once. Cómpralo en ${shop.name}, en ${st}.` },
@@ -48,15 +69,24 @@ export class MissionSystem {
    * @param {Array} stations  estaciones de la línea activa
    */
   constructor(lineId, stations) {
+    if (typeof lineId === "object") lineId = lineId.id;          // se acepta la línea o su id
     this.key = `metrosim.missions.${lineId}`;
     this.stations = stations;
-    const s = this.read();
+    let s = this.read();
+    // Versiones anteriores guardaban todo bajo "metrosim.missions.[object Object]": se rescata ese avance
+    if (!s) {
+      try { s = JSON.parse(localStorage.getItem("metrosim.missions.[object Object]") || "null"); } catch { s = null; }
+      if (s) s = { ...s, typesDone: [], mastered: false };      // la libreta es por línea: empieza de cero en cada una
+    }
     this.active = s?.active ?? null;
     this.offers = s?.offers ?? [];
     this.completed = s?.completed ?? 0;
     this.failed = s?.failed ?? 0;
     this.tutorialDone = s?.tutorialDone ?? false;
     this.seq = s?.seq ?? 1;
+    this.lineId = lineId;
+    this.typesDone = new Set(s?.typesDone ?? []);   // tipos de misión ya cumplidos en esta línea (libreta)
+    this.mastered = s?.mastered ?? false;           // libreta completa
     // Descarta misiones guardadas que apunten a estaciones que ya no existen
     const valid = (m) => m.steps.every(st => !st.station || this.byName(st.station));
     if (this.active && !valid(this.active)) this.active = null;
@@ -66,11 +96,16 @@ export class MissionSystem {
   read() { try { return JSON.parse(localStorage.getItem(this.key) || "null"); } catch { return null; } }
   save() {
     try {
-      localStorage.setItem(this.key, JSON.stringify({ active: this.active, offers: this.offers, completed: this.completed, failed: this.failed, tutorialDone: this.tutorialDone, seq: this.seq }));
+      localStorage.setItem(this.key, JSON.stringify({ active: this.active, offers: this.offers, completed: this.completed, failed: this.failed, tutorialDone: this.tutorialDone, seq: this.seq, typesDone: [...this.typesDone], mastered: this.mastered }));
     } catch { /* sin almacenamiento */ }
   }
 
   byName(name) { return this.stations.find(s => s.name === name) || null; }
+
+  /** Avance de la libreta: tipos cumplidos / total. */
+  get progress() {
+    return { done: MISSION_TYPES.filter(t => this.typesDone.has(t.type)).length, total: MISSION_TYPES.length };
+  }
 
   /** Paso actual de la misión activa. */
   get step() { return this.active ? this.active.steps[this.active.step] : null; }
@@ -92,10 +127,13 @@ export class MissionSystem {
 
   refill(ctx) {
     const makers = [this.makeShopping, this.makeTourism, this.makeDelivery, this.makeTimed, this.makeSaver, this.makeWork, this.makeShopping];
+    const byType = { compras: this.makeShopping, turismo: this.makeTourism, encargo: this.makeDelivery, contrarreloj: this.makeTimed, ahorro: this.makeSaver, trabajo: this.makeWork };
+    const missing = this.mastered ? [] : MISSION_TYPES.filter(t => !this.typesDone.has(t.type)).map(t => byType[t.type]);
     const used = new Set(this.offers.map(o => o.type));
     let guard = 0;
     while (this.offers.length < OFFERS && guard++ < 40) {
-      const m = pickOf(makers).call(this, ctx);
+      // Mientras falten tipos en la libreta, se ofrecen más seguido
+      const m = pickOf(missing.length && Math.random() < 0.6 ? missing : makers).call(this, ctx);
       if (!m || (used.has(m.type) && guard < 30)) continue;
       used.add(m.type);
       this.offers.push(m);
@@ -177,7 +215,14 @@ export class MissionSystem {
       this.completed++;
       this.active = null;
       this.refill(ctx);
-      out.push({ text: `✔ Misión cumplida: ${m.title} · recompensa ${formatCLP(m.reward)}`, level: "ok", completed: m });
+      const kind = m.type === "tutorial" ? "compras" : m.type;
+      const fresh = !this.typesDone.has(kind);
+      this.typesDone.add(kind);
+      out.push({ text: `✔ Misión cumplida: ${m.title} · recompensa ${formatCLP(m.reward)}${fresh && !this.mastered ? ` · libreta ${this.progress.done}/${this.progress.total}` : ""}`, level: "ok", completed: m });
+      if (!this.mastered && this.progress.done === this.progress.total) {
+        this.mastered = true;
+        out.push({ text: "🏆 ¡Libreta de misiones completa!", level: "ok", mastered: this.lineId });
+      }
     } else {
       out.push({ text: `✔ ${m.steps[m.step - 1].text} · ahora: ${m.steps[m.step].text}`, level: "ok" });
       // El siguiente paso puede estar cumplido ya (p. ej. ya tienes bip!)

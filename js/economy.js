@@ -37,18 +37,19 @@ const round10 = (n) => Math.max(0, Math.round(n / 10) * 10);
 
 /**
  * Pago de una estación servida.
- * @param {{gained:number, perfect:boolean, deductions:number}} s
+ * @param {{gained:number, perfect:boolean, deductions:number, mult?:number}} s
  *   gained: puntos de la estación · deductions: puntos de falta desde la anterior
+ *   mult: multiplicador del contrato comprado en la Tienda Metro (shop.js)
  * @returns {{pay:number, gross:number, discount:number}}
  */
-export function stationWage({ gained, perfect, deductions = 0 }) {
-  const gross = round10(WAGE.base + gained * WAGE.perPoint + (perfect ? WAGE.perfect : 0));
+export function stationWage({ gained, perfect, deductions = 0, mult = 1 }) {
+  const gross = round10((WAGE.base + gained * WAGE.perPoint + (perfect ? WAGE.perfect : 0)) * mult);
   const discount = Math.min(gross, round10(deductions * WAGE.deduction));
   return { pay: gross - discount, gross, discount };
 }
 
 /** Bono al terminar el servicio según la nota (S..D). */
-export function shiftBonus(grade) { return WAGE.shift[grade] ?? 0; }
+export function shiftBonus(grade, mult = 1) { return round10((WAGE.shift[grade] ?? 0) * mult); }
 
 export class BankAccount {
   constructor() {
