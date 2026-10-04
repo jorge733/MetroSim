@@ -91,8 +91,9 @@ Three.js se carga desde CDN, así que hace falta conexión a internet.
 
 | Tecla | Acción |
 |---|---|
-| W A S D / flechas | Caminar (Shift: correr) |
-| Clic · Esc | Capturar / soltar el ratón |
+| W / ↑ · S / ↓ | Caminar hacia adelante · retroceder despacio (Shift: correr) |
+| A / ← · D / → | Girar |
+| Re Pág · Av Pág | Mirar arriba / abajo (al caminar la vista vuelve sola al frente) |
 | F | Sentarse / levantarse (en el tren o en un banco del andén) |
 | E | Boletería, tótem, salida a la calle · en la calle: entrar a un local, bajar al Metro o sacar una foto del hito |
 | J | Misiones |

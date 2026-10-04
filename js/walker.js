@@ -13,10 +13,12 @@
    coches por la intercirculación, te sientas, bajas, subes a la mezanina y
    sales a la calle.
 
-   Controles: W A S D / flechas caminar · Shift correr · ratón mirar
-   (clic para capturar, Esc para soltar) · F sentarse (en el tren o en un
-   banco del andén mientras esperas) · E interactuar (boletería, tótem de
-   carga, salida a la calle).
+   Controles (solo teclado, como una persona de verdad): W / ↑ caminar
+   hacia adelante · S / ↓ retroceder despacio · A D / ← → girar · Shift
+   correr · Re Pág / Av Pág mirar arriba / abajo (la mirada vuelve sola al
+   frente al caminar) · F sentarse · E interactuar.
+   El cuerpo tiene inercia: acelera y frena de a poco, gira con suavidad,
+   la cabeza se balancea con cada paso y se oyen los pasos (evento "step").
 
    Choques: no se atraviesan columnas, bancos ni a los demás viajeros
    (stationLayout.js y el sistema de viajeros).
@@ -40,7 +42,10 @@ import { clamp } from "./utils.js";
 import { platformSolidAt, isArrivalOnly } from "./stationLayout.js";
 
 const EYE = 1.62;
-const WALK = 1.45, RUN = 3.1;
+const WALK = 1.4, RUN = 3.2, BACK = 0.75;        // m/s: caminar, correr, retroceder
+const ACCEL = 2.2, DECEL = 4.5;                   // m/s²: arrancar / detenerse
+const TURN = 1.7, TURN_RUN = 1.25;                // rad/s de giro (corriendo se gira más abierto)
+const LOOK = 0.9;                                 // rad/s al mirar arriba / abajo
 const S = CONFIG.station, MZ = CONFIG.mezzanine, F = CONFIG.train.floorY;
 
 export class Walker {
@@ -112,24 +117,17 @@ export class Walker {
   }
 
   /* ----- Entrada ----- */
+  /** El pasajero se maneja solo con el teclado (o los controles táctiles): el ratón no mueve la vista. */
   attach(dom) {
     this.dom = dom;
-    // requestPointerLock puede devolver una promesa rechazada (iframes, permisos): se ignora y queda el arrastre con el ratón
-    this.onClick = () => { if (document.pointerLockElement !== dom) dom.requestPointerLock?.()?.catch?.(() => {}); };
-    this.onMouse = (ev) => {
-      const locked = document.pointerLockElement === dom;
-      if (!locked && !(ev.buttons & 1)) return;
-      const k = locked ? 0.0022 : 0.004;
-      this.yaw -= ev.movementX * k;
-      this.pitch = clamp(this.pitch - ev.movementY * k, -1.3, 1.3);
-    };
-    dom.addEventListener("click", this.onClick);
-    dom.addEventListener("mousemove", this.onMouse);
+    this.speed = 0;          // velocidad actual hacia adelante (m/s, negativa al retroceder)
+    this.turnRate = 0;       // giro actual (rad/s)
+    this.stepPhase = 0;
+    this.sway = 0;
+    if (document.pointerLockElement) document.exitPointerLock?.();
   }
 
   detach() {
-    this.dom?.removeEventListener("click", this.onClick);
-    this.dom?.removeEventListener("mousemove", this.onMouse);
     if (document.pointerLockElement) document.exitPointerLock?.();
   }
 
@@ -356,6 +354,7 @@ export class Walker {
   update(dt) {
     this.deniedT = Math.max(0, this.deniedT - dt);
     if (!this.seat && dt > 0 && !this.frozen) this.move(dt);
+    if (this.seat || this.frozen) { this.speed = 0; this.turnRate = 0; this.moving = false; }   // sentado o en un panel: quieto
 
     // En la calle: solo caminar; al pisar la boca del acceso se baja a la estación
     if (this.space === "street") {
@@ -411,29 +410,56 @@ export class Walker {
   updateCamera() {
     this.holder.position.copy(this.pos);
     if (this.seat) this.holder.position.y = this.seat.seatY - 0.62;
-    const bob = this.moving ? Math.sin(this.stepPhase) * 0.025 : 0;
-    this.camera.position.set(0, EYE + bob, 0);
-    this.camera.rotation.set(this.pitch, this.yaw, 0);
+    // Balanceo de la cabeza: sube y baja con cada paso y se mece de lado a lado
+    const amp = Math.min(1, Math.abs(this.speed || 0) / WALK);
+    const bob = Math.abs(Math.sin(this.stepPhase || 0)) * 0.045 * amp;
+    const side = Math.cos(this.stepPhase || 0) * 0.025 * amp;
+    this.camera.position.set(side * Math.cos(this.yaw), EYE - 0.02 * amp + bob, -side * Math.sin(this.yaw));
+    this.camera.rotation.set(this.pitch, this.yaw, (this.sway || 0) + side * 0.15);
   }
 
   move(dt) {
     const k = this.keys;
-    let f = 0, r = 0;
+    let f = 0, turn = 0;
     if (k.has("w") || k.has("arrowup")) f += 1;
     if (k.has("s") || k.has("arrowdown")) f -= 1;
-    if (k.has("d") || k.has("arrowright")) r += 1;
-    if (k.has("a") || k.has("arrowleft")) r -= 1;
-    this.moving = f !== 0 || r !== 0;
+    if (k.has("d") || k.has("arrowright")) turn -= 1;
+    if (k.has("a") || k.has("arrowleft")) turn += 1;
+    const running = k.has("shift") && f > 0;
+
+    // Velocidad con inercia: acelera y frena de a poco
+    const target = f > 0 ? (running ? RUN : WALK) : f < 0 ? -BACK : 0;
+    const rate = Math.abs(target) > Math.abs(this.speed) && Math.sign(target || 1) === Math.sign(this.speed || target || 1) ? ACCEL : DECEL;
+    this.speed += Math.max(-rate * dt, Math.min(rate * dt, target - this.speed));
+    if (Math.abs(this.speed) < 0.02 && !target) this.speed = 0;
+
+    // Giro suave (el cuerpo no gira de golpe) y leve inclinación al girar caminando
+    const maxTurn = running ? TURN_RUN : TURN;
+    this.turnRate += (turn * maxTurn - this.turnRate) * Math.min(1, dt * 6);
+    this.yaw += this.turnRate * dt;
+    this.sway += (-this.turnRate * Math.min(1, Math.abs(this.speed) / WALK) * 0.03 - this.sway) * Math.min(1, dt * 5);
+
+    // Mirada: Re Pág / Av Pág; al caminar vuelve sola a mirar al frente
+    const look = (k.has("pageup") ? 1 : 0) - (k.has("pagedown") ? 1 : 0);
+    if (look) this.pitch = clamp(this.pitch + look * LOOK * dt, -1.1, 1.1);
+    else if (Math.abs(this.speed) > 0.3) this.pitch += (-0.04 - this.pitch) * Math.min(1, dt * 1.5);
+
+    this.moving = Math.abs(this.speed) > 0.05;
     if (!this.moving) return;
-    const speed = (k.has("shift") ? RUN : WALK) * dt / Math.hypot(f, r);
-    this.stepPhase = (this.stepPhase || 0) + dt * (k.has("shift") ? 14 : 9);
-    const dx = (-Math.sin(this.yaw) * f + Math.cos(this.yaw) * r) * speed;
-    const dz = (-Math.cos(this.yaw) * f - Math.sin(this.yaw) * r) * speed;
+
+    // Pasos: la cadencia sube con la velocidad; cada medio ciclo suena un paso
+    const before = Math.floor((this.stepPhase || 0) / Math.PI);
+    this.stepPhase = (this.stepPhase || 0) + dt * (5.2 + Math.abs(this.speed) * 2.6);
+    if (Math.floor(this.stepPhase / Math.PI) !== before) this.onEvent("step", { running, space: this.space });
+
+    const dx = -Math.sin(this.yaw) * this.speed * dt;
+    const dz = -Math.cos(this.yaw) * this.speed * dt;
     const { x, z, y } = this.pos;
 
     if (this.space === "street") {
       const tries = [[dx, dz], [dx, 0], [0, dz]];
-      for (const [mx, mz] of tries) if (this.city.walkable(x + mx, z + mz)) { this.pos.x += mx; this.pos.z += mz; return; }
+      for (const [mx, mz] of tries) if (this.city.walkable(x + mx, z + mz)) { this.pos.x += mx; this.pos.z += mz; if (mx !== dx || mz !== dz) this.speed *= 0.9; return; }
+      this.speed *= 0.5;
       return;
     }
     const unit = this.space === "train" ? this.unit : null;

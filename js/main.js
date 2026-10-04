@@ -292,7 +292,7 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A) {
   hud.setBank(bank);
   hud.showMessage(mode === "driver"
     ? `Servicio ${playerTrip.id} · ${direction.label} · salida ${formatClock(playerTrip.departure)} · cada estación bien servida te paga en tu cuenta`
-    : `Calle de ${STATIONS[stationIndex].name} · cuenta ${bank.label} · J misiones · clic para mirar con el ratón`, "info", 7000);
+    : `Calle de ${STATIONS[stationIndex].name} · cuenta ${bank.label} · W/S caminar · A/D girar · Shift correr · J misiones`, "info", 7000);
 
   game.raf = requestAnimationFrame(loop);
 }
@@ -396,7 +396,7 @@ function toggleSound() {
 function onKeyDown(event) {
   if (!game || game.warming) return;
   const key = event.key.toLowerCase();
-  if (["arrowup", "arrowdown", "arrowleft", "arrowright", " "].includes(key)) event.preventDefault();
+  if (["arrowup", "arrowdown", "arrowleft", "arrowright", " ", "pageup", "pagedown"].includes(key)) event.preventDefault();
   if (hud.summaryOpen) return;
   if (hud.ticketOpen) { if (key === "escape" || key === "e") hud.closeTicket(); return; }
   if (hud.storeOpen) { if (key === "escape" || key === "e") hud.closeStore(); return; }
@@ -680,6 +680,9 @@ function onWalkerEvent(type, data) {
   switch (type) {
     case "service":
       openService(data);
+      break;
+    case "step":
+      game.audio.footstep(data.space === "street" ? "street" : data.space === "train" ? "train" : "tile", data.running);
       break;
     case "boarded":
       if (!ride.origin) { ride.origin = data.unit.sim.dockedStation()?.world || null; ride.boardedClock = game.clock; }

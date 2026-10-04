@@ -414,6 +414,15 @@ export class AudioSystem {
     }
   }
 
+  /** Paso del pasajero: vereda (seco), baldosa de la estación (más brillante) o piso del tren (sordo). */
+  footstep(surface = "tile", running = false) {
+    if (!this.ctx) return;
+    const f = { street: 900, tile: 1700, train: 600 }[surface] || 1200;
+    const g = (running ? 0.07 : 0.045) * (0.8 + Math.random() * 0.4);
+    this.burst({ duration: 0.07, gain: g, type: "bandpass", freq: f * (0.85 + Math.random() * 0.3), q: 1.2, attack: 0.003 });
+    this.burst({ duration: 0.05, gain: g * 0.8, type: "lowpass", freq: 220, q: 0.7, attack: 0.002, buffer: this.brown });
+  }
+
   /** Obturador de la cámara de fotos. */
   shutter() {
     if (!this.ctx) return;
