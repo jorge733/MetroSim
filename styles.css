@@ -1219,3 +1219,59 @@ button, select, .shop-launch { touch-action: manipulation; -webkit-tap-highlight
 .schedule-mini { display: none; font-size: 12px; color: #a9b7c5; font-variant-numeric: tabular-nums; }
 .schedule-mini .delay { font-size: 13px; }
 @media (max-width: 980px) { .schedule-mini { display: block; } }
+/* ---------- Tutorial interactivo (tutorial.js) ---------- */
+.tutorial-launch {
+  justify-self: start; margin-top: 8px; padding: 5px 10px; border-radius: 999px; cursor: pointer;
+  border: 1px solid #ffd16666; background: #ffd16614; color: #ffe7a8; font-size: 12px; font-weight: 600;
+}
+.tutorial-launch:hover { border-color: var(--warn); background: #ffd16626; }
+.tutorial {
+  position: absolute; top: 118px; z-index: 4; display: grid; gap: 7px;
+  width: min(360px, calc(100% - 32px)); padding: 12px 14px 12px;
+  border: 1px solid #ffd16655; border-left: 5px solid var(--warn); border-radius: 14px;
+  background: #0b141ef0; backdrop-filter: blur(14px); box-shadow: 0 14px 40px #000a;
+  transition: border-color .25s, background .25s;
+}
+.tutorial-driver { left: 18px; }
+.tutorial-passenger { right: 18px; }
+.tutorial.enter { animation: tutorialIn .35s ease-out; }
+.tutorial.passed { border-color: #6fe39a; background: #0d2219f0; }
+.tutorial header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.tutorial-badge { font-size: 11px; font-weight: 800; letter-spacing: 1.5px; color: var(--warn); }
+.tutorial.passed .tutorial-badge::after { content: " · ✔ ¡BIEN!"; color: var(--ok); }
+.tutorial-count { font-size: 11px; color: var(--muted); }
+.tutorial-bar { height: 4px; border-radius: 2px; background: #ffffff14; overflow: hidden; }
+.tutorial-bar i { display: block; height: 100%; background: var(--warn); transition: width .4s; }
+.tutorial-title { font-size: 17px; }
+.tutorial-text { font-size: 13px; line-height: 1.45; color: #d6e1ec; }
+.tutorial-live {
+  padding: 6px 9px; border-radius: 8px; background: #ffffff0d; font-size: 12.5px; font-weight: 700;
+  color: #ffe7a8; font-variant-numeric: tabular-nums;
+}
+.tutorial-live[hidden] { display: none; }
+.tutorial footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 2px; }
+.tutorial footer button { padding: 7px 12px; border-radius: 9px; cursor: pointer; font-size: 12.5px; }
+.tutorial-next[hidden], .tutorial-wait[hidden], .tutorial-skip[hidden] { display: none; }
+.tutorial-skip[hidden] + .tutorial-next { margin-left: auto; }
+.tutorial-wait { font-size: 12px; color: var(--muted); font-style: italic; }
+.tut-focus { outline: 2px solid var(--warn); outline-offset: 3px; animation: tutorialPulse 1.4s ease-in-out infinite; }
+@keyframes tutorialIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+@keyframes tutorialPulse { 50% { outline-color: #ffd16633; } }
+@media (prefers-reduced-motion: reduce) {
+  .tutorial.enter, .tut-focus { animation: none; }
+}
+@media (max-width: 720px) {
+  .tutorial { top: 64px; left: 50%; right: auto; transform: translateX(-50%); width: min(340px, calc(100% - 32px)); padding: 9px 11px; gap: 5px; }
+  .tutorial.enter { animation: none; }
+  .tutorial-title { font-size: 15px; }
+  .tutorial-text { font-size: 12px; }
+}
+/* Pantallas táctiles: centrada entre las columnas de botones (mando a la izquierda, puertas/inversor a la derecha) y bajo los avisos */
+body.touch-mode .tutorial {
+  top: 116px; left: 50%; right: auto; transform: translateX(-50%);   /* bajo los avisos (#message) */
+  width: max(220px, min(400px, calc(100% - 250px))); padding: 9px 11px; gap: 5px;
+}
+body.touch-mode .tutorial.enter { animation: none; }
+body.touch-mode .tutorial-title { font-size: 15px; }
+body.touch-mode .tutorial-text { font-size: 12px; line-height: 1.3; }
+body.touch-mode .tutorial footer button { padding: 5px 10px; }

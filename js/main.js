@@ -44,6 +44,7 @@
      city/        la calle de cada estación: plan.js (locales), catalog.js (hitos),
                   landmarks.js (modelos de los hitos), kit.js (piezas), city.js (calle 3D)
      scoring.js   puntaje del conductor: parada, horario, confort, rachas y récord
+   tutorial.js  tutorial interactivo del jugador nuevo (conductor y pasajero)
      announcements.js  frases reales de megafonía del Metro de Santiago
 
    Principio: Conductor y Pasajero comparten el MISMO mundo, el MISMO tráfico
@@ -93,6 +94,7 @@ import { Inventory, souvenirId, SOUVENIR_PRICE, ALBUM_REWARD, LICENSES } from ".
 import { openShopUI } from "./shopUI.js";
 import { trainLiveryMaterials } from "./train.js";
 import { City } from "./city/city.js";
+import { Tutorial, tutorialDone } from "./tutorial.js";
 
 const startScreen = $("startScreen");
 const loadingScreen = $("loadingScreen");
@@ -200,6 +202,8 @@ function useLine(line) {
 }
 
 document.querySelectorAll("[data-mode]").forEach(btn => btn.addEventListener("click", () => startGame(btn.dataset.mode)));
+// "🎓 Tutorial" de cada modo: juega ese modo con el tutorial interactivo desde el principio
+document.querySelectorAll("[data-tutorial]").forEach(btn => btn.addEventListener("click", () => startGame(btn.dataset.tutorial, { tutorial: true })));
 $("backButton").addEventListener("click", stopGame);
 $("shopButton").addEventListener("click", () => openStore());
 $("soundButton").addEventListener("click", toggleSound);
@@ -218,7 +222,7 @@ window.MetroSim = { get game() { return game; }, bank, card, CONFIG, get STATION
    Inicio y fin de partida
    ========================================================================== */
 
-function startGame(mode) {
+function startGame(mode, opts = {}) {
   if (game) stopGame();
   if (mode === "control") return startControl();
   if (mode === "driver" && !inventory.canDrive(driverLineSelect.value)) {
@@ -234,7 +238,7 @@ function startGame(mode) {
   const audio = new AudioSystem();          // dentro del gesto del usuario
   audio.muted = muted;
   audio.start();
-  setTimeout(() => buildGame(mode, stationIndex, audio, direction), 40);
+  setTimeout(() => buildGame(mode, stationIndex, audio, direction, opts), 40);
 }
 
 function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = {}) {
@@ -352,6 +356,17 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = {}) {
 
   hud.setCard(card);
   hud.setBank(bank);
+
+  // Tutorial interactivo: la primera vez en cada modo, al pedirlo desde la portada o si sigue en curso tras una combinación
+  if (opts.tutorial || opts.tutorialStep != null || !tutorialDone(mode)) {
+    $("controlsHelp").classList.add("hidden");
+    game.tutorial = new Tutorial({
+      mode, parent: gameScreen, touch: wantsTouch(), step: opts.tutorialStep ?? 0,
+      onStep: () => game?.audio.loadOk(),
+      onFinish: () => { if (game) { game.tutorial = null; hud.showMessage("Tutorial completado · H muestra los controles · 🎓 Tutorial en la portada para repetirlo", "ok", 5000); } },
+    });
+  }
+
   if (opts.transferFrom) {
     $("controlsHelp").classList.add("hidden");
     hud.fadeIn();
@@ -368,6 +383,7 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = {}) {
 function stopGame({ keepFullscreen = false } = {}) {
   if (!game) return;
   game.touch?.destroy();
+  game.tutorial?.destroy();
   cancelAnimationFrame(game.raf);
   game.audio.stop();
   game.walker?.detach();
@@ -552,6 +568,7 @@ function onKeyDown(event) {
   if (hud.ticketOpen) { if (key === "escape" || key === "e") hud.closeTicket(); return; }
   if (hud.storeOpen) { if (key === "escape" || key === "e") hud.closeStore(); return; }
   if (hud.missionsOpen) { if (key === "escape" || key === "j") hud.closeMissions(); return; }
+  if (game.tutorial?.onKey(key)) return;                 // Enter: siguiente paso del tutorial
 
   if (key === "m") return toggleSound();
   if (key === "k" && !game.transition) return openStore({ tab: game.walker ? "album" : "driver" });
@@ -1054,6 +1071,7 @@ function transferLine(lineId, st) {
   const target = line.stations.find(s => s.name === st.name);
   if (!target) { game.walker.transferring = false; return; }
   const fromId = LINE.id;
+  const tutorialStep = game.tutorial ? game.tutorial.index : null;     // el tutorial sigue en la otra línea
   game.transition = true;
   game.walker.frozen = true;
   game.walker.keys.clear();
@@ -1072,7 +1090,7 @@ function transferLine(lineId, st) {
     const audio = new AudioSystem();
     audio.muted = muted;
     audio.start();
-    setTimeout(() => buildGame("passenger", target.index, audio, ROUTE_A, { transferFrom: fromId }), 40);
+    setTimeout(() => buildGame("passenger", target.index, audio, ROUTE_A, { transferFrom: fromId, tutorialStep }), 40);
   }, 700);
 }
 
@@ -1457,8 +1475,10 @@ function loop(now) {
     if (player.sim.speed > 0.2) game.lastDecel = -player.sim.accel;
     game.score.update(dt, player.sim);
     hud.updateDriver(player.sim, info, { clock: game.clock, onboard: people.onboardCount(player), boardingBusy: engine.isBoarding(player) });
+    game.tutorial?.update(dt, { game, sim: player.sim, info });
   } else {
     hud.updatePassenger(walkerHudData());
+    game.tutorial?.update(dt, { game, walker, card, hud, fare: fareBandAt(game.clock).price });
   }
 
   game.renderer.render(game.scene, game.camera);
