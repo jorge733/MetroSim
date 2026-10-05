@@ -1214,3 +1214,8 @@ button, select, .shop-launch { touch-action: manipulation; -webkit-tap-highlight
   .ticket-actions button { flex: 1; }
 }
 .shop-head, .shop-tabs, .shop-notice { flex-shrink: 0; }
+
+/* Horario compacto en el panel de estación (cuando el panel de señal y horario no cabe) */
+.schedule-mini { display: none; font-size: 12px; color: #a9b7c5; font-variant-numeric: tabular-nums; }
+.schedule-mini .delay { font-size: 13px; }
+@media (max-width: 980px) { .schedule-mini { display: block; } }
