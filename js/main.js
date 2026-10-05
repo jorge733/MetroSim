@@ -361,6 +361,8 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = {}) {
     : `Calle de ${STATIONS[stationIndex].name} · cuenta ${bank.label} · ${game.touch ? "joystick para caminar · arrastra para mirar · 🎯 misiones" : "W/S caminar · A/D girar · Shift correr · J misiones"}`, "info", 7000);
 
   game.raf = requestAnimationFrame(loop);
+  armBackTrap();
+  keepScreenOn();
 }
 
 function stopGame({ keepFullscreen = false } = {}) {
@@ -381,7 +383,11 @@ function stopGame({ keepFullscreen = false } = {}) {
   gameScreen.classList.add("hidden");
   loadingScreen.classList.add("hidden");
   startScreen.classList.remove("hidden");
-  if (!keepFullscreen) exitMobileFullscreen();
+  if (!keepFullscreen) {                       // en una combinación se sigue jugando: no se suelta nada
+    exitMobileFullscreen();
+    disarmBackTrap();
+    releaseScreen();
+  }
 }
 
 /* Celular: pantalla completa y horizontal mientras se juega (si el navegador lo permite;
@@ -400,6 +406,63 @@ function exitMobileFullscreen() {
   if (ownFullscreen && document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
   ownFullscreen = false;
 }
+
+/* "Atrás" no saca del juego: mientras se juega hay una entrada extra en el historial.
+   El gesto o botón atrás la consume y vuelve al menú de MetroSim (o cierra la ventana abierta). */
+let backTrap = false, ignorePops = 0;
+function armBackTrap() {
+  if (backTrap) return;
+  history.pushState({ metrosim: "play" }, "");
+  backTrap = true;
+}
+function disarmBackTrap() {
+  if (!backTrap) return;
+  backTrap = false;
+  ignorePops++;
+  history.back();                       // quita la entrada extra (su popstate se ignora)
+}
+window.addEventListener("popstate", () => {
+  if (ignorePops > 0) { ignorePops--; return; }
+  if (!backTrap) return;
+  backTrap = false;                     // el navegador ya la quitó
+  // Primero cierra la ventana que esté abierta (tienda, boletería, local, misiones) y se sigue jugando
+  const shopClose = document.querySelector(".shop-overlay .shop-close");
+  if (shopClose) shopClose.click();
+  else if (game && hud.ticketOpen) hud.closeTicket();
+  else if (game && hud.storeOpen) hud.closeStore();
+  else if (game && hud.missionsOpen) hud.closeMissions();
+  else if (game) return stopGame();
+  else if (control) return stopControl();
+  else return;
+  armBackTrap();
+});
+
+/* Aviso antes de cerrar o recargar la página en medio de una partida */
+window.addEventListener("beforeunload", (ev) => {
+  if (!(game && !game.warming) && !control) return;
+  ev.preventDefault();
+  ev.returnValue = "";                  // los navegadores muestran su propio "¿Salir del sitio?"
+});
+
+/* Pantalla siempre encendida mientras se juega (Wake Lock; si el navegador no lo tiene, nada cambia) */
+let wakeLock = null, wantAwake = false;
+async function keepScreenOn() {
+  wantAwake = true;
+  if (wakeLock || !navigator.wakeLock || document.visibilityState !== "visible") return;
+  try {
+    wakeLock = await navigator.wakeLock.request("screen");
+    wakeLock.addEventListener("release", () => { wakeLock = null; });
+  } catch { /* sin permiso (batería baja, etc.): se juega igual */ }
+}
+function releaseScreen() {
+  wantAwake = false;
+  wakeLock?.release().catch(() => {});
+  wakeLock = null;
+}
+// El navegador suelta el bloqueo al cambiar de app; se pide de nuevo al volver
+document.addEventListener("visibilitychange", () => {
+  if (wantAwake && document.visibilityState === "visible") keepScreenOn();
+});
 
 /* ==========================================================================
    Centro de Control: solo el motor y un esquema 2D (sin mundo 3D ni sonido)
@@ -422,6 +485,8 @@ function startControl() {
     window.MetroSim.control = control;
     loadingScreen.classList.add("hidden");
     control.raf = requestAnimationFrame(controlLoop);
+    armBackTrap();
+    keepScreenOn();
   }, 40);
 }
 
@@ -445,6 +510,8 @@ function stopControl() {
   control.ui.destroy();
   control = null;
   startScreen.classList.remove("hidden");
+  disarmBackTrap();
+  releaseScreen();
 }
 
 function restartGame() {
