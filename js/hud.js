@@ -25,6 +25,7 @@ export class Hud {
       stationTitle: $("stationTitle"), nextStation: $("nextStation"), distance: $("distance"),
       precision: $("precision"), precisionMarker: $("precisionMarker"), precisionText: $("precisionText"),
       signalId: $("signalId"), signalDist: $("signalDist"), scheduleLabel: $("scheduleLabel"), scheduleDelay: $("scheduleDelay"),
+      scheduleMiniLabel: $("scheduleMiniLabel"), scheduleMiniDelay: $("scheduleMiniDelay"),
       doorLamp: $("doorLamp"), doorStatus: $("doorStatus"), doorHint: $("doorHint"), onboard: $("onboardCount"),
       paxTitle: $("paxTitle"), paxStation: $("paxStation"), paxSub: $("paxSub"), paxHint: $("paxHint"),
       lineStrip: $("lineStrip"), lineStripTrain: $("lineStripTrain"),
@@ -183,6 +184,9 @@ export class Hud {
       this.setText(e.scheduleLabel, info.schedule.label);
       this.setText(e.scheduleDelay, info.schedule.delayText);
       e.scheduleDelay.className = `delay ${info.schedule.cls}`;
+      this.setText(e.scheduleMiniLabel, info.schedule.label);
+      this.setText(e.scheduleMiniDelay, info.schedule.delayText);
+      e.scheduleMiniDelay.className = `delay ${info.schedule.cls}`;
     }
 
     // Puertas y viajeros
