@@ -66,7 +66,28 @@ const CSS = `
 .pcc-log .warn { border-left: 3px solid #ffb020; } .pcc-log .alert { border-left: 3px solid #ff4b4b; } .pcc-log .ok { border-left: 3px solid #3fd07a; }
 .pcc-legend { display: flex; flex-wrap: wrap; gap: 8px 12px; font-size: 12px; color: var(--pcc-dim); }
 .pcc-legend i { display: inline-block; width: 12px; height: 8px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
-@media (max-width: 900px) { .pcc-body { grid-template-columns: 1fr; } .pcc-line canvas { height: 170px; } }
+.pcc-scroll { min-width: 0; }
+.pcc-train-close { display: none; }
+@media (max-width: 900px) { .pcc-body { grid-template-columns: 1fr; } .pcc-line canvas { height: 200px; } }
+/* Celular: esquemas desplazables de lado (las estaciones no se amontonan) y ficha del tren como hoja inferior */
+@media (max-width: 760px) {
+  .pcc { padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left); }
+  .pcc-top { gap: 6px 10px; padding: 8px 12px; }
+  .pcc-top h1 { font-size: 15px; }
+  .pcc-top small, .pcc-legend { font-size: 11px; }
+  .pcc-clock { font-size: 18px; }
+  .pcc-body { padding: 10px 10px 90px; gap: 10px; }
+  .pcc-line { padding: 8px 10px; }
+  .pcc-line header small { flex-basis: 100%; order: 3; }
+  .pcc-kpis { gap: 4px 12px; font-size: 12px; }
+  .pcc-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; margin: 0 -10px; padding: 0 10px; }
+  .pcc-line canvas { width: 860px; max-width: none; height: 190px; }
+  .pcc button { min-height: 38px; }
+  .pcc-train.has-train { position: fixed; left: 8px; right: 8px; bottom: calc(8px + env(safe-area-inset-bottom)); z-index: 2;
+    max-height: 45vh; overflow: auto; box-shadow: 0 -10px 40px #000c; border-color: #4aa3ff88; }
+  .pcc-train.has-train .pcc-train-close { display: block; position: absolute; top: 8px; right: 8px; min-height: 0; padding: 4px 10px; }
+  .pcc-train { position: relative; }
+}
 `;
 
 export class ControlCenter {
@@ -101,7 +122,7 @@ export class ControlCenter {
       <div class="pcc-body">
         <div class="pcc-lines"></div>
         <aside class="pcc-side">
-          <div class="pcc-card pcc-train"><h2>TREN SELECCIONADO</h2><div class="pcc-train-body"><small>Haz clic en un tren del esquema.</small></div></div>
+          <div class="pcc-card pcc-train"><button class="pcc-train-close" data-act="deselect" aria-label="Cerrar">✕</button><h2>TREN SELECCIONADO</h2><div class="pcc-train-body"><small>Toca un tren del esquema.</small></div></div>
           <div class="pcc-card"><h2>INCIDENCIAS</h2><ul class="pcc-log"></ul></div>
         </aside>
       </div>`;
@@ -125,7 +146,7 @@ export class ControlCenter {
           <button data-act="reg" data-line="${ls.line.id}" style="margin-left:auto">Regulación</button>
         </header>
         <div class="pcc-kpis"></div>
-        <canvas></canvas>`;
+        <div class="pcc-scroll"><canvas></canvas></div>`;
       wrap.append(el);
       const canvas = el.querySelector("canvas");
       canvas.addEventListener("click", (ev) => this.pick(ls, canvas, ev));
@@ -137,6 +158,7 @@ export class ControlCenter {
       if (!btn) return;
       const act = btn.dataset.act;
       if (act === "exit") this.onExit();
+      else if (act === "deselect") { this.selected = null; this.renderTrain(); }
       else if (act === "reg") {
         const ls = this.engine.line(btn.dataset.line);
         this.engine.command("control.regulation", { on: !ls.regulator.enabled, line: ls.line.id, source: "pcc" });
@@ -306,8 +328,9 @@ export class ControlCenter {
 
   renderTrain() {
     const u = this.selected ? this.engine.findTrain(this.selected) : null;
+    this.trainEl.parentElement.classList.toggle("has-train", !!u);     // en el celular: hoja inferior
     if (!u) {
-      const html = this.selected ? `<small>El tren ${this.selected} ya no está en servicio.</small>` : `<small>Haz clic en un tren del esquema.</small>`;
+      const html = this.selected ? `<small>El tren ${this.selected} ya no está en servicio.</small>` : `<small>Toca un tren del esquema.</small>`;
       if (html !== this.lastTrainHtml) { this.trainEl.innerHTML = html; this.lastTrainHtml = html; }
       return;
     }
