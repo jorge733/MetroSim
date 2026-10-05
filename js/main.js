@@ -201,6 +201,7 @@ function useLine(line) {
 
 document.querySelectorAll("[data-mode]").forEach(btn => btn.addEventListener("click", () => startGame(btn.dataset.mode)));
 $("backButton").addEventListener("click", stopGame);
+$("endShiftButton").addEventListener("click", requestEndShift);
 $("shopButton").addEventListener("click", () => openStore());
 $("soundButton").addEventListener("click", toggleSound);
 window.addEventListener("keydown", onKeyDown);
@@ -338,6 +339,7 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = {}) {
   renderer.compile(scene, camera);
 
   hud.setMode(mode);
+  $("endShiftButton").classList.toggle("hidden", mode !== "driver");
   // La ayuda de controles se muestra al empezar y se oculta sola (H la vuelve a mostrar)
   $("controlsHelp").classList.remove("hidden");
   setTimeout(() => game && $("controlsHelp").classList.add("hidden"), 12000);
@@ -578,6 +580,7 @@ function onKeyDown(event) {
   if (event.repeat) return;
   if (key === "r") return restartGame();
   if (key === "t") return changeCab();
+  if (key === "f") return requestEndShift();
 }
 
 /** Respuesta del motor a una orden (del conductor o desde la consola / Centro de Control). */
@@ -709,7 +712,7 @@ function onPlayerEvent(type, data) {
       if (data.delay < -10) hud.showMessage(`Salida anticipada de ${data.station.name} (${formatDelay(data.delay)}) · respeta el horario`, "warn", 4000);
       break;
     case "doorsOpen":
-      if (data.station === game.player.route.last) setTimeout(() => game && showDriverSummary(), 2500);
+      if (data.station === game.player.route.last && !game.shiftEnded) setTimeout(() => game && !game.shiftEnded && showDriverSummary(), 2500);
       break;
     case "overspeed":
       stats.overspeeds++;
@@ -754,7 +757,24 @@ function newScore(route) {
   return score;
 }
 
-function showDriverSummary() {
+/**
+ * Finalizar turno antes de la terminal: el primer toque pide confirmación (para no
+ * terminar por accidente) y el segundo, dentro de 4 s, muestra el resumen del servicio.
+ */
+function requestEndShift() {
+  if (!game?.player || game.transition || hud.summaryOpen) return;
+  if (game.shiftEnded) return hud.showMessage("Este servicio ya terminó · haz la maniobra de retorno (T) o vuelve al menú", "info", 4000);
+  const now = performance.now();
+  if (!game.endShiftAsk || now - game.endShiftAsk > 4000) {
+    game.endShiftAsk = now;
+    return hud.showMessage(`¿Finalizar el turno aquí? ${game.touch ? "Toca" : "Pulsa"} otra vez «Finalizar turno» para confirmar`, "warn", 4000);
+  }
+  game.endShiftAsk = 0;
+  showDriverSummary({ early: true });
+}
+
+function showDriverSummary({ early = false } = {}) {
+  game.shiftEnded = true;
   const s = game.stats, sc = game.score;
   const prevBest = sc.best?.total ?? 0;
   const record = sc.finish();
@@ -762,11 +782,15 @@ function showDriverSummary() {
   const punctual = s.arrivals.filter(d => Math.abs(d) <= w).length;
   const avgStop = s.stops.length ? s.stops.reduce((a, b) => a + b, 0) / s.stops.length : 0;
   // Bono solo si se sirvió al menos la mitad de la línea (no vale empezar a mitad de camino)
-  const bonus = s.arrivals.length >= (STATIONS.length - 1) / 2 ? shiftBonus(sc.grade(), inventory.wageMultiplier) : 0;
+  const minStations = Math.ceil((STATIONS.length - 1) / 2);
+  const bonusOk = s.arrivals.length >= minStations;
+  const bonus = bonusOk ? shiftBonus(sc.grade(), inventory.wageMultiplier) : 0;
   if (bonus) { bank.deposit(bonus, `Bono de servicio ${game.player.trip.id} (nota ${sc.grade()})`, { wage: true }); hud.setBank(bank); hud.moneyFloat(bonus); }
+  const sim = game.player.sim;
+  const where = sim.dockedStation()?.name ?? (sim.nextStation() ? `Antes de ${spokenName(sim.nextStation().name)}` : spokenName(game.player.route.last.name));
   hud.showSummary({
-    kicker: `SERVICIO ${game.player.trip.id} COMPLETADO`,
-    title: spokenName(game.player.route.last.name),
+    kicker: early ? `TURNO FINALIZADO · SERVICIO ${game.player.trip.id}` : `SERVICIO ${game.player.trip.id} COMPLETADO`,
+    title: early ? (sim.dockedStation() ? spokenName(where) : where) : spokenName(game.player.route.last.name),
     rows: [
       ["Estaciones servidas", `${s.arrivals.length} / ${STATIONS.length - 1}`],
       ["Llegadas puntuales (±30 s)", `${punctual} / ${s.arrivals.length}`],
@@ -780,13 +804,19 @@ function showDriverSummary() {
       ["PUNTAJE", `${sc.total} pts · nota ${sc.grade()}`],
       [record ? "★ ¡NUEVO RÉCORD!" : "Récord de este servicio", record ? `antes ${prevBest} pts` : `${prevBest} pts`],
       ["Sueldo por estaciones", formatCLP(game.shiftPay)],
-      [`Bono de fin de servicio (nota ${sc.grade()})`, formatCLP(bonus)],
+      bonusOk
+        ? [`Bono de fin de servicio (nota ${sc.grade()})`, formatCLP(bonus)]
+        : [`Bono de fin de servicio (desde ${minStations} estaciones)`, formatCLP(0)],
       [`Saldo en tu cuenta ${BANK_NAME}`, bank.label],
     ],
-    continueLabel: "Maniobra de retorno",
-    onContinue: () => hud.showMessage("Cierra puertas (D), avanza a la cola de maniobras y detente en el cartel FIN DE MANIOBRA. Luego pulsa T", "info", 9000),
-    altLabel: "Reiniciar",
-    onAlt: restartGame,
+    ...(early
+      ? { continueLabel: "Nuevo servicio", onContinue: restartGame }
+      : {
+        continueLabel: "Maniobra de retorno",
+        onContinue: () => hud.showMessage("Cierra puertas (D), avanza a la cola de maniobras y detente en el cartel FIN DE MANIOBRA. Luego pulsa T", "info", 9000),
+        altLabel: "Reiniciar",
+        onAlt: restartGame,
+      }),
     onMenu: stopGame,
   });
 }
@@ -820,6 +850,7 @@ function changeCab() {
     game.lightsUnit = player;
     game.stats = { arrivals: [], stops: [], redSignals: 0, overspeeds: 0, emergencies: 0 };
     game.score = newScore(other);
+    game.shiftEnded = false;                 // empieza un servicio nuevo
     game.lastStop = null;
     game.dmiTimer = 0;
     hud.fadeIn();
