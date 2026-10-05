@@ -230,6 +230,7 @@ function startGame(mode) {
   const direction = directionSelect.value === "B" ? ROUTE_B : ROUTE_A;
   startScreen.classList.add("hidden");
   loadingScreen.classList.remove("hidden");
+  if (wantsTouch()) enterMobileFullscreen();     // dentro del gesto del usuario
   const audio = new AudioSystem();          // dentro del gesto del usuario
   audio.muted = muted;
   audio.start();
@@ -357,12 +358,12 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = {}) {
     hud.showMessage(`Combinación desde la Línea ${opts.transferFrom} · ${STATIONS[stationIndex].name} · ${LINE.name.charAt(0) + LINE.name.slice(1).toLowerCase()} · sigues en zona pagada`, "ok", 6000);
   } else hud.showMessage(mode === "driver"
     ? `Servicio ${playerTrip.id} · ${direction.label} · salida ${formatClock(playerTrip.departure)} · cada estación bien servida te paga en tu cuenta`
-    : `Calle de ${STATIONS[stationIndex].name} · cuenta ${bank.label} · W/S caminar · A/D girar · Shift correr · J misiones`, "info", 7000);
+    : `Calle de ${STATIONS[stationIndex].name} · cuenta ${bank.label} · ${game.touch ? "joystick para caminar · arrastra para mirar · 🎯 misiones" : "W/S caminar · A/D girar · Shift correr · J misiones"}`, "info", 7000);
 
   game.raf = requestAnimationFrame(loop);
 }
 
-function stopGame() {
+function stopGame({ keepFullscreen = false } = {}) {
   if (!game) return;
   game.touch?.destroy();
   cancelAnimationFrame(game.raf);
@@ -380,6 +381,24 @@ function stopGame() {
   gameScreen.classList.add("hidden");
   loadingScreen.classList.add("hidden");
   startScreen.classList.remove("hidden");
+  if (!keepFullscreen) exitMobileFullscreen();
+}
+
+/* Celular: pantalla completa y horizontal mientras se juega (si el navegador lo permite;
+   en iPhone no existe y el juego sigue igual, con el aviso de girar el teléfono). */
+let ownFullscreen = false;
+function enterMobileFullscreen() {
+  const el = document.documentElement;
+  if (document.fullscreenElement || !el.requestFullscreen) return;
+  if (matchMedia("(display-mode: fullscreen), (display-mode: standalone)").matches) return;   // ya es app instalada
+  el.requestFullscreen({ navigationUI: "hide" })
+    .then(() => { ownFullscreen = true; return screen.orientation?.lock?.("landscape"); })
+    .catch(() => { /* no permitido: se juega igual */ });
+}
+function exitMobileFullscreen() {
+  try { screen.orientation?.unlock?.(); } catch { /* sin bloqueo */ }
+  if (ownFullscreen && document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+  ownFullscreen = false;
 }
 
 /* ==========================================================================
@@ -974,7 +993,7 @@ function transferLine(lineId, st) {
   hud.fadeOut(`Combinación · Línea ${lineId} · ${st.name}`);
   setTimeout(() => {
     if (!game) return;
-    stopGame();
+    stopGame({ keepFullscreen: true });          // en el celular sigue a pantalla completa
     // Mismo arranque que "Entrar" en la pantalla de inicio, pero en la otra línea
     paxLineSelect.value = line.id;
     fillStations(line);

@@ -117,9 +117,12 @@ depto con muebles y recuerdos) y compras, pasajes y cargas sin costo. Tu saldo y
 
 **Ambos:** M sonido · H ayuda.
 
-**Celular o tablet:** aparecen controles táctiles (mejor con el teléfono en horizontal). Conductor: ▲ / ▼ mando,
-EMERGENCIA, Puertas, Inversor, Vista y Cabina; arrastra la pantalla para mirar. Pasajero: joystick a la izquierda
-para caminar (al borde corre), arrastra a la derecha para mirar, botones E (usar), F (sentarse), Misiones y Correr.
+**Celular o tablet:** aparecen controles táctiles (mejor con el teléfono en horizontal; en Android el juego pasa a
+pantalla completa y horizontal al empezar). Conductor: indicador de mando e inversor, ▲ / ▼ mando y EMERGENCIA abajo
+a la izquierda; Puertas, Inversor, Vista, Cabina y Tienda a la derecha; arrastra la pantalla para mirar. Pasajero:
+joystick abajo a la izquierda para caminar (al borde corre), arrastra a la derecha para mirar, botones Usar,
+Sentarse, Misiones, Correr y Tienda. El HUD se compacta en pantallas chicas y respeta la muesca del teléfono; en el
+Centro de Control los esquemas se desplazan de lado y la ficha del tren aparece como hoja inferior.
 Para probarlos en el computador, abre la página con `?touch=1` al final de la dirección.
 
 ## Arquitectura

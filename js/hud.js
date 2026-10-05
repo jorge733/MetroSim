@@ -110,7 +110,10 @@ export class Hud {
   }
 
   setSound(on) {
-    this.setText(this.el.soundButton, on ? "🔊 Sonido" : "🔇 Silencio");
+    // El texto va en su propio <span> para que el celular muestre solo el ícono
+    const html = on ? `🔊<span class="sound-label"> Sonido</span>` : `🔇<span class="sound-label"> Silencio</span>`;
+    if (this.el.soundButton.innerHTML !== html) this.el.soundButton.innerHTML = html;
+    this.el.soundButton.setAttribute("aria-label", on ? "Sonido activado" : "Sonido desactivado");
     this.el.soundButton.classList.toggle("off", !on);
   }
 

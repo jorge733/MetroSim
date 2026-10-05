@@ -1125,3 +1125,92 @@ kbd {
 .creator-launch { margin-top: 6px; border-color: #3ddc8477; background: linear-gradient(90deg, #3ddc841f, #ffd23f14); }
 .creator-launch:hover { border-color: #3ddc84; }
 .creator-launch[hidden] { display: none; }
+
+/* ---------- Versión móvil: celular y tablet ---------- */
+/* Toques sin zoom por doble toque ni menú de mantener presionado; sin "rebote" de la página */
+html, body { overscroll-behavior: none; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+button, select, .shop-launch { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.game-screen { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+/* Altura real de la pantalla (la barra del navegador del celular no tapa nada) */
+@supports (height: 100dvh) {
+  html, body, .screen { height: 100dvh; }
+  .ticket-card { max-height: 92dvh; }
+  .shop-card { max-height: min(88dvh, 100%); }
+}
+/* Muesca y esquinas redondeadas */
+.start-screen {
+  padding-left: max(16px, env(safe-area-inset-left));
+  padding-right: max(16px, env(safe-area-inset-right));
+  padding-bottom: max(24px, env(safe-area-inset-bottom));
+}
+.ticket-panel, .summary, .shop-overlay, .celebration {
+  padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+}
+/* Las tarjetas del menú nunca se salen de la pantalla (antes medían 300 px mínimo) */
+.mode-selection { grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); }
+.mode-card-passenger > span:nth-child(2) { width: 100%; grid-template-columns: minmax(0, 1fr); }
+.station-select { min-width: 0; }
+.station-select select { width: 100%; min-height: 40px; text-overflow: ellipsis; }
+@media (max-width: 560px) {
+  .start-screen { padding-top: max(18px, env(safe-area-inset-top)); }
+  .metro-mark { width: 84px; margin-bottom: 10px; }
+  .line-stripe { margin-bottom: 10px; }
+  .start-card h1 { font-size: 46px; letter-spacing: -2px; }
+  .tagline { margin: 6px 0 18px; font-size: 14px; }
+  .mode-selection { gap: 12px; }
+  .mode-card.mode-card-passenger { padding: 16px; gap: 10px; }
+  .mode-card-passenger > .mode-icon { display: none !important; }
+  .mode-card strong { font-size: 17px; }
+  .mode-card small { font-size: 12.5px; }
+  .shop-launch { font-size: 14px; padding: 12px; }
+  .version { font-size: 9px; padding: 0 8px; }
+}
+/* Celular en horizontal: portada compacta para que las tarjetas aparezcan sin desplazar */
+@media (max-height: 520px) and (orientation: landscape) {
+  .start-screen { padding-top: max(12px, env(safe-area-inset-top)); }
+  .metro-mark { width: 60px; margin-bottom: 6px; }
+  .line-stripe { margin-bottom: 6px; }
+  .start-card .eyebrow { display: none; }
+  .start-card h1 { font-size: 38px; letter-spacing: -1.5px; }
+  .tagline { margin: 4px 0 14px; font-size: 13px; }
+  .mode-selection { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .mode-card.mode-card-passenger { padding: 14px; gap: 8px; }
+  .mode-card-passenger > .mode-icon { width: 36px; height: 36px; font-size: 19px; }
+  .mode-card strong { font-size: 15px; }
+  .mode-card small { font-size: 11.5px; line-height: 1.35; }
+  .mode-card .go-button { padding: 10px; font-size: 14px; }
+  .loading-card strong { font-size: 18px; }
+}
+/* Ventanas (boletería, locales, misiones, resumen) en pantallas bajas */
+@media (max-height: 520px) {
+  .ticket-card { padding: 12px 14px; gap: 6px; }
+  .ticket-balance { padding: 8px 10px; }
+  .ticket-balance strong { font-size: 22px; }
+  .ticket-status { min-height: 0; }
+  .summary-card { max-height: 100%; overflow: auto; padding: 14px 16px; gap: 6px; }
+  .summary-card h2 { font-size: 19px; }
+  .summary-card li { padding: 3px 0; font-size: 13px; }
+  .shop-head { padding: 10px 14px 6px; }
+  .shop-head h2 { font-size: 18px; }
+  .shop-tabs { padding: 0 14px 8px; }
+  .shop-body { padding: 4px 14px 14px; }
+}
+/* Botones de las ventanas más fáciles de tocar */
+@media (pointer: coarse) {
+  .ticket-close, .shop-close { width: 42px; height: 42px; }
+  .ticket-amounts button, .ticket-pay button { min-height: 42px; padding: 8px 14px; }
+  .store-item { min-height: 46px; align-items: center; }
+  .summary-actions { flex-wrap: wrap; }
+  .summary-actions button { flex: 1; min-height: 44px; }
+  .mission-item button { min-height: 40px; }
+  .shop-tabs button { min-height: 40px; }
+  .back-button { min-height: 36px; }
+}
+@media (max-width: 420px) {
+  .shop-tabs { overflow-x: auto; }
+  .shop-tabs button { flex: 0 0 auto; font-size: 13px; }
+  .shop-head { flex-wrap: wrap; }
+  .ticket-actions { flex-wrap: wrap; }
+  .ticket-actions button { flex: 1; }
+}
+.shop-head, .shop-tabs, .shop-notice { flex-shrink: 0; }
