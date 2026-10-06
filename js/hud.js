@@ -25,7 +25,7 @@ export class Hud {
       stationTitle: $("stationTitle"), nextStation: $("nextStation"), distance: $("distance"),
       precision: $("precision"), precisionMarker: $("precisionMarker"), precisionText: $("precisionText"),
       signalId: $("signalId"), signalDist: $("signalDist"), scheduleLabel: $("scheduleLabel"), scheduleDelay: $("scheduleDelay"),
-      scheduleMiniLabel: $("scheduleMiniLabel"), scheduleMiniDelay: $("scheduleMiniDelay"),
+      signalMiniText: $("signalMiniText"), scheduleMiniLabel: $("scheduleMiniLabel"), scheduleMiniDelay: $("scheduleMiniDelay"),
       doorLamp: $("doorLamp"), doorStatus: $("doorStatus"), doorHint: $("doorHint"), onboard: $("onboardCount"),
       paxTitle: $("paxTitle"), paxStation: $("paxStation"), paxSub: $("paxSub"), paxHint: $("paxHint"),
       lineStrip: $("lineStrip"), lineStripTrain: $("lineStripTrain"),
@@ -177,7 +177,8 @@ export class Hud {
     const sig = info.signal;
     this.setText(e.signalId, sig ? `S${sig.id}` : "S---");
     this.setText(e.signalDist, sig ? `${Math.round(sig.distance)} m · ${{ red: "ROJO", yellow: "AMARILLO", green: "VERDE" }[sig.aspect]}` : "—");
-    this.signalLamps.forEach(l => l.classList.toggle("on", !!sig && l.dataset.a === sig.aspect));
+    this.signalLamps.forEach(l => l.classList.toggle("on", !!sig && l.dataset.a === sig.aspect));   // panel y versión compacta
+    this.setText(e.signalMiniText, sig ? `S${sig.id} · ${Math.round(sig.distance)} m` : "S---");
 
     // Horario
     if (info.schedule) {

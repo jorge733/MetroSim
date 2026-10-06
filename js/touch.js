@@ -123,6 +123,8 @@ body.touch-mode .fade { z-index: 15; }
   body.touch-mode .mission-tracker:not(.hidden) ~ .message { top: 250px; }
   .touch-hint { top: auto; bottom: 52%; }
   .touch-driver .touch-left { bottom: 150px; }
+  /* Tutorial: a la izquierda de la columna de botones (sin taparlos) */
+  body.touch-mode .tutorial { top: 156px; left: 10px; right: auto; transform: none; width: calc(100% - 132px); }
   .touch-stick-ghost { bottom: 240px; }
   .touch-rotate { bottom: 40%; }
 }
