@@ -22,6 +22,11 @@ Los íconos están en `icons/` (los PNG se generan desde `icons/icon.svg`).
 
 ## Qué incluye (versión 1.0 · estable)
 
+- **Tutorial interactivo** para el jugador nuevo, en Conductor y en Pasajero: una tarjeta explica un paso a la vez
+  y avanza sola cuando haces lo que pide (abrir puertas, acelerar, frenar en la marca; bajar al Metro, cargar la
+  bip!, pasar el torniquete, viajar y salir a la calle). Resalta la parte del HUD de la que habla y muestra datos en
+  vivo (distancia, hora de salida, mando). Empieza solo la primera vez en cada modo; se repite con **🎓 Tutorial**
+  en la portada, se salta con "Saltar tutorial" y en pantallas táctiles nombra los botones en vez de las teclas.
 - **Economía compartida**: tienes una cuenta bancaria con tarjeta de débito (Banco Andino, ficticio) que vale
   para los dos modos. Empiezas con $3.000 y sin tarjeta bip!.
 - **Sueldo del conductor en tiempo real**: cada estación bien servida te deposita al instante un sueldo
@@ -227,6 +232,7 @@ js/hud.js             interfaz (incluye boletería y tótem)
 js/card.js            tarjeta bip! del jugador
 js/economy.js         cuenta bancaria (débito), sueldo del conductor y bono de servicio
 js/missions.js        misiones del pasajero (sin Three.js)
+js/tutorial.js        tutorial interactivo del jugador nuevo (conductor y pasajero)
 js/city/              la calle de cada estación
   plan.js             locales de cada estación y lo que venden (sin Three.js)
   catalog.js          hitos de las estaciones (sin Three.js)
