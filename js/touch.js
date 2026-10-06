@@ -59,7 +59,7 @@ const CSS = `
 .touch-rotate { display: none; bottom: 46%; background: #5a3d00e8; color: #ffe7a8; font-weight: 700; }
 @media (orientation: portrait) { .touch-rotate { display: block; } }
 /* Con controles táctiles se ocultan las ayudas de teclado */
-body.touch-mode .controls-help, body.touch-mode .start-keys { display: none !important; }
+body.touch-mode .controls-help, body.touch-mode .start-keys, body.touch-mode .end-shift-button { display: none !important; }
 body.touch-mode #gameContainer, body.touch-mode #gameContainer canvas { touch-action: none; }
 body.touch-mode .selector-hud { transform: scale(.78); transform-origin: right center; }
 /* El HUD respeta la muesca y las esquinas redondeadas del teléfono */
@@ -219,6 +219,7 @@ export class TouchControls {
       this.button("👁 Vista", "v"),
       this.button("⇄ Cabina", "t"),
       this.button("🛒 Tienda", "k", "touch-mid", { onClick: true }),
+      this.button("🏁 Finalizar", "f", "touch-mid", { onClick: true }),
     );
     this.root.append(col, row);
     // El mando y el inversor se leen del HUD (el selector lateral se oculta en el celular)

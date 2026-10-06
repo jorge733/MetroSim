@@ -1219,6 +1219,16 @@ button, select, .shop-launch { touch-action: manipulation; -webkit-tap-highlight
 .schedule-mini { display: none; font-size: 12px; color: #a9b7c5; font-variant-numeric: tabular-nums; }
 .schedule-mini .delay { font-size: 13px; }
 @media (max-width: 980px) { .schedule-mini { display: block; } }
+
+/* Finalizar turno (modo Conductor): al lado del botón Menú */
+.end-shift-button { left: 104px; border-color: #ffd16655; }
+/* Resumen en pantallas bajas (celular en horizontal): dos columnas y botones siempre a la vista */
+@media (max-height: 520px) {
+  .summary-card { width: min(94vw, 780px); grid-template-rows: auto auto minmax(0, 1fr) auto; overflow: hidden; }
+  .summary-card ul { grid-template-columns: 1fr 1fr; column-gap: 18px; row-gap: 0; overflow-y: auto; min-height: 0; }
+  .summary-card li { font-size: 12px; }
+  .summary-actions { margin-top: 2px; }
+}
 /* ---------- Tutorial interactivo (tutorial.js) ---------- */
 .tutorial-launch {
   justify-self: start; margin-top: 8px; padding: 5px 10px; border-radius: 999px; cursor: pointer;

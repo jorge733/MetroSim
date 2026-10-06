@@ -91,7 +91,7 @@ depto con muebles y recuerdos) y compras, pasajes y cargas sin costo. Tu saldo y
 
 ## Modos
 
-- **Conductor:** eliges servicio de ida o de vuelta (sale ~1,5 min después de la hora actual) y conduces respetando señales, límites y horario. Cada estación te paga en tu cuenta. Al final recibes un resumen con tu sueldo y el bono, y puedes hacer la maniobra de retorno para seguir con el servicio contrario.
+- **Conductor:** eliges servicio de ida o de vuelta (sale ~1,5 min después de la hora actual) y conduces respetando señales, límites y horario. Cada estación te paga en tu cuenta. Al final recibes un resumen con tu sueldo y el bono, y puedes hacer la maniobra de retorno para seguir con el servicio contrario. Si quieres terminar antes, el botón **🏁 Finalizar turno** muestra el resumen hasta donde llegaste.
 - **Centro de Control:** supervisas toda la red (L3 y L6) en un esquema en tiempo real: trenes coloreados según su estado, ficha de cada tren, indicadores por línea (puntualidad, retraso máximo, gente esperando), registro de incidencias, botones para retener o liberar trenes y para activar o apagar la regulación de intervalos.
 - **Pasajero a pie:** apareces en la calle de la estación que elijas, frente a su hito. Bajas por el acceso, compras y cargas tu bip! con débito, validas en el torniquete, viajas y sales a la calle de otra estación para cumplir tus misiones.
 
@@ -108,6 +108,7 @@ depto con muebles y recuerdos) y compras, pasajes y cargas sin costo. Tu saldo y
 | V · C | Vista exterior · centrar vista |
 | T | Cambio de cabina (en el cartel FIN DE MANIOBRA) |
 | R | Reiniciar servicio |
+| F | Finalizar turno antes de la terminal (pulsa dos veces; muestra el resumen) |
 
 **Pasajero a pie**
 
@@ -124,7 +125,7 @@ depto con muebles y recuerdos) y compras, pasajes y cargas sin costo. Tu saldo y
 
 **Celular o tablet:** aparecen controles táctiles (mejor con el teléfono en horizontal; en Android el juego pasa a
 pantalla completa y horizontal al empezar). Conductor: indicador de mando e inversor, ▲ / ▼ mando y EMERGENCIA abajo
-a la izquierda; Puertas, Inversor, Vista, Cabina y Tienda a la derecha; arrastra la pantalla para mirar. Pasajero:
+a la izquierda; Puertas, Inversor, Vista, Cabina, Tienda y Finalizar turno a la derecha; arrastra la pantalla para mirar. Pasajero:
 joystick abajo a la izquierda para caminar (al borde corre), arrastra a la derecha para mirar, botones Usar,
 Sentarse, Misiones, Correr y Tienda. El HUD se compacta en pantallas chicas y respeta la muesca del teléfono; en el
 Centro de Control los esquemas se desplazan de lado y la ficha del tren aparece como hoja inferior.
