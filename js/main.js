@@ -268,7 +268,7 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = {}) {
   /* --- Hora local: la partida empieza "ahora" --- */
   const startClock = localClock(), startEpoch = performance.now();
   CONFIG.startTime = startClock;
-  CONFIG.schedule.playerDeparture = Math.ceil((startClock + 90) / 30) * 30;   // tu servicio sale en ~1,5 min
+  CONFIG.schedule.playerDeparture = Math.ceil((startClock + 15) / 5) * 5;     // tu servicio sale en ~15–20 s
 
   /* --- Motor MetroSim (el "cerebro") y su dibujo --- */
   const world = new World(scene);
@@ -729,7 +729,13 @@ function onPlayerEvent(type, data) {
       if (data.delay < -10) hud.showMessage(`Salida anticipada de ${data.station.name} (${formatDelay(data.delay)}) · respeta el horario`, "warn", 4000);
       break;
     case "doorsOpen":
+      game.boardingDone = false;
       if (data.station === game.player.route.last && !game.shiftEnded) setTimeout(() => game && !game.shiftEnded && showDriverSummary(), 2500);
+      break;
+    case "doorsClosed":
+      // Embarque terminado y puertas cerradas: no hace falta esperar la hora; el horario se adelanta
+      if (game.boardingDone && data.station && data.station !== game.player.route.last) advanceSchedule(game.player, data.station);
+      game.boardingDone = false;
       break;
     case "overspeed":
       stats.overspeeds++;
@@ -754,6 +760,21 @@ function onPlayerEvent(type, data) {
       hud.showMessage(`IMPACTO CONTRA LA TOPERA a ${Math.round(data.kmh)} km/h`, "alert", 4000);
       break;
   }
+}
+
+/**
+ * Salida sin esperas: si el conductor cierra las puertas con el embarque ya terminado,
+ * su horario se adelanta desde esta estación (la señal de salida se abre y los
+ * tiempos siguientes se corren igual, así la puntualidad se mide contra el horario nuevo).
+ */
+function advanceSchedule(unit, station) {
+  const trip = unit.trip, i = station.index;
+  const ready = game.clock + 6;                        // lo que tarda en abrirse la señal y arrancar
+  const shift = trip.dep[i] - ready;
+  if (shift < 3) return;
+  trip.dep[i] -= shift;
+  for (let j = i + 1; j < trip.arr.length; j++) { trip.arr[j] -= shift; trip.dep[j] -= shift; }
+  hud.showMessage(`Embarque completo · puedes salir ya (horario adelantado ${formatDelay(shift).replace("+", "")})`, "ok", 3500);
 }
 
 function punctuality(delay) {
@@ -1505,7 +1526,9 @@ function loop(now) {
     updateCabVisuals(dt, player, info);
     if (player.sim.speed > 0.2) game.lastDecel = -player.sim.accel;
     game.score.update(dt, player.sim);
-    hud.updateDriver(player.sim, info, { clock: game.clock, onboard: people.onboardCount(player), boardingBusy: engine.isBoarding(player) });
+    const boardingBusy = engine.isBoarding(player);
+    if (player.sim.doorState === "open") game.boardingDone = !boardingBusy;     // ¿terminó el embarque antes de cerrar?
+    hud.updateDriver(player.sim, info, { clock: game.clock, onboard: people.onboardCount(player), boardingBusy });
     game.tutorial?.update(dt, { game, sim: player.sim, info });
   } else {
     hud.updatePassenger(walkerHudData());
