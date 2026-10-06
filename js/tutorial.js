@@ -53,8 +53,8 @@ function driverSteps(k) {
       done: (c) => c.sim.doorState !== "closed",
     },
     {
-      title: "Cierra a la hora de salida",
-      text: () => `Mira SEÑAL Y HORARIO: dice a qué hora sales y cuánto falta. Salir antes de tiempo resta puntos. Cuando llegue la hora, pulsa ${k("D", "🚪 Puertas")} para cerrar.`,
+      title: "Cierra cuando termine el embarque",
+      text: () => `Espera a que suban y bajen los viajeros (lo dice PUERTAS: «Embarque completo»). Entonces pulsa ${k("D", "🚪 Puertas")} para cerrar: tu horario se adelanta y puedes salir de inmediato, sin perder puntos.`,
       live: (c) => c.info.schedule ? `${c.info.schedule.label} · ${c.info.schedule.delayText}` : "",
       focus: [".signal-panel", ".door-panel"],
       done: (c) => c.sim.doorState === "closed",
@@ -124,7 +124,7 @@ function driverSteps(k) {
     },
     {
       title: "¡Ya eres conductor!",
-      text: `Así se sirve cada estación: abrir, esperar la hora, cerrar, acelerar, rodar y frenar a tiempo. Al final de la línea verás tu puntaje y harás la maniobra de retorno (${k("T", "⇄ Cabina")}). ${k("H muestra los controles · V cambia la vista.", "👁 Vista cambia la cámara.")}`,
+      text: `Así se sirve cada estación: abrir, esperar el embarque, cerrar, acelerar, rodar y frenar a tiempo. Al final de la línea verás tu puntaje y harás la maniobra de retorno (${k("T", "⇄ Cabina")}). ${k("H muestra los controles · V cambia la vista.", "👁 Vista cambia la cámara.")}`,
       next: "Terminar",
     },
   ];

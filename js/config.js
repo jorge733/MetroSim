@@ -139,7 +139,7 @@ export const CONFIG = {
     minDwell: 20,
     peakHeadway: 240,                  // 4 min en hora punta
     offPeakHeadway: 360,               // 6 min fuera de punta
-    playerDeparture: 8 * 3600 + 90,    // referencia de las mallas (en el juego: ~1,5 min después de la hora local)
+    playerDeparture: 8 * 3600 + 90,    // referencia de las mallas (en el juego: ~15–20 s después de la hora local)
     reverseOffset: 120,                // los servicios de vuelta están desfasados 2 min
     punctualWindow: 30,
   },

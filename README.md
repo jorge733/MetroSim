@@ -91,7 +91,7 @@ depto con muebles y recuerdos) y compras, pasajes y cargas sin costo. Tu saldo y
 
 ## Modos
 
-- **Conductor:** eliges servicio de ida o de vuelta (sale ~1,5 min después de la hora actual) y conduces respetando señales, límites y horario. Cada estación te paga en tu cuenta. Al final recibes un resumen con tu sueldo y el bono, y puedes hacer la maniobra de retorno para seguir con el servicio contrario. Si quieres terminar antes, el botón **🏁 Finalizar turno** muestra el resumen hasta donde llegaste.
+- **Conductor:** eliges servicio de ida o de vuelta (sale ~15–20 s después de la hora actual; en cada estación, si cierras las puertas con el embarque completo, sales de inmediato y tu horario se adelanta) y conduces respetando señales, límites y horario. Cada estación te paga en tu cuenta. Al final recibes un resumen con tu sueldo y el bono, y puedes hacer la maniobra de retorno para seguir con el servicio contrario. Si quieres terminar antes, el botón **🏁 Finalizar turno** muestra el resumen hasta donde llegaste.
 - **Centro de Control:** supervisas toda la red (L3 y L6) en un esquema en tiempo real: trenes coloreados según su estado, ficha de cada tren, indicadores por línea (puntualidad, retraso máximo, gente esperando), registro de incidencias, botones para retener o liberar trenes y para activar o apagar la regulación de intervalos.
 - **Pasajero a pie:** apareces en la calle de la estación que elijas, frente a su hito. Bajas por el acceso, compras y cargas tu bip! con débito, validas en el torniquete, viajas y sales a la calle de otra estación para cumplir tus misiones.
 
