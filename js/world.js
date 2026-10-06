@@ -333,16 +333,24 @@ function buildTrack(scene, M) {
   const m = new THREE.Matrix4();
   const sleeperGeo = new THREE.BoxGeometry(2.3, 0.12, 0.24);
 
+  // Losa, carriles y catenaria en tramos de 250 m: la cámara descarta los lejanos
+  // y cada tramo se subdivide para seguir las pendientes (render/trackLift.js)
+  const CH = 250;
+  const chunks = [];
+  for (let c0 = z0; c0 > z1; c0 -= CH) chunks.push([c0, Math.max(z1, c0 - CH)]);
   [ROUTE_A.trackX, ROUTE_B.trackX].forEach(tx => {
-    addBox(scene, 2.6, 0.08, len, M.slab, tx, -0.01, mid);
+    for (const [a, b] of chunks) {
+      const l = a - b, cm = (a + b) / 2;
+      addBox(scene, 2.6, 0.08, l, M.slab, tx, -0.01, cm);
+      [-gaugeHalf, gaugeHalf].forEach(x => {
+        addBox(scene, 0.07, 0.11, l, M.rail, tx + x, 0.2, cm);
+        addBox(scene, 0.075, 0.02, l, M.railHead, tx + x, CONFIG.track.railTop - 0.01, cm);
+      });
+      // Catenaria rígida sobre cada vía
+      addBox(scene, 0.11, 0.09, l, M.catenary, tx, cy + 0.07, cm);
+      addBox(scene, 0.02, 0.02, l, M.contactWire, tx, cy, cm);
+    }
     instancedChunks(scene, sleeperGeo, M.sleeper, z0, z1, 0.75, (z) => m.makeTranslation(tx, 0.09, z));
-    [-gaugeHalf, gaugeHalf].forEach(x => {
-      addBox(scene, 0.07, 0.11, len, M.rail, tx + x, 0.2, mid);
-      addBox(scene, 0.075, 0.02, len, M.railHead, tx + x, CONFIG.track.railTop - 0.01, mid);
-    });
-    // Catenaria rígida sobre cada vía
-    addBox(scene, 0.11, 0.09, len, M.catenary, tx, cy + 0.07, mid);
-    addBox(scene, 0.02, 0.02, len, M.contactWire, tx, cy, mid);
     instancedChunks(scene, new THREE.BoxGeometry(0.5, 0.06, 0.08), M.catenary, z0 - 5, z1, 10, (z) => m.makeTranslation(tx, cy + 0.15, z));
     instancedChunks(scene, new THREE.BoxGeometry(0.05, 2.2, 0.05), M.catenary, z0 - 5, z1, 10, (z) => m.makeTranslation(tx, cy + 1.3, z));
     instancedChunks(scene, new THREE.CylinderGeometry(0.05, 0.05, 0.22, 8), M.insulator, z0 - 5, z1, 10, (z) => m.makeTranslation(tx, cy + 0.3, z));
@@ -370,7 +378,7 @@ function buildTunnelSegment(scene, M, zA, zB) {
 
   const below = T.centerY - T.floorY;
   const cut = Math.acos(below / T.radius);
-  const geo = new THREE.CylinderGeometry(T.radius, T.radius, len, 48, 1, true, cut, Math.PI * 2 - cut * 2);
+  const geo = new THREE.CylinderGeometry(T.radius, T.radius, len, 32, Math.ceil(len / 10), true, cut, Math.PI * 2 - cut * 2);
   geo.rotateX(Math.PI / 2);
   const archMat = std(0xffffff, { map: toTexture(M.tunnelCanvas, 12, len / 1.5), rough: 0.95, side: THREE.BackSide });
   addBounce(archMat, 0.05);                                       // el túnel no queda negro absoluto

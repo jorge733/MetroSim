@@ -26,7 +26,7 @@
    y curva de demanda horaria de un día real de Santiago.
    ========================================================================== */
 
-export const VERSION = "1.1";
+export const VERSION = "1.2";
 
 /* ---------- Colores oficiales de las líneas ---------- */
 export const LINE_COLORS = {
@@ -140,10 +140,10 @@ export const CONFIG = {
   track: { tail: 430, railTop: 0.27 }, // metros de cola de maniobra tras cada terminal
   people: {
     liftShare: 0.12,                   // parte de los viajeros dibujados que usa el ascensor (si no va lleno)
-    maxWaitingPerSide: 20,             // máx. de viajeros DIBUJADOS esperando en cada andén (las cifras reales: engine/passengers.js)
-    maxVisibleOnboard: 70,             // máximo de viajeros dibujados por tren (el resto se cuenta)
+    maxWaitingPerSide: 55,             // máx. de viajeros DIBUJADOS esperando en cada andén (las cifras reales: engine/passengers.js)
+    maxVisibleOnboard: 170,            // máximo de viajeros dibujados por tren (el resto se cuenta)
     activeRadius: 330,                 // solo se dibujan viajeros a esta distancia de la cámara
-    capacity: 700,                     // máximo de personas dibujadas a la vez
+    capacity: 1000,                    // máximo de personas dibujadas a la vez
   },
   schedule: {
     minDwell: 16,                      // parada mínima (s) del ATO con puertas abiertas

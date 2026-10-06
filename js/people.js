@@ -11,8 +11,8 @@
    Las CIFRAS reales (cuánta gente espera en cada andén y va en cada tren)
    las lleva el motor (engine/passengers.js). Este módulo solo dibuja una
    MUESTRA de esa gente cerca de la cámara:
-     · en un andén se ven ~12 % de los que esperan (máx. 20);
-     · en un tren, ~12 % de los que viajan (máx. 70).
+     · en un andén se ven ~30 % de los que esperan (máx. 55);
+     · en un tren, ~30 % de los que viajan (máx. 170).
    Cerca de la cámara son personas 3D articuladas (caminan, suben escaleras,
    se sientan, se agarran a la barra...); lejos no se dibuja nadie.
 
@@ -41,7 +41,7 @@ const S = CONFIG.station, MZ = CONFIG.mezzanine, F = CONFIG.train.floorY;
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 
 /** Parte de la gente real (motor) que se dibuja. */
-const VISIBLE_SHARE = 0.12;
+const VISIBLE_SHARE = 0.3;
 
 const PALETTE = {
   shirt: [0x2f4f7f, 0x8a2b2b, 0x3f6e46, 0xd9d4c7, 0x1d1f24, 0x6b4f8a, 0xc7862f, 0x5f6f7a, 0xa33f6b, 0x2d6c78, 0xe5e5e5, 0x7a6450],
@@ -258,8 +258,15 @@ export class PeopleSystem {
       serveT: null,                               // tiempo restante de atención al primero
       clerk: null,
     }));
-    // Las puertas no se cierran mientras un viajero dibujado esté subiendo o bajando
-    traffic.boardingChecks.push((unit) => this.isBusy(unit));
+    // Las puertas no se cierran mientras un viajero dibujado esté subiendo o bajando, pero
+    // la muestra dibujada nunca retiene al tren más de 6 s después de que terminó el
+    // intercambio real (engine/passengers.js): manda la cifra, no el muñeco
+    traffic.boardingChecks.push((unit) => {
+      if (!this.isBusy(unit)) return false;
+      if (unit.pax?.exchanging) { unit.visualLagFrom = null; return true; }
+      unit.visualLagFrom ??= this.time;
+      return this.time - unit.visualLagFrom < 6;
+    });
   }
 
   /* ----- Consultas ----- */

@@ -37,7 +37,7 @@
 import * as THREE from "three";
 import { CONFIG, STATIONS } from "./config.js";
 import { ROUTES, ROUTE_A, ROUTE_B, routeForSide } from "./engine/route.js";
-import { TRAIN_LAYOUT } from "./engine/consist.js";
+import { TRAIN_LAYOUT, STOCK } from "./engine/consist.js";
 import { clamp } from "./utils.js";
 import { platformSolidAt, isArrivalOnly } from "./stationLayout.js";
 import { Elevator, inElevatorShaft } from "./elevators.js";
@@ -80,6 +80,10 @@ export class Walker {
     this.frozen = false;                 // true mientras hay un panel abierto (boletería, tótem)
     this.gatePass = false;               // validó en un torniquete y lo está cruzando
     this.deniedT = 0;
+    this.fullT = 0;          // aviso de tren lleno (no se repite en cada fotograma)
+    this.obstructT = 0;      // aviso de puerta obstruida
+    this.lean = 0;           // inercia a bordo: aceleración del tren suavizada (m/s²)
+    this.rideT = 0;          // fase de la vibración de marcha
     this.keys = new Set();
     this.holder = new THREE.Object3D();
     this.holder.add(camera);
@@ -311,6 +315,21 @@ export class Walker {
     return x > 0 && x < 1.75 && !!sim.dockedStation() && sim.doorProgress > 0.75 && sim.doorState !== "closing";
   }
 
+  /** Tren cuyas puertas se están cerrando con el pasajero en el vano de una de ellas (o null). */
+  doorwayClosing() {
+    if (this.space === "train") {
+      const u = this.unit;
+      if (u.sim.doorState !== "closing" || this.pos.x < 1.0) return null;
+      return TRAIN_LAYOUT.doors.some(d => Math.abs(this.pos.z - d) < 0.6) ? u : null;
+    }
+    if (this.space !== "world" || Math.abs(this.pos.y - S.platformTop) > 0.3) return null;
+    const ax = Math.abs(this.pos.x);
+    if (ax > S.platformEdgeX + 0.35 || ax < S.trackX + 1.0) return null;
+    const st = this.stationAt(this.pos.z), side = Math.sign(this.pos.x) || 1;
+    const u = st && this.traffic.unitDockedAt(st, routeForSide(side));
+    return u && u.sim.doorState === "closing" && this.traffic.doorAtWorldZ(u, this.pos.z, 0.6) !== null ? u : null;
+  }
+
   /* ----- Acciones ----- */
   /**
    * Sentarse o levantarse. this.seat = { place, seatY, stand }:
@@ -324,6 +343,10 @@ export class Walker {
   }
 
   sitInTrain() {
+    // Con más viajeros que asientos (los cuenta el motor), todos están ocupados
+    const seats = this.unit.slots.filter(s => s.type === "seat").length;
+    const load = Math.round(this.unit.load || 0);
+    if (load >= seats) return { text: `No hay asientos libres: van ${load} personas y el tren tiene ${seats} asientos · agárrate de una barra`, level: "info" };
     const free = this.unit.slots
       .filter(s => s.type === "seat" && !s.occupant)
       .map(s => ({ s, d: Math.hypot(s.approach.x - this.pos.x, s.approach.z - this.pos.z) }))
@@ -436,6 +459,26 @@ export class Walker {
   /* ----- Paso por fotograma ----- */
   update(dt) {
     this.deniedT = Math.max(0, this.deniedT - dt);
+    this.fullT = Math.max(0, this.fullT - dt);
+    this.obstructT = Math.max(0, this.obstructT - dt);
+
+    // Puerta obstruida: si estás en el vano de una puerta que se está cerrando, se reabre
+    // (como en la realidad: el sensor de obstáculos invierte el cierre)
+    const blocked = this.obstructT <= 0 ? this.doorwayClosing() : null;
+    if (blocked) { this.obstructT = 6; this.onEvent("doorObstructed", { unit: blocked }); }
+
+    // A bordo: inercia (te vas hacia atrás al acelerar y hacia adelante al frenar) y vibración
+    if (this.space === "train") {
+      const sim = this.unit.sim;
+      this.lean += (sim.netAccel - this.lean) * Math.min(1, dt * 4);
+      this.rideT += dt * (2 + sim.speed * 0.9);
+      // De pie, una frenada o un arranque fuerte te hace dar un paso (hacia adelante al frenar)
+      if (!this.seat && Math.abs(sim.netAccel) > 1.0 && dt > 0) {
+        const nz = this.pos.z + Math.sign(sim.netAccel) * 0.9 * dt;
+        if (this.trainWalkable(this.pos.x, nz)) this.pos.z = nz;
+      }
+    } else this.lean *= Math.max(0, 1 - dt * 4);
+
     if (!this.seat && dt > 0 && !this.frozen) this.move(dt);
     if (this.seat || this.frozen) { this.speed = 0; this.turnRate = 0; this.moving = false; }   // sentado o en un panel: quieto
 
@@ -504,7 +547,11 @@ export class Walker {
     if (this.space === "world" && Math.abs(this.pos.y - S.platformTop) < 0.3 && Math.abs(this.pos.x) < S.trackX + 1.42) {
       const st = this.stationAt(this.pos.z);
       const u = st && this.openUnit(st, Math.sign(this.pos.x));
-      if (u) this.enterTrain(u);
+      if (u && (u.load || 0) >= STOCK.capacity - 4) {
+        // Tren lleno (6 personas/m²): no cabes, te quedas en el andén
+        this.pos.x = Math.sign(this.pos.x || 1) * (S.trackX + 1.6);
+        if (this.fullT <= 0) { this.fullT = 4; this.onEvent("trainFull", { unit: u }); }
+      } else if (u) this.enterTrain(u);
     } else if (this.space === "train" && this.pos.x > 1.45) {
       this.exitTrain();
     }
@@ -535,8 +582,18 @@ export class Walker {
     const amp = Math.min(1, Math.abs(this.speed || 0) / WALK);
     const bob = Math.abs(Math.sin(this.stepPhase || 0)) * 0.045 * amp;
     const side = Math.cos(this.stepPhase || 0) * 0.025 * amp;
-    this.camera.position.set(side * Math.cos(this.yaw), EYE - 0.02 * amp + bob, -side * Math.sin(this.yaw));
-    this.camera.rotation.set(this.pitch, this.yaw, (this.sway || 0) + side * 0.15);
+    // A bordo: el cuerpo se va hacia atrás al acelerar y hacia adelante al frenar (en ejes
+    // del tren, la cabeza está en −Z), y el coche vibra más cuanto más rápido va
+    let lz = 0, ly = 0, roll = 0, nod = 0;
+    if (this.space === "train") {
+      const k = this.seat ? 0.025 : 0.08, v = Math.min(1, this.unit.sim.speed / 22);
+      lz = clamp(this.lean, -1.4, 1.4) * k;
+      nod = clamp(this.lean, -1.4, 1.4) * (this.seat ? 0.01 : 0.025);
+      ly = (Math.sin(this.rideT * 2.3) * 0.6 + Math.sin(this.rideT * 5.1) * 0.4) * 0.006 * v;
+      roll = Math.sin(this.rideT * 1.7) * 0.006 * v;
+    }
+    this.camera.position.set(side * Math.cos(this.yaw), EYE - 0.02 * amp + bob + ly, -side * Math.sin(this.yaw) + lz);
+    this.camera.rotation.set(this.pitch + nod, this.yaw, (this.sway || 0) + side * 0.15 + roll);
   }
 
   move(dt) {

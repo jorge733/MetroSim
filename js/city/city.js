@@ -29,6 +29,7 @@ import { CONFIG, LINE, LINE_COLORS } from "../config.js";
 import { STREET, streetPlan, seededRandom } from "./plan.js";
 import { buildLandmark } from "./landmarks.js";
 import { cityMaterials, genericBuilding, signMaterial, facingPlane, streetLamp, tree, bench, addMesh } from "./kit.js";
+import { markCity } from "../render/trackLift.js";
 
 const S = STREET;
 /** Origen de la calle en el mundo: justo encima de la estación, con la boca del acceso sobre su escalera de salida. */
@@ -129,6 +130,7 @@ export class City {
     this.sun.target.position.set(0, 0, 0);
     g.add(this.hemi, this.sun, this.sun.target);
     this.setTime(clock);
+    markCity(g);                            // la calle es horizontal: no se dobla con la vía (render/trackLift.js)
   }
 
   unload() {

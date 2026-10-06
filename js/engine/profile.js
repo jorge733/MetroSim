@@ -17,8 +17,8 @@
 
    Las cotas son APROXIMADAS (terreno real de cada extremo y profundidad
    típica de 18–26 m); sirven para que la física tenga pendientes creíbles.
-   El dibujo 3D sigue siendo plano: la pendiente se siente en la física y se
-   muestra en la DMI de la cabina.
+   La pendiente se siente en la física, se muestra en la DMI de la cabina y
+   se VE en 3D: render/trackLift.js dobla el dibujo de la vía con estas cotas.
 
    Unidades: cotas en m s. n. m. del carril; pendiente como fracción (0,02 = 20 ‰),
    positiva cuesta ARRIBA en el sentido de avance.

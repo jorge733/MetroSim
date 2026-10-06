@@ -62,7 +62,7 @@
 
 import * as THREE from "three";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
-import { CONFIG, STATIONS, LINE, NOTCH_INDEX, FARES, spokenName, fareBandAt, formatCLP, demandAt, dayTypeOf } from "./config.js";
+import { CONFIG, STATIONS, LINE, NOTCH_INDEX, FARES, spokenName, fareBandAt, formatCLP, demandAt, dayTypeOf, inService, SERVICE_HOURS } from "./config.js";
 import { ROUTES, ROUTE_A, ROUTE_B, routeForSide, oppositeRoute, setActiveLine } from "./engine/route.js";
 import { LINES, lineById } from "./engine/network.js";
 import { BipCard } from "./card.js";
@@ -95,6 +95,10 @@ import { openShopUI } from "./shopUI.js";
 import { trainLiveryMaterials } from "./train.js";
 import { City } from "./city/city.js";
 import { Tutorial, tutorialDone } from "./tutorial.js";
+import { installTrackLift, setTrackLiftLine, updateTrackLift, pitchCamera } from "./render/trackLift.js";
+
+// La vía en 3D sigue las pendientes reales: se engancha antes de compilar ningún material
+installTrackLift();
 
 const startScreen = $("startScreen");
 const loadingScreen = $("loadingScreen");
@@ -271,6 +275,7 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = {}) {
   CONFIG.schedule.playerDeparture = Math.ceil((startClock + 15) / 5) * 5;     // tu servicio sale en ~15–20 s
 
   /* --- Motor MetroSim (el "cerebro") y su dibujo --- */
+  setTrackLiftLine();                                         // cotas de la línea activa (pendientes en 3D)
   const world = new World(scene);
   const warmStart = CONFIG.startTime - 45 * 60;
   const engine = new MetroEngine({ startTime: warmStart });
@@ -920,6 +925,18 @@ function onWalkerEvent(type, data) {
     case "transfer":
       transferLine(data.lineId, data.station);
       break;
+    case "trainFull":
+      hud.showMessage(`Tren lleno (${Math.round(data.unit.load)} personas, 6 por m²): no alcanzas a subir · espera el siguiente`, "warn", 4000);
+      break;
+    case "doorObstructed": {
+      // El sensor de la puerta detecta el obstáculo y el cierre se invierte; el ATO vuelve a cerrar
+      const u = data.unit, sim = u.sim;
+      if (sim.doorState === "closing") sim.toggleDoors({ automatic: true });
+      if (!u.isPlayer) game.engine.line(u.route)?.incidents.recloses.push({ unit: u, at: game.clock + 5 });
+      hud.showMessage("Obstruiste el cierre de puertas: se vuelven a abrir · no te quedes en el vano de la puerta", "warn", 4000);
+      game.audio.doorsOpening?.(CONFIG.train.doorTime);
+      break;
+    }
     case "surface":
       arriveStreet(data.station);
       break;
@@ -1438,7 +1455,7 @@ function loop(now) {
   const realDt = Math.max(0, (now - game.last) / 1000);
   const dt = Math.min(realDt, 0.05);                 // paso de animación del fotograma
   game.last = now;
-  if (hud.summaryOpen) { game.renderer.render(game.scene, game.camera); game.raf = requestAnimationFrame(loop); return; }
+  if (hud.summaryOpen) { renderFrame(); game.raf = requestAnimationFrame(loop); return; }
   game.elapsed += dt;
   const { engine, traffic, people, world, audio, walker, player } = game;
 
@@ -1540,8 +1557,25 @@ function loop(now) {
     game.tutorial?.update(dt, { game, walker, card, hud, fare: fareBandAt(game.clock).price });
   }
 
-  game.renderer.render(game.scene, game.camera);
+  renderFrame();
   game.raf = requestAnimationFrame(loop);
+}
+
+/**
+ * Dibuja el fotograma con la vía doblada según sus pendientes (render/trackLift.js):
+ * la cota de la cámara es la referencia, y en la cabina, el interior o a bordo la
+ * cámara cabecea con el tren.
+ */
+const _camWorld = new THREE.Vector3();
+function renderFrame() {
+  const { camera, walker, rig, city } = game;
+  camera.getWorldPosition(_camWorld);
+  const inStreet = walker?.space === "street";
+  updateTrackLift(_camWorld.z, { cityZ: city?.station ? city.station.z : null, inStreet });
+  const onboard = (rig && rig.view !== "exterior") || walker?.space === "train";
+  const undo = onboard ? pitchCamera(camera, _camWorld.z) : null;
+  game.renderer.render(game.scene, camera);
+  undo?.();
 }
 
 /**
@@ -1570,7 +1604,10 @@ function nextTrainText(st, side) {
 
 function walkerHudData() {
   const w = game.walker, clock = game.clock;
-  const base = { clock, worldZ: w.worldZ, hint: w.hint() };
+  // Fuera del horario comercial el Metro real está cerrado: el juego mantiene un servicio especial
+  const [h0, h1] = SERVICE_HOURS[CONFIG.dayType];
+  const closed = inService(clock) ? "" : `Fuera del horario comercial (${String(h0 | 0).padStart(2, "0")}:${h0 % 1 ? "30" : "00"}–${h1 | 0}:${h1 % 1 ? "30" : "00"}): servicio especial del juego cada 15 min · `;
+  const base = { clock, worldZ: w.worldZ, hint: closed + w.hint() };
   if (w.space === "street") {
     const lm = game.city.landmark, band = fareBandAt(clock);
     return {

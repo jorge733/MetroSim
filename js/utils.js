@@ -33,7 +33,10 @@ export function glow(color, opts = {}) {
 
 /** Caja con centro en (x, y, z), añadida a parent. */
 export function addBox(parent, w, h, d, mat, x = 0, y = 0, z = 0) {
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+  // Las piezas largas se subdividen a lo largo (cada ~10 m) para que el dibujo
+  // pueda doblarlas siguiendo las pendientes de la vía (render/trackLift.js)
+  const segs = d > 24 ? Math.ceil(d / 10) : 1;
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d, 1, 1, segs), mat);
   mesh.position.set(x, y, z);
   parent.add(mesh);
   return mesh;

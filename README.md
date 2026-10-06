@@ -20,6 +20,24 @@ Compartir → *Agregar a inicio*. Se abre a pantalla completa y, tras la primera
 (el service worker `sw.js` guarda el juego, Three.js y las voces). La instalación necesita `https` o `localhost`.
 Los íconos están en `icons/` (los PNG se generan desde `icons/icon.svg`).
 
+## Versión 1.2 · Pendientes en 3D y pasajero realista
+
+- **La vía en 3D sigue las pendientes reales** (`js/render/trackLift.js`): el túnel baja y sube entre
+  estaciones, cada estación queda a su altura y los trenes se doblan siguiendo la vía coche a coche. La lógica
+  del juego sigue en un mundo plano; lo que se dobla es el dibujo, en la tarjeta gráfica, con una textura de
+  cotas de la línea (una muestra cada 2 m), así que casi no cuesta rendimiento. En la cabina y a bordo la cámara
+  cabecea con el tren al entrar en una rampa. La calle no se dobla: queda horizontal a la altura de su estación.
+- **Tren lleno**: a 6 personas/m² (1.299 viajeros) no cabes; te quedas en el andén y esperas el siguiente.
+- **Asientos según la carga real**: si viajan más personas que asientos tiene el tren, no hay dónde sentarse.
+- **Inercia a bordo**: al acelerar el cuerpo se va hacia atrás y al frenar hacia adelante; de pie, un arranque o
+  una frenada fuerte te hace dar un paso. El coche vibra más cuanto más rápido va.
+- **Puertas que se reabren**: si te quedas en el vano mientras se cierran, el sensor invierte el cierre (y vuelve
+  a pasar mientras sigas ahí).
+- **Más gente visible**: andenes y trenes muestran ~30 % de los viajeros reales del motor (antes ~12 %), así que la
+  punta se ve llena. Los viajeros dibujados nunca retienen al tren más de 6 s tras terminar el intercambio real.
+- Fuera del horario comercial el pasajero ve un aviso (el Metro real está cerrado; el juego mantiene un servicio
+  especial cada 15 min).
+
 ## Versión 1.1 · Realismo
 
 - **El tren real de la L3**: AS-2014 de CAF, 5 coches de ~23,4 m (120 m en total), 4 puertas dobles por costado
@@ -258,6 +276,7 @@ js/render/            dibujo del estado del motor
   trainViews.js       trenes
   signalViews.js      señales
   lineMapPanel.js     plano de línea dinámico de los coches
+  trackLift.js        pendientes en 3D: dobla el dibujo de la vía según el perfil de la línea
 js/control/           Centro de Control
   controlCenter.js    esquema de la red, ficha de tren, incidencias y órdenes
 js/touch.js           controles táctiles (celular y tablet)
