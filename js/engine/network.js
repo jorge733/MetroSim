@@ -13,9 +13,19 @@
    las demás.
 
    El orden, los nombres y las combinaciones son reales; las distancias
-   entre estaciones son APROXIMADAS. Por simplicidad todas las líneas se
-   representan subterráneas (en la realidad hay tramos en viaducto o en
-   superficie en las líneas 2, 4, 4A y 5).
+   entre estaciones son APROXIMADAS (la L3 suma ~25 km, como la real). Por
+   simplicidad todas las líneas se representan subterráneas (en la realidad
+   hay tramos en viaducto o en superficie en las líneas 2, 4, 4A y 5).
+
+   1.1 · Datos de operación de cada línea (aproximados):
+     peakHeadway  intervalo en hora punta (s), coherente con su flota y su
+                  tiempo de vuelta (la L1 es la más frecuente; la 4A la menos)
+     demand       volumen de viajeros relativo a la L3 (la L1 es la más cargada)
+     centers      estaciones que atraen los viajes de la mañana (trabajo,
+                  estudio, comercio) y de las que se vuelve por la tarde
+     terrain      cota aproximada del terreno en cada extremo (m s. n. m.)
+     deep         tramos que pasan más hondos (bajo el río Mapocho)
+     w            (por estación, opcional) importancia relativa de la estación
    ========================================================================== */
 
 import { LINE_COLORS } from "../config.js";
@@ -37,8 +47,18 @@ function buildStations(data, lineId) {
 }
 
 /** Crea una línea. Los sentidos se llaman <id>A / <id>B (la L3 conserva A / B). */
-function makeLine({ id, name, data, speedLimits = () => [], scheduleOffset = 0, description }) {
+function makeLine({ id, name, data, speedLimits = () => [], scheduleOffset = 0, description,
+  peakHeadway = 200, demand = 1, centers = [], terrain = [520, 560], deep = {} }) {
   const stations = buildStations(data, id);
+  // Importancia de cada estación: la indicada, o según combinaciones y terminales
+  stations.forEach(s => {
+    s.weight = s.w ?? (1 + 0.6 * s.combos.length + (s.index === 0 || s.index === stations.length - 1 ? 0.3 : 0));
+  });
+  // Centralidad (0..1): 1 en los centros de atracción, decae con la distancia (~6 km)
+  const centerZ = stations.filter(s => centers.includes(s.name)).map(s => s.z);
+  stations.forEach(s => {
+    s.centrality = centerZ.length ? Math.max(0, 1 - Math.min(...centerZ.map(z => Math.abs(z - s.z))) / 6000) : 0.5;
+  });
   return {
     id,
     name,
@@ -51,12 +71,14 @@ function makeLine({ id, name, data, speedLimits = () => [], scheduleOffset = 0, 
     tripPrefix: [`L${id}`, `L${id}V`],
     signalPrefix: id === "3" ? ["1", "2"] : [`${id}1`, `${id}2`],
     scheduleOffset,                    // desfase de su malla respecto a la de referencia
+    peakHeadway, demand, centers, terrain, deep,
   };
 }
 
 /* ---------- Línea 1: San Pablo → Los Dominicos ---------- */
 export const L1 = makeLine({
-  id: "1", name: "LÍNEA 1", scheduleOffset: 30,
+  id: "1", name: "LÍNEA 1", scheduleOffset: 30, peakHeadway: 120, demand: 1.9, terrain: [495, 760],
+  centers: ["LOS HÉROES", "LA MONEDA", "UNIVERSIDAD DE CHILE", "SANTA LUCÍA", "BAQUEDANO", "PEDRO DE VALDIVIA", "LOS LEONES", "TOBALABA", "EL GOLF"],
   description: "La línea más antigua y concurrida, bajo la Alameda y Providencia.",
   data: [
     { name: "SAN PABLO",                 short: "SAN PABLO",        gap: 0,    combos: ["5"] },
@@ -91,7 +113,8 @@ export const L1 = makeLine({
 
 /* ---------- Línea 2: Vespucio Norte → Hospital El Pino ---------- */
 export const L2 = makeLine({
-  id: "2", name: "LÍNEA 2", scheduleOffset: 50,
+  id: "2", name: "LÍNEA 2", scheduleOffset: 50, peakHeadway: 165, demand: 1.1, terrain: [490, 575],
+  centers: ["PUENTE CAL Y CANTO", "SANTA ANA", "LOS HÉROES", "TOESCA"], deep: { "PATRONATO>PUENTE CAL Y CANTO": 6 },
   description: "De norte a sur por el centro, hasta San Bernardo.",
   data: [
     { name: "VESPUCIO NORTE",            short: "VESPUCIO NORTE",   gap: 0 },
@@ -125,38 +148,44 @@ export const L2 = makeLine({
 
 /* ---------- Línea 3: Plaza Quilicura → Fernando Castillo Velasco ---------- */
 export const L3 = makeLine({
-  id: "3", name: "LÍNEA 3", scheduleOffset: 0,
+  id: "3", name: "LÍNEA 3", scheduleOffset: 0, peakHeadway: 200, demand: 1, terrain: [485, 600],
+  centers: ["PUENTE CAL Y CANTO", "PLAZA DE ARMAS", "UNIVERSIDAD DE CHILE", "PARQUE ALMAGRO"],
+  deep: { "HOSPITALES>PUENTE CAL Y CANTO": 8 },          // cruce bajo el río Mapocho
   description: "De Quilicura a La Reina pasando por el centro y Ñuñoa.",
   data: [
-    { name: "PLAZA QUILICURA",           short: "PLAZA QUILICURA",  gap: 0 },
-    { name: "LO CRUZAT",                 short: "LO CRUZAT",        gap: 1500 },
-    { name: "FERROCARRIL",               short: "FERROCARRIL",      gap: 1300 },
-    { name: "LOS LIBERTADORES",          short: "LOS LIBERTADORES", gap: 1700 },
-    { name: "CARDENAL CARO",             short: "CARDENAL CARO",    gap: 1600 },
-    { name: "VIVACETA",                  short: "VIVACETA",         gap: 1250 },
-    { name: "CONCHALÍ",                  short: "CONCHALÍ",         gap: 1150 },
-    { name: "PLAZA CHACABUCO",           short: "PZA. CHACABUCO",   gap: 1050 },
-    { name: "HOSPITALES",                short: "HOSPITALES",       gap: 1150 },
-    { name: "PUENTE CAL Y CANTO",        short: "CAL Y CANTO",      gap: 1400, combos: ["2"] },
-    { name: "PLAZA DE ARMAS",            short: "PLAZA DE ARMAS",   gap: 650,  combos: ["5"] },
-    { name: "UNIVERSIDAD DE CHILE",      short: "U. DE CHILE",      gap: 750,  combos: ["1"] },
-    { name: "PARQUE ALMAGRO",            short: "PARQUE ALMAGRO",   gap: 950 },
-    { name: "MATTA",                     short: "MATTA",            gap: 1050 },
-    { name: "IRARRÁZAVAL",               short: "IRARRÁZAVAL",      gap: 1350, combos: ["5"] },
-    { name: "MONSEÑOR EYZAGUIRRE",       short: "M. EYZAGUIRRE",    gap: 1200 },
-    { name: "ÑUÑOA",                     short: "ÑUÑOA",            gap: 1000, combos: ["6"] },
-    { name: "CHILE ESPAÑA",              short: "CHILE ESPAÑA",     gap: 1050 },
-    { name: "VILLA FREI",                short: "VILLA FREI",       gap: 950 },
-    { name: "PLAZA EGAÑA",               short: "PLAZA EGAÑA",      gap: 1050, combos: ["4"] },
-    { name: "FERNANDO CASTILLO VELASCO", short: "F. CASTILLO V.",   gap: 1300 },
+    // Extensión 2023 (Los Libertadores → Plaza Quilicura): 3,8 km y 3 estaciones.
+    // Tramo original (Los Libertadores → F. Castillo Velasco): ~21 km; el más largo,
+    // Hospitales → Puente Cal y Canto (~2 km), cruza bajo el río Mapocho.
+    { name: "PLAZA QUILICURA",           short: "PLAZA QUILICURA",  gap: 0,    w: 1.5 },
+    { name: "LO CRUZAT",                 short: "LO CRUZAT",        gap: 1250, w: 0.7 },
+    { name: "FERROCARRIL",               short: "FERROCARRIL",      gap: 1200, w: 0.8 },
+    { name: "LOS LIBERTADORES",          short: "LOS LIBERTADORES", gap: 1350, w: 1.5 },
+    { name: "CARDENAL CARO",             short: "CARDENAL CARO",    gap: 1730, w: 0.9 },
+    { name: "VIVACETA",                  short: "VIVACETA",         gap: 1350, w: 0.9 },
+    { name: "CONCHALÍ",                  short: "CONCHALÍ",         gap: 1245, w: 1.0 },
+    { name: "PLAZA CHACABUCO",           short: "PZA. CHACABUCO",   gap: 1135, w: 1.0 },
+    { name: "HOSPITALES",                short: "HOSPITALES",       gap: 1245, w: 1.2 },
+    { name: "PUENTE CAL Y CANTO",        short: "CAL Y CANTO",      gap: 2000, combos: ["2"], w: 1.6 },
+    { name: "PLAZA DE ARMAS",            short: "PLAZA DE ARMAS",   gap: 650,  combos: ["5"], w: 1.8 },
+    { name: "UNIVERSIDAD DE CHILE",      short: "U. DE CHILE",      gap: 800,  combos: ["1"], w: 2.0 },
+    { name: "PARQUE ALMAGRO",            short: "PARQUE ALMAGRO",   gap: 1030, w: 1.2 },
+    { name: "MATTA",                     short: "MATTA",            gap: 1135, w: 0.9 },
+    { name: "IRARRÁZAVAL",               short: "IRARRÁZAVAL",      gap: 1460, combos: ["5"], w: 1.5 },
+    { name: "MONSEÑOR EYZAGUIRRE",       short: "M. EYZAGUIRRE",    gap: 1300, w: 0.9 },
+    { name: "ÑUÑOA",                     short: "ÑUÑOA",            gap: 1080, combos: ["6"], w: 1.5 },
+    { name: "CHILE ESPAÑA",              short: "CHILE ESPAÑA",     gap: 1135, w: 1.0 },
+    { name: "VILLA FREI",                short: "VILLA FREI",       gap: 1030, w: 0.9 },
+    { name: "PLAZA EGAÑA",               short: "PLAZA EGAÑA",      gap: 1135, combos: ["4"], w: 1.6 },
+    { name: "FERNANDO CASTILLO VELASCO", short: "F. CASTILLO V.",   gap: 1400, w: 1.2 },
   ],
-  // Zona céntrica: 50 km/h entre Puente Cal y Canto y Plaza de Armas
-  speedLimits: (st) => [{ from: st[9].z + 300, to: st[10].z - 200, kmh: 50, label: "ZONA CÉNTRICA" }],
+  // Curvas de la zona céntrica: 50 km/h entre Puente Cal y Canto y Plaza de Armas
+  speedLimits: (st) => [{ from: st[9].z + 320, to: st[10].z - 220, kmh: 50, label: "CURVAS · ZONA CÉNTRICA" }],
 });
 
 /* ---------- Línea 4: Tobalaba → Plaza de Puente Alto ---------- */
 export const L4 = makeLine({
-  id: "4", name: "LÍNEA 4", scheduleOffset: 90,
+  id: "4", name: "LÍNEA 4", scheduleOffset: 90, peakHeadway: 180, demand: 1.1, terrain: [590, 690],
+  centers: ["TOBALABA", "CRISTÓBAL COLÓN", "FRANCISCO BILBAO"],
   description: "Por Américo Vespucio y Vicuña Mackenna hasta Puente Alto.",
   data: [
     { name: "TOBALABA",                  short: "TOBALABA",         gap: 0,    combos: ["1"] },
@@ -187,7 +216,7 @@ export const L4 = makeLine({
 
 /* ---------- Línea 4A: Vicuña Mackenna → La Cisterna ---------- */
 export const L4A = makeLine({
-  id: "4A", name: "LÍNEA 4A", scheduleOffset: 110,
+  id: "4A", name: "LÍNEA 4A", scheduleOffset: 110, peakHeadway: 300, demand: 0.35, terrain: [585, 560],
   description: "Corta y rápida, une la L4 con la L2 por Américo Vespucio Sur.",
   data: [
     { name: "VICUÑA MACKENNA",           short: "V. MACKENNA",      gap: 0,    combos: ["4"] },
@@ -201,7 +230,8 @@ export const L4A = makeLine({
 
 /* ---------- Línea 5: Plaza de Maipú → Vicente Valdés ---------- */
 export const L5 = makeLine({
-  id: "5", name: "LÍNEA 5", scheduleOffset: 20,
+  id: "5", name: "LÍNEA 5", scheduleOffset: 20, peakHeadway: 165, demand: 1.3, terrain: [500, 600],
+  centers: ["SANTA ANA", "PLAZA DE ARMAS", "BELLAS ARTES", "BAQUEDANO", "PARQUE BUSTAMANTE"],
   description: "De Maipú a La Florida cruzando el centro: la más larga de la red.",
   data: [
     { name: "PLAZA DE MAIPÚ",            short: "PLAZA DE MAIPÚ",   gap: 0 },
@@ -239,7 +269,8 @@ export const L5 = makeLine({
 
 /* ---------- Línea 6: Cerrillos → Los Leones ---------- */
 export const L6 = makeLine({
-  id: "6", name: "LÍNEA 6", scheduleOffset: 75,
+  id: "6", name: "LÍNEA 6", scheduleOffset: 75, peakHeadway: 270, demand: 0.55, terrain: [510, 590],
+  centers: ["LOS LEONES", "INÉS DE SUÁREZ", "ÑUÑOA"],
   description: "La más moderna: de Cerrillos a Providencia, sin conductor en la realidad.",
   data: [
     { name: "CERRILLOS",                      short: "CERRILLOS",     gap: 0 },

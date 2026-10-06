@@ -9,10 +9,36 @@
    Todo se calcula en las coordenadas de la RUTA del tren (route.js): en
    ellas el tren siempre avanza hacia -Z, sea cual sea su sentido real.
    Velocidad con signo: velocity > 0 = avanza, velocity < 0 = retrocede.
+
+   1.1 · Física por FUERZAS (dinámica longitudinal de un tren real):
+     · masa = tara del AS-2014 + viajeros a bordo (70 kg c/u) y masas rotativas;
+     · tracción: el mando pide una aceleración; los motores dan como mucho el
+       esfuerzo máximo hasta la velocidad base y luego potencia constante
+       (F = P/v), y nunca más que la adherencia rueda-carril. Por eso un tren
+       lleno, cuesta arriba o rápido acelera menos;
+     · freno: compensado por carga. Primero el freno ELÉCTRICO (regenerativo,
+       devuelve energía a la catenaria) y, cuando no alcanza o bajo ~6 km/h,
+       el de FRICCIÓN. La emergencia es solo fricción;
+     · resistencia al avance de Davis en túnel (A + B·v + C·v²);
+     · pendiente de la vía (profile.js): cuesta arriba frena, cuesta abajo
+       empuja; un tren sin freno en pendiente se va;
+     · freno de mantenimiento automático al detenerse (anti-retroceso);
+     · limitación de jerk (sacudida) para un arranque y frenado suaves;
+     · consumo eléctrico: potencia, corriente de catenaria y energía
+       (tracción, regenerada y auxiliares).
    ========================================================================== */
 
 import { CONFIG, NOTCHES, NOTCH_INDEX, REVERSER } from "../config.js";
+import { STOCK, trainMass } from "./consist.js";
 import { clamp, formatStopError } from "./format.js";
+
+const G = 9.81;
+/** Sacudida máxima (m/s³) en servicio y al aplicar la emergencia. */
+const JERK = 0.9, JERK_EMERGENCY = 4;
+/** Freno de mantenimiento automático (m/s² equivalentes) con el tren detenido. */
+const HOLD_BRAKE = 0.7;
+/** Deceleración máxima de servicio que usa la conducción automática (m/s²). */
+const ATO_MAX_BRAKE = 0.95;
 
 
 /* ==========================================================================
@@ -28,19 +54,27 @@ export class TrainSim {
   constructor(route, onEvent = () => {}, start = route.first) {
     this.route = route;
     this.onEvent = onEvent;
+    this.load = 0;                   // viajeros a bordo (lo actualiza el tráfico): cambian la masa
+    this.energy = { traction: 0, regen: 0, aux: 0 };   // kWh acumulados
     this.reset(start);
   }
 
   reset(start = this.route.first) {
     this.position = typeof start === "number" ? start : start.stopZ;   // z del testero delantero
     this.velocity = 0;               // m/s con signo
-    this.accel = 0;                  // esfuerzo aplicado (m/s²): + tracción, − freno. Con limitación de jerk
+    this.accel = 0;                  // esfuerzo PEDIDO tras limitar el jerk (m/s²): + tracción, − freno
+    this.netAccel = 0;               // aceleración real resultante (m/s²) en el sentido de avance
     this.notch = NOTCH_INDEX.B3;     // se empieza frenado
     this.reverser = 1;               // inversor en ADELANTE
     this.doorState = "closed";       // closed | opening | open | closing
     this.doorProgress = 0;           // 0 = cerradas, 1 = abiertas
     this.autoDemand = null;          // si no es null, la conducción automática manda
     this.overspeedWarned = false;
+    this.grade = 0;                  // pendiente bajo el tren (fracción, + cuesta arriba)
+    this.forces = { traction: 0, electricBrake: 0, frictionBrake: 0, resistance: 0, gravity: 0 };   // N
+    this.power = 0;                  // potencia eléctrica tomada de la catenaria (W, negativa si regenera)
+    this.current = 0;                // corriente de catenaria (A)
+    this.voltage = STOCK.lineVoltage;
     this.onEvent("reset", { start });
   }
 
@@ -58,6 +92,17 @@ export class TrainSim {
     if (this.autoDemand !== null) return this.autoDemand < 0;
     return this.notchData.type === "brake";
   }
+  /** Masa real (kg) con los viajeros a bordo. */
+  get mass() { return trainMass(this.load); }
+  /** Esfuerzo aplicado para mostrar (−1 freno máximo … +1 tracción máxima). */
+  get effort() {
+    const f = this.forces;
+    if (f.traction > 0) return clamp(f.traction / STOCK.maxTractive, 0, 1);
+    const brake = f.electricBrake + f.frictionBrake;
+    return -clamp(brake / (this.mass * STOCK.rotary * 1.3), 0, 1);
+  }
+  /** Ocupación del tren (0..1 respecto de la capacidad a 6 p/m²). */
+  get occupancy() { return clamp(this.load / STOCK.capacity, 0, 1.2); }
 
   /** Límite efectivo: el de la vía o el de marcha atrás. */
   currentLimit() {
@@ -153,39 +198,79 @@ export class TrainSim {
     const T = CONFIG.train;
     const prevSpeed = this.speed;
 
-    // 1. Demanda de esfuerzo: emergencia > automático > mando manual
+    // 1. Esfuerzo pedido: emergencia > automático > mando manual
     let demand = this.emergency ? NOTCHES[NOTCH_INDEX.EM].accel : (this.autoDemand ?? this.notchData.accel);
 
     // 2. Enclavamientos: sin tracción con puertas abiertas o inversor en neutro
     if (demand > 0 && (!this.doorsClosed || this.reverser === 0)) demand = 0;
-    if (!this.doorsClosed) demand = Math.min(demand, -0.6);   // freno de mantenimiento con puertas abiertas
+    if (!this.doorsClosed) demand = Math.min(demand, -0.6);   // freno de estacionamiento con puertas abiertas
 
-    // 3. Limitación de jerk
-    const jerk = this.emergency ? 5 : 1.4;
+    // 3. Limitación de jerk (la emergencia se aplica de golpe)
+    const jerk = this.emergency ? JERK_EMERGENCY : JERK;
     this.accel += clamp(demand - this.accel, -jerk * dt, jerk * dt);
 
-    // 4. Fuerzas: tracción en el sentido del inversor; freno y resistencia se oponen al movimiento
+    // 4. Fuerzas (N) en el sentido de avance de la ruta
     const v = this.velocity, speed = Math.abs(v);
     const dir = this.reverser;
     const cap = dir === -1 ? T.reverseMaxSpeed : T.maxSpeed;
+    const m = this.mass, mEq = m * STOCK.rotary;
+    this.grade = this.route.gradeAt ? this.route.gradeAt(this.position + T.length / 2) : 0;
+
+    // Tracción: pedida (compensada por carga) ≤ curva esfuerzo-velocidad ≤ adherencia
     let traction = 0;
     if (this.accel > 0 && dir !== 0) {
-      const curve = Math.min(1, T.tractionBaseSpeed / Math.max(speed, 0.1));
-      const goingThatWay = Math.sign(v) === dir;
-      traction = goingThatWay && speed >= cap - 0.01 ? 0 : this.accel * curve * dir;
+      const goingThatWay = Math.sign(v) === dir || speed < 0.05;
+      const available = Math.min(STOCK.maxTractive, STOCK.maxPower / Math.max(speed, 0.5));
+      const adhesion = STOCK.adhesion * G * m * (STOCK.motorCars / STOCK.cars);
+      traction = Math.min(this.accel * mEq, available, adhesion);
+      if (goingThatWay && speed >= cap - 0.05) traction = 0;            // corte de tracción a la velocidad máxima
     }
-    const brake = this.accel < 0 ? -this.accel : 0;
-    const resistance = speed > 0 ? 0.01 + 0.0006 * speed + 0.00009 * speed * speed : 0;
 
-    let newV = v + traction * dt;
-    const opposing = (brake + resistance) * dt;
+    // Freno: pedido (compensado por carga), con freno de mantenimiento automático al detenerse
+    let brakeDecel = this.accel < 0 ? -this.accel : 0;
+    if (speed < 0.08 && traction === 0) brakeDecel = Math.max(brakeDecel, HOLD_BRAKE);
+    const brakeTotal = Math.min(brakeDecel * mEq, STOCK.adhesion * G * m * 1.0);
+    // Reparto: eléctrico (regenerativo) primero, la fricción completa lo que falta
+    let electric = 0;
+    if (!this.emergency && speed > 0.05) {
+      const fade = clamp(speed / STOCK.electricFadeSpeed, 0, 1);
+      electric = Math.min(brakeTotal, STOCK.maxElectricBrake, STOCK.maxElectricBrakePower / Math.max(speed, 0.5)) * fade;
+    }
+    const friction = brakeTotal - electric;
+
+    const resistance = speed > 0.01 ? STOCK.rollingPerKg * m + STOCK.davisB * speed + STOCK.davisC * speed * speed : 0;
+    const gravity = -m * G * this.grade;                                 // + empuja hacia delante (cuesta abajo)
+
+    // 5. Integración: las fuerzas "motrices" (tracción con signo y gravedad) cambian la velocidad;
+    //    el freno y la resistencia solo se oponen al movimiento (y pueden retener el tren)
+    const drive = traction * dir + gravity;
+    let newV = v + (drive / mEq) * dt;
+    const opposing = ((brakeTotal + resistance + (speed <= 0.01 ? STOCK.rollingPerKg * m : 0)) / mEq) * dt;
     newV = Math.abs(newV) <= opposing ? 0 : newV - Math.sign(newV) * opposing;
-    newV = clamp(newV, -T.reverseMaxSpeed - 0.3, T.maxSpeed);
+    newV = clamp(newV, -T.reverseMaxSpeed - 1, T.maxSpeed + 3 / 3.6);
 
     this.position -= ((v + newV) / 2) * dt;
+    this.netAccel = (newV - v) / dt;
     this.velocity = newV;
+    this.forces.traction = traction;
+    this.forces.electricBrake = electric;
+    this.forces.frictionBrake = friction;
+    this.forces.resistance = resistance;
+    this.forces.gravity = gravity;
 
-    // 5. Límites físicos de la vía
+    // 6. Electricidad: potencia de tracción, regeneración y auxiliares
+    const vAvg = (Math.abs(v) + Math.abs(newV)) / 2;
+    const pTraction = (traction * vAvg) / STOCK.tractionEfficiency;
+    const pRegen = electric * vAvg * STOCK.regenEfficiency * STOCK.regenReceptivity;
+    this.power = pTraction + STOCK.auxPower - pRegen;
+    this.current = this.power / STOCK.lineVoltage;
+    this.voltage = STOCK.lineVoltage - STOCK.lineDropPerAmp * this.current;
+    const toKWh = dt / 3.6e6;
+    this.energy.traction += pTraction * toKWh;
+    this.energy.regen += pRegen * toKWh;
+    this.energy.aux += STOCK.auxPower * toKWh;
+
+    // 7. Límites físicos de la vía
     const track = this.route.track;
     if (this.position <= track.bumperZ) {
       if (this.speed > 0.5) this.onEvent("bumper", { kmh: this.speedKmh });
@@ -196,7 +281,7 @@ export class TrainSim {
       this.position = track.rearLimitZ; this.velocity = 0; this.accel = Math.min(this.accel, 0);
     }
 
-    // 6. Detección de parada
+    // 8. Detección de parada
     if (prevSpeed > 0 && this.velocity === 0) {
       const st = this.nearestStation();
       const error = this.position - st.stopZ;
@@ -204,7 +289,7 @@ export class TrainSim {
       if (Math.abs(error) < 40) this.onEvent("stopped", { station: st, error });
     }
 
-    // 7. Puertas
+    // 9. Puertas
     const step = dt / T.doorTime;
     if (this.doorState === "opening") {
       this.doorProgress = Math.min(1, this.doorProgress + step);
@@ -214,7 +299,7 @@ export class TrainSim {
       if (this.doorProgress === 0) { this.doorState = "closed"; this.onEvent("doorsClosed", { station: this.dockedStation() }); }
     }
 
-    // 8. Vigilancia de velocidad
+    // 10. Vigilancia de velocidad
     const limit = this.currentLimit();
     if (this.speedKmh > limit + 2 && !this.overspeedWarned) { this.overspeedWarned = true; this.onEvent("overspeed", { limit }); }
     if (this.speedKmh < limit) this.overspeedWarned = false;
@@ -223,7 +308,7 @@ export class TrainSim {
 
 
 /* ==========================================================================
-   AutoDriver — conducción automática (ATO)
+   AutoDriver — conducción automática (ATO, como la del CBTC de la L3)
    Respeta señales, horario y espera a que suban/bajen los viajeros.
 
    Estados:
@@ -236,12 +321,20 @@ export class TrainSim {
      retired  → al final de la cola: el tráfico le cambia de cabina y de vía
                 (maniobra de retorno) o lo retira a cocheras
 
+   Marcha económica (1.1): al alcanzar la velocidad de crucero el ATO corta
+   la tracción y deja el tren en DERIVA hasta perder unos 4 km/h; entonces
+   vuelve a traccionar. Así ahorra energía, como los ATO reales. Si el tren
+   va con retraso (hurry) no deriva. Al frenar compensa la pendiente.
+
    Retención (orden "control.hold" del Centro de Control): con held = true el
    tren no cierra puertas ni sale de la estación hasta que lo liberen.
 
    Regulación (regulation.js): regulateUntil retrasa la salida para igualar
    intervalos; hurry acorta la parada de un tren que va con mucho hueco.
    ========================================================================== */
+
+/** Pérdida de velocidad permitida en deriva antes de volver a traccionar (m/s). */
+const COAST_BAND = 4 / 3.6;
 
 export class AutoDriver {
   /**
@@ -266,6 +359,8 @@ export class AutoDriver {
     this.timer = 0;
     this.extraWait = 0;
     this.brakeTarget = null;
+    this.coasting = false;
+    this.backing = false;              // retrocediendo hasta la marca tras un rebase
     this.held = false;                 // retenido por el Centro de Control
     this.regulateUntil = null;         // regulación: no sale antes de esta hora
     this.regulating = false;
@@ -293,16 +388,22 @@ export class AutoDriver {
   update(dt, clock) {
     const sim = this.sim;
     const last = this.stations.length - 1;
+    const HOLD = -1.0;
     switch (this.state) {
       case "depot":
-        sim.autoDemand = -1.05;
+        sim.autoDemand = HOLD;
         if (clock >= this.holdUntil) this.state = "running";
         break;
       case "running": {
-        sim.autoDemand = this.runDemand(this.target.stopZ, true);
-        const d = sim.position - this.target.stopZ;
+        let d = sim.position - this.target.stopZ;
+        // Rebase de la marca: retrocede a paso de hombre hasta ella (tolerancia ±2,5 m)
+        if (this.backing || (sim.isStopped && d <= -1.0 && d > -60)) {
+          sim.autoDemand = this.backDemand(d);
+          if (this.backing) break;
+        } else sim.autoDemand = this.runDemand(this.target.stopZ, true);
+        d = sim.position - this.target.stopZ;
         if (sim.isStopped && Math.abs(d) < 1.0) {
-          sim.autoDemand = -1.05;
+          sim.autoDemand = HOLD;
           sim.toggleDoors({ automatic: true });
           this.state = "dwell";
           this.arrivedAt = clock;
@@ -312,7 +413,7 @@ export class AutoDriver {
         break;
       }
       case "dwell": {
-        sim.autoDemand = -1.05;
+        sim.autoDemand = HOLD;
         let minDwell = this.targetIndex === last ? CONFIG.schedule.minDwell + 10 : CONFIG.schedule.minDwell;
         if (this.hurry) minDwell = Math.min(minDwell, 12);
         const leave = this.leaveTime();
@@ -326,11 +427,11 @@ export class AutoDriver {
         break;
       }
       case "closing":
-        sim.autoDemand = -1.05;
+        sim.autoDemand = HOLD;
         if (sim.doorsClosed) this.state = "ready";
         break;
       case "ready": {
-        sim.autoDemand = -1.05;
+        sim.autoDemand = HOLD;
         if (this.targetIndex === last) { this.state = "retire"; break; }
         if (this.held) break;
         const leave = this.leaveTime();
@@ -339,6 +440,7 @@ export class AutoDriver {
           this.onEvent("departing", { station: this.target, next: this.stations[this.targetIndex + 1] });
           this.targetIndex++;
           this.brakeTarget = null;
+          this.coasting = false;
           this.state = "running";
         }
         break;
@@ -348,9 +450,21 @@ export class AutoDriver {
         if (sim.isStopped && Math.abs(sim.position - sim.route.track.retireZ) < 2) { this.state = "retired"; this.onEvent("retired"); }
         break;
       case "retired":
-        sim.autoDemand = -1.05;
+        sim.autoDemand = HOLD;
         break;
     }
+  }
+
+  /** Retroceso lento hasta la marca tras un rebase (inversor atrás, ~3 km/h). */
+  backDemand(d) {
+    const sim = this.sim;
+    if (!this.backing) { this.backing = true; sim.reverser = -1; }
+    if (d > -0.6) {                                      // de vuelta en la marca: frena y vuelve el inversor
+      if (sim.isStopped) { sim.reverser = 1; this.backing = false; this.brakeTarget = null; }
+      return -0.8;
+    }
+    const v = sim.speed, want = Math.min(0.8, Math.sqrt(Math.max(0, -d - 0.5) * 0.6));
+    return v < want ? 0.3 : -0.3;
   }
 
   /**
@@ -359,6 +473,7 @@ export class AutoDriver {
    */
   runDemand(stopZ, isStation) {
     const sim = this.sim, v = sim.speed;
+    const gGrade = 9.81 * sim.grade;                     // + cuesta arriba (ayuda a frenar)
 
     // ¿Hay una señal en rojo antes del punto de parada?
     let targetZ = stopZ;
@@ -371,26 +486,43 @@ export class AutoDriver {
     if (this.brakeTarget === null || Math.abs(this.brakeTarget.z - targetZ) > 1) this.brakeTarget = { z: targetZ, braking: false };
 
     const d = sim.position - targetZ;
-    if (d <= 0.15) return -1.05;
+    if (d <= 0.15) return -1.0;
 
+    // Curva de frenado: deceleración neta necesaria, y freno que hay que pedir para lograrla.
+    // Se anticipa lo que tarda el freno en llegar (limitación de jerk): mientras crece, el tren sigue avanzando.
+    const ramp = this.brakeTarget.braking ? 0 : Math.max(0, sim.accel + 0.75) / JERK;
     const req = (v * v) / (2 * Math.max(d - 0.1, 0.05));
-    if (req > 0.6 || this.brakeTarget.braking) {
+    const reqEarly = (v * v) / (2 * Math.max(d - 0.1 - v * ramp * 0.55, 0.05));
+    const brakeNeeded = reqEarly - gGrade;
+    if (brakeNeeded > ATO_MAX_BRAKE * 0.76 || this.brakeTarget.braking) {
       this.brakeTarget.braking = true;
-      if (v < 0.4 && d > 1) return 0.25;                  // aproximación lenta si se quedó corto
-      return -clamp(req * 1.05, 0, 1.05);
+      this.coasting = false;
+      if (v < 0.4 && d > 1) return 0.35;                  // aproximación lenta si se quedó corto
+      return -clamp(req * 1.05 - gGrade, 0, ATO_MAX_BRAKE + 0.05);
     }
 
     // Velocidad de crucero respetando límites presentes y futuros
-    let cruise = Math.min((sim.route.speedLimitAt(sim.position) - 4) / 3.6, cruiseCap);
+    let cruise = Math.min((sim.route.speedLimitAt(sim.position) - 3) / 3.6, cruiseCap);
     for (const s of sim.route.limits) {
       if (s.from < sim.position && sim.position - s.from < 1500) {
         const dist = sim.position - s.from;
-        const vTarget = (s.kmh - 4) / 3.6;
-        cruise = Math.min(cruise, Math.sqrt(vTarget * vTarget + 2 * 0.5 * dist));
+        const vTarget = (s.kmh - 3) / 3.6;
+        cruise = Math.min(cruise, Math.sqrt(vTarget * vTarget + 2 * 0.6 * dist));
       }
     }
-    if (v < cruise - 0.4) return 0.9;
-    if (v > cruise + 0.2) return -0.6;
-    return 0;
+    for (const s of sim.route.restrictions) {
+      if (s.from < sim.position && sim.position - s.from < 1500) {
+        const vTarget = (s.kmh - 3) / 3.6;
+        cruise = Math.min(cruise, Math.sqrt(vTarget * vTarget + 2 * 0.6 * (sim.position - s.from)));
+      }
+    }
+
+    // Marcha económica: tracción hasta el crucero, deriva, y de nuevo tracción
+    const band = this.hurry || !isStation ? 0.4 : COAST_BAND;
+    if (v > cruise + 0.3) { this.coasting = true; return -clamp((v - cruise) * 0.8, 0.15, 0.6); }
+    if (v >= cruise - 0.2) this.coasting = true;
+    if (this.coasting && v > cruise - band) return 0;
+    this.coasting = false;
+    return v < cruise - 1.5 ? 1.0 : 0.6;
   }
 }

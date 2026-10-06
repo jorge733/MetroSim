@@ -46,7 +46,7 @@ export class CabDisplay {
     }
 
     /* --- Velocímetro --- */
-    const cx = 170, cy = 185, r = 135, vmax = 80;
+    const cx = 170, cy = 185, r = 135, vmax = 90;
     const a0 = Math.PI * 0.75, sweep = Math.PI * 1.5;
     const ang = (v) => a0 + sweep * clamp(v / vmax, 0, 1);
     const kmh = sim.speedKmh;
@@ -91,17 +91,38 @@ export class CabDisplay {
     g.textAlign = "left"; g.font = "900 44px Arial"; g.fillText(n.id, x0 + 14, 56);
     g.font = "700 18px Arial"; g.textAlign = "right"; g.fillText(n.label, x0 + w - 12, 56);
 
-    // Barra de esfuerzo (tracción / freno aplicado)
+    // Barra de esfuerzo REAL (no lo pedido): tracción a la derecha; a la izquierda el
+    // freno eléctrico regenerativo (verde) y el de fricción (ámbar)
     const barY = 104, barH = 16, mid = x0 + w / 2;
     g.fillStyle = "#1a242e"; g.fillRect(x0, barY, w, barH);
-    const effort = clamp(sim.accel / 1.45, -1, 1);
-    g.fillStyle = effort >= 0 ? "#4fd6ff" : "#ffb547";
-    if (effort >= 0) g.fillRect(mid, barY, (w / 2) * effort, barH);
-    else g.fillRect(mid + (w / 2) * effort, barY, -(w / 2) * effort, barH);
+    const effort = sim.effort ?? clamp(sim.accel / 1.3, -1, 1);
+    if (effort >= 0) {
+      g.fillStyle = "#4fd6ff"; g.fillRect(mid, barY, (w / 2) * effort, barH);
+    } else {
+      const f = sim.forces || { electricBrake: 0, frictionBrake: 1 };
+      const total = f.electricBrake + f.frictionBrake || 1;
+      const len = -(w / 2) * effort, elec = len * f.electricBrake / total;
+      g.fillStyle = "#3ee08a"; g.fillRect(mid - elec, barY, elec, barH);
+      g.fillStyle = "#ffb547"; g.fillRect(mid - len, barY, len - elec, barH);
+    }
     g.fillStyle = "#ffffff"; g.fillRect(mid - 1, barY - 3, 2, barH + 6);
     g.fillStyle = "#8b9bab"; g.font = "600 12px Arial";
     g.textAlign = "left"; g.fillText("FRENO", x0, barY + 30);
-    g.textAlign = "right"; g.fillText("TRACCIÓN", x0 + w, barY + 30);
+    g.fillStyle = "#3ee08a"; g.textAlign = "center"; g.fillText("REGEN.", x0 + w * 0.34, barY + 30);
+    g.fillStyle = "#8b9bab"; g.textAlign = "right"; g.fillText("TRACCIÓN", x0 + w, barY + 30);
+
+    // Pendiente, tensión de catenaria y corriente (abajo a la izquierda)
+    if (sim.voltage !== undefined) {
+      const permil = Math.round((sim.grade || 0) * 1000);
+      const arrow = permil > 1 ? "↗" : permil < -1 ? "↘" : "→";
+      g.fillStyle = Math.abs(permil) >= 20 ? "#ffd166" : "#9fb0c2";
+      g.font = "700 15px Arial"; g.textAlign = "left";
+      g.fillText(`${arrow} ${permil > 0 ? "+" : ""}${permil} ‰`, 16, 340);
+      g.fillStyle = "#9fb0c2";
+      g.fillText(`${Math.round(sim.voltage)} V`, 106, 340);
+      g.fillStyle = sim.current < -5 ? "#3ee08a" : "#9fb0c2";
+      g.fillText(`${sim.current >= 0 ? "" : "−"}${Math.abs(Math.round(sim.current)).toLocaleString("es-CL")} A`, 180, 340);
+    }
 
     // Estación
     g.textAlign = "left";
@@ -217,10 +238,18 @@ export class CabStatusDisplay {
     });
     if (!upcoming.length) { g.fillStyle = "#e8eef5"; g.font = "700 19px Arial"; g.textAlign = "left"; g.fillText("Fin de servicio · maniobra de retorno", 30, 152); }
 
-    // Pie: viajeros a bordo
-    g.fillStyle = "#8b9bab"; g.font = "600 14px Arial"; g.textAlign = "left";
-    g.fillText(`A BORDO: ${extra.onboard ?? 0} VIAJEROS`, 26, Hd - 16);
-    g.textAlign = "right"; g.fillText(`LÍMITE ${info.limit} KM/H`, Wd - 26, Hd - 16);
+    // Pie: viajeros a bordo (y ocupación), masa del tren y energía neta del turno
+    const occ = Math.round((sim.occupancy ?? 0) * 100);
+    g.fillStyle = occ >= 85 ? "#ff8a8a" : occ >= 65 ? "#ffd166" : "#8b9bab";
+    g.font = "600 14px Arial"; g.textAlign = "left";
+    g.fillText(`A BORDO: ${extra.onboard ?? 0} VIAJEROS · ${occ} %`, 26, Hd - 16);
+    if (sim.energy) {
+      const net = sim.energy.traction + sim.energy.aux - sim.energy.regen;
+      g.fillStyle = "#8b9bab"; g.textAlign = "right";
+      g.fillText(`${Math.round(sim.mass / 1000)} t · ${net.toFixed(1)} kWh (regen. ${sim.energy.regen.toFixed(1)})`, Wd - 26, Hd - 16);
+    } else {
+      g.textAlign = "right"; g.fillText(`LÍMITE ${info.limit} KM/H`, Wd - 26, Hd - 16);
+    }
     this.texture.needsUpdate = true;
   }
 }

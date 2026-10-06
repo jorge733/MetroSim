@@ -15,12 +15,24 @@
    para la de vuelta son el espejo (zSim = K − zLínea). Así la física
    (sim.js), las señales, los horarios y la conducción automática funcionan
    igual en ambos sentidos y en todas las líneas sin duplicar código.
+
+   1.1 · El andén (125 m) no es simétrico respecto del centro de la estación
+   (la mezanina queda sobre el extremo +Z del mundo), así que cada sentido
+   tiene su propia marca de parada: la cabeza del tren queda a
+   CONFIG.station.stopMargin del final del andén por el que sale. Cada
+   estación de la ruta lleva, en coordenadas de la ruta:
+     stopZ        marca de parada (cabeza del tren)
+     platformIn   extremo del andén por el que ENTRA el tren
+     platformOut  extremo del andén por el que SALE
+     hallIn / hallOut  bocas del túnel de la estación
+   Además cada ruta conoce la PENDIENTE de la vía (profile.js).
    ========================================================================== */
 
 import { CONFIG, setActiveLineData } from "../config.js";
 import { L3, LINES } from "./network.js";
+import { buildProfile } from "./profile.js";
 
-function makeRoute(line, dir) {
+function makeRoute(line, dir, profile) {
   const S = CONFIG.station, tail = CONFIG.track.tail, L = CONFIG.train.length;
   const LS = line.stations;
   const K = LS[0].z + LS.at(-1).z;                 // constante del espejo
@@ -28,22 +40,36 @@ function makeRoute(line, dir) {
   const toWorldZ = toSimZ;                         // el espejo es su propia inversa
   const k = dir === 1 ? 0 : 1;
 
+  // Extremos de andén y vestíbulo relativos al centro, vistos en el sentido de avance
+  // (en coordenadas de la ruta el tren va hacia −Z: "in" es el lado +Z, "out" el −Z)
+  const platIn = dir === 1 ? S.platformZ1 : -S.platformZ0;
+  const platOut = dir === 1 ? S.platformZ0 : -S.platformZ1;
+  const hallIn = dir === 1 ? S.hallZ1 : -S.hallZ0;
+  const hallOut = dir === 1 ? S.hallZ0 : -S.hallZ1;
+  const stopOffset = platOut + S.stopMargin;
+
   const order = dir === 1 ? LS : [...LS].reverse();
   const stations = order.map((st, index) => {
     const z = toSimZ(st.z);
-    return { ...st, world: st, worldIndex: st.index, index, z, stopZ: z + S.stopOffset };
+    return {
+      ...st, world: st, worldIndex: st.index, index, z,
+      stopZ: z + stopOffset,
+      platformIn: z + platIn, platformOut: z + platOut,
+      hallIn: z + hallIn, hallOut: z + hallOut,
+    };
   });
   const first = stations[0], last = stations.at(-1);
 
+  const DEPOT = 245;                               // m entre el centro de la terminal y la cabeza del tren en cocheras
   const track = {
     start: first.z + tail,                         // fondo de saco tras la terminal de origen
     end: last.z - tail,                            // fondo de saco tras la terminal de destino
-    depotZ: first.z + 200,                         // aparición de trenes que entran en servicio
+    depotZ: first.z + DEPOT,                       // aparición de trenes que entran en servicio
     rearLimitZ: first.z + tail - L - 2,            // marcha atrás: límite del testero
     // Fin de la cola de maniobras: el testero queda donde, tras cambiar de cabina,
     // el otro extremo del tren coincide con el punto de entrada de la vía contraria.
-    retireZ: last.z - 200 - L,
-    bumperZ: last.z - 300,                         // topera
+    retireZ: last.z - DEPOT - L,
+    bumperZ: last.z - tail + 25,                   // topera
     railTop: CONFIG.track.railTop,
   };
 
@@ -52,8 +78,9 @@ function makeRoute(line, dir) {
     const a = toSimZ(l.from), b = toSimZ(l.to);
     return { ...l, from: Math.max(a, b), to: Math.min(a, b) };
   });
-  limits.push({ from: last.z + 300, to: track.end, kmh: 40, label: "ENTRADA A TERMINAL" });
-  limits.push({ from: track.start, to: first.z + S.hallHalf, kmh: 25, label: "SALIDA DE COCHERAS" });
+  limits.push({ from: last.z + 320, to: track.end, kmh: 40, label: "ENTRADA A TERMINAL" });
+  limits.push({ from: last.hallOut, to: track.end, kmh: 25, label: "COLA DE MANIOBRAS" });
+  limits.push({ from: track.start, to: first.hallIn, kmh: 25, label: "SALIDA DE COCHERAS" });
 
   const route = {
     id: line.routeIds[k],
@@ -78,6 +105,13 @@ function makeRoute(line, dir) {
       for (const l of route.restrictions) if (z <= l.from && z >= l.to) limit = Math.min(limit, l.kmh);
       return limit;
     },
+    /** Pendiente (fracción, + cuesta arriba en el sentido de avance) en una coordenada de la ruta. */
+    gradeAt(z) {
+      // Avanzar en la ruta es ir hacia −Z de la ruta: en el mundo, −Z (ida) o +Z (vuelta)
+      return -dir * profile.slopeWorld(toWorldZ(z));
+    },
+    /** Cota del carril (m s. n. m.) en una coordenada de la ruta. */
+    elevationAt(z) { return profile.elevationAt(toWorldZ(z)); },
     /** Estación de la ruta que corresponde a una estación de la línea (el mismo objeto o el mismo nombre). */
     stationOf(lineStation) {
       return stations.find(s => s.world === lineStation) || stations.find(s => s.name === lineStation?.name) || null;
@@ -89,7 +123,8 @@ function makeRoute(line, dir) {
 
 /** Los dos sentidos de una línea: [ida, vuelta]. */
 function makeLineRoutes(line) {
-  const routes = [makeRoute(line, 1), makeRoute(line, -1)];
+  line.profile = buildProfile(line);
+  const routes = [makeRoute(line, 1, line.profile), makeRoute(line, -1, line.profile)];
   routes[0].opposite = routes[1];
   routes[1].opposite = routes[0];
   line.routes = routes;

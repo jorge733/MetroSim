@@ -47,7 +47,7 @@ import { Regulator } from "./regulation.js";
 import { IncidentManager } from "./incidents.js";
 
 /** Parte de los que bajan en una estación de combinación que siguen viaje por la otra línea. */
-const TRANSFER_SHARE = 0.35;
+const TRANSFER_SHARE = 0.3;
 
 /** Una línea de la red con todos sus sistemas. */
 class LineSystem {

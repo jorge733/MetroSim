@@ -62,7 +62,7 @@
 
 import * as THREE from "three";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
-import { CONFIG, STATIONS, LINE, NOTCH_INDEX, FARES, spokenName, fareBandAt, formatCLP, demandAt } from "./config.js";
+import { CONFIG, STATIONS, LINE, NOTCH_INDEX, FARES, spokenName, fareBandAt, formatCLP, demandAt, dayTypeOf } from "./config.js";
 import { ROUTES, ROUTE_A, ROUTE_B, routeForSide, oppositeRoute, setActiveLine } from "./engine/route.js";
 import { LINES, lineById } from "./engine/network.js";
 import { BipCard } from "./card.js";
@@ -606,9 +606,14 @@ function onCommandResult(r) {
   if (game.driverRole?.owns(r) || r.type.startsWith("control.")) hud.showMessage(r.result.text, r.result.level);
 }
 
-/** Hora local del computador en segundos desde medianoche. */
+/**
+ * Hora local del computador en segundos desde medianoche. Fija también el
+ * tipo de día de hoy (laboral, sábado o domingo/festivo): de él dependen el
+ * horario comercial, la demanda y los intervalos.
+ */
 function localClock() {
   const d = new Date();
+  CONFIG.dayType = dayTypeOf(d);
   return d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds() + d.getMilliseconds() / 1000;
 }
 
@@ -1512,7 +1517,7 @@ function loop(now) {
     accel: fs ? fs.accel : 0,
     braking: fs ? fs.isBraking : false,
     level: focus ? level : 0,
-    inStation: !inStreet && STATIONS.some(s => Math.abs(cameraZ - s.z) < CONFIG.station.hallHalf),
+    inStation: !inStreet && STATIONS.some(s => cameraZ - s.z > CONFIG.station.hallZ0 && cameraZ - s.z < CONFIG.station.hallZ1),
     street: inStreet,
     streetBusy: inStreet ? clamp(demandAt(game.clock) * 1.4 + 0.15, 0.15, 1) : 0,
     view,

@@ -1,6 +1,6 @@
 /* ==========================================================================
    MetroSim — Motor · traffic.js
-   Gestor de tráfico: todos los trenes de la Línea 3 en ambos sentidos.
+   Gestor de tráfico: todos los trenes de una línea en ambos sentidos.
 
    · Cada ruta (sentido) tiene su horario y sus señales. Los servicios entran
      desde las cocheras de su terminal de origen y se retiran tras la de destino.
@@ -159,6 +159,7 @@ export class TrafficManager {
     for (const u of this.units) {
       u.prevPos = u.sim.position;
       u.ato?.update(dt, clock);
+      u.sim.load = u.load || 0;                       // los viajeros a bordo pesan (física)
       u.sim.update(dt);
       this.trackSchedule(u, clock);
     }

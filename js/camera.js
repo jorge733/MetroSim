@@ -145,7 +145,7 @@ export class CameraRig {
 
   /** Mantiene la cámara dentro del túnel (círculo) o del vestíbulo de la estación (caja). */
   constrain(p, target) {
-    const inStation = STATIONS.some(s => Math.abs(p.z - s.z) < ST.hallHalf - 2);
+    const inStation = STATIONS.some(s => p.z - s.z > ST.hallZ0 + 2 && p.z - s.z < ST.hallZ1 - 2);
     if (inStation) {
       p.x = clamp(p.x, -ST.wallX + 0.5, ST.wallX - 0.5);
       p.y = clamp(p.y, 0.6, ST.ceilingY - 0.6);

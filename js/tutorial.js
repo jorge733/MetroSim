@@ -37,7 +37,7 @@ function driverSteps(k) {
   return [
     {
       title: "Bienvenido a la cabina",
-      text: (c) => `Hoy conduces el servicio ${c.game.player.trip.id}, un tren de 5 coches. Te enseñaremos a salir de ${nice(c.mem.origin.name)} y detenerte bien en la estación siguiente. ${k("Arrastra el ratón para mirar alrededor (C vuelve a centrar).", "Arrastra el dedo para mirar alrededor.")}`,
+      text: (c) => `Hoy conduces el servicio ${c.game.player.trip.id}, un tren AS-2014 de 5 coches y 120 m. Te enseñaremos a salir de ${nice(c.mem.origin.name)} y detenerte bien en la estación siguiente. ${k("Arrastra el ratón para mirar alrededor (C vuelve a centrar).", "Arrastra el dedo para mirar alrededor.")}`,
       next: true,
     },
     {

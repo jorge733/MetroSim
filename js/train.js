@@ -1,6 +1,6 @@
 /* ==========================================================================
-   MetroSim — Alpha 0.6 · train.js
-   Tren AS-2014 de 5 coches (simplificado): exterior, intercirculación,
+   MetroSim — 1.1 · train.js
+   Tren AS-2014 (CAF) de 5 coches y ~120 m (simplificado): exterior, intercirculación,
    salones de viajeros, pantógrafos y cabina de conducción.
 
    Origen del tren: centro de su vía en el testero delantero (z = 0); el tren
@@ -145,7 +145,7 @@ function mergeByMaterial(root) {
 
 
 /* ==========================================================================
-   Construcción de un coche (en coordenadas del coche: 0..18, cabina en z=0)
+   Construcción de un coche (en coordenadas del coche: 0..23,4, cabina en z=0)
    ========================================================================== */
 
 /** Pared lateral con huecos rectangulares (ventanas y puertas). */
@@ -199,9 +199,17 @@ function buildCarStatic(g, car, mat, { dest, cabFiller, openFront, openRear }) {
 
   // Techo, climatizadores, bastidor, bogies y ruedas
   addBoxSpan(g, 0, W * 2 + 0.04, R, R + 0.15, 0, L, mat.roof);
-  [4.5, 13.5].forEach(zc => addBoxSpan(g, 0, 1.8, R + 0.15, R + 0.42, zc - 1.4, zc + 1.4, mat.roof));
+  // Equipos de climatización en el techo (uno sobre cada mitad del salón)
+  [5.6, L - 5.6].forEach(zc => {
+    addBoxSpan(g, 0, 1.8, R + 0.15, R + 0.42, zc - 1.5, zc + 1.5, mat.roof);
+    addBoxSpan(g, 0, 1.2, R + 0.42, R + 0.45, zc - 1.1, zc + 1.1, mat.under);     // rejilla del condensador
+  });
+  // Equipos bajo bastidor entre bogies: convertidor de tracción, baterías y compresor
+  [[6.2, 9.4, 0.95], [10.4, 13.0, 0.8], [14.0, 16.8, 0.9]].forEach(([za, zb, w]) => [-1, 1].forEach(s => {
+    addBoxSpan(g, s * (W - 0.15 - w / 2), w, 0.42, 0.85, za, zb, mat.under);
+  }));
   addBoxSpan(g, 0, W * 2 - 0.2, 0.55, 0.85, 0.4, L - 0.4, mat.under);
-  [3.0, L - 3.0].forEach(zb => {
+  [3.4, L - 3.4].forEach(zb => {
     addBoxSpan(g, 0, 2.0, 0.42, 0.72, zb - 1.3, zb + 1.3, mat.under);
     [-0.9, 0.9].forEach(dz => [-0.72, 0.72].forEach(x => {
       const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.12, 14), mat.wheel);
@@ -301,7 +309,7 @@ function buildGangway(root, mat, z) {
 /** Pantógrafo de un brazo sobre el techo, tocando la catenaria. */
 function buildPantograph(g, mat, R) {
   const contact = CONFIG.catenary.contactY;
-  const z0 = 9;
+  const z0 = CAR / 2;
   addBoxSpan(g, 0, 0.9, R + 0.15, R + 0.25, z0 - 0.5, z0 + 0.6, mat.under);
   [-0.35, 0.35].forEach(x => addBoxSpan(g, x, 0.1, R + 0.25, R + 0.4, z0 - 0.1, z0 + 0.1, mat.stripe));
   const arm = (y0, za, y1, zb, w) => {
@@ -345,10 +353,20 @@ export function buildTrain({ routeId = "A", cab = false } = {}) {
   }));
   const m = new THREE.Matrix4();
   const x = T.halfWidth + 0.035, y = T.floorY + T.doorHeight / 2;
+
+  // Pilotos de puerta (exterior, sobre cada puerta del lado del andén): se encienden
+  // en naranjo mientras las puertas no están cerradas, como en los trenes reales
+  const lampMat = new THREE.MeshBasicMaterial({ color: 0x3a1c00, toneMapped: false });
+  const lamps = new THREE.InstancedMesh(new THREE.BoxGeometry(0.04, 0.07, 0.22), lampMat, TRAIN_LAYOUT.doors.length);
+  lamps.frustumCulled = false;
+  TRAIN_LAYOUT.doors.forEach((zc, i) => { m.makeTranslation(T.halfWidth + 0.05, T.floorY + T.doorHeight + 0.14, zc); lamps.setMatrixAt(i, m); });
+  group.add(lamps);
+
   let lastProgress = -1;
   const setDoors = (progress) => {
     if (progress === lastProgress) return;
     lastProgress = progress;
+    lampMat.color.setHex(progress > 0.001 ? 0xff9a1a : 0x3a1c00);
     const e = progress * progress * (3 - 2 * progress);
     leaves.forEach((l, i) => {
       m.makeTranslation(x, y, l.closedZ + (l.openZ - l.closedZ) * e);

@@ -24,14 +24,14 @@ import { CONFIG } from "../config.js";
 /** Lista ordenada (z descendente) de señales a lo largo de una ruta. */
 function buildSignalList(route) {
   const list = [];
-  const S = CONFIG.station;
-  const entryOff = S.hallHalf + 4, exitOff = -(S.platformHalf + 5);
+  // Entrada: 4 m antes de la boca de la estación · salida: 5 m tras el final del andén
+  // (cotas de cada estación de la ruta, route.js)
   route.stations.forEach((st, i) => {
-    list.push({ type: "entrada", station: st, z: st.z + entryOff });
-    list.push({ type: "salida", station: st, z: st.z + exitOff });
+    list.push({ type: "entrada", station: st, z: st.hallIn + 4 });
+    list.push({ type: "salida", station: st, z: st.platformOut - 5 });
     const next = route.stations[i + 1];
     if (!next) return;
-    const from = st.z + exitOff, to = next.z + entryOff;
+    const from = st.platformOut - 5, to = next.hallIn + 4;
     const gap = from - to;
     const n = Math.ceil(gap / CONFIG.signals.maxBlock) - 1;
     for (let k = 1; k <= n; k++) list.push({ type: "intermedia", station: null, z: from - (gap * k) / (n + 1) });
@@ -85,7 +85,7 @@ export class SignalSystem {
       s.hold = false;
       if (s.type !== "salida") continue;
       const st = s.station;
-      const standing = units.find(u => u.sim.position <= st.z + CONFIG.station.platformHalf && u.sim.position > s.z);   // (st en coordenadas de la ruta)
+      const standing = units.find(u => u.sim.position <= st.platformIn && u.sim.position > s.z);   // (st en coordenadas de la ruta)
       if (standing && standing.sim.isStopped && Math.abs(standing.sim.position - st.stopZ) < 12) {
         const due = standing.trip ? standing.trip.dep[st.index] - 5 : -Infinity;
         s.hold = !standing.sim.doorsClosed || clock < due;

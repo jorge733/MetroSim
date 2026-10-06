@@ -151,7 +151,7 @@ export class Walker {
   /** Estación cuyo vestíbulo contiene la coordenada z (o null). */
   stationAt(z) {
     // (incluye la escalera de salida, que sigue más allá del vestíbulo hasta la calle)
-    return STATIONS.find(st => z - st.z >= -S.hallHalf && z - st.z <= EXIT_TOP + 1) || null;
+    return STATIONS.find(st => z - st.z >= S.hallZ0 && z - st.z <= EXIT_TOP + 1) || null;
   }
 
   /**
@@ -205,7 +205,7 @@ export class Walker {
     // Andenes (salvo la huella de la escalera)
     const onStairFoot = ax >= MZ.escX0 - 0.05 && dz >= MZ.stairZ0 && dz <= MZ.stairZ1;
     const inShaft = inElevatorShaft(ax, dz, 0.3);                           // pozo del ascensor (se entra solo por la puerta)
-    if (ax >= S.platformEdgeX + 0.3 && ax <= S.wallX - 0.35 && Math.abs(dz) <= S.platformHalf - 0.3 && !onStairFoot && !inShaft && !platformSolidAt(x, dz)) candidates.push(S.platformTop);
+    if (ax >= S.platformEdgeX + 0.3 && ax <= S.wallX - 0.35 && dz >= S.platformZ0 + 0.3 && dz <= S.platformZ1 - 0.3 && !onStairFoot && !inShaft && !platformSolidAt(x, dz)) candidates.push(S.platformTop);
 
     // Ascensor: cabina (a su altura actual) y umbral de la puerta del piso donde está detenida y abierta
     const el = this.elevators?.at(st, side);
@@ -215,7 +215,7 @@ export class Walker {
     }
 
     // Hueco de puerta del tren detenido con puertas abiertas
-    if (Math.abs(dz) <= S.platformHalf && ax >= S.trackX + 1.0 && ax < S.platformEdgeX + 0.3) {
+    if (dz >= S.platformZ0 && dz <= S.platformZ1 && ax >= S.trackX + 1.0 && ax < S.platformEdgeX + 0.3) {
       const u = this.openUnit(st, side);
       if (u && this.traffic.doorAtWorldZ(u, z) !== null) candidates.push(S.platformTop);
     }

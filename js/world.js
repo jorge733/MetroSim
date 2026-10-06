@@ -7,7 +7,7 @@
    Sección transversal de una estación (x):
      muro −8,5 | andén vía 2 | borde −3,55 | vía 2 (x=−2) | columnas x=0 |
      vía 1 (x=+2) | borde +3,55 | andén vía 1 | muro +8,5
-   A lo largo (z relativo al centro): andenes ±50 · escalera fija y escalera
+   A lo largo (z relativo al centro): andenes de 125 m (−75…+50) · escalera fija y escalera
    mecánica +20…+34 · mezanina +34…+52 a 7,2 m de altura · torniquetes en +44
    · boletería, tótems de carga y salida a la calle tras los torniquetes.
    En las colas tras cada terminal hay un cambio de vía para la maniobra de
@@ -43,7 +43,7 @@ function fitFont(text, size, maxChars) {
 function createWorldMaterials() {
   const wallH = S.ceilingY + 0.05;
   const bandV0 = (3.75 + 0.05) / wallH, bandV1 = (4.1 + 0.05) / wallH;
-  const platformLen = S.platformHalf * 2;
+  const platformLen = S.platformZ1 - S.platformZ0;
   const platformW = S.wallX - S.platformEdgeX;
   const trackLen = WORLD.start - WORLD.end;
 
@@ -69,6 +69,14 @@ function createWorldMaterials() {
     cableTray: std(0x6d747a, { metal: 0.6, rough: 0.45 }),
     tunnelLamp: glow(0xffdcaa),
     tunnelLampHousing: std(0x2a2d30, { metal: 0.4 }),
+    // Equipamiento del túnel: señalética de evacuación, salidas de emergencia,
+    // balizas del CBTC entre carriles y canaleta central de drenaje
+    evacSign: glow(0xffffff, { map: toTexture(signCanvas("⇦  SALIDA DE EMERGENCIA  ⇨", "#1f7a3c", 512, 96, "800 36px Arial")) }),
+    exitDoor: std(0x55606a, { metal: 0.5, rough: 0.45 }),
+    exitFrame: glow(0x2fd36b),
+    exitSign: glow(0xffffff, { map: toTexture(signCanvas("SALIDA · PIQUE DE EVACUACIÓN", "#1f7a3c", 512, 96, "800 32px Arial")) }),
+    balise: std(0xf2c230, { rough: 0.6 }),
+    drain: std(0x15181a, { rough: 0.95 }),
     headwall: std(0x2c3034, { rough: 0.95 }),
     hallFloor: std(0xffffff, { map: toTexture(concreteTexture("#34383b"), 6, 40), rough: 0.95 }),
     platform: std(0xffffff, { map: toTexture(terrazzoTexture(), platformW / 2, platformLen / 2), rough: 0.55 }),
@@ -77,7 +85,7 @@ function createWorldMaterials() {
     platformEdge: std(0xf2c230, { rough: 0.6 }),
     platformLine: std(0xf4f4ef, { rough: 0.6 }),
     stationWalls: TILE_TINTS.map(t => std(0xffffff, {
-      map: toTexture(tileTexture(LINE.color, bandV0, bandV1, t), S.hallHalf * 2 / 4, 2), rough: 0.35, metal: 0.05,
+      map: toTexture(tileTexture(LINE.color, bandV0, bandV1, t), (S.hallZ1 - S.hallZ0) / 4, 2), rough: 0.35, metal: 0.05,
     })),
     portal: std(0xffffff, { map: toTexture(concreteTexture("#4a4e52"), 4, 2), rough: 0.9, side: THREE.DoubleSide }),
     ceiling: std(0x262c32, { rough: 0.8 }),
@@ -220,7 +228,7 @@ export class World {
     this.lightSpots = [];
     STATIONS.forEach(st => {
       this.lightSpots.push(
-        new THREE.Vector3(0, 6.0, st.z - 30), new THREE.Vector3(0, 6.0, st.z + 2),
+        new THREE.Vector3(0, 6.0, st.z - 58), new THREE.Vector3(0, 6.0, st.z - 30), new THREE.Vector3(0, 6.0, st.z + 2),
         new THREE.Vector3(0, 6.3, st.z + 27),                      // escaleras y zona bajo la mezanina
         new THREE.Vector3(0, 9.9, st.z + 43),                      // mezanina
         new THREE.Vector3(0, 9.6, st.z + 57),                      // pasillo y escalera de salida
@@ -236,7 +244,7 @@ export class World {
 
   buildTunnels() {
     const bounds = [WORLD.start];
-    STATIONS.forEach(s => bounds.push(s.z + S.hallHalf, s.z - S.hallHalf));
+    STATIONS.forEach(s => bounds.push(s.z + S.hallZ1, s.z + S.hallZ0));
     bounds.push(WORLD.end);
     for (let i = 0; i < bounds.length; i += 2) buildTunnelSegment(this.scene, this.M, bounds[i], bounds[i + 1]);
   }
@@ -395,6 +403,48 @@ function buildTunnelSegment(scene, M, zA, zB) {
   }
   scene.add(housings, lamps);
 
+  // Canaleta central de drenaje (entre las dos vías)
+  addBox(scene, 0.35, 0.02, len, M.drain, 0, T.floorY + 0.005, mid);
+
+  // Señalética de evacuación cada 100 m en ambos hastiales (instanciada: 2 llamadas de dibujo)
+  const signGeo = new THREE.PlaneGeometry(1.6, 0.3);
+  const nSigns = Math.floor((len - 40) / 100);
+  if (nSigns > 0) {
+    [-1, 1].forEach(s => {
+      const signs = new THREE.InstancedMesh(signGeo, M.evacSign, nSigns);
+      const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), s > 0 ? -Math.PI / 2 : Math.PI / 2);
+      const one = new THREE.Vector3(1, 1, 1);
+      for (let i = 0; i < nSigns; i++) {
+        m.compose(new THREE.Vector3(s * 5.3, 2.35, zA - 70 - i * 100), q, one);
+        signs.setMatrixAt(i, m);
+      }
+      signs.computeBoundingSphere();
+      scene.add(signs);
+    });
+  }
+
+  // Balizas del CBTC entre los carriles de cada vía, cada 250 m
+  const nBal = Math.floor(len / 250);
+  if (nBal > 0) {
+    const bal = new THREE.InstancedMesh(new THREE.BoxGeometry(0.5, 0.08, 0.35), M.balise, nBal * 2);
+    let k = 0;
+    for (let i = 0; i < nBal; i++) for (const tx of [ROUTE_A.trackX, ROUTE_B.trackX]) {
+      m.makeTranslation(tx, 0.19, zA - 125 - i * 250);
+      bal.setMatrixAt(k++, m);
+    }
+    bal.computeBoundingSphere();
+    scene.add(bal);
+  }
+
+  // Salida de emergencia (pique de evacuación) a media distancia en los tramos largos
+  if (len > 900) {
+    const ez = mid, ex = 5.15, y0 = 0.95;
+    addBoxSpan(scene, ex + 0.12, 0.12, y0, y0 + 2.25, ez + 0.75, ez - 0.75, M.exitDoor);              // puerta cortafuego
+    addBoxSpan(scene, ex + 0.06, 0.06, y0 + 2.25, y0 + 2.33, ez + 0.85, ez - 0.85, M.exitFrame);     // marco iluminado
+    [-1, 1].forEach(e => addBoxSpan(scene, ex + 0.06, 0.06, y0, y0 + 2.33, ez + e * 0.8 + 0.04, ez + e * 0.8 - 0.04, M.exitFrame));
+    addPlane(scene, 2.2, 0.41, M.exitSign, ex - 0.02, y0 + 2.75, ez, -Math.PI / 2);
+  }
+
   // Hitos kilométricos cada 200 m (pk desde la primera estación de la línea)
   const origin = STATIONS[0].z;
   for (let d = Math.ceil((origin - zA) / 200) * 200; origin - d > zB; d += 200) {
@@ -411,7 +461,7 @@ function buildTunnelSegment(scene, M, zA, zB) {
    ========================================================================== */
 
 function buildStation(scene, M, st, gates, elevators) {
-  const z = st.z, hall = S.hallHalf, ph = S.platformHalf;
+  const z = st.z, h1 = z + S.hallZ1, h0 = z + S.hallZ0, p1 = z + S.platformZ1, p0 = z + S.platformZ0;
   const group = new THREE.Group();
   group.name = `station-${st.id}`;
   scene.add(group);
@@ -421,15 +471,15 @@ function buildStation(scene, M, st, gates, elevators) {
   const pids = [];
 
   // Solera y techo del vestíbulo
-  addBoxSpan(group, 0, S.wallX * 2, -0.15, -0.05, z + hall, z - hall, M.hallFloor);
+  addBoxSpan(group, 0, S.wallX * 2, -0.15, -0.05, h1, h0, M.hallFloor);
   // (con un corte sobre la escalera de salida, que sube por encima del techo hacia la calle)
   const cutX = MZ.exitHalf + 0.15, cutZ = z + CONFIG.exit.corridorZ1;
-  addBoxSpan(group, 0, S.wallX * 2 + 0.6, S.ceilingY, S.ceilingY + 0.2, cutZ, z - hall, M.ceiling);
+  addBoxSpan(group, 0, S.wallX * 2 + 0.6, S.ceilingY, S.ceilingY + 0.2, cutZ, h0, M.ceiling);
   [[-S.wallX - 0.3, -cutX], [cutX, S.wallX + 0.3]].forEach(([x0, x1]) =>
-    addBoxSpan(group, (x0 + x1) / 2, x1 - x0, S.ceilingY, S.ceilingY + 0.2, z + hall, cutZ, M.ceiling));
+    addBoxSpan(group, (x0 + x1) / 2, x1 - x0, S.ceilingY, S.ceilingY + 0.2, h1, cutZ, M.ceiling));
 
   // Columnas centrales entre las dos vías; bajo la mezanina terminan en su losa
-  for (let off = -50; off <= 50; off += 10) {
+  for (let off = -70; off <= 50; off += 10) {
     const top = off >= MZ.z0 && off <= MZ.z1 ? MZ.y - 0.34 : S.ceilingY;
     addBox(group, 0.5, top + 0.05, 0.5, M.column, 0, top / 2 - 0.025, z + off);
   }
@@ -441,16 +491,16 @@ function buildStation(scene, M, st, gates, elevators) {
     const route = side > 0 ? ROUTE_A : ROUTE_B;
 
     // Andén
-    addBoxSpan(group, pcx, pw, -0.05, S.platformTop, z + ph, z - ph, M.platform);
-    addBoxSpan(group, side * (edgeX + 0.02), 0.04, -0.05, S.platformTop - 0.06, z + ph, z - ph, M.platformFace);
-    addBoxSpan(group, side * (edgeX + 0.25), 0.5, S.platformTop, S.platformTop + 0.012, z + ph, z - ph, M.platformEdge);
-    addBoxSpan(group, side * (edgeX + 0.62), 0.06, S.platformTop, S.platformTop + 0.012, z + ph, z - ph, M.platformLine);
-    [z + ph, z - ph].forEach(endZ => {
+    addBoxSpan(group, pcx, pw, -0.05, S.platformTop, p1, p0, M.platform);
+    addBoxSpan(group, side * (edgeX + 0.02), 0.04, -0.05, S.platformTop - 0.06, p1, p0, M.platformFace);
+    addBoxSpan(group, side * (edgeX + 0.25), 0.5, S.platformTop, S.platformTop + 0.012, p1, p0, M.platformEdge);
+    addBoxSpan(group, side * (edgeX + 0.62), 0.06, S.platformTop, S.platformTop + 0.012, p1, p0, M.platformLine);
+    [p1, p0].forEach(endZ => {
       addBox(group, pw - 0.6, 0.05, 0.05, M.steel, side * (edgeX + 0.3 + (pw - 0.6) / 2), S.platformTop + 1.0, endZ);
     });
 
     // Muro alicatado
-    addBoxSpan(group, side * (wallX + 0.15), 0.3, -0.05, S.ceilingY, z + hall, z - hall, wallMat);
+    addBoxSpan(group, side * (wallX + 0.15), 0.3, -0.05, S.ceilingY, h1, h0, wallMat);
 
     // Columnas y bancos del andén (posiciones compartidas: stationLayout.js)
     for (const off of PLATFORM_COLUMNS) {
@@ -464,13 +514,13 @@ function buildStation(scene, M, st, gates, elevators) {
     }
 
     // Carteles de nombre y plano de línea en el muro
-    for (const off of [-44, -32, 0, 12]) addPlane(group, 3.6, 0.9, nameMat, side * (wallX - 0.01), 2.85, z + off, faceRot);
+    for (const off of [-68, -56, -44, -32, 0, 12]) addPlane(group, 3.6, 0.9, nameMat, side * (wallX - 0.01), 2.85, z + off, faceRot);
     const mapW = 4.4, mapH = 0.825, mapZ = z - 16;
     addPlane(group, mapW, mapH, M.lineMap, side * (wallX - 0.01), 2.85, mapZ, faceRot);
     addPlane(group, 0.14, 0.14, M.youAreHere, side * (wallX - 0.02), 2.85 + mapH * (0.5 - 190 / 384), mapZ + side * (lineMapU(st) - 0.5) * mapW, faceRot);
 
     // Bandejas de luz sobre el andén (hasta la mezanina)
-    for (let off = -57; off <= 31; off += 6) {
+    for (let off = S.hallZ0 + 3; off <= 31; off += 6) {
       addBox(group, 0.5, 0.08, 4.4, M.fixtureHousing, side * 5.8, S.platformCeilingY, z + off);
       addBox(group, 0.3, 0.03, 4.2, M.fixture, side * 5.8, S.platformCeilingY - 0.05, z + off);
     }
@@ -548,8 +598,8 @@ function buildStation(scene, M, st, gates, elevators) {
   buildExitPassage(group, M, z);
 
   // Muros de boca de túnel (el del lado de la salida, con el paso de la escalera)
-  group.add(makePortalWall(M.portal, z + hall, true));
-  group.add(makePortalWall(M.portal, z - hall));
+  group.add(makePortalWall(M.portal, h1, true));
+  group.add(makePortalWall(M.portal, h0));
 
   return { st, group, pids };
 }

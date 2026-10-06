@@ -369,7 +369,8 @@ export class PeopleSystem {
       const free = this.stations[st.index].benches[side].filter(b => !b.occupant);
       if (free.length) return pick(free);
     }
-    const z = Math.random() < 0.85 ? st.z + rand(-45, 15) : st.z + rand(-49, 48);
+    // (la mayoría espera cerca de las escaleras y el centro; algunos se reparten por los 125 m)
+    const z = Math.random() < 0.7 ? st.z + rand(-55, 15) : st.z + rand(S.platformZ0 + 1, S.platformZ1 - 2);
     return { side, bench: false, pos: V(side * rand(4.3, 5.4), S.platformTop, z) };
   }
 

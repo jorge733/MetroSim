@@ -12,6 +12,8 @@
                                             por defecto, UNIVERSIDAD DE CHILE)
      node tools/simular.mjs 10:00 15 "UNIVERSIDAD DE CHILE" sin-regulacion
                                             sin regulación automática de intervalos
+     node tools/simular.mjs 10:00 15 "ÑUÑOA" con-regulacion sabado
+                                            tipo de día: laboral (por defecto), sabado o domingo
 
    Si esto funciona, el "cerebro" del Metro es independiente del dibujo 3D.
    ========================================================================== */
@@ -20,7 +22,8 @@ import { CONFIG } from "../js/config.js";
 import { MetroEngine } from "../js/engine/engine.js";
 import { formatClock } from "../js/engine/format.js";
 
-const [untilArg = "10:00", everyArg = "15", stationArg = "UNIVERSIDAD DE CHILE", regArg = ""] = process.argv.slice(2);
+const [untilArg = "10:00", everyArg = "15", stationArg = "UNIVERSIDAD DE CHILE", regArg = "", dayArg = "laboral"] = process.argv.slice(2);
+CONFIG.dayType = ["laboral", "sabado", "domingo"].includes(dayArg) ? dayArg : "laboral";
 const [hh, mm] = untilArg.split(":").map(Number);
 const until = hh * 3600 + (mm || 0) * 60;
 const every = Number(everyArg) * 60;

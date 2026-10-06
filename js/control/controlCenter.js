@@ -22,6 +22,7 @@ import { describeTrain } from "../engine/engine.js";
 import { TRAIN_STATES } from "../engine/state.js";
 import { formatClock } from "../engine/format.js";
 import { formatDelay } from "../engine/schedule.js";
+import { TRAIN_CAPACITY } from "../engine/passengers.js";
 
 /** Color de cada estado de tren en el esquema. */
 const STATE_COLORS = {
@@ -346,7 +347,7 @@ export class ControlCenter {
         <dt>Estado</dt><dd><span style="color:${STATE_COLORS[u.state] || "#fff"}">●</span> ${TRAIN_STATES[u.state] ?? "—"}</dd>
         <dt>Velocidad</dt><dd>${t.kmh} km/h</dd>
         <dt>Retraso</dt><dd>${t.delay === null ? "—" : formatDelay(t.delay)}</dd>
-        <dt>Pasajeros</dt><dd>${t.load} / 1000</dd>
+        <dt>Pasajeros</dt><dd>${t.load} / ${TRAIN_CAPACITY}</dd>
         <dt>Próxima</dt><dd>${next ? `${next.name}${eta ? ` · ${formatClock(eta).slice(0, 5)}` : ""}` : "—"}</dd>
       </dl>
       <div class="pcc-actions">

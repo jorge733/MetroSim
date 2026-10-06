@@ -16,21 +16,21 @@ const MZ = CONFIG.mezzanine;
 /** ¿Cae esta cota en la zona de la escalera (sin columnas ni bancos)? */
 const inStairs = (off) => off > MZ.stairZ0 - 3 && off < MZ.stairZ1 + 2;
 
-/** Columnas del andén (cada 12 m) y bancos (entre columnas). */
+/** Columnas del andén (cada 12 m, a lo largo de los 125 m) y bancos (entre columnas). */
 export const PLATFORM_COLUMNS = [];
 export const PLATFORM_BENCHES = [];
-for (let off = -46; off <= 46; off += 12) {
+for (let off = CONFIG.station.platformZ0 + 5; off <= CONFIG.station.platformZ1 - 4; off += 12) {
   if (inStairs(off)) continue;
   PLATFORM_COLUMNS.push(off);
   const bz = off + 6;
-  if (off < 46 && !inStairs(bz)) PLATFORM_BENCHES.push(bz);
+  if (bz < CONFIG.station.platformZ1 - 3 && !inStairs(bz)) PLATFORM_BENCHES.push(bz);
 }
 
 export const COLUMN_X = 6.0, COLUMN_HALF = 0.21;
 export const BENCH_X = 7.95, BENCH_HALF_DEPTH = 0.23, BENCH_HALF_LEN = 0.9;
 
 /** Pantallas de próximo tren: entre columnas y lejos de los carteles de dirección. */
-export const PID_OFFSETS = [10, -16, -40];
+export const PID_OFFSETS = [10, -16, -40, -64];
 
 /**
  * Pasillo libre del andén por el que caminan los viajeros: entre la línea

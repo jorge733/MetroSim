@@ -20,7 +20,52 @@ Compartir → *Agregar a inicio*. Se abre a pantalla completa y, tras la primera
 (el service worker `sw.js` guarda el juego, Three.js y las voces). La instalación necesita `https` o `localhost`.
 Los íconos están en `icons/` (los PNG se generan desde `icons/icon.svg`).
 
-## Qué incluye (versión 1.0 · estable)
+## Versión 1.1 · Realismo
+
+- **El tren real de la L3**: AS-2014 de CAF, 5 coches de ~23,4 m (120 m en total), 4 puertas dobles por costado
+  en cada coche (20 por lado), capacidad de 1.299 personas a 6 p/m² y velocidad máxima de 80 km/h. Bogies,
+  climatizadores y equipos bajo bastidor a escala, y pilotos naranjos sobre las puertas mientras están abiertas.
+- **Andenes de 125 m**: el andén y el vestíbulo se alargan para el tren de 120 m. Cada sentido tiene su propia
+  marca de parada (la cabeza del tren queda a 2 m del final del andén por el que sale).
+- **Física por fuerzas**: masa = tara (178 t) + viajeros (70 kg c/u); curva esfuerzo-velocidad (285 kN hasta la
+  velocidad base, luego potencia constante de 3,2 MW); adherencia rueda-carril; resistencia al avance en túnel;
+  limitación de sacudida (jerk). El mando pide una aceleración y el tren consigue lo que puede: **lleno, cuesta
+  arriba o rápido acelera menos**. El freno está compensado por carga y combina **freno eléctrico regenerativo**
+  y freno de fricción (bajo ~6 km/h y en emergencia, solo fricción). Freno de mantenimiento automático al
+  detenerse (el tren no retrocede en pendiente).
+- **Pendientes**: perfil longitudinal de cada línea (`js/engine/profile.js`) con el terreno de Santiago subiendo
+  hacia la cordillera, estaciones a nivel, trazado en "diente de sierra" entre estaciones (máx. 35 ‰) y túnel más
+  hondo bajo el río Mapocho. La pendiente se siente en la física y se ve en la DMI.
+- **DMI más completa**: escala hasta 90 km/h, barra de esfuerzo real (tracción / freno regenerativo / fricción),
+  pendiente en ‰, tensión y corriente de catenaria; la pantalla de estado muestra ocupación (%), masa del tren y
+  energía consumida y regenerada.
+- **Conducción automática (ATO) realista**: marcha económica con deriva (corta la tracción al llegar al crucero y
+  vuelve a traccionar tras perder ~4 km/h), compensa la pendiente al frenar, anticipa la rampa del freno y, si
+  rebasa la marca, retrocede a paso de hombre.
+- **Horario calculado con la misma física**: los tiempos entre estaciones salen de simular cada interestación con
+  el tren, la pendiente y el ATO (+4 % de margen). La L3 completa tarda ~37 min (≈ 40 km/h comerciales).
+- **Calendario real**: día laboral, sábado o domingo/festivo (incluye festivos de Chile y Semana Santa) según la
+  fecha de tu computador. Horario comercial: L–V 06:00–23:00, sábado 06:30–23:00, domingo y festivos 07:30–22:30
+  (fuera de él queda un servicio simbólico cada 15 min para poder jugar siempre).
+- **Demanda horaria de un día real**: punta mañana 07:00–09:00, valle con repunte al almuerzo, punta tarde
+  17:30–20:00; el fin de semana, menor y repartida.
+- **Intervalos por línea**: cada línea tiene su intervalo de punta (L1 2 min, L2/L5 2:45, L4 3 min, L3 3:20,
+  L6 4:30, L4A 5 min) que se alarga cuando baja la demanda.
+- **Pasajeros origen-destino**: en la mañana se viaja de los barrios hacia el centro y en la tarde al revés; en
+  cada andén espera más gente en el sentido de los viajes y en cada estación baja la parte que tiene ahí su
+  destino. Subir y bajar va a un ritmo por puerta; sobre 4 p/m² cuesta más subir y a 6 p/m² ya no cabe nadie
+  (la gente espera el siguiente tren). Las líneas más cargadas (L1, L4, L5) se llenan en punta.
+- **Túnel**: canaleta de drenaje, señalética de evacuación cada 100 m, balizas del CBTC entre los carriles y
+  salidas de emergencia (piques de evacuación) en las interestaciones largas.
+- **L3 a escala**: distancias ajustadas a los ~25 km reales (extensión a Quilicura de 3,8 km; Hospitales → Puente
+  Cal y Canto ~2 km bajo el Mapocho).
+- `node tools/simular.mjs 09:00 15 "ÑUÑOA" "" sabado` simula también sábados y domingos.
+
+Los datos oficiales usados son los del AS-2014 (5 coches, 120 m, 1.299 personas, 80 km/h), la longitud de la L3
+y el horario de funcionamiento; masas, esfuerzos, potencias, demanda e intervalos son valores aproximados
+coherentes con un metro moderno de este tamaño.
+
+## Qué incluía la versión 1.0 · estable
 
 - **Tutorial interactivo** para el jugador nuevo, en Conductor y en Pasajero: una tarjeta explica un paso a la vez
   y avanza sola cuando haces lo que pide (abrir puertas, acelerar, frenar en la marca; bajar al Metro, cargar la
@@ -63,8 +108,8 @@ Los íconos están en `icons/` (los PNG se generan desde `icons/icon.svg`).
   simplicidad, todas las líneas se representan subterráneas.
 
 - Las 21 estaciones reales de la L3 (Plaza Quilicura ⇄ Fernando Castillo Velasco) con sus combinaciones.
-- Doble vía con trenes automáticos en ambos sentidos según horario (cada 4 min en punta).
-- Trenes de 5 coches con intercirculación, pantógrafos y catenaria rígida.
+- Doble vía con trenes automáticos en ambos sentidos según horario.
+- Trenes AS-2014 de 5 coches con intercirculación, pantógrafos y catenaria rígida.
 - Señalización de bloqueo automático de 3 aspectos y protección por rebase de señal en rojo.
 - Estaciones con andenes laterales, escaleras, mezanina con torniquetes (tarjeta bip!), boletería y salida a la calle.
 - Viajeros que entran desde la calle, validan, esperan en su andén, suben, viajan y bajan.
@@ -200,7 +245,8 @@ js/engine/            MOTOR (sin Three.js)
   signals.js          lógica de señalización de bloqueo automático
   sim.js              física del tren y conducción automática
   traffic.js          todos los trenes de la línea, maniobras y retrasos
-  consist.js          composición lógica del tren de 5 coches
+  consist.js          composición del AS-2014 (5 coches, 20 puertas por lado) y sus datos físicos
+  profile.js          perfil longitudinal: cotas y pendientes de cada línea
   state.js            estado explícito de cada tren
   eta.js              llegadas estimadas desde la posición real
   commands.js         buzón de órdenes (roles → motor)
