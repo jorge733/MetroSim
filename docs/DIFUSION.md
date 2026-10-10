@@ -9,9 +9,8 @@ Código: https://github.com/jorge733/MetroSim
 
 1. ✅ **Juego publicado** en Vercel (`https`: la PWA instalable y el modo sin conexión funcionan).
 2. **Capturas y video**: 4–6 capturas (cabina con la DMI, andén lleno, calle con un hito,
-   Centro de Control) y un clip vertical de 20–40 s. Guardar una captura de 1200×630 como
-   `icons/og.png` y cambiar `og:image` en `index.html` para que el enlace se vea con imagen grande
-   (y `twitter:card` a `summary_large_image`).
+   Centro de Control) y un clip vertical de 20–40 s. ✅ Imagen para compartir lista: `icons/og.jpg` (1200×630). Al cambiarla, guardar como
+   `icons/og.jpg` con el mismo tamaño.
 3. **Probar el enlace en el celular** antes de publicarlo en ningún lado.
 
 ---
