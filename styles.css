@@ -1,5 +1,5 @@
 /* ==========================================================================
-   MetroSim — Alpha 0.6 · Estilos
+   MetroSim — 1.2 · Estilos (interfaz 2.0: señalética)
    1. Base y variables
    2. Pantalla inicial
    3. Pantalla de juego y HUD superior
@@ -14,46 +14,71 @@
    ========================================================================== */
 
 /* ---------- 1. Base y variables ---------- */
+/* Interfaz 2.0 · lenguaje de señalética: letra condensada de letrero para nombres,
+   cifras en monoespaciada (no "bailan" al cambiar) y un solo color de acento,
+   el de la línea activa (--line, lo fija hud.setLine). Fuentes locales en fonts/. */
+@font-face { font-family: "Barlow"; font-weight: 400; font-display: swap; src: url("fonts/barlow-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Barlow"; font-weight: 500; font-display: swap; src: url("fonts/barlow-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "Barlow"; font-weight: 600; font-display: swap; src: url("fonts/barlow-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "Barlow"; font-weight: 700 900; font-display: swap; src: url("fonts/barlow-latin-700-normal.woff2") format("woff2"); }
+@font-face { font-family: "Barlow Condensed"; font-weight: 600; font-display: swap; src: url("fonts/barlow-condensed-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "Barlow Condensed"; font-weight: 700 900; font-display: swap; src: url("fonts/barlow-condensed-latin-700-normal.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-weight: 500; font-display: swap; src: url("fonts/jetbrains-mono-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-weight: 600 800; font-display: swap; src: url("fonts/jetbrains-mono-latin-700-normal.woff2") format("woff2"); }
+
 :root {
   color-scheme: dark;
-  --bg: #05080d;
-  --panel: #0a121bdd;
-  --panel-border: #ffffff22;
-  --text: #f4f7fb;
-  --muted: #91a1b4;
-  --line: #8b5a2b;            /* café, Línea 3 de Santiago */
-  --power: #4fd6ff;
+  --bg: #070b10;              /* fondo de las pantallas */
+  --surface: #0d141c;         /* paneles y ventanas */
+  --raise: #141e29;           /* controles dentro de un panel, hover */
+  --panel: #0b1118e6;         /* paneles del HUD sobre el 3D (translúcidos) */
+  --panel-border: #ffffff17;
+  --hair: #ffffff12;          /* filetes interiores */
+  --text: #edf1f5;
+  --muted: #8693a2;
+  --dim: #56626f;
+  --line: #8b5a2b;            /* color de la línea activa (lo cambia hud.setLine) */
+  --on-line: #fff;            /* texto sobre el color de la línea (oscuro en la L2) */
+  --power: #5cc8ff;
   --neutral: #e8eef5;
   --brake: #ffb547;
-  --emergency: #ff4b4b;
-  --ok: #6fe39a;
-  --warn: #ffd166;
-  font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --emergency: #ff4d4d;
+  --ok: #34d17c;
+  --warn: #ffc247;
+  --radius: 10px;
+  --f-display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  --f-body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-data: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-family: var(--f-body);
   background: var(--bg);
   color: var(--text);
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body, .screen { width: 100%; height: 100%; overflow: hidden; }
-button { font: inherit; }
+body { background: var(--bg); }
+button, select, input { font: inherit; }
+button:focus-visible, select:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--power); outline-offset: 2px; }
 .hidden { display: none !important; }
 kbd {
   display: inline-block;
-  min-width: 18px;
+  min-width: 20px;
   padding: 1px 5px;
-  border: 1px solid #ffffff33;
+  border: 1px solid #ffffff2e;
   border-bottom-width: 2px;
-  border-radius: 4px;
-  background: #ffffff10;
-  font: 600 10px/1.4 inherit;
+  border-radius: 5px;
+  background: #ffffff0a;
+  font: 600 10.5px/1.4 var(--f-data);
   text-align: center;
-  color: #dfe7f0;
+  color: #d4dbe3;
 }
 .hud-label, .small-label, .eyebrow {
-  font-size: 10px;
-  letter-spacing: 1.7px;
+  font: 600 10px/1.2 var(--f-data);
+  letter-spacing: 1.3px;
   color: var(--muted);
   text-transform: uppercase;
 }
+/* Íconos de trazo en SVG (sustituyen a los emojis de la interfaz) */
+.ico { width: 1.15em; height: 1.15em; flex: none; vertical-align: -.2em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
 /* ---------- 2. Pantalla inicial ---------- */
 .start-screen {

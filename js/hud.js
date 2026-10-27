@@ -14,6 +14,7 @@ import { $, clamp, formatClock, formatStopError } from "./utils.js";
 import { formatDelay } from "./engine/schedule.js";
 import { BANK_NAME } from "./economy.js";
 import { MISSION_TYPES, MASTERY_REWARD } from "./missions.js";
+import { icon, textOn } from "./icons.js";
 
 export class Hud {
   constructor() {
@@ -70,6 +71,7 @@ export class Hud {
    */
   setLine() {
     document.documentElement.style.setProperty("--line", LINE.color);
+    document.documentElement.style.setProperty("--on-line", textOn(LINE.color));
     this.setText($("hudLineBadge"), LINE.id);
     this.setText($("hudLineLabel"), `METRO DE SANTIAGO · ${LINE.name}`);
     this.setText($("hudLineRoute"), `${STATIONS[0].name} ⇄ ${STATIONS.at(-1).name}`);

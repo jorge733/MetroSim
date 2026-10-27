@@ -22,6 +22,11 @@ const SHELL = [
   "./", "index.html", "styles.css", "logo.svg", "favicon.svg",
   "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png",
   "js/main.js",
+  // Fuentes de la interfaz (si faltan, la portada usa letras del sistema)
+  "fonts/barlow-latin-400-normal.woff2", "fonts/barlow-latin-500-normal.woff2",
+  "fonts/barlow-latin-600-normal.woff2", "fonts/barlow-latin-700-normal.woff2",
+  "fonts/barlow-condensed-latin-600-normal.woff2", "fonts/barlow-condensed-latin-700-normal.woff2",
+  "fonts/jetbrains-mono-latin-500-normal.woff2", "fonts/jetbrains-mono-latin-700-normal.woff2",
 ];
 
 self.addEventListener("install", (e) => {
