@@ -1,6 +1,9 @@
 /* ==========================================================================
    MetroSim — Alpha 0.6 · dmi.js
    Pantalla de cabina (DMI) dibujada en un canvas y usada como textura.
+   1.5 · Avisos de PATINAJE / DESLIZAMIENTO (riel mojado), freno reostático
+   en los trenes sin regeneración, modelo del tren y Ruta Expresa (estaciones
+   que se pasan sin detenerse).
    ========================================================================== */
 
 import * as THREE from "three";
@@ -118,7 +121,8 @@ export class CabDisplay {
     g.fillStyle = "#ffffff"; g.fillRect(mid - 1, barY - 3, 2, barH + 6);
     g.fillStyle = "#8b9bab"; g.font = "600 12px Arial";
     g.textAlign = "left"; g.fillText("FRENO", x0, barY + 30);
-    g.fillStyle = "#3ee08a"; g.textAlign = "center"; g.fillText("REGEN.", x0 + w * 0.34, barY + 30);
+    const regen = (sim.stock?.regenReceptivity ?? 1) > 0;
+    g.fillStyle = "#3ee08a"; g.textAlign = "center"; g.fillText(regen ? "REGEN." : "REOSTÁT.", x0 + w * 0.34, barY + 30);
     g.fillStyle = "#8b9bab"; g.textAlign = "right"; g.fillText("TRACCIÓN", x0 + w, barY + 30);
 
     // Pendiente, tensión de catenaria y corriente (abajo a la izquierda)
@@ -134,10 +138,20 @@ export class CabDisplay {
       g.fillText(`${sim.current >= 0 ? "" : "−"}${Math.abs(Math.round(sim.current)).toLocaleString("es-CL")} A`, 180, 340);
     }
 
+    // Antipatinaje / antideslizante activos (riel mojado al aire libre)
+    if (sim.slip || sim.slide) {
+      const blink = Math.floor(performance.now() / 300) % 2 === 0;
+      g.fillStyle = blink ? "#ffb000" : "#6b4a00";
+      g.fillRect(x0, barY + 35, w, 18);
+      g.fillStyle = blink ? "#0a121b" : "#ffd98a"; g.font = "900 13px Arial"; g.textAlign = "center"; g.textBaseline = "middle";
+      g.fillText(sim.slide ? "DESLIZAMIENTO · ANTIDESLIZANTE ACTIVO" : "PATINAJE · ANTIPATINAJE ACTIVO", x0 + w / 2, barY + 44);
+      g.textBaseline = "alphabetic";
+    }
+
     // Estación
     g.textAlign = "left";
     g.fillStyle = "#8b9bab"; g.font = "600 13px Arial";
-    g.fillText(info.docked ? "EN ESTACIÓN" : "PRÓXIMA", x0, 168);
+    g.fillText(info.docked ? "EN ESTACIÓN" : info.express ? "PRÓXIMA PARADA" : "PRÓXIMA", x0, 168);
     g.fillStyle = "#ffffff"; g.font = "800 28px Arial";
     const stName = info.docked ? info.docked.short : (info.next ? info.next.short : "FIN DE LÍNEA");
     g.font = stName.length > 13 ? "800 21px Arial" : "800 27px Arial";
@@ -221,6 +235,13 @@ export class CabStatusDisplay {
     g.fillStyle = color; g.fillRect(14, 14, Wd - 28, 40);
     g.fillStyle = "#ffffff"; g.font = "800 20px Arial"; g.textAlign = "left"; g.textBaseline = "middle";
     g.fillText(`→ ${route.last.short}`, 26, 35);
+    const trip = extra.trip;
+    if (trip?.express) {
+      const red = trip.express === "roja";
+      g.fillStyle = red ? "#d42026" : "#16a34a"; g.fillRect(250, 20, 132, 28);
+      g.fillStyle = "#ffffff"; g.font = "900 15px Arial"; g.textAlign = "center";
+      g.fillText(red ? "RUTA ROJA" : "RUTA VERDE", 316, 35);
+    }
     const h = Math.floor(extra.clock / 3600) % 24, m = Math.floor(extra.clock / 60) % 60, s = Math.floor(extra.clock) % 60;
     g.textAlign = "right"; g.font = "800 22px Arial";
     g.fillText(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`, Wd - 26, 35);
@@ -233,8 +254,11 @@ export class CabStatusDisplay {
     const next = info.docked || info.next;
     for (const st of sts) {
       const passed = next && route.stationOf ? st.index < next.index : false;
+      const skip = trip?.skip?.has(st.index);
       g.fillStyle = passed ? "#4a5560" : st === next ? "#ffd166" : "#e8eef5";
-      g.beginPath(); g.arc(px(st.stopZ), y, st === next ? 6 : 4, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = g.fillStyle; g.lineWidth = 2;
+      g.beginPath(); g.arc(px(st.stopZ), y, st === next ? 6 : 4, 0, Math.PI * 2);
+      if (skip) g.stroke(); else g.fill();                                     // Ruta Expresa: hueca = pasa sin detenerse
     }
     g.fillStyle = color; g.fillRect(x0, y - 3, Math.max(0, px(sim.position) - x0), 6);
     g.fillStyle = "#ffffff"; g.beginPath(); g.moveTo(px(sim.position) + 9, y); g.lineTo(px(sim.position) - 5, y - 8); g.lineTo(px(sim.position) - 5, y + 8); g.fill();
@@ -243,20 +267,29 @@ export class CabStatusDisplay {
     g.textBaseline = "alphabetic";
     g.fillStyle = "#8b9bab"; g.font = "700 13px Arial"; g.textAlign = "left";
     g.fillText("PRÓXIMAS ESTACIONES", 26, 122);
+    if (sim.stock) {
+      g.textAlign = "right"; g.fillStyle = "#6f8193"; g.font = "700 12px Arial";
+      g.fillText(`${sim.stock.model} · ${sim.stock.tyre === "rubber" ? "NEUMÁTICOS" : "RUEDA DE ACERO"} · ${sim.stock.lineVoltage} V`, Wd - 26, 122);
+      g.textAlign = "left";
+    }
     const startIdx = next ? sts.indexOf(next) : sts.length;
     const upcoming = sts.slice(startIdx, startIdx + 5);
     upcoming.forEach((st, i) => {
       const yy = 152 + i * 34;
       if (i === 0) { g.fillStyle = "#1a2633"; g.fillRect(18, yy - 24, Wd - 36, 32); }
-      g.fillStyle = i === 0 ? "#ffd166" : "#e8eef5";
-      g.font = `${i === 0 ? 800 : 600} 19px Arial`; g.textAlign = "left";
+      const skip = trip?.skip?.has(st.index);
+      g.fillStyle = skip ? "#6f7d8b" : i === 0 ? "#ffd166" : "#e8eef5";
+      g.font = `${i === 0 && !skip ? 800 : 600} 19px Arial`; g.textAlign = "left";
       g.fillText(st.name.length > 26 ? st.short : st.name, 30, yy);
       if (st.combos?.length) {
         let cx = 360;
         for (const c of st.combos) { g.fillStyle = "#3a4654"; g.beginPath(); g.arc(cx, yy - 6, 11, 0, Math.PI * 2); g.fill(); g.fillStyle = "#fff"; g.font = "800 11px Arial"; g.textAlign = "center"; g.fillText(c, cx, yy - 2); cx += 26; }
       }
       const arr = extra.trip?.arr?.[st.index];
-      if (arr != null) {
+      if (skip) {
+        g.fillStyle = "#8b9bab"; g.font = "700 15px Arial"; g.textAlign = "right";
+        g.fillText("PASA SIN DETENERSE", Wd - 30, yy);
+      } else if (arr != null) {
         const hh = Math.floor(arr / 3600) % 24, mm = Math.floor(arr / 60) % 60;
         g.fillStyle = "#9fb0c2"; g.font = "700 17px Arial"; g.textAlign = "right";
         g.fillText(`${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`, Wd - 30, yy);

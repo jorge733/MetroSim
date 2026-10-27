@@ -25,12 +25,14 @@
      platformIn   extremo del andén por el que ENTRA el tren
      platformOut  extremo del andén por el que SALE
      hallIn / hallOut  bocas del túnel de la estación
-   Además cada ruta conoce la PENDIENTE de la vía (profile.js).
+   Además cada ruta conoce la PENDIENTE de la vía (profile.js) y, desde la
+   1.5, si cada punto va en túnel, trinchera o viaducto (sections.js).
    ========================================================================== */
 
 import { CONFIG, setActiveLineData } from "../config.js";
 import { L3, LINES } from "./network.js";
 import { buildProfile } from "./profile.js";
+import { buildSections } from "./sections.js";
 
 function makeRoute(line, dir, profile) {
   const S = CONFIG.station, tail = CONFIG.track.tail, L = CONFIG.train.length;
@@ -112,6 +114,10 @@ function makeRoute(line, dir, profile) {
     },
     /** Cota del carril (m s. n. m.) en una coordenada de la ruta. */
     elevationAt(z) { return profile.elevationAt(toWorldZ(z)); },
+    /** Tipo de tramo ("tunel" | "trinchera" | "viaducto") en una coordenada de la ruta. */
+    sectionAt(z) { return line.sectionsInfo.typeAt(toWorldZ(z)); },
+    /** ¿La vía va al aire libre en esta coordenada de la ruta? (la lluvia la moja) */
+    exposedAt(z) { return line.sectionsInfo.exposedAt(toWorldZ(z)); },
     /** Estación de la ruta que corresponde a una estación de la línea (el mismo objeto o el mismo nombre). */
     stationOf(lineStation) {
       return stations.find(s => s.world === lineStation) || stations.find(s => s.name === lineStation?.name) || null;
@@ -123,6 +129,7 @@ function makeRoute(line, dir, profile) {
 
 /** Los dos sentidos de una línea: [ida, vuelta]. */
 function makeLineRoutes(line) {
+  line.sectionsInfo = buildSections(line);         // túnel, trinchera o viaducto (1.5)
   line.profile = buildProfile(line);
   const routes = [makeRoute(line, 1, line.profile), makeRoute(line, -1, line.profile)];
   routes[0].opposite = routes[1];

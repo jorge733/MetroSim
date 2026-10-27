@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <title>MetroSim 1.4</title>
+  <title>MetroSim 1.5</title>
   <!-- Difusión: descripción para buscadores y vista previa al compartir el enlace (WhatsApp, X, Discord...) -->
   <meta name="description" content="Simulador 3D gratuito del Metro de Santiago en el navegador: conduce trenes AS-2014, viaja como pasajero o dirige el Centro de Control en las líneas 1 a 6.">
   <meta property="og:type" content="website">
@@ -57,7 +57,7 @@
         <header class="start-brand">
           <img class="metro-mark" src="logo.svg" alt="">
           <h1>MetroSim</h1>
-          <span class="start-ver">v1.2</span>
+          <span class="start-ver">v1.5</span>
         </header>
         <div class="start-hero">
           <p class="eyebrow">Simulador del Metro de Santiago</p>
@@ -85,6 +85,12 @@
           <p id="lineCardText" class="line-card-text"></p>
         </div>
 
+        <div class="weather-picker">
+          <span class="small-label" id="weatherLabel">Clima en Santiago</span>
+          <div id="weatherSeg" class="seg weather-seg" role="radiogroup" aria-labelledby="weatherLabel"></div>
+          <small id="weatherNow" class="weather-now">Consultando el tiempo…</small>
+        </div>
+
         <div class="start-tools">
           <button id="installButton" class="tool-button install-launch" hidden><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg> Instalar app</button>
           <button id="creatorBadge" class="tool-button creator-launch" hidden title="Todo desbloqueado y gratis · toca para desactivar"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/></svg> Modo Creador activo</button>
@@ -99,7 +105,7 @@
               <span class="mode-icon"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="14" rx="3"/><path d="M5 11h14M9 17l-2 4M15 17l2 4"/><path d="M9 14h.01M15 14h.01"/></svg></span>
               <div class="mode-text">
                 <strong>Conductor</strong>
-                <small>Tren AS-2014 real: 5 coches, 120 m, 80 km/h. Respeta señales y horario: cada estación bien servida te paga al instante.</small>
+                <small>El tren real de cada línea: neumáticos o acero, viaductos y Ruta Expresa. Respeta señales y horario: cada estación bien servida te paga al instante.</small>
               </div>
               <button class="go-button" data-mode="driver">Conducir <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
             </div>
@@ -171,7 +177,7 @@
         <p class="start-note">Con sonido y anuncios. La carga de la línea completa puede tardar unos segundos.</p>
       </div>
     </main>
-    <p class="version">MetroSim 1.4 · conductor más realista · pasajero aún más realista · vía con pendientes en 3D · física real, demanda y horarios de Santiago · 7 líneas · Centro de Control</p>
+    <p class="version">MetroSim 1.5 · realismo de la red: flota real, viaductos, clima y Ruta Expresa · conductor más realista · pasajero aún más realista · vía con pendientes en 3D · física real, demanda y horarios de Santiago · 7 líneas · Centro de Control</p>
   </section>
 
   <!-- =============================== PANTALLA DE CARGA =============================== -->

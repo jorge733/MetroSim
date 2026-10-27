@@ -103,6 +103,11 @@ import { trainLiveryMaterials } from "./train.js";
 import { City } from "./city/city.js";
 import { Tutorial, tutorialDone } from "./tutorial.js";
 import { installTrackLift, setTrackLiftLine, updateTrackLift, pitchCamera } from "./render/trackLift.js";
+import { OutdoorView } from "./render/outdoor.js";
+import { WEATHER, WEATHER_KINDS, setWeather, typicalWeather, kindFromWmo, weatherLabel } from "./engine/weather.js";
+import { LINE_FLEETS, STOCKS, stockLabel } from "./engine/fleet.js";
+import { tripStopsAt, nextStopIndex, EXPRESS_LABEL } from "./engine/express.js";
+import { SECTION_LABEL } from "./engine/sections.js";
 
 // La vía en 3D sigue las pendientes reales: se engancha antes de compilar ningún material
 installTrackLift();
@@ -177,7 +182,7 @@ function renderLineCard(line) {
   $("lineCardStations").textContent = st.length;
   $("lineCardLength").textContent = `${last.km.toFixed(1).replace(".", ",")} km`;
   $("lineCardCombos").textContent = st.filter(s => s.combos.length).length;
-  $("lineCardText").textContent = line.description || "";
+  $("lineCardText").textContent = [line.description, lineRealismText(line)].filter(Boolean).join(" ");
   const map = $("lineCardMap");
   map.querySelectorAll("i").forEach(d => d.remove());
   for (const s of st) {
@@ -281,6 +286,70 @@ function fillStations(line) {
   stationSelect.value = String(preferred.index);
 }
 
+/** Flota, tramos al aire libre y Ruta Expresa de una línea (ficha de la portada, 1.5). */
+function lineRealismText(line) {
+  const fleet = LINE_FLEETS[line.id] || [];
+  const rubber = STOCKS[fleet[0]?.[0]]?.tyre === "rubber";
+  const parts = [`Trenes ${fleet.map(([m]) => m).join(", ")} (${rubber ? "neumáticos" : "rueda de acero"}).`];
+  const open = {};
+  for (const sp of line.sectionsInfo?.spans || []) {
+    if (sp.type === "tunel") continue;
+    const a = Math.min(sp.zA, line.stations[0].z), b = Math.max(sp.zB, line.stations.at(-1).z);
+    if (a > b) open[sp.type] = (open[sp.type] || 0) + (a - b);
+  }
+  const km = Object.entries(open).filter(([, m]) => m > 300).map(([t, m]) => `${SECTION_LABEL[t]} ${(m / 1000).toFixed(1).replace(".", ",")} km`);
+  if (km.length) parts.push(`Al aire libre: ${km.join(" · ")}.`);
+  if (line.express) parts.push("Ruta Expresa en punta (roja y verde).");
+  return parts.join(" ");
+}
+
+/* --- Clima (1.5): el tiempo real de Santiago, o el que elijas --- */
+const WEATHER_CHOICES = ["real", "despejado", "nublado", "lluvia", "temporal"];
+let weatherChoice = loadSetting("metrosim.weather") || "real";
+if (!WEATHER_CHOICES.includes(weatherChoice)) weatherChoice = "real";
+let realWeather = null;                     // { kind, temp, source } del servicio meteorológico (o el típico del día)
+
+function applyWeatherChoice() {
+  if (weatherChoice === "real") {
+    const w = realWeather || { ...typicalWeather(new Date()), source: "simulado" };
+    setWeather(w.kind, { temp: w.temp, source: w.source });
+  } else setWeather(weatherChoice, { temp: realWeather?.temp ?? typicalWeather(new Date()).temp, source: "elegido" });
+  renderWeather();
+}
+
+function renderWeather() {
+  const seg = $("weatherSeg");
+  if (!seg) return;
+  seg.replaceChildren(...WEATHER_CHOICES.map(id => {
+    const btn = document.createElement("button");
+    btn.innerHTML = `<b></b>`;
+    btn.firstChild.textContent = id === "real" ? "Real" : WEATHER_KINDS[id].icon;
+    btn.title = id === "real" ? "El tiempo de ahora en Santiago" : WEATHER_KINDS[id].label;
+    btn.setAttribute("aria-label", btn.title);
+    btn.setAttribute("role", "radio");
+    btn.setAttribute("aria-checked", String(id === weatherChoice));
+    btn.addEventListener("click", () => { weatherChoice = id; saveSetting("metrosim.weather", id); applyWeatherChoice(); });
+    return btn;
+  }));
+  const src = { real: "tiempo real de Santiago", simulado: "sin conexión: tiempo típico de la temporada", elegido: "elegido por ti" }[WEATHER.source];
+  $("weatherNow").textContent = `${weatherLabel()} · ${src}${WEATHER.rain > 0 ? " · riel mojado al aire libre y más viajeros" : ""}`;
+}
+
+/** Pide el tiempo actual de Santiago a Open-Meteo (servicio público, sin clave). Sin conexión, usa el típico del día. */
+async function fetchRealWeather() {
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 5000);
+    const res = await fetch("https://api.open-meteo.com/v1/forecast?latitude=-33.45&longitude=-70.66&current=temperature_2m,precipitation,weather_code&timezone=America%2FSantiago", { signal: ctrl.signal });
+    clearTimeout(timer);
+    const cur = (await res.json())?.current;
+    if (cur && Number.isFinite(cur.weather_code)) realWeather = { kind: kindFromWmo(cur.weather_code, cur.precipitation || 0), temp: cur.temperature_2m ?? 15, source: "real" };
+  } catch { /* sin conexión: queda el típico de la temporada */ }
+  if (weatherChoice === "real" && !game) applyWeatherChoice();
+}
+applyWeatherChoice();
+fetchRealWeather();
+
 function loadSetting(key) { try { return localStorage.getItem(key); } catch { return null; } }
 function saveSetting(key, value) { try { localStorage.setItem(key, value); } catch { /* sin almacenamiento */ } }
 
@@ -365,6 +434,7 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = {}) {
   /* --- Motor MetroSim (el "cerebro") y su dibujo --- */
   setTrackLiftLine();                                         // cotas de la línea activa (pendientes en 3D)
   const world = new World(scene);
+  const outdoor = new OutdoorView(scene);                     // viaductos, trincheras, cielo y lluvia (1.5)
   const warmStart = CONFIG.startTime - 45 * 60;
   const engine = new MetroEngine({ startTime: warmStart });
   const { traffic, signals, timetables } = engine;
@@ -378,7 +448,7 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = {}) {
   const playerTrip = timetables.get(direction.id).anchorTrip;
 
   game = {
-    mode, renderer, scene, camera, world, engine, signals, timetables, traffic, trainViews, signalViews, audio, playerTrip,
+    mode, renderer, scene, camera, world, outdoor, engine, signals, timetables, traffic, trainViews, signalViews, audio, playerTrip,
     clock: warmStart, elapsed: 0, last: performance.now(), dmiTimer: 0, pidTimer: 0, raf: 0,
     warming: true,
     stats: { arrivals: [], stops: [], log: [], redSignals: 0, overspeeds: 0, emergencies: 0 },
@@ -420,6 +490,7 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = {}) {
     game.rig = rig;
     player.group.add(game.trainLights);
     game.lightsUnit = player;
+    setTimeout(() => game?.player === player && hud.showMessage(driverBriefing(player), "info", 9000), 1500);
   } else {
     const city = new City(scene);
     city.sound = (type, data) => game?.audio.cityEvent(type, data);     // autos, bocinas, pájaros...
@@ -761,6 +832,11 @@ function onUnitEvent(unit, type, data = {}) {
   switch (type) {
     case "ato:arrived":
       if (riding) hud.showMessage(`Estación ${data.station.name}`, "ok", 3500);
+      // Ruta Expresa: el andén avisa de qué ruta es el tren que llega
+      else if (unit.trip.express && !data.closed && walkerOnPlatformOf(unit, data.station)) {
+        const ex = unit.trip.express;
+        hud.showMessage(`Tren ${EXPRESS_LABEL[ex].name}: se detiene solo en estaciones ${ex === "roja" ? "rojas" : "verdes"} y comunes`, "info", 5000);
+      }
       break;
     case "ato:doorsClosing":
       if (riding && data.station === unit.route.last) {
@@ -774,7 +850,7 @@ function onUnitEvent(unit, type, data = {}) {
       }
       break;
     case "ato:departing":
-      if (riding && data.next) hud.showMessage(`Próxima estación: ${data.next.name}`, "info", 3500);
+      if (riding && data.next) hud.showMessage(`Próxima estación: ${data.next.name}${unit.trip.express ? ` · ${EXPRESS_LABEL[unit.trip.express].name}` : ""}`, "info", 3500);
       break;
     case "ato:evacuate":
       // El tren se retira del servicio: se avisa a bordo y en el andén
@@ -853,6 +929,11 @@ function onPlayerEvent(type, data) {
       }
       break;
     case "arrivedStation": {
+      if (!tripStopsAt(game.player.trip, data.station.index)) {
+        // Ruta Expresa: esta estación no le toca a tu servicio (no paga; abrir puertas es falta)
+        hud.showMessage(`Tu servicio es ${EXPRESS_LABEL[game.player.trip.express].name}: no se detiene en ${data.station.name} · sigue a la próxima parada`, "warn", 5000);
+        break;
+      }
       const stop = game.lastStop?.station === data.station ? game.lastStop.error : 0;
       stats.stops.push(Math.abs(stop));
       stats.arrivals.push(data.delay);
@@ -876,6 +957,10 @@ function onPlayerEvent(type, data) {
       break;
     case "doorsOpen":
       game.boardingDone = false;
+      if (data.station && !tripStopsAt(game.player.trip, data.station.index)) {
+        game.score.penalty("wrongStop");
+        hud.showMessage(`FALTA · abriste puertas en ${data.station.name}, que tu ${EXPRESS_LABEL[game.player.trip.express].name} no sirve`, "alert", 5000);
+      }
       if (data.station === game.player.route.last && !game.shiftEnded) setTimeout(() => game && !game.shiftEnded && showDriverSummary(), 2500);
       break;
     case "doorsClosed":
@@ -964,7 +1049,8 @@ function showDriverSummary({ early = false } = {}) {
   const record = sc.finish();
   const w = CONFIG.schedule.punctualWindow;
   // Bono solo si se sirvió al menos la mitad de la línea (no vale empezar a mitad de camino)
-  const minStations = Math.ceil((STATIONS.length - 1) / 2);
+  const stops = STATIONS.filter((_, i) => tripStopsAt(game.player.trip, game.player.route.stationOf(STATIONS[i]).index)).length;
+  const minStations = Math.ceil((stops - 1) / 2);
   const bonusOk = s.arrivals.length >= minStations;
   const bonus = bonusOk ? shiftBonus(sc.grade(), inventory.wageMultiplier) : 0;
   if (bonus) { bank.deposit(bonus, `Bono de servicio ${game.player.trip.id} (nota ${sc.grade()})`, { wage: true }); hud.setBank(bank); hud.moneyFloat(bonus); }
@@ -976,7 +1062,7 @@ function showDriverSummary({ early = false } = {}) {
     title: early ? (sim.dockedStation() ? spokenName(where) : where) : spokenName(game.player.route.last.name),
     line: { id: LINE.id, color: LINE.color },
     stations: s.log,
-    totalStations: STATIONS.length - 1,
+    totalStations: stops - 1,
     punctualWindow: w,
     score: {
       total: sc.total, grade: sc.grade(), record, prevBest,
@@ -1530,15 +1616,38 @@ function updateStateSounds(unit, level, rider) {
    Información para el conductor
    ========================================================================== */
 
+/** Caja que ocupa un tren en el mundo (para que no llueva dentro del coche). */
+function trainBounds(unit) {
+  const a = unit.route.toWorldZ(unit.sim.position), b = unit.route.toWorldZ(unit.sim.position + CONFIG.train.length);
+  const x = unit.route.trackX, w = CONFIG.train.halfWidth + 0.15;
+  return { x0: x - w, x1: x + w, z0: Math.min(a, b), z1: Math.max(a, b) };
+}
+
+/** Aviso al empezar a conducir (1.5): el tren que te tocó, tu ruta y el tiempo. */
+function driverBriefing(unit) {
+  const k = unit.stock, parts = [`Hoy conduces un ${stockLabel(k)}`];
+  if (k.tyre === "rubber") parts.push("frena y arranca fuerte, sin pantógrafo: toma 750 V de las barras guía");
+  if (!k.regenEfficiency) parts.push("sin freno regenerativo");
+  if (unit.trip.express) parts.push(`servicio ${EXPRESS_LABEL[unit.trip.express].name}: para solo en estaciones ${unit.trip.express === "roja" ? "rojas" : "verdes"} y comunes`);
+  if (WEATHER.rain > 0 && unit.route.line.sectionsInfo.hasExposed) parts.push(`${weatherLabel()}: riel mojado en los tramos al aire libre, frena antes`);
+  return parts.join(" · ");
+}
+
 function getRouteInfo(unit) {
   const sim = unit.sim;
   const docked = sim.isStopped ? sim.dockedStation() : null;
-  const next = sim.nextStation();
+  // Ruta Expresa: la próxima es la próxima PARADA; las saltadas antes de ella se pasan sin detenerse
+  const physical = sim.nextStation();
+  let next = physical, passing = null;
+  if (physical && unit.trip?.skip && !tripStopsAt(unit.trip, physical.index)) {
+    passing = physical;
+    next = unit.route.stations[nextStopIndex(unit.trip, physical.index, unit.route.stations.length - 1)];
+  }
   const near = sim.nearestStation();
   const nearError = sim.position - near.stopZ;
   let approach = null;
   if (next && sim.position - next.stopZ < 60) approach = { station: next, error: sim.position - next.stopZ };
-  else if (Math.abs(nearError) < 15) approach = { station: near, error: nearError };
+  else if (Math.abs(nearError) < 15 && tripStopsAt(unit.trip, near.index)) approach = { station: near, error: nearError };
 
   const s = game.signals.get(unit.route.id).nextAhead(sim.position);
   const signal = s ? { id: s.id, aspect: s.aspect, distance: sim.position - s.z } : null;
@@ -1559,7 +1668,8 @@ function getRouteInfo(unit) {
   }
 
   return {
-    docked, next,
+    docked, next, passing,
+    express: unit.trip?.express || null,
     distance: next ? sim.position - next.stopZ : 0,
     approach,
     limit: sim.currentLimit(),
@@ -1697,6 +1807,8 @@ function loop(now) {
   const inStreet = !!walker && walker.space === "street";
   if (game.city && walker) updateOutdoor(walker);
   if (game.city) game.city.update(dt, inStreet ? walker.pos : null, game.clock);
+  const ridden = player && game.rig.view !== "exterior" ? player : walker?.unit;
+  game.outdoor.update(dt, cameraWorld, game.clock, { street: inStreet, cityOutdoor: game.city?.outdoor || 0, dry: ridden ? trainBounds(ridden) : null });
   game.missionT = (game.missionT || 0) - dt;
   if (game.missions && game.missionT <= 0) {
     game.missionT = 1;
@@ -1712,7 +1824,8 @@ function loop(now) {
   game.carInfo.update(player || walker.unit || focus || null, game.clock, game.elapsed);
   engine.main.incidents.focus = walker ? (walker.unit || focus) : null;     // los incidentes le tocan a menudo al tren del pasajero
   const inHall = !inStreet && STATIONS.some(s => cameraZ - s.z > CONFIG.station.hallZ0 && cameraZ - s.z < CONFIG.station.hallZ1);
-  if (walker) updateTunnelView(dt, walker, inHall);
+  const outside = game.outdoor.exposure;                                  // 0 túnel … 1 viaducto / trinchera
+  if (walker) updateTunnelView(dt, walker, inHall || outside > 0.5);
 
   // 5. Sonido
   let level = 1, view = "cab", rider = null;
@@ -1735,6 +1848,9 @@ function loop(now) {
     braking: fs ? fs.isBraking : false,
     level: focus ? level : 0,
     inStation: inHall,
+    outdoor: inStreet ? 1 : outside,
+    rain: game.outdoor.rainAmount || 0,
+    stock: (rider || focus)?.stock || null,
     street: inStreet,
     streetBusy: inStreet ? clamp(demandAt(game.clock) * 1.4 + 0.15, 0.15, 1) : 0,
     view,

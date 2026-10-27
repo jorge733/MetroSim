@@ -28,6 +28,7 @@ const POINTS = {
 /** Penalizaciones (puntos que se restan). */
 export const PENALTIES = {
   overspeed: 150,
+  wrongStop: 200,                   // Ruta Expresa: abrir puertas en una estación que tu ruta no sirve
   redSignal: 500,
   emergency: 100,
   collision: 1000,

@@ -7,6 +7,11 @@
    se extiende hacia +Z local. Composición:
      [cabina] [intermedio+pantógrafo] [intermedio] [intermedio+pantógrafo] [cabina trasera]
 
+   1.5 · En las líneas de NEUMÁTICOS (L1, L2, L5; engine/fleet.js) el tren no
+   lleva pantógrafo: sus bogies tienen neumáticos sobre las pistas de
+   rodadura, ruedas guía horizontales contra las barras guía y frotadores que
+   toman de ellas la corriente.
+
    Rendimiento: todas las piezas fijas de un tren se FUSIONAN por material en
    una plantilla que comparten todos los trenes (≈ 20 llamadas de dibujo por
    tren). Las hojas de puerta del lado del andén (+X local) son dos
@@ -21,6 +26,7 @@ import { ROUTE_A, ROUTE_B } from "./engine/route.js";
 import { std, glow, addBox, addBoxSpan, addPlane, toTexture, makeCanvas, lineMapCanvas, destinationCanvas } from "./utils.js";
 import { CabDisplay, CabStatusDisplay } from "./dmi.js";
 import { CAR_TYPES, CONSIST, carToTrainZ, TRAIN_LAYOUT } from "./engine/consist.js";
+import { lineStock } from "./engine/fleet.js";
 
 const T = CONFIG.train;
 const CAR = T.carLength, GAP = T.carGap;
@@ -66,6 +72,7 @@ function assets() {
     roof: std(0x6e757b, { metal: 0.5, rough: 0.55 }),
     under: std(0x1d2024, { metal: 0.4, rough: 0.7 }),
     wheel: std(0x4a4f54, { metal: 0.85, rough: 0.35 }),
+    tyre: std(0x16181a, { metal: 0.05, rough: 0.9 }),
     glass: new THREE.MeshBasicMaterial({ color: 0x9fd3ef, transparent: true, opacity: 0.06, depthWrite: false, side: THREE.DoubleSide }),
     sideGlass: std(0x34495a, { metal: 0.2, rough: 0.1, transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide }),
     lining: std(0xe1e4e6, { rough: 0.6 }),
@@ -90,7 +97,8 @@ function assets() {
     infoDoor: glow(0xffffff),          // pantalla sobre las puertas, lado del andén (+X del tren)
     infoOther: glow(0xffffff),         // pantalla sobre las puertas del lado contrario
   };
-  ASSETS = { mat, templates: {} };
+  const stock = lineStock(ROUTE_A.line);
+  ASSETS = { mat, templates: {}, rubber: stock.tyre === "rubber", panto: stock.supply === "catenaria" };
 
   // Hojas de puerta móviles (geometría compartida)
   const leafW = T.doorWidth / 2 + 0.02;
@@ -117,7 +125,7 @@ function trainTemplate(routeId, cabInterior) {
   CONSIST.forEach((car, i) => {
     const g = new THREE.Group();
     buildCarStatic(g, car, A.mat, {
-      dest,
+      dest, rubber: A.rubber, panto: A.panto,
       cabFiller: car.type === "cab" && (car.flipped || !cabInterior),
       openFront: i > 0, openRear: i < CONSIST.length - 1,
     });
@@ -176,7 +184,7 @@ export function buildPanelWall(parent, { x, thickness, mat, zStart, zEnd, yBotto
   }
 }
 
-function buildCarStatic(g, car, mat, { dest, cabFiller, openFront, openRear }) {
+function buildCarStatic(g, car, mat, { dest, cabFiller, openFront, openRear, rubber = false, panto = true }) {
   const type = CAR_TYPES[car.type];
   const F = T.floorY, W = T.halfWidth, R = T.roofY, L = CAR;
   const isCab = car.type === "cab";
@@ -219,12 +227,29 @@ function buildCarStatic(g, car, mat, { dest, cabFiller, openFront, openRear }) {
   addBoxSpan(g, 0, W * 2 - 0.2, 0.55, 0.85, 0.4, L - 0.4, mat.under);
   [3.4, L - 3.4].forEach(zb => {
     addBoxSpan(g, 0, 2.0, 0.42, 0.72, zb - 1.3, zb + 1.3, mat.under);
-    [-0.9, 0.9].forEach(dz => [-0.72, 0.72].forEach(x => {
-      const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.12, 14), mat.wheel);
-      wheel.rotation.z = Math.PI / 2;
-      wheel.position.set(x, CONFIG.track.railTop + 0.4, zb + dz);
-      g.add(wheel);
+    if (!rubber) {
+      [-0.9, 0.9].forEach(dz => [-0.72, 0.72].forEach(x => {
+        const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.12, 14), mat.wheel);
+        wheel.rotation.z = Math.PI / 2;
+        wheel.position.set(x, CONFIG.track.railTop + 0.4, zb + dz);
+        g.add(wheel);
+      }));
+      return;
+    }
+    // Neumáticos: rueda portante sobre la pista, rueda de seguridad de acero dentro, rueda guía horizontal
+    // contra la barra guía y frotador que toma la corriente de ella
+    [-0.9, 0.9].forEach(dz => [-1, 1].forEach(s => {
+      const tyre = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.3, 16), mat.tyre);
+      tyre.rotation.z = Math.PI / 2;
+      tyre.position.set(s * 0.98, CONFIG.track.railTop + 0.47, zb + dz);
+      const safety = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.36, 0.08, 12), mat.wheel);
+      safety.rotation.z = Math.PI / 2;
+      safety.position.set(s * 0.72, CONFIG.track.railTop + 0.36, zb + dz);
+      const guide = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.12, 12), mat.tyre);
+      guide.position.set(s * 1.25, 0.52, zb + dz * 0.8);
+      g.add(tyre, safety, guide);
     }));
+    [-1, 1].forEach(s => addBoxSpan(g, s * 1.3, 0.08, 0.6, 0.66, zb - 0.25, zb + 0.25, mat.black));
   });
 
   /* ----- Interior del salón ----- */
@@ -306,7 +331,7 @@ function buildCarStatic(g, car, mat, { dest, cabFiller, openFront, openRear }) {
     if (cabFiller) addBoxSpan(g, 0, W * 2 - 0.1, F, R - 0.05, 0.12, 2.66, mat.black);   // cabina vista desde fuera
   }
 
-  if (car.panto) buildPantograph(g, mat, R);
+  if (car.panto && panto) buildPantograph(g, mat, R);
 }
 
 /** Fuelle de intercirculación entre dos coches (z = fin del coche delantero). */

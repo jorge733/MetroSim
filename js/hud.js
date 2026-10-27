@@ -165,9 +165,9 @@ export class Hud {
       this.setText(e.nextStation, info.docked.name);
       this.setText(e.distance, info.next ? `Siguiente: ${info.next.name}` : "Fin de línea · R reiniciar");
     } else if (info.next) {
-      this.setText(e.stationTitle, sim.movingBackwards ? "RETROCEDIENDO" : "PRÓXIMA ESTACIÓN");
+      this.setText(e.stationTitle, sim.movingBackwards ? "RETROCEDIENDO" : info.express ? `PRÓXIMA PARADA · RUTA ${info.express.toUpperCase()}` : "PRÓXIMA ESTACIÓN");
       this.setText(e.nextStation, info.next.name);
-      this.setText(e.distance, `${Math.max(0, Math.round(info.distance))} m`);
+      this.setText(e.distance, `${Math.max(0, Math.round(info.distance))} m${info.passing ? ` · pasa sin detenerse por ${info.passing.short}` : ""}`);
     } else {
       const d = Math.round(sim.position - sim.route.track.retireZ);
       this.setText(e.stationTitle, "COLA DE MANIOBRAS");

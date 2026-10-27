@@ -112,6 +112,3 @@ export const STOCK = {
   lineVoltage: 1500,
   lineDropPerAmp: 0.028,
 };
-
-/** Masa real del tren (kg) con una carga de viajeros. */
-export const trainMass = (load = 0) => STOCK.tare + Math.max(0, load) * STOCK.paxMass;

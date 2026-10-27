@@ -14,6 +14,7 @@
 
 import * as THREE from "three";
 import { CONFIG, STATIONS } from "./config.js";
+import { ROUTE_A } from "./engine/route.js";
 import { clamp } from "./utils.js";
 
 // Puntos de vista en coordenadas locales del tren (la cabeza está en z = 0 y el tren crece hacia +z).
@@ -143,9 +144,10 @@ export class CameraRig {
     this.camera.quaternion.copy(parentQ.invert().multiply(q));
   }
 
-  /** Mantiene la cámara dentro del túnel (círculo) o del vestíbulo de la estación (caja). */
+  /** Mantiene la cámara dentro del túnel (círculo) o del vestíbulo de la estación (caja); al aire libre, libre. */
   constrain(p, target) {
     const inStation = STATIONS.some(s => p.z - s.z > ST.hallZ0 + 2 && p.z - s.z < ST.hallZ1 - 2);
+    if (!inStation && ROUTE_A.line.sectionsInfo.exposedAt(p.z)) { p.y = Math.max(p.y, 0.6); return; }   // viaducto o trinchera (1.5)
     if (inStation) {
       p.x = clamp(p.x, -ST.wallX + 0.5, ST.wallX - 0.5);
       p.y = clamp(p.y, 0.6, ST.ceilingY - 0.6);

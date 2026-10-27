@@ -13,9 +13,15 @@
    las demás.
 
    El orden, los nombres y las combinaciones son reales; las distancias
-   entre estaciones son APROXIMADAS (la L3 suma ~25 km, como la real). Por
-   simplicidad todas las líneas se representan subterráneas (en la realidad
-   hay tramos en viaducto o en superficie en las líneas 2, 4, 4A y 5).
+   entre estaciones son APROXIMADAS (la L3 suma ~25 km, como la real).
+
+   1.5 · Realismo de la red:
+     sections     tramos en VIADUCTO o en TRINCHERA (sections.js): las
+                  estaciones de la lista y la vía entre ellas van al aire
+                  libre; el resto es túnel. Tramos aproximados.
+     express      Ruta Expresa (express.js): estaciones de la ruta roja y de
+                  la verde (las demás son comunes). Listas de 2023.
+     La flota de cada línea (neumáticos o acero) está en fleet.js.
 
    1.1 · Datos de operación de cada línea (aproximados):
      peakHeadway  intervalo en hora punta (s), coherente con su flota y su
@@ -48,7 +54,7 @@ function buildStations(data, lineId) {
 
 /** Crea una línea. Los sentidos se llaman <id>A / <id>B (la L3 conserva A / B). */
 function makeLine({ id, name, data, speedLimits = () => [], scheduleOffset = 0, description,
-  peakHeadway = 200, demand = 1, centers = [], terrain = [520, 560], deep = {} }) {
+  peakHeadway = 200, demand = 1, centers = [], terrain = [520, 560], deep = {}, sections = [], express = null }) {
   const stations = buildStations(data, id);
   // Importancia de cada estación: la indicada, o según combinaciones y terminales
   stations.forEach(s => {
@@ -71,7 +77,7 @@ function makeLine({ id, name, data, speedLimits = () => [], scheduleOffset = 0, 
     tripPrefix: [`L${id}`, `L${id}V`],
     signalPrefix: id === "3" ? ["1", "2"] : [`${id}1`, `${id}2`],
     scheduleOffset,                    // desfase de su malla respecto a la de referencia
-    peakHeadway, demand, centers, terrain, deep,
+    peakHeadway, demand, centers, terrain, deep, sections, express,
   };
 }
 
@@ -116,6 +122,12 @@ export const L2 = makeLine({
   id: "2", name: "LÍNEA 2", scheduleOffset: 50, peakHeadway: 165, demand: 1.1, terrain: [490, 575],
   centers: ["PUENTE CAL Y CANTO", "SANTA ANA", "LOS HÉROES", "TOESCA"], deep: { "PATRONATO>PUENTE CAL Y CANTO": 6 },
   description: "De norte a sur por el centro, hasta San Bernardo.",
+  // Trinchera junto a la autopista Central (aprox.)
+  sections: [{ from: "EL LLANO", to: "LO OVALLE", type: "trinchera" }],
+  express: {
+    verde: ["EINSTEIN", "CERRO BLANCO", "TOESCA", "RONDIZZONI", "SAN MIGUEL", "DEPARTAMENTAL", "EL PARRÓN"],
+    roja: ["DORSAL", "CEMENTERIOS", "PATRONATO", "PARQUE O'HIGGINS", "EL LLANO", "LO VIAL", "CIUDAD DEL NIÑO"],
+  },
   data: [
     { name: "VESPUCIO NORTE",            short: "VESPUCIO NORTE",   gap: 0 },
     { name: "ZAPADORES",                 short: "ZAPADORES",        gap: 1050 },
@@ -187,6 +199,15 @@ export const L4 = makeLine({
   id: "4", name: "LÍNEA 4", scheduleOffset: 90, peakHeadway: 180, demand: 1.1, terrain: [590, 690],
   centers: ["TOBALABA", "CRISTÓBAL COLÓN", "FRANCISCO BILBAO"],
   description: "Por Américo Vespucio y Vicuña Mackenna hasta Puente Alto.",
+  // Trinchera en Américo Vespucio y viaducto de ~7 km sobre Vicuña Mackenna (aprox.)
+  sections: [
+    { from: "LOS PRESIDENTES", to: "MACUL", type: "trinchera" },
+    { from: "VICUÑA MACKENNA", to: "PROTECTORA DE LA INFANCIA", type: "viaducto" },
+  ],
+  express: {
+    verde: ["CRISTÓBAL COLÓN", "SIMÓN BOLÍVAR", "GRECIA", "QUILÍN", "ROJAS MAGALLANES", "SAN JOSÉ DE LA ESTRELLA", "PROTECTORA DE LA INFANCIA"],
+    roja: ["PRÍNCIPE DE GALES", "LOS ORIENTALES", "LOS PRESIDENTES", "LAS TORRES", "TRINIDAD", "LOS QUILLAYES", "LAS MERCEDES"],
+  },
   data: [
     { name: "TOBALABA",                  short: "TOBALABA",         gap: 0,    combos: ["1"] },
     { name: "CRISTÓBAL COLÓN",           short: "CRISTÓBAL COLÓN",  gap: 1200 },
@@ -218,6 +239,11 @@ export const L4 = makeLine({
 export const L4A = makeLine({
   id: "4A", name: "LÍNEA 4A", scheduleOffset: 110, peakHeadway: 300, demand: 0.35, terrain: [585, 560],
   description: "Corta y rápida, une la L4 con la L2 por Américo Vespucio Sur.",
+  // Viaducto en Vicuña Mackenna (junto a la L4) y trinchera en el bandejón de Vespucio Sur (aprox.)
+  sections: [
+    { from: "VICUÑA MACKENNA", to: "VICUÑA MACKENNA", type: "viaducto" },
+    { from: "SANTA JULIA", to: "SAN RAMÓN", type: "trinchera" },
+  ],
   data: [
     { name: "VICUÑA MACKENNA",           short: "V. MACKENNA",      gap: 0,    combos: ["4"] },
     { name: "SANTA JULIA",               short: "SANTA JULIA",      gap: 1300 },
@@ -233,6 +259,16 @@ export const L5 = makeLine({
   id: "5", name: "LÍNEA 5", scheduleOffset: 20, peakHeadway: 165, demand: 1.3, terrain: [500, 600],
   centers: ["SANTA ANA", "PLAZA DE ARMAS", "BELLAS ARTES", "BAQUEDANO", "PARQUE BUSTAMANTE"],
   description: "De Maipú a La Florida cruzando el centro: la más larga de la red.",
+  // Viaductos de Pudahuel-Maipú y de Vicuña Mackenna (aprox.)
+  sections: [
+    { from: "DEL SOL", to: "PUDAHUEL", type: "viaducto" },
+    { from: "RODRIGO DE ARAYA", to: "BELLAVISTA DE LA FLORIDA", type: "viaducto" },
+  ],
+  // Colores de 2023 (Del Sol, Laguna Sur y Mirador: aproximados)
+  express: {
+    verde: ["DEL SOL", "LAS PARCELAS", "LO PRADO", "GRUTA DE LOURDES", "CUMMING", "SANTA ISABEL", "CARLOS VALDOVINOS", "PEDRERO"],
+    roja: ["SANTIAGO BUERAS", "MONTE TABOR", "BARRANCAS", "BLANQUEADO", "QUINTA NORMAL", "PARQUE BUSTAMANTE", "RODRIGO DE ARAYA", "CAMINO AGRÍCOLA", "MIRADOR"],
+  },
   data: [
     { name: "PLAZA DE MAIPÚ",            short: "PLAZA DE MAIPÚ",   gap: 0 },
     { name: "SANTIAGO BUERAS",           short: "S. BUERAS",        gap: 1100 },

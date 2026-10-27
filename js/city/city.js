@@ -27,6 +27,7 @@ import * as THREE from "three";
 import { std, glow, addBox, makeCanvas, toTexture } from "../utils.js";
 import { CONFIG, LINE, LINE_COLORS } from "../config.js";
 import { STREET, streetPlan, seededRandom } from "./plan.js";
+import { skyAt } from "../render/outdoor.js";            // cielo según la hora y el tiempo (1.5: nublado, lluvia)
 import { buildLandmark } from "./landmarks.js";
 import { cityMaterials, genericBuilding, signMaterial, facingPlane, streetLamp, tree, bench, addMesh } from "./kit.js";
 import { markCity } from "../render/trackLift.js";
@@ -69,16 +70,6 @@ function lineBadgesTexture(ids) {
 }
 
 const LANES = [{ x: -5.2, dir: 1 }, { x: -1.9, dir: 1 }, { x: 1.9, dir: -1 }, { x: 5.2, dir: -1 }];
-
-/** Hora (s) → luz del día: sol (0..1), color del cielo y si es de noche. */
-function skyAt(clock) {
-  const h = (clock / 3600) % 24;
-  const sun = Math.sin(Math.PI * (h - 6.8) / 13.6);              // > 0 entre ~06:50 y ~20:25
-  const day = THREE.MathUtils.clamp(sun * 2.2 + 0.15, 0, 1);
-  const dusk = THREE.MathUtils.clamp(1 - Math.abs(sun - 0.08) / 0.22, 0, 1) * (h > 12 ? 1 : 0.7);
-  const color = new THREE.Color(0x0a1224).lerp(new THREE.Color(0x8fc3ee), day).lerp(new THREE.Color(0xf09a5e), dusk * 0.55);
-  return { sun, day, dusk, color, night: day < 0.25 ? 1 : 0 };
-}
 
 export class City {
   constructor(scene) {
@@ -174,8 +165,8 @@ export class City {
     this.scene.fog.far = this.base.far + (330 - this.base.far) * f;
     if (this.hemi) {
       const k = f > 0 ? 0.5 + 0.5 * f : 0;               // la luz del día entra por la boca del acceso
-      this.hemi.intensity = (0.25 + 1.0 * sky.day) * k;
-      this.sun.intensity = 2.4 * sky.day * k;
+      this.hemi.intensity = (0.25 + 1.0 * sky.day * (1 - 0.3 * sky.cloud)) * k;
+      this.sun.intensity = 2.4 * sky.light * k;
       this.sun.color.setHex(sky.dusk > 0.4 ? 0xffb37a : 0xfff1dc);
     }
   }

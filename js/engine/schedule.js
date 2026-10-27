@@ -16,11 +16,17 @@
      que siempre se pueda jugar (en la realidad el Metro está cerrado).
    · Cada servicio (trip) tiene hora de llegada (arr) y salida (dep) en cada
      estación de su ruta (índices en el orden de la ruta).
+   · 1.5 · La marcha tipo usa el tren más numeroso de la flota de la línea
+     (fleet.js). Ruta Expresa (express.js): en punta los servicios alternan
+     ruta roja y verde; trip.express dice cuál y trip.skip qué estaciones se
+     salta (en ellas arr = dep = hora de paso, sin detenerse).
    ========================================================================== */
 
 import { CONFIG, demandAt, inService } from "../config.js";
 import { formatClock } from "./format.js";
 import { TrainSim, AutoDriver } from "./sim.js";
+import { lineStock } from "./fleet.js";
+import { expressActive, skipSet } from "./express.js";
 
 const MARGIN = 1.04;         // margen de regularidad (+4 %)
 const FIXED = 3;             // segundos fijos por aproximación final a la marca
@@ -43,7 +49,7 @@ export function routeProfile(route) {
   segs = [null];
   const dt = 0.25;
   for (let i = 1; i < route.stations.length; i++) {
-    const sim = new TrainSim(route, () => {}, route.stations[i - 1]);
+    const sim = new TrainSim(route, () => {}, route.stations[i - 1], lineStock(route.line));
     sim.load = PROFILE_LOAD;
     const ato = new AutoDriver(sim, { targetIndex: i });
     let t = 0, nextSample = 0;
@@ -65,6 +71,32 @@ export function routeProfile(route) {
 /** Tiempo de recorrido del horario (s) entre la estación i−1 y la i de una ruta. */
 export function segmentRunTime(route, i) {
   return Math.round(routeProfile(route)[i].time * MARGIN + FIXED);
+}
+
+const THROUGH = new Map();
+/**
+ * Marcha SIN PARAR de la estación i a la j de una ruta (Ruta Expresa: pasa de
+ * largo por las intermedias). Devuelve el tiempo total y la hora de paso por
+ * cada estación intermedia (s desde la salida de i).
+ */
+export function throughRun(route, i, j) {
+  const key = `${route.id}|${i}>${j}`;
+  if (THROUGH.has(key)) return THROUGH.get(key);
+  const sim = new TrainSim(route, () => {}, route.stations[i], lineStock(route.line));
+  sim.load = PROFILE_LOAD;
+  const ato = new AutoDriver(sim, { targetIndex: j });
+  const pass = {};
+  let t = 0;
+  const dt = 0.25;
+  while (ato.state === "running" && t < 2400) {
+    ato.update(dt, 0);
+    sim.update(dt);
+    t += dt;
+    for (let k = i + 1; k < j; k++) if (pass[k] === undefined && sim.position <= route.stations[k].stopZ) pass[k] = t;
+  }
+  const res = { time: t, pass };
+  THROUGH.set(key, res);
+  return res;
 }
 
 /**
@@ -147,18 +179,33 @@ export function headwayAt(clock, line = null) {
   return Math.round(Math.min(peak * factor, 720) / 10) * 10;
 }
 
-/** Servicio con horas de llegada y salida en cada estación de la ruta. */
-export function makeTrip(route, departure) {
+/**
+ * Servicio con horas de llegada y salida en cada estación de la ruta.
+ * @param {"roja"|"verde"|null} express  ruta expresa (o null: para en todas)
+ */
+export function makeTrip(route, departure, express = null) {
   const st = route.stations;
+  const skip = skipSet(route, express);
   const arr = [], dep = [];
   arr[0] = departure - 60;
   dep[0] = departure;
   for (let i = 1; i < st.length; i++) {
-    arr[i] = dep[i - 1] + segmentRunTime(route, i);
+    if (skip?.has(i)) continue;                                       // la rellena el tramo sin parar
+    let prev = i - 1;
+    while (skip?.has(prev)) prev--;
+    if (prev === i - 1) arr[i] = dep[i - 1] + segmentRunTime(route, i);
+    else {
+      const run = throughRun(route, prev, i);
+      arr[i] = dep[prev] + Math.round(run.time * MARGIN + FIXED);
+      for (let k = prev + 1; k < i; k++) arr[k] = dep[k] = dep[prev] + Math.round((run.pass[k] ?? run.time / 2) * MARGIN);
+    }
     dep[i] = arr[i] + dwellTime(st[i], arr[i]);
   }
   const hhmm = formatClock(departure).slice(0, 5).replace(":", "");
-  return { id: `${route.tripPrefix}-${hhmm}`, route, departure, arr, dep, commercial: inService(departure) };
+  return {
+    id: `${route.tripPrefix}-${hhmm}`, route, departure, arr, dep, commercial: inService(departure),
+    express, skip: skip && skip.size ? skip : null,
+  };
 }
 
 export class Timetable {
@@ -173,7 +220,9 @@ export class Timetable {
     const deps = [anchor];
     for (let t = anchor; t > from;) { t -= headwayAt(t, line); deps.unshift(t); }
     for (let t = anchor; t < to;) { t += headwayAt(t, line); deps.push(t); }
-    this.trips = deps.map(d => makeTrip(route, d));
+    // Ruta Expresa: en sus horarios los servicios alternan roja y verde
+    let k = 0;
+    this.trips = deps.map(d => makeTrip(route, d, expressActive(d, line) ? (k++ % 2 ? "verde" : "roja") : null));
     // (dos salidas en el mismo minuto tendrían el mismo id: se distinguen con una letra)
     const seen = new Map();
     for (const t of this.trips) {
@@ -192,7 +241,7 @@ export class Timetable {
   /** Servicios futuros (no iniciados aún) que pasarán por una estación tras "clock". */
   upcomingAt(stIndex, clock, excludeIds) {
     return this.trips
-      .filter(t => !excludeIds.has(t.id) && t.arr[stIndex] > clock)
+      .filter(t => !excludeIds.has(t.id) && t.arr[stIndex] > clock && !t.skip?.has(stIndex))
       .slice(0, 3);
   }
 

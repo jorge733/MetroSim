@@ -16,11 +16,18 @@
        sin esperas extra, para no seguir acumulando retraso.
    Nunca retiene más de MAX_HOLD segundos seguidos.
 
+   Ruta Expresa (1.5): solo cuentan los trenes que SE DETIENEN en la
+   estación (en una estación roja, el tren de delante es el rojo anterior).
+   Mientras funciona, los intervalos son desiguales por diseño (un tren rojo
+   y uno verde llegan a las comunes con huecos alternos), así que no se
+   retiene a los trenes expresos: se regulan solo por su horario.
+
    Se puede activar o desactivar con la orden "control.regulation".
    ========================================================================== */
 
 import { CONFIG } from "../config.js";
 import { estimateArrival } from "./eta.js";
+import { tripStopsAt } from "./express.js";
 
 /** Retención máxima en una parada (s). */
 const MAX_HOLD = 75;
@@ -78,6 +85,7 @@ export class Regulator {
 
         // ¿Va demasiado pegado? → retener en la parada (solo una vez abiertas las puertas)
         if (ato.state !== "dwell" || !front) continue;
+        if (u.trip?.express || front.trip?.express) continue;                            // Ruta Expresa: manda el horario
         if (ato.regulateUntil !== null && ato.regulateUntil !== undefined) continue;     // ya decidido en esta parada
         const follower = this.followerArrival(route, u, rs, clock);
         if (!follower || !u.trip || !front.trip) continue;
@@ -100,8 +108,9 @@ export class Regulator {
   /** Intervalo previsto por el horario entre este servicio y el anterior en una estación. */
   scheduledHeadway(route, trip, index) {
     const trips = this.engine.timetables.get(route.id).trips;
-    const i = trips.indexOf(trip);
-    return i > 0 ? trip.dep[index] - trips[i - 1].dep[index] : CONFIG.schedule.peakHeadway;
+    let i = trips.indexOf(trip) - 1;
+    while (i >= 0 && !tripStopsAt(trips[i], index)) i--;            // el anterior que también para aquí
+    return i >= 0 ? trip.dep[index] - trips[i].dep[index] : CONFIG.schedule.peakHeadway;
   }
 
   /** Tren de atrás: hora prevista de llegada a esta estación y su servicio (o el siguiente del horario). */
@@ -113,7 +122,7 @@ export class Regulator {
       if (at !== null && (best === null || at < best.at)) best = { at, trip: v.trip };
     }
     if (best) return best;
-    const next = this.engine.timetables.get(route.id).trips.find(t => !this.engine.traffic.started.has(t.id) && t.arr[rs.index] > clock);
+    const next = this.engine.timetables.get(route.id).trips.find(t => !this.engine.traffic.started.has(t.id) && t.arr[rs.index] > clock && tripStopsAt(t, rs.index));
     return next ? { at: next.arr[rs.index], trip: next } : null;
   }
 

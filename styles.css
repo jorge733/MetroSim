@@ -142,6 +142,11 @@ kbd {
 .line-card-facts dd { font: 700 18px/1 var(--f-data); }
 .line-card-text { font-size: 13px; line-height: 1.45; color: #a8b3bf; }
 .line-card-text:empty { display: none; }
+/* Clima (1.5) */
+.weather-picker { display: grid; gap: 6px; }
+.weather-seg button { padding: 4px 6px; text-align: center; }
+.weather-seg button b { font-size: 15px; white-space: nowrap; }
+.weather-now { font-size: 12px; color: var(--muted); line-height: 1.35; }
 
 .start-tools { display: flex; flex-wrap: wrap; gap: 8px; }
 .tool-button {
@@ -243,7 +248,7 @@ body.touch-mode .start-keys { display: none; }
   .start-screen { padding-top: max(12px, env(safe-area-inset-top)); }
   .start-layout { grid-template-columns: minmax(0, 320px) minmax(0, 1fr); gap: 14px 24px; max-width: none; }
   .start-side { gap: 10px; }
-  .start-hero .eyebrow, .tagline, .line-card-text, .start-note { display: none; }
+  .start-hero .eyebrow, .tagline, .line-card-text, .start-note, .weather-now { display: none; }
   .start-hero h2 { font-size: 22px; }
   .metro-mark { width: 40px; }
   .start-brand h1 { font-size: 26px; }

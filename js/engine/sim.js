@@ -27,6 +27,12 @@
      · consumo eléctrico: potencia, corriente de catenaria y energía
        (tracción, regenerada y auxiliares).
 
+   1.5 · Cada tren tiene su MODELO (fleet.js → stock): neumáticos o acero,
+   masa, esfuerzo, freno regenerativo o no, tensión de alimentación… La
+   adherencia depende del tiempo: al aire libre con lluvia (weather.js) el
+   antipatinaje recorta la tracción (slip = "PATINAJE") y el antideslizante
+   el freno (slide = "DESLIZAMIENTO"): el tren tarda más en frenar.
+
    1.4 · Protección del tren (ATP) para el conductor:
      · sobre el límite + ATP_MARGIN km/h el ATP aplica el freno de
        emergencia (evento "atpTrip"); el rebase de una señal en rojo también
@@ -38,7 +44,9 @@
    ========================================================================== */
 
 import { CONFIG, NOTCHES, NOTCH_INDEX, REVERSER } from "../config.js";
-import { STOCK, trainMass } from "./consist.js";
+import { STOCK } from "./consist.js";
+import { adhesionFor } from "./weather.js";
+import { nextStopIndex } from "./express.js";
 import { clamp, formatStopError } from "./format.js";
 
 const G = 9.81;
@@ -61,10 +69,12 @@ export class TrainSim {
    * @param {object} route   ruta (sentido de circulación) del tren
    * @param {(type:string, data?:object)=>void} onEvent  receptor de eventos (mensajes, sonidos...)
    * @param {object|number} start  estación de la ruta (se coloca en su marca) o coordenada z
+   * @param {object} stock  modelo de tren (fleet.js); por defecto el AS-2014
    */
-  constructor(route, onEvent = () => {}, start = route.first) {
+  constructor(route, onEvent = () => {}, start = route.first, stock = STOCK) {
     this.route = route;
     this.onEvent = onEvent;
+    this.stock = stock;
     this.load = 0;                   // viajeros a bordo (lo actualiza el tráfico): cambian la masa
     this.energy = { traction: 0, regen: 0, aux: 0 };   // kWh acumulados
     this.reset(start);
@@ -85,7 +95,10 @@ export class TrainSim {
     this.forces = { traction: 0, electricBrake: 0, frictionBrake: 0, resistance: 0, gravity: 0 };   // N
     this.power = 0;                  // potencia eléctrica tomada de la catenaria (W, negativa si regenera)
     this.current = 0;                // corriente de catenaria (A)
-    this.voltage = STOCK.lineVoltage;
+    this.voltage = this.stock.lineVoltage;
+    this.slip = false;               // patinaje: la tracción pedida supera la adherencia (riel mojado)
+    this.slide = false;              // deslizamiento: el freno pedido supera la adherencia
+    this.exposed = false;            // va al aire libre (viaducto o trinchera)
     this.tractionLock = null;        // texto: tracción bloqueada (ATP, espera autorización del PCC)
     this.restriction = null;         // marcha a la vista: { kmh, untilZ, label }
     this.onEvent("reset", { start });
@@ -106,16 +119,16 @@ export class TrainSim {
     return this.notchData.type === "brake";
   }
   /** Masa real (kg) con los viajeros a bordo. */
-  get mass() { return trainMass(this.load); }
+  get mass() { return this.stock.tare + Math.max(0, this.load) * this.stock.paxMass; }
   /** Esfuerzo aplicado para mostrar (−1 freno máximo … +1 tracción máxima). */
   get effort() {
     const f = this.forces;
-    if (f.traction > 0) return clamp(f.traction / STOCK.maxTractive, 0, 1);
+    if (f.traction > 0) return clamp(f.traction / this.stock.maxTractive, 0, 1);
     const brake = f.electricBrake + f.frictionBrake;
-    return -clamp(brake / (this.mass * STOCK.rotary * 1.3), 0, 1);
+    return -clamp(brake / (this.mass * this.stock.rotary * 1.3), 0, 1);
   }
   /** Ocupación del tren (0..1 respecto de la capacidad a 6 p/m²). */
-  get occupancy() { return clamp(this.load / STOCK.capacity, 0, 1.2); }
+  get occupancy() { return clamp(this.load / this.stock.capacity, 0, 1.2); }
 
   /** Límite efectivo: el de la vía o el de marcha atrás. */
   currentLimit() {
@@ -228,39 +241,50 @@ export class TrainSim {
     const v = this.velocity, speed = Math.abs(v);
     const dir = this.reverser;
     const cap = dir === -1 ? T.reverseMaxSpeed : T.maxSpeed;
-    const m = this.mass, mEq = m * STOCK.rotary;
-    this.grade = this.route.gradeAt ? this.route.gradeAt(this.position + T.length / 2) : 0;
+    const K = this.stock;
+    const m = this.mass, mEq = m * K.rotary;
+    const mid = this.position + T.length / 2;
+    this.grade = this.route.gradeAt ? this.route.gradeAt(mid) : 0;
+    this.exposed = !!this.route.exposedAt?.(mid);
+    const mu = adhesionFor(K, this.exposed);                             // adherencia (menor con riel mojado al aire libre)
 
     // Tracción: pedida (compensada por carga) ≤ curva esfuerzo-velocidad ≤ adherencia
     let traction = 0;
+    this.slip = false;
     if (this.accel > 0 && dir !== 0) {
       const goingThatWay = Math.sign(v) === dir || speed < 0.05;
-      const available = Math.min(STOCK.maxTractive, STOCK.maxPower / Math.max(speed, 0.5));
-      const adhesion = STOCK.adhesion * G * m * (STOCK.motorCars / STOCK.cars);
-      traction = Math.min(this.accel * mEq, available, adhesion);
-      if (goingThatWay && speed >= cap - 0.05) traction = 0;            // corte de tracción a la velocidad máxima
+      const available = Math.min(K.maxTractive, K.maxPower / Math.max(speed, 0.5));
+      const adhesion = mu * G * m * (K.motorCars / K.cars);
+      const wanted = Math.min(this.accel * mEq, available);
+      // Antipatinaje: si se pide más de lo que agarra, recorta con un margen (el eje patina y se corrige)
+      this.slip = wanted > adhesion * 1.02;
+      traction = this.slip ? adhesion * 0.9 : wanted;
+      if (goingThatWay && speed >= cap - 0.05) { traction = 0; this.slip = false; }   // corte de tracción a la velocidad máxima
     }
 
     // Freno: pedido (compensado por carga), con freno de mantenimiento automático al detenerse
     let brakeDecel = this.accel < 0 ? -this.accel : 0;
     if (speed < 0.08 && traction === 0) brakeDecel = Math.max(brakeDecel, HOLD_BRAKE);
-    const brakeTotal = Math.min(brakeDecel * mEq, STOCK.adhesion * G * m * 1.0);
+    const brakeGrip = mu * G * m;
+    this.slide = speed > 0.5 && brakeDecel * mEq > brakeGrip * 1.02;
+    // Antideslizante: si las ruedas se bloquean, suelta y vuelve a apretar (rinde algo menos que el agarre)
+    const brakeTotal = this.slide ? brakeGrip * 0.92 : Math.min(brakeDecel * mEq, brakeGrip);
     // Reparto: eléctrico (regenerativo) primero, la fricción completa lo que falta
     let electric = 0;
     if (!this.emergency && speed > 0.05) {
-      const fade = clamp(speed / STOCK.electricFadeSpeed, 0, 1);
-      electric = Math.min(brakeTotal, STOCK.maxElectricBrake, STOCK.maxElectricBrakePower / Math.max(speed, 0.5)) * fade;
+      const fade = clamp(speed / K.electricFadeSpeed, 0, 1);
+      electric = Math.min(brakeTotal, K.maxElectricBrake, K.maxElectricBrakePower / Math.max(speed, 0.5)) * fade;
     }
     const friction = brakeTotal - electric;
 
-    const resistance = speed > 0.01 ? STOCK.rollingPerKg * m + STOCK.davisB * speed + STOCK.davisC * speed * speed : 0;
+    const resistance = speed > 0.01 ? K.rollingPerKg * m + K.davisB * speed + K.davisC * speed * speed : 0;
     const gravity = -m * G * this.grade;                                 // + empuja hacia delante (cuesta abajo)
 
     // 5. Integración: las fuerzas "motrices" (tracción con signo y gravedad) cambian la velocidad;
     //    el freno y la resistencia solo se oponen al movimiento (y pueden retener el tren)
     const drive = traction * dir + gravity;
     let newV = v + (drive / mEq) * dt;
-    const opposing = ((brakeTotal + resistance + (speed <= 0.01 ? STOCK.rollingPerKg * m : 0)) / mEq) * dt;
+    const opposing = ((brakeTotal + resistance + (speed <= 0.01 ? K.rollingPerKg * m : 0)) / mEq) * dt;
     newV = Math.abs(newV) <= opposing ? 0 : newV - Math.sign(newV) * opposing;
     newV = clamp(newV, -T.reverseMaxSpeed - 1, T.maxSpeed + 3 / 3.6);
 
@@ -275,15 +299,15 @@ export class TrainSim {
 
     // 6. Electricidad: potencia de tracción, regeneración y auxiliares
     const vAvg = (Math.abs(v) + Math.abs(newV)) / 2;
-    const pTraction = (traction * vAvg) / STOCK.tractionEfficiency;
-    const pRegen = electric * vAvg * STOCK.regenEfficiency * STOCK.regenReceptivity;
-    this.power = pTraction + STOCK.auxPower - pRegen;
-    this.current = this.power / STOCK.lineVoltage;
-    this.voltage = STOCK.lineVoltage - STOCK.lineDropPerAmp * this.current;
+    const pTraction = (traction * vAvg) / K.tractionEfficiency;
+    const pRegen = electric * vAvg * K.regenEfficiency * K.regenReceptivity;
+    this.power = pTraction + K.auxPower - pRegen;
+    this.current = this.power / K.lineVoltage;
+    this.voltage = K.lineVoltage - K.lineDropPerAmp * this.current;
     const toKWh = dt / 3.6e6;
     this.energy.traction += pTraction * toKWh;
     this.energy.regen += pRegen * toKWh;
-    this.energy.aux += STOCK.auxPower * toKWh;
+    this.energy.aux += K.auxPower * toKWh;
 
     // 7. Límites físicos de la vía
     const track = this.route.track;
@@ -355,6 +379,10 @@ export class TrainSim {
    Detención en plena vía (1.3, incidents.js): con lineStop = { until } el
    tren frena con suavidad entre dos estaciones y espera detenido hasta esa
    hora (regulación de frecuencia, tren detenido más adelante…).
+
+   Ruta Expresa (1.5, express.js): un servicio rojo o verde pasa de largo
+   por las estaciones que no le tocan (trip.skip): su próxima estación
+   objetivo es siempre la siguiente en la que se detiene.
 
    Retiro del servicio (1.3, incidents.js): al llegar a la estación
    evacuateAt abre puertas y bajan TODOS (evacuating); desde ahí sigue vacío
@@ -486,8 +514,9 @@ export class AutoDriver {
         const leave = this.outOfService && !this.evacuating ? this.arrivedAt + 6 : this.leaveTime();
         const sig = this.signals?.startingSignal(this.target);
         if ((leave === null || clock >= leave) && (!sig || sig.aspect !== "red")) {
-          this.onEvent("departing", { station: this.target, next: this.stations[this.targetIndex + 1] });
-          this.targetIndex++;
+          const nextIdx = nextStopIndex(this.trip, this.targetIndex, last);
+          this.onEvent("departing", { station: this.target, next: this.stations[nextIdx] });
+          this.targetIndex = nextIdx;
           this.brakeTarget = null;
           this.coasting = false;
           this.state = "running";

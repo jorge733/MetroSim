@@ -20,6 +20,46 @@ Compartir → *Agregar a inicio*. Se abre a pantalla completa y, tras la primera
 (el service worker `sw.js` guarda el juego, Three.js y las voces). La instalación necesita `https` o `localhost`.
 Los íconos están en `icons/` (los PNG se generan desde `icons/icon.svg`).
 
+## Versión 1.5 · Realismo de la red
+
+- **El tren real de cada línea** (`js/engine/fleet.js`): las líneas 1, 2 y 5 usan trenes de **neumáticos** de Alstom
+  (NS-74, NS-93, NS-2007, NS-2016) y las 3, 4, 4A y 6, de **rueda de acero** (AS-2002 de Alstom, AS-2014 de CAF).
+  Cada línea tiene su mezcla de modelos y a cada servicio le toca uno (la L5 conserva casi la mitad de su flota de
+  NS-74, de 1975). Cambia la física: el neumático agarra mucho más (arranca y frena fuerte) pero rueda con más
+  resistencia; los trenes antiguos aceleran menos, el NS-74 frena con resistencias (sin freno regenerativo) y
+  ninguno de neumáticos tiene pantógrafo: toman 750 V de las **barras guía** que se ven a los costados de la vía,
+  junto a las pistas de rodadura. Al empezar a conducir te dice qué tren te tocó y la DMI lo muestra.
+- **Viaductos y trincheras** (`js/engine/sections.js`, `js/render/outdoor.js`): la L4 corre en viaducto sobre
+  Vicuña Mackenna y en trinchera por Américo Vespucio, la L4A en trinchera por Vespucio Sur, la L5 en los viaductos
+  de Pudahuel-Maipú y de Vicuña Mackenna y la L2 en trinchera junto a la autopista Central (tramos aproximados).
+  Al aire libre se ve el cielo según la hora, la avenida con autos, veredas, árboles, faroles y edificios (con
+  ventanas encendidas de noche), pilas con capitel bajo el viaducto, muros y puntales en la trinchera, pórticos de
+  catenaria y portales de túnel. Las estaciones al aire libre tienen el andén abierto con mamparas de vidrio y
+  cubierta liviana. El perfil cambia: en viaducto la vía va ~9 m sobre la calle y en trinchera ~7 m bajo ella.
+- **Clima de Santiago** (`js/engine/weather.js`): por defecto, el **tiempo real** (se consulta a Open-Meteo, un
+  servicio público sin clave; sin conexión, uno típico de la temporada: en Santiago llueve casi solo de mayo a
+  agosto). También se puede elegir en la portada: despejado, nublado, lluvia o temporal. Con lluvia, en los tramos
+  al aire libre el riel mojado agarra mucho menos: el tren **patina** al arrancar y **desliza** al frenar (la DMI
+  avisa y el antipatinaje recorta el esfuerzo), así que hay que frenar antes. Además viaja más gente (y con frío,
+  algo más). Se ve la lluvia (también en la calle del pasajero), el cielo gris y se oye.
+- **Ruta Expresa** (`js/engine/express.js`): en la L2, la L4 y la L5, los días laborales de 06:00 a 09:00 y de
+  18:00 a 21:00 los trenes alternan **ruta roja** y **ruta verde** y se saltan las estaciones del otro color
+  (las comunes las sirven todos). Colores de 2023. El horario de cada servicio se calcula con la marcha sin
+  parar por las saltadas, en las estaciones de un color pasa un tren cada dos y los letreros de las estaciones
+  muestran su color. El conductor ve "PRÓXIMA PARADA · RUTA VERDE" y qué estaciones pasa sin detenerse (abrir
+  puertas en una que no le toca es falta); las pantallas del andén marcan el color de cada tren y el pasajero
+  recibe el aviso al llegar. Mientras funciona, la regulación no retiene a los trenes expresos (sus intervalos
+  son desiguales por diseño): se rigen por su horario.
+- **Sonido**: los trenes de neumáticos no hacen el golpeteo de las juntas (solo un golpe sordo y un rodar más
+  grave), el NS-74 no tiene el canto VVVF y el NS-93 suena con el zumbido de su chopper; al aire libre no hay
+  retumbe de túnel y se oye la lluvia.
+- El letrero frontal de los trenes muestra el número de su línea (antes decía 3 en todas).
+- `node tools/simular.mjs 10:00 15 "VICENTE VALDÉS" con-regulacion laboral lluvia` simula también con lluvia.
+
+Siguen siendo simplificaciones: todos los trenes se dibujan con la composición de 5 coches y ~120 m del AS-2014
+(para que andenes, puertas y viajeros funcionen igual) y la calle del modo pasajero queda sobre su estación aunque
+esta vaya en viaducto.
+
 ## Versión 1.4 · Conductor más realista
 
 - **ATP (protección automática del tren)**: si pasas el límite por más de 5 km/h, el ATP frena de emergencia. Lo
@@ -322,6 +362,10 @@ js/engine/            MOTOR (sin Three.js)
   sim.js              física del tren y conducción automática
   traffic.js          todos los trenes de la línea, maniobras y retrasos
   consist.js          composición del AS-2014 (5 coches, 20 puertas por lado) y sus datos físicos
+  fleet.js            flota real de cada línea: modelos de neumáticos y de acero y su física
+  sections.js         tramos en túnel, trinchera o viaducto
+  weather.js          clima: lluvia (adherencia al aire libre) y demanda
+  express.js          Ruta Expresa (rutas roja y verde) de las líneas 2, 4 y 5
   profile.js          perfil longitudinal: cotas y pendientes de cada línea
   state.js            estado explícito de cada tren
   eta.js              llegadas estimadas desde la posición real
@@ -336,6 +380,7 @@ js/render/            dibujo del estado del motor
   lineMapPanel.js     plano de línea dinámico de los coches
   carInfoPanel.js     pantallas de información sobre las puertas de los coches
   trackLift.js        pendientes en 3D: dobla el dibujo de la vía según el perfil de la línea
+  outdoor.js          al aire libre: viaductos, trincheras, la avenida y los edificios, cielo y lluvia
 js/control/           Centro de Control
   controlCenter.js    esquema de la red, ficha de tren, incidencias y órdenes
 js/touch.js           controles táctiles (celular y tablet)

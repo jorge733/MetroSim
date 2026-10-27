@@ -12,10 +12,16 @@
      · la parada en cada estación intermedia (no sale antes de su hora).
    Así, si un tren se retiene en una estación o queda parado ante una señal,
    las pantallas de los andenes de más adelante lo notan enseguida.
+   1.5 · Ruta Expresa: un tren que se salta una estación no "llega" a ella
+   (null) y en las que pasa de largo no se suma parada.
    ========================================================================== */
 
 import { CONFIG } from "../config.js";
 import { remainingRunTime } from "./schedule.js";
+import { tripStopsAt } from "./express.js";
+
+/** Segundos que ahorra pasar de largo por una estación (sin frenar, parar ni arrancar). */
+const PASS_SAVING = 14;
 
 /** Segundos extra por cada parada intermedia (cierre de puertas y arranque). */
 const LEG_EXTRA = 2;
@@ -32,6 +38,7 @@ export function estimateArrival(u, rs, clock) {
   const tol = CONFIG.station.stopTolerance;
   const ato = u.ato?.state;
   if (rs.route !== route) return null;
+  if (!tripStopsAt(trip, rs.index)) return null;                     // Ruta Expresa: no se detiene aquí
   if (ato === "retire" || ato === "retired") return null;           // ya terminó su recorrido
   if (sim.position < rs.stopZ - tol) return null;                    // ya pasó
 
@@ -47,7 +54,8 @@ export function estimateArrival(u, rs, clock) {
     if (st.stopZ >= z - tol) continue;                               // detrás del tren
     t += remainingRunTime(route, z, st.index, v);
     if (st === rs) return t;
-    t = Math.max(t + CONFIG.schedule.minDwell + CONFIG.train.doorTime + LEG_EXTRA, trip?.dep[st.index] ?? 0);
+    if (!tripStopsAt(trip, st.index)) t -= PASS_SAVING;               // pasa de largo
+    else t = Math.max(t + CONFIG.schedule.minDwell + CONFIG.train.doorTime + LEG_EXTRA, trip?.dep[st.index] ?? 0);
     z = st.stopZ;
     v = 0;
   }

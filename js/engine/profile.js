@@ -20,6 +20,12 @@
    La pendiente se siente en la física, se muestra en la DMI de la cabina y
    se VE en 3D: render/trackLift.js dobla el dibujo de la vía con estas cotas.
 
+   1.5 · Tramos al aire libre (sections.js): las estaciones en VIADUCTO
+   quedan ~9 m sobre la calle y las de TRINCHERA ~7 m bajo ella; entre ellas
+   no hay "olla". Una estación subterránea vecina de una al aire libre es
+   menos profunda (~12 m, como un cajón bajo la avenida), para que la rampa
+   de transición quepa en la pendiente máxima.
+
    Unidades: cotas en m s. n. m. del carril; pendiente como fracción (0,02 = 20 ‰),
    positiva cuesta ARRIBA en el sentido de avance.
    ========================================================================== */
@@ -47,12 +53,17 @@ export function buildProfile(line) {
   const st = line.stations;
   const [e0, e1] = line.terrain || [520, 560];
   const span = st[0].z - st.at(-1).z || 1;
+  const levels = line.sectionsInfo?.levels || st.map(() => "tunel");
+  /** Cota del terreno (la calle) en una z del mundo: sube o baja parejo de un extremo al otro. */
+  const groundAt = (z) => e0 + (e1 - e0) * Math.min(1, Math.max(0, (st[0].z - z) / span));
 
-  // 1. Cota de carril de cada estación: terreno − profundidad (18–26 m)
-  const elev = st.map(s => {
-    const t = (st[0].z - s.z) / span;
-    const ground = e0 + (e1 - e0) * t;
-    return ground - (18 + 8 * hash(line.id + s.name));
+  // 1. Cota de carril de cada estación: terreno − profundidad (18–26 m), o sobre / bajo la calle si va al aire libre
+  const elev = st.map((s, i) => {
+    const ground = groundAt(s.z);
+    if (levels[i] === "viaducto") return ground + 9;
+    if (levels[i] === "trinchera") return ground - 7;
+    const shallow = levels[i - 1] && levels[i - 1] !== "tunel" || levels[i + 1] && levels[i + 1] !== "tunel";
+    return ground - (shallow ? 12 : 18 + 8 * hash(line.id + s.name));
   });
 
   // 2. Tramos entre estaciones: diferencia de cota acotada y "olla" central
@@ -61,13 +72,15 @@ export function buildProfile(line) {
     const a = st[i], b = st[i + 1];
     const len = a.z - b.z - FLAT_NEG - FLAT_POS;                    // largo con pendiente (sin las estaciones)
     // Diferencia de cota: el perfil suavizado (smoothstep) tiene pendiente máxima 1,5·Δ/len
-    const maxDelta = (MAX_GRADE * 0.75 * len) / 1.5;
+    // (en las rampas de entrada a un viaducto o trinchera se permite la pendiente máxima)
+    const open = levels[i] !== "tunel" || levels[i + 1] !== "tunel";
+    const maxDelta = (MAX_GRADE * (open ? 1 : 0.75) * len) / 1.5;
     let delta = elev[i + 1] - elev[i];
     if (Math.abs(delta) > maxDelta) { delta = Math.sign(delta) * maxDelta; elev[i + 1] = elev[i] + delta; }
     // Olla: hasta 9 m (más bajo un río), sin pasar de la pendiente máxima
     const extra = line.deep?.[`${a.name}>${b.name}`] || 0;
     const room = (MAX_GRADE * len - 1.5 * Math.abs(delta)) / Math.PI;
-    const sag = Math.max(0, Math.min(room, Math.min(9, len * 0.006) + extra));
+    const sag = open ? 0 : Math.max(0, Math.min(room, Math.min(9, len * 0.006) + extra));
     segs.push({ zStart: a.z - FLAT_NEG, zEnd: b.z + FLAT_POS, len, eA: elev[i], delta, sag });
   }
 
@@ -91,5 +104,5 @@ export function buildProfile(line) {
     return (elevationAt(z + 0.5) - elevationAt(z - 0.5));
   }
 
-  return { elevationAt, slopeWorld, stationElevations: elev };
+  return { elevationAt, slopeWorld, groundAt, stationElevations: elev };
 }

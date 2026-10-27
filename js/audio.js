@@ -85,6 +85,8 @@ export class AudioSystem {
     this.traffic = this.noiseLayer(this.white, "bandpass", 520, 0.5);   // rumor lejano (no grave, para no confundirse con el tren)
     this.trafficWander = 0;
     this.tyres = this.noiseLayer(this.white, "bandpass", 900, 0.4);
+    // Lluvia (1.5): siseo agudo y parejo al aire libre
+    this.rainNoise = this.noiseLayer(this.white, "highpass", 2500, 0.3);
 
     // Motor de tracción: diente de sierra grave + armónico, filtrados
     this.motor = this.toneLayer("sawtooth", 60, "lowpass", 900, 1.2);
@@ -199,13 +201,21 @@ export class AudioSystem {
 
   /* ---------------------------------------------------------------------
      Actualización continua
-     state: { velocity, speedKmh, accel, braking, inStation, view, overspeed, crowd, dt, level, street }
+     state: { velocity, speedKmh, accel, braking, inStation, view, overspeed, crowd, dt, level, street,
+              outdoor, rain, stock }
      street: el jugador está en la calle (sin túnel; se oye el tránsito).
      level (0..1): volumen del tren según la distancia (1 = vas dentro).
+     1.5 · outdoor (0..1): al aire libre no hay retumbe de túnel; rain (0..1):
+     lluvia que se oye afuera; stock: modelo del tren (fleet.js). Los de
+     NEUMÁTICOS ruedan sin golpes de juntas (un siseo de goma y el roce de las
+     ruedas guía); los antiguos no tienen el canto VVVF: el NS-74 arranca
+     con resistencias (sin portadora) y el NS-93, con el zumbido fijo de su
+     chopper.
      --------------------------------------------------------------------- */
   update(s) {
     if (!this.ctx) return;
     // En la calle no se oye NADA del tren ni del túnel: solo la ciudad
+    this.set(this.rainNoise.gain.gain, clamp(s.rain || 0, 0, 1) * (s.view === "cab" || s.view === "saloon" ? 0.035 : 0.07), 0.6);
     if (s.street) {
       for (const layer of [this.rolling, this.rumble, this.roar, this.fan, this.motor, this.motor2, this.carrier, this.squeal]) this.set(layer.gain.gain, 0, 0.15);
       this.jointDistance = 0;
@@ -225,12 +235,14 @@ export class AudioSystem {
     const L = s.level ?? 1;                                                          // atenuación por distancia
     const underfloor = (s.view === "saloon" ? 1.25 : s.view === "cab" ? 0.8 : 1.0) * L;   // el salón está sobre los motores
 
-    // Rodadura y túnel: dentro del túnel retumba; al entrar a la estación el ruido se abre y baja
-    const open = s.inStation ? 0.7 : 1;
-    this.set(this.rolling.gain.gain, k > 0 ? (0.04 + k * 0.32) * (inside ? 0.85 : 1.1) * L * open : 0);
-    this.set(this.rolling.filter.frequency, 220 + kmh * 24);
-    this.set(this.rumble.gain.gain, (0.05 + k * 0.5 * L) * (s.inStation ? 0.45 : 1));
-    this.set(this.roar.gain.gain, (inside ? k * k * 0.3 * (s.inStation ? 0.2 : 1) : k * 0.06) * L, 0.35);
+    // Rodadura y túnel: dentro del túnel retumba; al entrar a la estación (o al salir al aire libre) el ruido se abre y baja
+    const air = clamp(s.outdoor || 0, 0, 1);
+    const rubber = s.stock?.tyre === "rubber";
+    const open = (s.inStation ? 0.7 : 1) * (1 - 0.35 * air);
+    this.set(this.rolling.gain.gain, k > 0 ? (0.04 + k * 0.32) * (inside ? 0.85 : 1.1) * L * open * (rubber ? 0.75 : 1) : 0);
+    this.set(this.rolling.filter.frequency, rubber ? 160 + kmh * 14 : 220 + kmh * 24);       // la goma suena más sorda
+    this.set(this.rumble.gain.gain, (0.05 + k * 0.5 * L) * (s.inStation ? 0.45 : 1) * (1 - 0.5 * air));
+    this.set(this.roar.gain.gain, (inside ? k * k * 0.3 * (s.inStation ? 0.2 : 1) : k * 0.06) * L * (1 - 0.85 * air), 0.35);
     this.set(this.roar.filter.frequency, 140 + kmh * 2.2, 0.2);
     this.set(this.fan.gain.gain, inside ? 0.022 : 0.004);
 
@@ -250,25 +262,29 @@ export class AudioSystem {
     else if (kmh < 18) carrierFreq = 1150;
     else if (kmh < 30) carrierFreq = motorFreq * 5;
     else carrierFreq = motorFreq * 3;
-    const carrierLevel = electric ? motorLevel * clamp(1 - kmh / 55, 0.15, 1) : 0;
+    const model = s.stock?.model;
+    if (model === "NS-93") carrierFreq = 1350;                                     // chopper: zumbido de frecuencia fija
+    const carrierLevel = electric && model !== "NS-74" ? motorLevel * clamp(1 - kmh / 55, 0.15, 1) : 0;
     this.set(this.carrier.osc.frequency, carrierFreq, 0.03);
     this.set(this.carrier.filter.frequency, carrierFreq, 0.03);
     this.set(this.carrier.gain.gain, carrierLevel * 0.03 * underfloor);
 
     // Chirrido de freno en los últimos metros de frenada
     const squealing = s.braking && kmh > 0.4 && kmh < 14;
-    this.set(this.squeal.gain.gain, squealing ? 0.022 * (1 - kmh / 14) * (0.6 + Math.random() * 0.4) * L : 0, 0.05);
+    this.set(this.squeal.gain.gain, squealing ? 0.022 * (1 - kmh / 14) * (0.6 + Math.random() * 0.4) * L * (rubber ? 0.35 : 1) : 0, 0.05);
 
     // Viajeros en el andén
     this.set(this.crowdGain.gain, clamp(s.crowd, 0, 1) * 0.13, 0.4);
 
-    // Juntas de carril: un golpe por eje cada 18 m (dos bogies, dos ejes por bogie)
+    // Juntas de carril: un golpe por eje cada 18 m (dos bogies, dos ejes por bogie).
+    // Con neumáticos no hay juntas: solo un golpe sordo en las juntas de las pistas, cada 36 m
+    const joint = rubber ? 36 : 18;
     if (kmh > 3 && L > 0.05) {
       this.jointDistance += Math.abs(s.velocity) * s.dt;
-      if (this.jointDistance >= 18) {
-        this.jointDistance -= 18;
-        const v = Math.abs(s.velocity), vol = clamp(kmh / 55, 0.15, 1) * (inside ? 0.16 : 0.22) * L;
-        [2.5, 4.3, 13.7, 15.5].forEach(d => this.clack(d / v, vol));
+      if (this.jointDistance >= joint) {
+        this.jointDistance -= joint;
+        const v = Math.abs(s.velocity), vol = clamp(kmh / 55, 0.15, 1) * (inside ? 0.16 : 0.22) * L * (rubber ? 0.45 : 1);
+        [2.5, 4.3, 13.7, 15.5].forEach(d => rubber ? this.thump(d / v, vol) : this.clack(d / v, vol));
       }
     }
 
@@ -286,6 +302,13 @@ export class AudioSystem {
     if (!this.ctx || delay > 3) return;
     this.burst({ start: delay, duration: 0.07, gain: vol, type: "bandpass", freq: 1700, q: 1.2, attack: 0.002 });
     this.tone(95, { start: delay, duration: 0.09, gain: vol * 0.9, attack: 0.002 });
+  }
+
+  /** Golpe sordo de neumático en una junta de la pista de rodadura. */
+  thump(delay, vol) {
+    if (!this.ctx || delay > 3) return;
+    this.burst({ start: delay, duration: 0.12, gain: vol, type: "lowpass", freq: 380, q: 0.8, attack: 0.006 });
+    this.tone(62, { start: delay, duration: 0.14, gain: vol * 0.8, attack: 0.006 });
   }
 
   /** Clic del manipulador al cambiar de posición. */

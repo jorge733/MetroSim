@@ -13,6 +13,17 @@
    En las colas tras cada terminal hay un cambio de vía para la maniobra de
    retorno y un cartel de FIN DE MANIOBRA.
 
+   1.5 · Realismo de la red:
+     · el túnel solo existe en los tramos subterráneos (engine/sections.js):
+       donde la vía sale a un viaducto o a una trinchera hay un PORTAL y el
+       exterior lo dibuja render/outdoor.js;
+     · las estaciones al aire libre tienen el andén ABIERTO: antepecho,
+       mamparas de vidrio y una cubierta liviana en vez de bóveda; el
+       edificio de la mezanina (escaleras, torniquetes) sigue cerrado;
+     · líneas de NEUMÁTICOS (L1, L2, L5; engine/fleet.js): pistas de
+       rodadura a cada lado de los carriles y barras guía laterales que
+       llevan la corriente (750 V), sin catenaria.
+
    Rendimiento: estaciones lejanas ocultas, pool fijo de 3 luces que sigue a
    la cámara, piezas repetidas instanciadas y texturas comunes compartidas.
    ========================================================================== */
@@ -20,6 +31,8 @@
 import * as THREE from "three";
 import { CONFIG, STATIONS, WORLD, LINE, FARES, formatCLP } from "./config.js";
 import { ROUTE_A, ROUTE_B } from "./engine/route.js";
+import { lineStock } from "./engine/fleet.js";
+import { stationColor } from "./engine/express.js";
 import { Elevator, ElevatorSystem } from "./elevators.js";
 import { PLATFORM_COLUMNS, PLATFORM_BENCHES, COLUMN_X, BENCH_X, PID_OFFSETS, isArrivalOnly } from "./stationLayout.js";
 import {
@@ -29,6 +42,10 @@ import {
 } from "./utils.js";
 
 const S = CONFIG.station, MZ = CONFIG.mezzanine;
+/** Las estaciones al aire libre: el andén es abierto hasta esta cota (relativa al centro); de ahí al fondo, el edificio de la mezanina. */
+const OPEN_UNTIL = 16;
+/** Altura de la cubierta de los andenes abiertos. */
+const ROOF_Y = 7.0;
 const TILE_TINTS = [[0, 0, 0], [-14, -4, 10], [8, -2, -14], [-8, 4, -4]];
 
 /* ==========================================================================
@@ -144,6 +161,14 @@ function createWorldMaterials() {
     youAreHere: glow(0xd42026),
     noEntry: glow(0xd42026),
     exitOnly: glow(0xffffff, { map: toTexture(signCanvas("SOLO SALIDA · ANDÉN DE LLEGADA", "#b3121f", 512, 128, "800 36px Arial")) }),
+    // Estaciones al aire libre (1.5): mamparas de vidrio y cubierta liviana
+    screenGlass: std(0xbfdcea, { metal: 0.1, rough: 0.05, transparent: true, opacity: 0.18, depthWrite: false, side: THREE.DoubleSide }),
+    roof: std(0xd9dcdf, { metal: 0.55, rough: 0.4, side: THREE.DoubleSide }),
+    roofFrame: std(0x5d666e, { metal: 0.7, rough: 0.35 }),
+    // Vía de neumáticos (1.5): pistas de rodadura y barras guía (tercer riel) con aisladores
+    runway: std(0x9aa0a4, { metal: 0.6, rough: 0.45 }),
+    guideBar: std(0x6e767c, { metal: 0.8, rough: 0.35 }),
+    guideInsulator: std(0xd9d2bf, { rough: 0.6 }),
   };
 }
 
@@ -247,7 +272,18 @@ export class World {
     STATIONS.forEach(s => bounds.push(s.z + S.hallZ1, s.z + S.hallZ0));
     bounds.push(WORLD.end);
     this.tunnelLamps = [];                 // luminarias del túnel { x, y, z } (para la luz que barre el coche)
-    for (let i = 0; i < bounds.length; i += 2) buildTunnelSegment(this.scene, this.M, bounds[i], bounds[i + 1], this.tunnelLamps);
+    // Solo en los tramos subterráneos (1.5): donde sale al aire libre, un portal
+    const SEC = ROUTE_A.line.sectionsInfo;
+    const tunnels = SEC.spans.filter(sp => sp.type === "tunel");
+    for (let i = 0; i < bounds.length; i += 2) {
+      for (const sp of tunnels) {
+        const a = Math.min(bounds[i], sp.zA), b = Math.max(bounds[i + 1], sp.zB);
+        if (a - b < 1) continue;
+        buildTunnelSegment(this.scene, this.M, a, b, this.tunnelLamps);
+        if (a < bounds[i] - 0.5) this.scene.add(makeTunnelPortal(this.M.portal, a, 1));      // boca hacia +Z
+        if (b > bounds[i + 1] + 0.5) this.scene.add(makeTunnelPortal(this.M.portal, b, -1)); // boca hacia −Z
+      }
+    }
     this.tunnelLamps.sort((a, b) => a.z - b.z);
   }
 
@@ -337,6 +373,8 @@ export class World {
    ========================================================================== */
 
 function buildTrack(scene, M) {
+  const stock = lineStock(ROUTE_A.line);
+  const rubber = stock.tyre === "rubber", catenary = stock.supply === "catenaria";
   const z0 = WORLD.start, z1 = WORLD.end;
   const len = z0 - z1, mid = (z0 + z1) / 2;
   const gaugeHalf = 0.7175;
@@ -357,14 +395,32 @@ function buildTrack(scene, M) {
         addBox(scene, 0.07, 0.11, l, M.rail, tx + x, 0.2, cm);
         addBox(scene, 0.075, 0.02, l, M.railHead, tx + x, CONFIG.track.railTop - 0.01, cm);
       });
-      // Catenaria rígida sobre cada vía
-      addBox(scene, 0.11, 0.09, l, M.catenary, tx, cy + 0.07, cm);
-      addBox(scene, 0.02, 0.02, l, M.contactWire, tx, cy, cm);
+      if (catenary) {
+        // Catenaria rígida sobre cada vía
+        addBox(scene, 0.11, 0.09, l, M.catenary, tx, cy + 0.07, cm);
+        addBox(scene, 0.02, 0.02, l, M.contactWire, tx, cy, cm);
+      }
+      if (rubber) {
+        // Pistas de rodadura de los neumáticos (fuera de los carriles) y barras guía laterales con la corriente
+        [-1, 1].forEach(s => {
+          addBox(scene, 0.36, 0.08, l, M.runway, tx + s * 0.98, CONFIG.track.railTop - 0.03, cm);
+          addBox(scene, 0.06, 0.24, l, M.guideBar, tx + s * 1.36, 0.52, cm);
+        });
+      }
     }
     instancedChunks(scene, sleeperGeo, M.sleeper, z0, z1, 0.75, (z) => m.makeTranslation(tx, 0.09, z));
-    instancedChunks(scene, new THREE.BoxGeometry(0.5, 0.06, 0.08), M.catenary, z0 - 5, z1, 10, (z) => m.makeTranslation(tx, cy + 0.15, z));
-    instancedChunks(scene, new THREE.BoxGeometry(0.05, 2.2, 0.05), M.catenary, z0 - 5, z1, 10, (z) => m.makeTranslation(tx, cy + 1.3, z));
-    instancedChunks(scene, new THREE.CylinderGeometry(0.05, 0.05, 0.22, 8), M.insulator, z0 - 5, z1, 10, (z) => m.makeTranslation(tx, cy + 0.3, z));
+    if (catenary) {
+      instancedChunks(scene, new THREE.BoxGeometry(0.5, 0.06, 0.08), M.catenary, z0 - 5, z1, 10, (z) => m.makeTranslation(tx, cy + 0.15, z));
+      instancedChunks(scene, new THREE.BoxGeometry(0.05, 2.2, 0.05), M.catenary, z0 - 5, z1, 10, (z) => m.makeTranslation(tx, cy + 1.3, z));
+      instancedChunks(scene, new THREE.CylinderGeometry(0.05, 0.05, 0.22, 8), M.insulator, z0 - 5, z1, 10, (z) => m.makeTranslation(tx, cy + 0.3, z));
+    }
+    if (rubber) {
+      // Soportes de las barras guía con aisladores cada 5 m (a ambos lados de cada vía)
+      [-1, 1].forEach(s => {
+        instancedChunks(scene, new THREE.BoxGeometry(0.28, 0.06, 0.12), M.guideBar, z0, z1, 5, (z) => m.makeTranslation(tx + s * 1.26, 0.36, z));
+        instancedChunks(scene, new THREE.CylinderGeometry(0.05, 0.05, 0.16, 6), M.guideInsulator, z0, z1, 5, (z) => m.makeTranslation(tx + s * 1.36, 0.33, z));
+      });
+    }
   });
 }
 
@@ -486,21 +542,31 @@ function buildStation(scene, M, st, gates, elevators) {
   group.name = `station-${st.id}`;
   scene.add(group);
 
-  const nameMat = glow(0xffffff, { map: toTexture(stationNameCanvas(st)) });
+  const nameMat = glow(0xffffff, { map: toTexture(stationNameCanvas(st, stationColor(ROUTE_A.line, st))) });
   const wallMat = M.stationWalls[st.index % M.stationWalls.length];
   const pids = [];
+  // Estación al aire libre (viaducto o trinchera, 1.5): andén abierto bajo una cubierta liviana
+  const open = ROUTE_A.line.sectionsInfo.levels[st.index] !== "tunel";
+  const o1 = z + OPEN_UNTIL;                                 // fin del andén abierto / inicio del edificio de la mezanina
 
   // Solera y techo del vestíbulo
   addBoxSpan(group, 0, S.wallX * 2, -0.15, -0.05, h1, h0, M.hallFloor);
   // (con un corte sobre la escalera de salida, que sube por encima del techo hacia la calle)
   const cutX = MZ.exitHalf + 0.15, cutZ = z + CONFIG.exit.corridorZ1;
-  addBoxSpan(group, 0, S.wallX * 2 + 0.6, S.ceilingY, S.ceilingY + 0.2, cutZ, h0, M.ceiling);
+  addBoxSpan(group, 0, S.wallX * 2 + 0.6, S.ceilingY, S.ceilingY + 0.2, cutZ, open ? o1 : h0, M.ceiling);
   [[-S.wallX - 0.3, -cutX], [cutX, S.wallX + 0.3]].forEach(([x0, x1]) =>
     addBoxSpan(group, (x0 + x1) / 2, x1 - x0, S.ceilingY, S.ceilingY + 0.2, h1, cutZ, M.ceiling));
+  if (open) {
+    // Cubierta del andén abierto con su estructura, y el frente del edificio de la mezanina sobre ella
+    addBoxSpan(group, 0, S.wallX * 2 + 1.6, ROOF_Y, ROOF_Y + 0.12, o1, h0 - 2, M.roof);
+    for (let zz = o1; zz > h0 - 2; zz -= 10) addBoxSpan(group, 0, S.wallX * 2 + 1.6, ROOF_Y - 0.35, ROOF_Y, zz, zz - 0.3, M.roofFrame);
+    [-1, 1].forEach(sd => addBoxSpan(group, sd * (S.wallX + 0.75), 0.25, ROOF_Y - 0.35, ROOF_Y, o1, h0 - 2, M.roofFrame));
+    addBoxSpan(group, 0, S.wallX * 2 + 0.6, ROOF_Y, S.ceilingY + 0.2, o1, o1 - 0.3, wallMat);
+  }
 
-  // Columnas centrales entre las dos vías; bajo la mezanina terminan en su losa
+  // Columnas centrales entre las dos vías; bajo la mezanina terminan en su losa (y bajo la cubierta, en ella)
   for (let off = -70; off <= 50; off += 10) {
-    const top = off >= MZ.z0 && off <= MZ.z1 ? MZ.y - 0.34 : S.ceilingY;
+    const top = off >= MZ.z0 && off <= MZ.z1 ? MZ.y - 0.34 : open && off < OPEN_UNTIL ? ROOF_Y - 0.35 : S.ceilingY;
     addBox(group, 0.5, top + 0.05, 0.5, M.column, 0, top / 2 - 0.025, z + off);
   }
 
@@ -519,8 +585,13 @@ function buildStation(scene, M, st, gates, elevators) {
       addBox(group, pw - 0.6, 0.05, 0.05, M.steel, side * (edgeX + 0.3 + (pw - 0.6) / 2), S.platformTop + 1.0, endZ);
     });
 
-    // Muro alicatado
-    addBoxSpan(group, side * (wallX + 0.15), 0.3, -0.05, S.ceilingY, h1, h0, wallMat);
+    // Muro alicatado (al aire libre: antepecho y mamparas de vidrio hasta la cubierta; el edificio, cerrado)
+    if (open) {
+      addBoxSpan(group, side * (wallX + 0.15), 0.3, -0.05, S.ceilingY, h1, o1, wallMat);
+      addBoxSpan(group, side * (wallX + 0.15), 0.3, -0.05, S.platformTop + 1.0, o1, h0, wallMat);
+      addBoxSpan(group, side * (wallX + 0.15), 0.04, S.platformTop + 1.0, ROOF_Y - 0.35, o1, h0, M.screenGlass);
+      for (let zz = o1; zz >= h0; zz -= 5) addBoxSpan(group, side * (wallX + 0.15), 0.08, S.platformTop + 1.0, ROOF_Y - 0.35, zz + 0.05, zz - 0.05, M.roofFrame);
+    } else addBoxSpan(group, side * (wallX + 0.15), 0.3, -0.05, S.ceilingY, h1, h0, wallMat);
 
     // Columnas y bancos del andén (posiciones compartidas: stationLayout.js)
     for (const off of PLATFORM_COLUMNS) {
@@ -619,7 +690,7 @@ function buildStation(scene, M, st, gates, elevators) {
 
   // Muros de boca de túnel (el del lado de la salida, con el paso de la escalera)
   group.add(makePortalWall(M.portal, h1, true));
-  group.add(makePortalWall(M.portal, h0));
+  if (!open) group.add(makePortalWall(M.portal, h0));
 
   return { st, group, pids };
 }
@@ -897,6 +968,32 @@ function makePortalWall(mat, z, exitNotch = false) {
 }
 
 /** Fondos de saco y toperas de ambas vías. */
+/**
+ * Boca de túnel hacia un tramo al aire libre (1.5): muro frontal de hormigón
+ * con el hueco del túnel, hasta la altura de la calle.
+ * @param {number} face  +1 si la boca mira hacia +Z, −1 si mira hacia −Z
+ */
+function makeTunnelPortal(mat, z, face) {
+  const T = CONFIG.tunnel;
+  const below = T.centerY - T.floorY;
+  const halfChord = Math.sqrt(T.radius ** 2 - below ** 2);
+  const aLeft = Math.atan2(-below, -halfChord), aRight = Math.atan2(-below, halfChord);
+  const W = 9.4, H = T.centerY + T.radius + 3.5;
+  const shape = new THREE.Shape();
+  shape.moveTo(-W, T.floorY - 0.1);
+  shape.lineTo(-halfChord, T.floorY - 0.1);
+  shape.absarc(0, T.centerY, T.radius, aLeft, aRight, true);
+  shape.lineTo(W, T.floorY - 0.1);
+  shape.lineTo(W, H);
+  shape.lineTo(-W, H);
+  shape.closePath();
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: 1.2, bevelEnabled: false, curveSegments: 24 });
+  geo.translate(0, 0, face > 0 ? -1.2 : 0);
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.z = z;
+  return mesh;
+}
+
 function buildTrackEnds(scene, M) {
   const T = CONFIG.tunnel;
   const disc = new THREE.CircleGeometry(T.radius + 0.1, 48);
@@ -905,7 +1002,10 @@ function buildTrackEnds(scene, M) {
   back.rotation.y = Math.PI;
   const front = new THREE.Mesh(disc, M.headwall);
   front.position.set(0, T.centerY, WORLD.end);
-  scene.add(back, front);
+  // (al aire libre la cola de maniobras termina en la topera, sin muro de fondo)
+  const SEC = ROUTE_A.line.sectionsInfo;
+  if (!SEC.exposedAt(WORLD.start)) scene.add(back);
+  if (!SEC.exposedAt(WORLD.end)) scene.add(front);
 
   // Cambios de vía tras cada terminal (de la cola de una vía al andén de la otra)
   const T0 = CONFIG.turnback;
@@ -941,7 +1041,8 @@ function drawPid(pid, st, clock, arrivals) {
   const route = pid.route;
   const terminal = route.stationOf(st) === route.last;
   const lines = arrivals.slice(0, 2).map(a => a.noPax ? "NO SUBIR" : a.here ? "EN ANDÉN" : a.minutes < 1 ? "LLEGANDO" : `${a.minutes} min`);
-  const key = `${Math.floor(clock / 30)}|${lines.join("|")}`;
+  const express = arrivals.slice(0, 2).map(a => a.express || "");
+  const key = `${Math.floor(clock / 30)}|${lines.join("|")}|${express.join("|")}`;
   if (key === pid.lastKey) return;
   pid.lastKey = key;
 
@@ -964,6 +1065,14 @@ function drawPid(pid, st, clock, arrivals) {
       g.textAlign = "left"; g.fillText(i === 0 ? "1º" : "2º", 14, y);
       g.font = "700 24px monospace";
       g.fillText(route.last.short.replace(".", ""), 64, y);
+      // Ruta Expresa: círculo rojo o verde del tren
+      if (express[i]) {
+        g.fillStyle = express[i] === "roja" ? "#e0262d" : "#1fb85a";
+        g.beginPath(); g.arc(W - 150, y, 11, 0, Math.PI * 2); g.fill();
+        g.fillStyle = "#fff"; g.font = "800 13px Arial"; g.textAlign = "center";
+        g.fillText(express[i] === "roja" ? "R" : "V", W - 150, y + 1);
+        g.fillStyle = i === 0 ? "#ffb000" : "#c98a00"; g.textAlign = "left";
+      }
       g.font = "700 30px monospace";
       if (lines[i] === "NO SUBIR") g.fillStyle = "#ff4d4d";       // tren que se retira del servicio
       g.textAlign = "right"; g.fillText(lines[i] ?? "--", W - 14, y);

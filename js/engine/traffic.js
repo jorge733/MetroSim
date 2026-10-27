@@ -17,6 +17,8 @@
      terminal, el tren cambia de cabina, pasa por el cambio de vía a la vía
      contraria y toma el siguiente servicio del sentido opuesto. Si no hay
      servicio próximo, se retira a cocheras.
+   · 1.5 · Cada tren es de un modelo de la flota de su línea (fleet.js),
+     elegido al entrar en servicio; lo conserva en las maniobras de retorno.
    ========================================================================== */
 
 import { CONFIG } from "../config.js";
@@ -26,6 +28,7 @@ import { TRAIN_LAYOUT } from "./consist.js";
 import { EventBus } from "./events.js";
 import { trainState } from "./state.js";
 import { estimateArrival } from "./eta.js";
+import { stockFor } from "./fleet.js";
 
 const L = CONFIG.train.length;
 
@@ -79,7 +82,8 @@ export class TrafficManager {
       state: null,           // estado explícito (state.js), lo calcula el motor en cada paso
       stateSince: null,
     };
-    unit.sim = new TrainSim(route, (type, data) => this.notify(unit, type, data), start ?? route.track.depotZ);
+    unit.stock = stockFor(route.line, trip.id);
+    unit.sim = new TrainSim(route, (type, data) => this.notify(unit, type, data), start ?? route.track.depotZ, unit.stock);
     unit.prevPos = unit.sim.position;
     unit.ato = isPlayer ? null : this.makeDriver(unit, targetIndex, holdUntil);
     this.started.add(trip.id);
@@ -252,7 +256,8 @@ export class TrafficManager {
    * Próximos trenes a una estación del mundo en una ruta.
    * Los trenes que ya circulan se estiman desde su posición real (eta.js);
    * los que aún no han salido de cocheras, por el horario.
-   * @returns {Array<{id, here, eta, minutes, at, scheduled, delay, noPax}>}  ordenados por llegada
+   * @returns {Array<{id, here, eta, minutes, at, scheduled, delay, noPax, express}>}  ordenados por llegada
+   *          (express: "roja" | "verde" | null; los trenes que pasan sin detenerse no aparecen)
    */
   arrivalsFor(worldStation, route, clock) {
     const rs = route.stationOf(worldStation);
@@ -265,11 +270,11 @@ export class TrafficManager {
       const scheduled = u.trip.arr[rs.index];
       const ev = u.ato?.evacuateAt;
       const noPax = ev !== null && ev !== undefined && rs.index >= ev;      // se retira del servicio: no admite pasajeros
-      list.push({ id: u.id, here: eta === 0, eta, minutes: Math.floor(eta / 60), at, scheduled, delay: at - scheduled, noPax });
+      list.push({ id: u.id, here: eta === 0, eta, minutes: Math.floor(eta / 60), at, scheduled, delay: at - scheduled, noPax, express: u.trip.express || null });
     }
     for (const t of this.timetables.get(route.id).upcomingAt(rs.index, clock, this.started)) {
       const at = t.arr[rs.index], eta = at - clock;
-      list.push({ id: t.id, here: false, eta, minutes: Math.floor(eta / 60), at, scheduled: at, delay: 0 });
+      list.push({ id: t.id, here: false, eta, minutes: Math.floor(eta / 60), at, scheduled: at, delay: 0, express: t.express || null });
     }
     return list.sort((a, b) => a.eta - b.eta);
   }

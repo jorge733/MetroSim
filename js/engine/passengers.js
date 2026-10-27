@@ -29,12 +29,19 @@
    quedan junto a la escalera del andén (por donde se entra y se sale) van
    más llenos y los del otro extremo, más vacíos (carLoads). Un tren que se
    retira del servicio (incidents.js) baja a todos y no admite pasajeros.
+
+   1.5 · Con lluvia o frío viaja más gente (weather.js). Ruta Expresa
+   (express.js): en un tren rojo o verde solo sube quien va a una estación
+   donde ese tren para (y la mitad de quienes van a una que se salta: bajan
+   en la parada siguiente y vuelven o caminan); quien iba a una estación
+   saltada baja en la próxima parada del tren.
    ========================================================================== */
 
 import { CONFIG, demandAt, flowPeriodAt } from "../config.js";
 import { TRAIN_LAYOUT, STOCK, CAR, GAP } from "./consist.js";
 import { headwayAt } from "./schedule.js";
 import { clamp } from "./format.js";
+import { weatherDemandFactor } from "./weather.js";
 
 /**
  * Personas por segundo que entran a una estación de importancia 1 (sumando
@@ -142,6 +149,8 @@ export class PassengerFlow {
       const total = up + down || 1;
       return { 1: up / total, "-1": down / total };
     });
+    this.attract = attract;
+    this.expressCache = new Map();
     // Bajadas: en cada estación baja la parte de los que van a bordo cuyo destino es esa
     this.alight = {};
     for (const route of this.line.routes) {
@@ -158,7 +167,40 @@ export class PassengerFlow {
 
   /** Personas por segundo que llegan a un andén (estación de la línea, lado +1 / −1). */
   rate(st, side, clock) {
-    return BASE_RATE * this.scale * demandAt(clock) * this.emit[st.index] * this.split[st.index][side];
+    return BASE_RATE * this.scale * demandAt(clock) * weatherDemandFactor() * this.emit[st.index] * this.split[st.index][side];
+  }
+
+  /**
+   * Ruta Expresa: reparto para un tren que se salta estaciones.
+   *   alight[i]  parte de los que van a bordo que bajan en la parada i
+   *   board[i]   parte de los que esperan en la parada i que suben a este tren
+   */
+  expressShares(route, skip) {
+    const key = `${route.id}|${[...skip].join(",")}`;
+    let r = this.expressCache.get(key);
+    if (r) return r;
+    const rs = route.stations, n = rs.length;
+    const a = rs.map(s => this.attract[s.worldIndex]);
+    // Quien va a una estación saltada baja en la parada siguiente: su atracción pasa a esa parada
+    const eff = new Array(n).fill(0);
+    let carry = 0;
+    for (let k = 0; k < n; k++) {
+      if (skip.has(k)) { carry += a[k]; continue; }
+      eff[k] = a[k] + carry; carry = 0;
+    }
+    const alight = new Array(n).fill(0), board = new Array(n).fill(1);
+    let remaining = 0, served = 0, skipped = 0;
+    for (let k = n - 1; k >= 0; k--) {
+      if (!skip.has(k)) {
+        remaining += eff[k];
+        alight[k] = k === n - 1 ? 1 : clamp(eff[k] / (remaining || 1), 0, 0.85);
+        board[k] = served + skipped > 0 ? (served + 0.5 * skipped) / (served + skipped) : 1;
+      }
+      if (skip.has(k)) skipped += a[k]; else served += a[k];
+    }
+    r = { alight, board };
+    this.expressCache.set(key, r);
+    return r;
   }
 
   /** Llega gente que hace transbordo desde otra línea: se reparte según el sentido de los viajes. */
@@ -185,8 +227,8 @@ export class PassengerFlow {
   update(dt, clock, units) {
     this.setPeriod(flowPeriodAt(clock));
 
-    // 1. Llegada de gente a los andenes
-    const k = BASE_RATE * this.scale * demandAt(clock) * dt;
+    // 1. Llegada de gente a los andenes (con lluvia o frío, más gente)
+    const k = BASE_RATE * this.scale * demandAt(clock) * weatherDemandFactor() * dt;
     for (const st of this.stations) {
       const w = this.waiting[st.index], e = this.emit[st.index] * k, s = this.split[st.index];
       w[1] = Math.min(PLATFORM_CAPACITY, w[1] + e * s[1]);
@@ -211,11 +253,18 @@ export class PassengerFlow {
       const ends = terminal || evac;
       // Al abrir puertas en una estación nueva: cuántos bajan aquí
       if (u.pax?.stationIndex !== rs.index || u.pax.routeId !== route.id) {
-        const normal = this.alight[route.id]?.[rs.index] ?? 0.2;
+        const ex = u.trip?.skip ? this.expressShares(route, u.trip.skip) : null;
+        const normal = (ex ? ex.alight : this.alight[route.id])?.[rs.index] ?? 0.2;
         const share = ends ? 1 : normal;
         // Si el tren se retira del servicio, quien no iba a esta estación espera el siguiente en el andén
         const stay = evac ? 1 - normal : 0;
-        u.pax = { stationIndex: rs.index, routeId: route.id, toAlight: u.load * share, stay, boarded: 0, alighted: 0, exchanging: true, full: 0 };
+        // Ruta Expresa: solo sube quien va a donde para este tren (el resto espera el de la otra ruta)
+        const boardShare = ex ? ex.board[rs.index] : 1;
+        const side0 = route.side;
+        u.pax = {
+          stationIndex: rs.index, routeId: route.id, toAlight: u.load * share, stay, boarded: 0, alighted: 0, exchanging: true, full: 0,
+          boardable: boardShare < 1 ? this.waiting[rs.world.index][side0] * boardShare : Infinity,
+        };
       }
       const p = u.pax;
 
@@ -232,14 +281,16 @@ export class PassengerFlow {
       // lleno cuesta más subir (la gente se acomoda) y a 6 p/m² no cabe nadie más.
       if (!ends && p.toAlight < 0.5) {
         const crowd = u.load <= comfort ? 1 : clamp(1 - 0.8 * (u.load - comfort) / (cap - comfort), 0.2, 1);
-        const up = Math.min(doors * BOARD_PER_DOOR * crowd * dt, w[side], Math.max(0, cap - u.load));
+        const want = Math.min(w[side], p.boardable - p.boarded);
+        const up = Math.max(0, Math.min(doors * BOARD_PER_DOOR * crowd * dt, want, Math.max(0, cap - u.load)));
         w[side] -= up; u.load += up; p.boarded += up;
         this.totals.boarded += up;
       }
       if (ends) u.load = Math.max(0, u.load);
       const roomLeft = u.load < cap - 0.5;
-      p.full = !ends && !roomLeft && w[side] >= 1 ? Math.round(w[side]) : 0;
-      p.exchanging = p.toAlight >= 0.5 || (!ends && w[side] >= 1 && roomLeft);
+      const wanting = Math.min(w[side], p.boardable - p.boarded);
+      p.full = !ends && !roomLeft && wanting >= 1 ? Math.round(wanting) : 0;
+      p.exchanging = p.toAlight >= 0.5 || (!ends && wanting >= 1 && roomLeft);
     }
   }
 }

@@ -166,7 +166,12 @@ function fitFont(g, text, weight, maxSize, maxWidth) {
  * Cartel de estación al estilo Metro de Santiago: fondo oscuro, insignia
  * del color de la línea activa y, si existen, insignias de combinación.
  */
-export function stationNameCanvas(st) {
+/**
+ * Letrero con el nombre de una estación.
+ * @param {object} st
+ * @param {"roja"|"verde"|"comun"|null} express  color de la estación en la Ruta Expresa (1.5)
+ */
+export function stationNameCanvas(st, express = null) {
   const W = 1024, H = 256, c = makeCanvas(W, H), g = c.getContext("2d");
   g.fillStyle = "#1d2228"; g.fillRect(0, 0, W, H);
   g.fillStyle = LINE.color; g.fillRect(0, H - 22, W, 22);
@@ -177,6 +182,12 @@ export function stationNameCanvas(st) {
   g.fillText(st.name, 210, 118);
   st.combos.forEach((id, i) => drawLineBadge(g, id, W - 70 - i * 120, 116, 46));
   if (st.combos.length) { g.fillStyle = "#aab4bf"; g.font = "600 24px Arial"; g.textAlign = "right"; g.fillText("COMBINACIÓN", W - 30 - combosW, 205); }
+  if (express) {
+    const col = { roja: "#e0262d", verde: "#1fb85a", comun: "#f2c230" }[express];
+    g.fillStyle = col; g.beginPath(); g.arc(226, 205, 13, 0, Math.PI * 2); g.fill();
+    g.fillStyle = "#aab4bf"; g.font = "600 24px Arial"; g.textAlign = "left";
+    g.fillText(`ESTACIÓN ${express === "comun" ? "COMÚN" : express.toUpperCase()}`, 250, 206);
+  }
   return c;
 }
 
@@ -336,7 +347,7 @@ export function destinationCanvas(text) {
   g.fillStyle = "#0b0b0b"; g.fillRect(0, 0, 512, 64);
   g.fillStyle = "#ffb000"; g.font = "700 44px monospace"; g.textAlign = "center"; g.textBaseline = "middle";
   g.font = text.length > 18 ? "700 30px monospace" : "700 40px monospace";
-  g.fillText(`3  ${text}`, 256, 34);
+  g.fillText(`${LINE.id}  ${text}`, 256, 34);
   return c;
 }
 
