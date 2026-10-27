@@ -302,7 +302,7 @@ window.addEventListener("resize", onResize);
 if (wantsTouch()) document.body.classList.add("touch-mode");
 
 // Acceso de depuración desde la consola: MetroSim.game.traffic, etc.
-window.MetroSim = { get game() { return game; }, bank, card, CONFIG, get STATIONS() { return STATIONS; }, get ROUTES() { return ROUTES; }, LINES };
+window.MetroSim = { get game() { return game; }, hud, bank, card, CONFIG, get STATIONS() { return STATIONS; }, get ROUTES() { return ROUTES; }, LINES };
 
 
 /* ==========================================================================

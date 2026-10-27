@@ -26,7 +26,7 @@ const CSS = `
 .touch-ui { position: absolute; z-index: 12; pointer-events: none; user-select: none; -webkit-user-select: none;
   inset: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
 .touch-ui button { pointer-events: auto; touch-action: none; border: 1px solid #ffffff38; color: #fff; background: #0b141ecc;
-  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-radius: 14px; font: 800 14px/1.1 system-ui, Arial, sans-serif; letter-spacing: .5px;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-radius: 14px; font: 700 14px/1.1 var(--f-body); letter-spacing: .5px;
   display: grid; place-items: center; padding: 0; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; }
 .touch-ui button:active, .touch-ui button.pressed { background: #2a4d6dcc; transform: scale(.96); }
 .touch-col { position: absolute; display: grid; gap: 10px; pointer-events: none; }
@@ -38,11 +38,11 @@ const CSS = `
 /* Mando e inversor actuales, junto a los botones (reemplaza al selector lateral en pantallas chicas) */
 .touch-notch { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px; width: 74px; padding: 4px; border-radius: 12px;
   background: #0b141ecc; border: 1px solid #ffffff2a; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
-.touch-notch b { display: grid; place-items: center; height: 30px; border-radius: 8px; font: 900 16px/1 system-ui, Arial; color: #0a121b; background: var(--neutral, #e8eef5); }
+.touch-notch b { display: grid; place-items: center; height: 30px; border-radius: 8px; font: 700 16px/1 var(--f-data); color: #0a121b; background: var(--neutral, #e8eef5); }
 .touch-notch b.power { background: var(--power, #4fd6ff); }
 .touch-notch b.brake { background: var(--brake, #ffb547); }
 .touch-notch b.emergency { background: var(--emergency, #ff4b4b); color: #fff; animation: blink .8s steps(2) infinite; }
-.touch-notch i { display: grid; place-items: center; width: 22px; height: 30px; border-radius: 8px; font: 900 13px/1 system-ui, Arial; font-style: normal; color: #0a121b; background: #e8eef5; }
+.touch-notch i { display: grid; place-items: center; width: 22px; height: 30px; border-radius: 8px; font: 700 13px/1 var(--f-data); font-style: normal; color: #0a121b; background: #e8eef5; }
 .touch-notch i[data-dir="1"] { background: var(--ok, #6fe39a); }
 .touch-notch i[data-dir="-1"] { background: var(--brake, #ffb547); }
 /* Joystick del pasajero */
@@ -54,7 +54,7 @@ const CSS = `
   border: 2px dashed #ffffff30; pointer-events: none; transition: opacity .3s; }
 .touch-stick-ghost::after { content: ""; position: absolute; inset: 30px; border-radius: 50%; background: #ffffff30; }
 .touch-hint, .touch-rotate { position: absolute; left: 50%; transform: translateX(-50%); padding: 6px 12px; border-radius: 10px;
-  font: 600 12px system-ui, Arial; text-align: center; max-width: calc(100% - 24px); transition: opacity 1s; }
+  font: 600 12px var(--f-body); text-align: center; max-width: calc(100% - 24px); transition: opacity 1s; }
 .touch-hint { top: 64px; background: #0b141ecc; color: #cfe0f1; }
 .touch-rotate { display: none; bottom: 46%; background: #5a3d00e8; color: #ffe7a8; font-weight: 700; }
 @media (orientation: portrait) { .touch-rotate { display: block; } }
@@ -75,7 +75,7 @@ body.touch-mode .fade { z-index: 15; }
   body.touch-mode .selector-hud, body.touch-mode .line-strip, body.touch-mode .mode-pill, body.touch-mode .hud-route { display: none !important; }
   body.touch-mode .hud-top { top: 8px; left: 10px; right: 96px; gap: 6px; }
   body.touch-mode .hud-brand { padding: 4px; gap: 6px; }
-  body.touch-mode .line-badge { width: 30px; height: 30px; font-size: 13px; }
+  body.touch-mode .line-badge { width: 30px; height: 30px; font-size: 17px; }
   body.touch-mode .hud-right { gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
   body.touch-mode .hud-right .hud-label { font-size: 8px; letter-spacing: 1px; }
   body.touch-mode .bank-pill, body.touch-mode .score-pill, body.touch-mode .hud-clock { padding: 4px 8px; border-radius: 10px; min-width: 0; }
