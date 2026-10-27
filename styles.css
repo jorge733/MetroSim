@@ -1237,6 +1237,7 @@ button, select { touch-action: manipulation; -webkit-tap-highlight-color: transp
 
 /* Finalizar turno (modo Conductor): al lado del botón Menú */
 .end-shift-button { left: 104px; border-color: #ffd16655; }
+.back-button.hidden + .end-shift-button { left: 18px; }        /* conductor: sin botón de Menú, ocupa su lugar */
 /* Resumen en pantallas bajas (celular en horizontal): dos columnas y botones siempre a la vista */
 @media (max-height: 520px) {
   .summary-card { width: min(94vw, 780px); grid-template-rows: auto auto minmax(0, 1fr) auto; overflow: hidden; }

@@ -448,6 +448,8 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = {}) {
 
   hud.setMode(mode);
   $("endShiftButton").classList.toggle("hidden", mode !== "driver");
+  // El conductor no tiene botón de Menú: sale con Finalizar turno (informe → Menú) o con "atrás"
+  $("backButton").classList.toggle("hidden", mode === "driver");
   // La ayuda de controles se muestra al empezar y se oculta sola (H la vuelve a mostrar)
   $("controlsHelp").classList.remove("hidden");
   setTimeout(() => game && $("controlsHelp").classList.add("hidden"), 12000);
