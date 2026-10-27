@@ -70,6 +70,7 @@ import { PHRASES } from "./announcements.js";
 import { playIntro } from "./intro.js";
 import { setupPWA } from "./pwa.js";
 import { setupCreator } from "./creator.js";
+import { icon, textOn } from "./icons.js";
 import { $, clamp, formatClock, formatStopError, gradeStop } from "./utils.js";
 import { formatDelay, makeTrip } from "./engine/schedule.js";
 import { MetroEngine } from "./engine/engine.js";
@@ -125,7 +126,7 @@ const wait = (ms) => new Promise(r => setTimeout(r, ms));
 /** Lo comprado en la Tienda Metro (licencias, libreas, contratos, depto, recuerdos). */
 const inventory = new Inventory();
 
-/* --- Selección de línea en la pantalla principal (conductor y pasajero) --- */
+/* --- Pantalla principal: primero la línea (botones de color), después el modo --- */
 const stationSelect = $("startStation");
 const driverLineSelect = $("driverLine"), paxLineSelect = $("paxLine");
 const savedLine = loadSetting("metrosim.line") || "3";
@@ -133,20 +134,84 @@ for (const sel of [driverLineSelect, paxLineSelect]) {
   LINES.forEach(l => sel.append(new Option(`${l.name} · ${l.stations[0].short} ⇄ ${l.stations.at(-1).short}`, l.id)));
   sel.value = lineById(savedLine) ? savedLine : "3";
 }
-refreshDriverLines();
-fillDirections(lineById(driverLineSelect.value));
-fillStations(lineById(paxLineSelect.value));
-driverLineSelect.addEventListener("change", () => { fillDirections(lineById(driverLineSelect.value)); saveSetting("metrosim.line", driverLineSelect.value); });
-paxLineSelect.addEventListener("change", () => { fillStations(lineById(paxLineSelect.value)); saveSetting("metrosim.line", paxLineSelect.value); });
+const lineChips = LINES.map(l => {
+  const chip = document.createElement("button");
+  chip.className = "line-chip";
+  chip.setAttribute("role", "radio");
+  chip.style.setProperty("--c", l.color);
+  chip.style.setProperty("--on-c", textOn(l.color));
+  chip.dataset.line = l.id;
+  chip.addEventListener("click", () => selectLine(l.id));
+  $("lineChips").append(chip);
+  return chip;
+});
+selectLine(driverLineSelect.value);
+directionSelect.addEventListener("change", renderDirections);
 
-/** Líneas del conductor: las que aún no tienen licencia muestran un candado y su precio. */
+/** Elige la línea para los dos modos: botones, ficha de la línea, servicios, estaciones y color de acento. */
+function selectLine(id) {
+  const line = lineById(id);
+  driverLineSelect.value = paxLineSelect.value = line.id;
+  saveSetting("metrosim.line", line.id);
+  startScreen.style.setProperty("--line", line.color);
+  startScreen.style.setProperty("--on-line", textOn(line.color));
+  lineChips.forEach(c => c.setAttribute("aria-checked", String(c.dataset.line === line.id)));
+  fillDirections(line);
+  fillStations(line);
+  renderLineCard(line);
+  refreshDriverLines();
+}
+
+/** Ficha de la línea elegida: recorrido, esquema con sus estaciones y datos. */
+function renderLineCard(line) {
+  const st = line.stations, first = st[0], last = st.at(-1);
+  $("lineCardRoute").textContent = `${first.name} ⇄ ${last.name}`;
+  $("lineCardFirst").textContent = first.short;
+  $("lineCardLast").textContent = last.short;
+  $("lineCardStations").textContent = st.length;
+  $("lineCardLength").textContent = `${last.km.toFixed(1).replace(".", ",")} km`;
+  $("lineCardCombos").textContent = st.filter(s => s.combos.length).length;
+  $("lineCardText").textContent = line.description || "";
+  const map = $("lineCardMap");
+  map.querySelectorAll("i").forEach(d => d.remove());
+  for (const s of st) {
+    const dot = document.createElement("i");
+    if (s.combos.length) dot.className = "combo";
+    dot.style.left = `${(s.km / last.km) * 100}%`;
+    dot.title = s.name + (s.combos.length ? ` · combinación L${s.combos.join(", L")}` : "");
+    map.append(dot);
+  }
+}
+
+/** Licencias: las líneas sin licencia muestran un candado y el conductor ve el precio. */
 function refreshDriverLines() {
   for (const opt of driverLineSelect.options) {
     const l = lineById(opt.value), lic = LICENSES.find(x => x.lineId === l.id);
     const base = `${l.name} · ${l.stations[0].short} ⇄ ${l.stations.at(-1).short}`;
     opt.textContent = inventory.canDrive(l.id) ? base : `🔒 ${base} · licencia ${formatCLP(lic.price)}`;
   }
+  for (const chip of lineChips) {
+    const l = lineById(chip.dataset.line), locked = !inventory.canDrive(l.id);
+    chip.innerHTML = l.id + (locked ? icon("lock", "chip-lock") : "");
+    chip.title = `${l.name} · ${l.stations[0].name} ⇄ ${l.stations.at(-1).name}` + (locked ? " · conducir requiere licencia" : "");
+    chip.setAttribute("aria-label", chip.title);
+  }
+  const id = driverLineSelect.value, lic = LICENSES.find(x => x.lineId === id), lock = $("driverLock");
+  lock.hidden = inventory.canDrive(id);
+  if (lic) lock.innerHTML = `${icon("lock")} Para conducir esta línea necesitas su licencia (${formatCLP(lic.price)}). La Línea 3 es gratis.`;
+  $("startBank").textContent = formatCLP(bank.balance);
 }
+
+/* Tarjetas de modo: la elegida muestra sus opciones; su botón empieza la partida */
+const modeCards = [...document.querySelectorAll(".mode-card")];
+function selectMode(mode) {
+  modeCards.forEach(c => c.classList.toggle("selected", c.dataset.card === mode));
+  saveSetting("metrosim.mode", mode);
+}
+modeCards.forEach(card => card.addEventListener("click", (ev) => {
+  if (!ev.target.closest("button, select")) selectMode(card.dataset.card);
+}));
+selectMode(modeCards.some(c => c.dataset.card === loadSetting("metrosim.mode")) ? loadSetting("metrosim.mode") : "driver");
 
 /** Tienda Metro: desde la pantalla de inicio o con K durante el juego. */
 function openStore(opts = {}) {
@@ -155,7 +220,7 @@ function openStore(opts = {}) {
   openShopUI({
     inventory, bank, ...opts,
     onBought: (item) => {
-      refreshDriverLines();
+      refreshDriverLines();      // candados de las líneas y saldo de la portada
       if (game) { game.audio.cash(); hud.setBank(bank); hud.moneyFloat(-item.price); }
     },
     onClose: () => { if (game?.walker) { game.walker.frozen = false; game.walker.keys.clear(); } },
@@ -183,6 +248,22 @@ function fillDirections(line) {
     new Option(`Ida · ${A.first.short} → ${A.last.short}`, "A"),
     new Option(`Vuelta · ${B.first.short} → ${B.last.short}`, "B"),
   );
+  renderDirections();
+}
+
+/** Selector segmentado de servicio (ida / vuelta) que maneja el <select> oculto. */
+function renderDirections() {
+  $("directionSeg").replaceChildren(...[...directionSelect.options].map(opt => {
+    const btn = document.createElement("button");
+    const [kind, route] = opt.textContent.split(" · ");
+    btn.innerHTML = `<b></b><span></span>`;
+    btn.firstChild.textContent = kind;
+    btn.lastChild.textContent = route;
+    btn.setAttribute("role", "radio");
+    btn.setAttribute("aria-checked", String(opt.value === directionSelect.value));
+    btn.addEventListener("click", () => { directionSelect.value = opt.value; renderDirections(); });
+    return btn;
+  }));
 }
 
 /** Estaciones del modo pasajero de la línea elegida (por defecto, la de más combinaciones). */
@@ -406,6 +487,7 @@ function stopGame({ keepFullscreen = false } = {}) {
   gameScreen.classList.add("hidden");
   loadingScreen.classList.add("hidden");
   startScreen.classList.remove("hidden");
+  refreshDriverLines();                 // saldo y licencias al volver a la portada
   if (!keepFullscreen) {                       // en una combinación se sigue jugando: no se suelta nada
     exitMobileFullscreen();
     disarmBackTrap();
@@ -533,6 +615,7 @@ function stopControl() {
   control.ui.destroy();
   control = null;
   startScreen.classList.remove("hidden");
+  refreshDriverLines();                 // saldo y licencias al volver a la portada
   disarmBackTrap();
   releaseScreen();
 }
