@@ -15,6 +15,7 @@ import { formatDelay } from "./engine/schedule.js";
 import { BANK_NAME } from "./economy.js";
 import { MISSION_TYPES, MASTERY_REWARD } from "./missions.js";
 import { icon, textOn } from "./icons.js";
+import { renderShiftReport } from "./shiftReport.js";
 
 export class Hud {
   constructor() {
@@ -269,6 +270,10 @@ export class Hud {
     const e = this.el;
     this.setText(e.summaryKicker, s.kicker);
     this.setText(e.summaryTitle, s.title);
+    this.closeReport?.();
+    this.closeReport = null;
+    e.summary.classList.remove("summary-report");
+    e.summary.querySelector(".summary-card").classList.remove("hidden");
     e.summaryList.replaceChildren(...s.rows.map(([k, v]) => {
       const li = document.createElement("li");
       li.innerHTML = `<span></span><b></b>`;
@@ -285,7 +290,30 @@ export class Hud {
     if (document.pointerLockElement) document.exitPointerLock?.();
   }
 
-  hideSummary() { this.el.summary.classList.add("hidden"); }
+  hideSummary() {
+    this.el.summary.classList.add("hidden");
+    this.closeReport?.();
+    this.closeReport = null;
+  }
+
+  /**
+   * Informe animado de fin de turno del Conductor (shiftReport.js). Usa el mismo
+   * contenedor que el resumen, así el juego se pausa igual mientras está abierto.
+   * @param {object} r      datos del turno
+   * @param {object} sound  { tick, stamp, record, cash }
+   */
+  showShiftReport(r, sound) {
+    this.closeReport?.();
+    const box = this.el.summary;
+    box.querySelector(".summary-card").classList.add("hidden");
+    box.classList.add("summary-report");
+    this.closeReport = renderShiftReport(box, r, {
+      sound,
+      onAction: (fn) => { this.hideSummary(); fn?.(); },
+    });
+    box.classList.remove("hidden");
+    if (document.pointerLockElement) document.exitPointerLock?.();
+  }
 
   /* ---------------------------------------------------------------------
      Tarjeta bip!, boletería y tótem

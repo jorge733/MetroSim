@@ -26,6 +26,9 @@ const PATHS = {
   close: '<path d="M6 6l12 12M18 6 6 18"/>',
   home: '<path d="M3 11 12 4l9 7M5 10v10h14V10M10 20v-6h4v6"/>',
   ticket: '<path d="M3 7h18v3a2 2 0 0 0 0 4v3H3v-3a2 2 0 0 0 0-4z"/><path d="M15 7v10"/>',
+  star: '<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>',
+  check: '<path d="m5 12 5 5 9-10"/>',
+  coins: '<ellipse cx="9" cy="7" rx="6" ry="3"/><path d="M3 7v4c0 1.7 2.7 3 6 3s6-1.3 6-3V7M3 11v4c0 1.7 2.7 3 6 3 1.1 0 2.2-.2 3-.4M15 12.6c.9-.4 3-.6 3-.6 1.7 0 3 1.3 3 3v2c0 1.7-2.7 3-6 3"/>',
 };
 
 /** Ícono como texto SVG (hereda el color del texto). */

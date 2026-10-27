@@ -375,7 +375,7 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = {}) {
     mode, renderer, scene, camera, world, engine, signals, timetables, traffic, trainViews, signalViews, audio, playerTrip,
     clock: warmStart, elapsed: 0, last: performance.now(), dmiTimer: 0, pidTimer: 0, raf: 0,
     warming: true,
-    stats: { arrivals: [], stops: [], redSignals: 0, overspeeds: 0, emergencies: 0 },
+    stats: { arrivals: [], stops: [], log: [], redSignals: 0, overspeeds: 0, emergencies: 0 },
     ride: { origin: null, boardedClock: null },
   };
   if (mode === "driver") traffic.started.add(playerTrip.id);
@@ -813,6 +813,8 @@ function onPlayerEvent(type, data) {
       const wage = stationWage({ gained: sc.gained, perfect: sc.perfect, deductions: game.wageDeductions, mult: inventory.wageMultiplier });
       game.wageDeductions = 0;
       game.shiftPay += wage.pay;
+      // Detalle por estación para el informe de turno
+      stats.log.push({ name: data.station.name, delay: data.delay, stop: Math.abs(stop), perfect: sc.perfect, points: sc.gained, pay: wage.pay });
       if (wage.pay > 0) { bank.deposit(wage.pay, `Sueldo · ${data.station.name}`, { wage: true }); hud.setBank(bank); hud.moneyFloat(wage.pay); }
       const discount = wage.discount ? ` (−${formatCLP(wage.discount)} por faltas)` : "";
       hud.showMessage(`${data.station.name} · parada ${gradeStop(stop)} · llegada ${formatDelay(data.delay)} (${p.text}) · +${sc.gained} pts${streak} · sueldo +${formatCLP(wage.pay)}${discount}`, p.cls === "ontime" ? "ok" : "warn", 5000);
@@ -911,8 +913,6 @@ function showDriverSummary({ early = false } = {}) {
   const prevBest = sc.best?.total ?? 0;
   const record = sc.finish();
   const w = CONFIG.schedule.punctualWindow;
-  const punctual = s.arrivals.filter(d => Math.abs(d) <= w).length;
-  const avgStop = s.stops.length ? s.stops.reduce((a, b) => a + b, 0) / s.stops.length : 0;
   // Bono solo si se sirvió al menos la mitad de la línea (no vale empezar a mitad de camino)
   const minStations = Math.ceil((STATIONS.length - 1) / 2);
   const bonusOk = s.arrivals.length >= minStations;
@@ -920,36 +920,34 @@ function showDriverSummary({ early = false } = {}) {
   if (bonus) { bank.deposit(bonus, `Bono de servicio ${game.player.trip.id} (nota ${sc.grade()})`, { wage: true }); hud.setBank(bank); hud.moneyFloat(bonus); }
   const sim = game.player.sim;
   const where = sim.dockedStation()?.name ?? (sim.nextStation() ? `Antes de ${spokenName(sim.nextStation().name)}` : spokenName(game.player.route.last.name));
-  hud.showSummary({
-    kicker: early ? `TURNO FINALIZADO · SERVICIO ${game.player.trip.id}` : `SERVICIO ${game.player.trip.id} COMPLETADO`,
+  const audio = game.audio;
+  hud.showShiftReport({
+    kicker: early ? `Turno finalizado · servicio ${game.player.trip.id}` : `Servicio ${game.player.trip.id} completado`,
     title: early ? (sim.dockedStation() ? spokenName(where) : where) : spokenName(game.player.route.last.name),
-    rows: [
-      ["Estaciones servidas", `${s.arrivals.length} / ${STATIONS.length - 1}`],
-      ["Llegadas puntuales (±30 s)", `${punctual} / ${s.arrivals.length}`],
-      ["Retraso final", formatDelay(s.arrivals.at(-1) ?? 0)],
-      ["Precisión media de parada", `${avgStop.toFixed(2)} m`],
-      ["Señales rebasadas en rojo", String(s.redSignals)],
-      ["Excesos de velocidad", String(s.overspeeds)],
-      ["Frenos de emergencia", String(s.emergencies)],
-      ["Tirones / paradas bruscas", `${sc.totalJerks} / ${sc.harshStops}`],
-      ["Estaciones perfectas · mejor racha", `${sc.perfects} · ${sc.bestStreak}`],
-      ["PUNTAJE", `${sc.total} pts · nota ${sc.grade()}`],
-      [record ? "★ ¡NUEVO RÉCORD!" : "Récord de este servicio", record ? `antes ${prevBest} pts` : `${prevBest} pts`],
-      ["Sueldo por estaciones", formatCLP(game.shiftPay)],
-      bonusOk
-        ? [`Bono de fin de servicio (nota ${sc.grade()})`, formatCLP(bonus)]
-        : [`Bono de fin de servicio (desde ${minStations} estaciones)`, formatCLP(0)],
-      [`Saldo en tu cuenta ${BANK_NAME}`, bank.label],
-    ],
-    ...(early
-      ? { continueLabel: "Nuevo servicio", onContinue: restartGame }
+    line: { id: LINE.id, color: LINE.color },
+    stations: s.log,
+    totalStations: STATIONS.length - 1,
+    punctualWindow: w,
+    score: {
+      total: sc.total, grade: sc.grade(), record, prevBest,
+      perfects: sc.perfects, bestStreak: sc.bestStreak, jerks: sc.totalJerks, harshStops: sc.harshStops,
+    },
+    faults: { redSignals: s.redSignals, overspeeds: s.overspeeds, emergencies: s.emergencies },
+    pay: { stations: game.shiftPay, bonus, bonusOk, minStations, bank: BANK_NAME, balance: bank.label },
+    actions: early
+      ? { continueLabel: "Nuevo servicio", onContinue: restartGame, onMenu: stopGame }
       : {
         continueLabel: "Maniobra de retorno",
         onContinue: () => hud.showMessage("Cierra puertas (D), avanza a la cola de maniobras y detente en el cartel FIN DE MANIOBRA. Luego pulsa T", "info", 9000),
         altLabel: "Reiniciar",
         onAlt: restartGame,
-      }),
-    onMenu: stopGame,
+        onMenu: stopGame,
+      },
+  }, {
+    tick: () => audio.notchClick(),
+    stamp: () => audio.reverserClunk(),
+    record: () => audio.chime(),
+    cash: () => audio.cash(),
   });
 }
 
@@ -980,7 +978,7 @@ function changeCab() {
     game.rig.setTrain(player.group);
     player.group.add(game.trainLights);
     game.lightsUnit = player;
-    game.stats = { arrivals: [], stops: [], redSignals: 0, overspeeds: 0, emergencies: 0 };
+    game.stats = { arrivals: [], stops: [], log: [], redSignals: 0, overspeeds: 0, emergencies: 0 };
     game.score = newScore(other);
     game.shiftEnded = false;                 // empieza un servicio nuevo
     game.lastStop = null;
