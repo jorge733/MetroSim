@@ -37,6 +37,10 @@ Los íconos están en `icons/` (los PNG se generan desde `icons/icon.svg`).
   voz del operador (voz sintetizada); el texto queda en el HUD con 📻.
 - **Cerrar con gente subiendo**: si cierras las puertas mientras aún suben pasajeros, es muy probable que alguien
   obstruya una puerta (se reabre y tienes que volver a cerrar). Espera a que termine el embarque.
+- **Tren de adelante en la DMI**: hasta 3 km, la DMI muestra el tren que va delante en tu vía, la distancia hasta su
+  cola (verde sobre 800 m, ámbar bajo 800 m, rojo bajo 300 m), una barra que se llena al acercarte y qué está haciendo
+  (circulando a tal velocidad, aproximándose, en estación, detenido en vía, sin pasajeros). En los últimos metros antes
+  de una estación ese espacio lo ocupa la marca de parada.
 - Botones táctiles **📯 Bocina** y **✋ Vigilancia** (la columna del conductor pasa a dos columnas).
 - Código: `js/roles/driverSafety.js` (vigilancia, ATP y PCC, personal en la vía); el bloqueo de tracción y la marcha
   a la vista viven en la simulación del tren (`js/engine/sim.js`).

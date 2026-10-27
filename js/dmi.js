@@ -160,6 +160,22 @@ export class CabDisplay {
       g.fillText(`MARCA: ${formatStopError(info.approach.error)}`, sx, sy + 34);
     }
 
+    // Tren de adelante (cuando no se muestra la marca de parada): distancia a su cola, barra y estado
+    if (!info.approach && info.ahead) {
+      const a = info.ahead, sy = 215;
+      const color = a.gap < 300 ? "#ff4b4b" : a.gap < 800 ? "#ffb000" : "#6fe39a";
+      g.textAlign = "left"; g.fillStyle = "#8b9bab"; g.font = "600 13px Arial";
+      g.fillText(`TREN ADELANTE · ${a.id}`, x0, sy + 6);
+      g.textAlign = "right"; g.fillStyle = color; g.font = "800 18px Arial";
+      g.fillText(`${a.gap < 1000 ? Math.round(a.gap) + " m" : (a.gap / 1000).toFixed(1).replace(".", ",") + " km"}`, x0 + w, sy + 6);
+      // Barra: llena = tren encima, vacía = a 3 km o más
+      g.fillStyle = "#1a242e"; g.fillRect(x0, sy + 18, w, 10);
+      g.fillStyle = color; g.fillRect(x0, sy + 18, w * clamp(1 - a.gap / 3000, 0.03, 1), 10);
+      g.textAlign = "left"; g.fillStyle = a.stopped ? "#ffd166" : "#cfe0f1"; g.font = "600 13px Arial";
+      const st = a.status.toUpperCase() + (a.outOfService ? " · SIN PASAJEROS" : "");
+      g.fillText(st.length > 36 ? st.slice(0, 35) + "…" : st, x0, sy + 42);
+    }
+
     // Horario
     if (info.schedule) {
       g.fillStyle = "#8b9bab"; g.font = "600 13px Arial"; g.textAlign = "left";

@@ -83,6 +83,7 @@ import { CarInfoPanel } from "./render/carInfoPanel.js";
 import { carAt, carLoads, CAR_CAPACITY } from "./engine/passengers.js";
 import { DriverRole } from "./roles/driverRole.js";
 import { DriverSafety } from "./roles/driverSafety.js";
+import { TRAIN_STATES } from "./engine/state.js";
 import { ControlCenter } from "./control/controlCenter.js";
 import { TouchControls, wantsTouch } from "./touch.js";
 import { World } from "./world.js";
@@ -1561,7 +1562,31 @@ function getRouteInfo(unit) {
     approach,
     limit: sim.currentLimit(),
     signal, schedule,
+    ahead: trainAhead(unit),
   };
+}
+
+/** Distancia (m) hasta la que la DMI muestra el tren de adelante. */
+const AHEAD_RANGE = 3000;
+
+/**
+ * Tren de adelante en la misma vía (para la DMI): distancia desde tu testero
+ * hasta su cola, su velocidad y qué está haciendo (estado del motor, state.js).
+ */
+function trainAhead(unit) {
+  const pos = unit.sim.position, L = CONFIG.train.length;
+  let best = null, gap = Infinity;
+  for (const u of game.traffic.units) {
+    if (u === unit || u.route !== unit.route || u.sim.position >= pos) continue;   // la ruta avanza hacia −Z
+    const g = pos - (u.sim.position + L);
+    if (g < gap) { gap = g; best = u; }
+  }
+  if (!best || gap > AHEAD_RANGE) return null;
+  const docked = best.sim.isStopped ? best.sim.dockedStation() : null;
+  let status = TRAIN_STATES[best.state] || "circulando";
+  if (docked && (best.state === "dwell" || best.state === "closing" || best.state === "ready" || best.state === "regulating" || best.state === "held")) status = `${status} · ${docked.short}`;
+  else if (!best.sim.isStopped) status = `${status} · ${Math.round(best.sim.speedKmh)} km/h`;
+  return { id: best.id, gap: Math.max(0, gap), stopped: best.sim.isStopped, status, outOfService: !!best.ato?.outOfService };
 }
 
 function delayStyle(d) {
