@@ -6,6 +6,7 @@
    ========================================================================== */
 
 import { formatCLP } from "./config.js";
+import { icon } from "./icons.js";
 import { LINES } from "./engine/network.js";
 import { LICENSES, LIVERIES, CONTRACTS, HOME, FURNITURE, SOUVENIR_PRICE, ALBUM_REWARD, souvenirId } from "./shop.js";
 
@@ -31,14 +32,14 @@ export function openShopUI(o) {
   root.innerHTML = `
     <div class="shop-card" role="dialog" aria-label="Tienda Metro">
       <header class="shop-head">
-        <div><p class="shop-kicker">Gasta lo que ganas como conductor</p><h2>🛒 Tienda Metro</h2></div>
+        <div><p class="shop-kicker">Gasta lo que ganas como conductor</p><h2>${icon("bag")} Tienda Metro</h2></div>
         <div class="shop-balance"><span>Tu cuenta</span><b></b></div>
-        <button class="shop-close" aria-label="Cerrar">✕</button>
+        <button class="shop-close" aria-label="Cerrar">${icon("close")}</button>
       </header>
       <nav class="shop-tabs">
-        <button data-tab="driver">🚇 Conductor</button>
-        <button data-tab="home">🏠 Mi depto</button>
-        <button data-tab="album">🎟️ Colección</button>
+        <button data-tab="driver">${icon("train")} Conductor</button>
+        <button data-tab="home">${icon("home")} Mi depto</button>
+        <button data-tab="album">${icon("ticket")} Colección</button>
       </nav>
       <p class="shop-notice hidden"></p>
       <div class="shop-body"></div>
