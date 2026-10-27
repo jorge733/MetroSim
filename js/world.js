@@ -246,7 +246,18 @@ export class World {
     const bounds = [WORLD.start];
     STATIONS.forEach(s => bounds.push(s.z + S.hallZ1, s.z + S.hallZ0));
     bounds.push(WORLD.end);
-    for (let i = 0; i < bounds.length; i += 2) buildTunnelSegment(this.scene, this.M, bounds[i], bounds[i + 1]);
+    this.tunnelLamps = [];                 // luminarias del túnel { x, y, z } (para la luz que barre el coche)
+    for (let i = 0; i < bounds.length; i += 2) buildTunnelSegment(this.scene, this.M, bounds[i], bounds[i + 1], this.tunnelLamps);
+    this.tunnelLamps.sort((a, b) => a.z - b.z);
+  }
+
+  /** Luminaria del túnel más cercana a una coordenada z del mundo (o null). */
+  tunnelLampNear(z) {
+    const L = this.tunnelLamps;
+    if (!L.length) return null;
+    let lo = 0, hi = L.length - 1;
+    while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (L[mid].z < z) lo = mid; else hi = mid; }
+    return Math.abs(L[lo].z - z) < Math.abs(L[hi].z - z) ? L[lo] : L[hi];
   }
 
   /** Visibilidad por distancia, pool de luces y escaleras mecánicas en marcha. */
@@ -371,7 +382,7 @@ function instancedChunks(scene, geo, mat, zStart, zEnd, spacing, matrixAt, chunk
 }
 
 /** Tramo de túnel de doble vía entre zA (mayor) y zB (menor). */
-function buildTunnelSegment(scene, M, zA, zB) {
+function buildTunnelSegment(scene, M, zA, zB, lampList = []) {
   const T = CONFIG.tunnel;
   const len = zA - zB, mid = (zA + zB) / 2;
   if (len <= 0) return;
@@ -408,6 +419,7 @@ function buildTunnelSegment(scene, M, zA, zB) {
     const z = zA - spacing / 2 - i * spacing, s = i % 2 ? 1 : -1;
     m.makeTranslation(s * 5.0, 3.6, z); housings.setMatrixAt(i, m);
     m.makeTranslation(s * 4.93, 3.6, z); lamps.setMatrixAt(i, m);
+    lampList.push({ x: s * 4.85, y: 3.6, z });
   }
   scene.add(housings, lamps);
 
@@ -928,7 +940,7 @@ function buildTrackEnds(scene, M) {
 function drawPid(pid, st, clock, arrivals) {
   const route = pid.route;
   const terminal = route.stationOf(st) === route.last;
-  const lines = arrivals.slice(0, 2).map(a => a.here ? "EN ANDÉN" : a.minutes < 1 ? "LLEGANDO" : `${a.minutes} min`);
+  const lines = arrivals.slice(0, 2).map(a => a.noPax ? "NO SUBIR" : a.here ? "EN ANDÉN" : a.minutes < 1 ? "LLEGANDO" : `${a.minutes} min`);
   const key = `${Math.floor(clock / 30)}|${lines.join("|")}`;
   if (key === pid.lastKey) return;
   pid.lastKey = key;
@@ -953,6 +965,7 @@ function drawPid(pid, st, clock, arrivals) {
       g.font = "700 24px monospace";
       g.fillText(route.last.short.replace(".", ""), 64, y);
       g.font = "700 30px monospace";
+      if (lines[i] === "NO SUBIR") g.fillStyle = "#ff4d4d";       // tren que se retira del servicio
       g.textAlign = "right"; g.fillText(lines[i] ?? "--", W - 14, y);
     });
   }

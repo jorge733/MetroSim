@@ -16,6 +16,14 @@
    Cerca de la cámara son personas 3D articuladas (caminan, suben escaleras,
    se sientan, se agarran a la barra...); lejos no se dibuja nadie.
 
+   1.3 · "Permite bajar antes de subir": cuando el tren abre, quienes van a
+   subir se ponen a los COSTADOS de la puerta y esperan a que bajen los que
+   salen por ella; recién entonces entran. Al acercarse el tren, la gente
+   que espera de pie se arrima al borde del andén. Cada coche se llena según
+   su parte de la carga (engine/passengers.js · carShares): más gente en los
+   coches junto a la escalera. Si el tren se retira del servicio bajan todos,
+   y quien no llegaba a esa estación se queda esperando el siguiente.
+
    Sin atravesar objetos: en el andén caminan por el pasillo libre entre la
    línea amarilla y las columnas (stationLayout.js) y solo se apartan de él
    en perpendicular para ir a un banco, a la escalera o a una puerta.
@@ -30,12 +38,20 @@ import * as THREE from "three";
 import { CONFIG, STATIONS, demandAt } from "./config.js";
 import { routeForSide } from "./engine/route.js";
 import { TRAIN_LAYOUT } from "./engine/consist.js";
+import { carShares } from "./engine/passengers.js";
 import { clamp } from "./utils.js";
 import { PLATFORM_BENCHES, PLATFORM_LANE_X, BENCH_X, isArrivalOnly } from "./stationLayout.js";
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const randInt = (a, b) => Math.floor(rand(a, b + 1));
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+/** Elige un elemento con probabilidad proporcional a su peso. */
+const pickWeighted = (arr, weight) => {
+  const total = arr.reduce((a, x) => a + weight(x), 0);
+  let r = Math.random() * total;
+  for (const x of arr) { r -= weight(x); if (r <= 0) return x; }
+  return arr.at(-1);
+};
 const wrapAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const S = CONFIG.station, MZ = CONFIG.mezzanine, F = CONFIG.train.floorY;
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -376,8 +392,10 @@ export class PeopleSystem {
       const free = this.stations[st.index].benches[side].filter(b => !b.occupant);
       if (free.length) return pick(free);
     }
-    // (la mayoría espera cerca de las escaleras y el centro; algunos se reparten por los 125 m)
-    const z = Math.random() < 0.7 ? st.z + rand(-55, 15) : st.z + rand(S.platformZ0 + 1, S.platformZ1 - 2);
+    // La mayoría se queda cerca del pie de la escalera (por donde llega); algunos se reparten por los 125 m
+    const gauss = (Math.random() + Math.random() + Math.random() - 1.5) * 2;
+    const dz = Math.random() < 0.7 ? MZ.stairZ0 + 4 - Math.abs(gauss) * 30 : rand(S.platformZ0 + 1, S.platformZ1 - 2);
+    const z = st.z + clamp(dz, S.platformZ0 + 1, S.platformZ1 - 2);
     return { side, bench: false, pos: V(side * rand(4.3, 5.4), S.platformTop, z) };
   }
 
@@ -447,11 +465,13 @@ export class PeopleSystem {
     if (p.spot.bench) this.sitAt(p, p.spot.pos, p.spot.seatY);
   }
 
+  /** Plaza libre del tren; el coche se elige según su parte de la carga (más gente junto a la escalera). */
   freeSlot(unit, preferSeat) {
     const free = unit.slots.filter(s => !s.occupant);
     if (!free.length) return null;
     const seats = free.filter(s => s.type === "seat");
-    return preferSeat && seats.length ? pick(seats) : pick(free);
+    const shares = carShares(unit.route.side);
+    return pickWeighted(preferSeat && seats.length ? seats : free, s => shares[s.car]);
   }
 
   /** Viajero colocado directamente en una plaza (sin animación). */
@@ -540,9 +560,15 @@ export class PeopleSystem {
     p.state = "toDoor";
     p.unit = unit;
     p.root.position.y = S.platformTop;
+    // Al costado de la puerta (del lado por el que llega), esperando a que bajen los que salen
+    const flankSide = Math.sign(p.root.position.z - doorWorld.z) || (Math.random() < 0.5 ? 1 : -1);
+    const flank = V(side * rand(3.75, 4.25), S.platformTop, doorWorld.z + flankSide * rand(1.0, 1.7));
+    const hold = flank.clone(), since = this.time;          // (punto repetido con espera, como en el ascensor)
+    hold.wait = () => !this.traffic.units.includes(unit) || unit.sim.doorState !== "open"
+      || (this.time - since > 0.8 && !this.alightingAt(unit, doorLocal) && (!(unit.pax?.toAlight >= 0.5) || this.time - since > 7));
     this.walk(p, [
       ...(fromBench ? [lane(side, p.root.position.z)] : []),
-      V(side * rand(3.95, 4.4), S.platformTop, doorWorld.z + rand(-0.6, 0.6)),
+      flank, hold,
       V(side * 3.7, S.platformTop, doorWorld.z + rand(-0.25, 0.25)),
     ], () => {
       if (unit.sim.doorState !== "open" || !this.traffic.units.includes(unit)) return this.abortBoarding(p);
@@ -554,6 +580,16 @@ export class PeopleSystem {
       p.state = "boarding";
       this.walk(p, [V(0.7, F, doorLocal), p.slot.approach], () => this.settleInSlot(p));
     });
+  }
+
+  /** ¿Alguien está bajando (o por bajar) por esta puerta del tren? */
+  alightingAt(unit, doorLocal) {
+    for (const q of this.people) {
+      if (q.unit !== unit || q.space !== "train") continue;
+      const leaving = q.state === "alighting" || (q.pending?.type === "alight" && q.pending.unit === unit);
+      if (leaving && this.nearestDoor(q.slot ? q.slot.pos.z : q.root.position.z) === doorLocal) return true;
+    }
+    return false;
   }
 
   abortBoarding(p) {
@@ -571,6 +607,7 @@ export class PeopleSystem {
   /* ----- Bajada ----- */
   startAlighting(p, station) {
     const unit = p.unit;
+    const evacuated = !!unit.ato?.evacuating;
     const slot = p.slot;
     const doorLocal = this.nearestDoor(slot ? slot.pos.z : p.root.position.z);
     if (slot) {
@@ -591,6 +628,15 @@ export class PeopleSystem {
       p.root.position.y = S.platformTop;
       p.station = station;
       p.side = side;
+      if (evacuated && p.dest !== station.index) {
+        // El tren se retira del servicio: espera el siguiente en el andén
+        const spot = this.waitingSpot(station, side);
+        if (spot.bench) spot.occupant = p;
+        p.spot = spot;
+        p.state = "arriving";
+        const pts = spot.bench ? [lane(side, p.root.position.z), lane(side, spot.pos.z), spot.pos] : [lane(side, p.root.position.z), spot.pos];
+        return this.walk(p, pts, () => this.settleWaiting(p));
+      }
       p.state = "leaving";
       this.walk(p, pathToStreet(station, side, p.root.position, this.liftFor(station, side, false)), () => this.remove(p));
     });
@@ -718,17 +764,32 @@ export class PeopleSystem {
       }
       if (!u.materialized) continue;
       u.exchangeIdx = rs.index;
-      const terminal = rs === u.route.last;
+      const ends = rs === u.route.last || !!u.ato?.evacuating;      // terminal o retiro del servicio: bajan todos
       for (const p of this.people) {
         if (p.pending) continue;
-        if (p.space === "train" && p.unit === u && p.state === "onboard" && (p.dest === st.index || terminal)) {
-          p.pending = { type: "alight", t: rand(0, 2.5), station: st, unit: u };
-        } else if (p.state === "waiting" && p.station === st && p.side === u.route.side && p.dest !== null && !terminal) {
+        if (p.space === "train" && p.unit === u && p.state === "onboard" && (p.dest === st.index || ends)) {
+          p.pending = { type: "alight", t: rand(0, ends ? 4 : 2.5), station: st, unit: u };
+        } else if (p.state === "waiting" && p.station === st && p.side === u.route.side && p.dest !== null && !ends) {
           const slot = this.freeSlot(u, Math.random() < 0.7);
           if (!slot) continue;
           slot.occupant = p; p.slot = slot;
-          p.pending = { type: "board", t: rand(1.2, 4), unit: u };
+          p.pending = { type: "board", t: rand(0.1, 1.6), unit: u };      // van a la puerta y esperan al costado
         }
+      }
+    }
+
+    // 3b. Llega un tren: quienes esperan de pie se arriman al borde del andén
+    for (const u of units) {
+      if (u.state !== "approaching" || u.ato?.outOfService) continue;
+      const next = u.sim.nextStation();
+      const ss = next && this.stations[next.world.index];
+      if (!ss?.materialized || next === u.route.last || u.gatheredAt === next.index) continue;
+      u.gatheredAt = next.index;
+      for (const p of this.people) {
+        if (p.state !== "waiting" || p.station !== ss.st || p.side !== u.route.side || p.spot?.bench || p.path.length || Math.random() < 0.3) continue;
+        const to = V(p.side * rand(3.9, 4.35), S.platformTop, p.root.position.z + rand(-1.5, 1.5));
+        p.state = "arriving";
+        this.walk(p, [to], () => this.settleWaiting(p));
       }
     }
 

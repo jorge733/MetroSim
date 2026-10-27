@@ -16,9 +16,17 @@
    Controles (solo teclado, como una persona de verdad): W / ↑ caminar
    hacia adelante · S / ↓ retroceder despacio · A D / ← → girar · Shift
    correr · Re Pág / Av Pág mirar arriba / abajo (la mirada vuelve sola al
-   frente al caminar) · F sentarse · E interactuar.
+   frente al caminar) · F sentarse · G agarrarse de una barra · E interactuar.
    El cuerpo tiene inercia: acelera y frena de a poco, gira con suavidad,
    la cabeza se balancea con cada paso y se oyen los pasos (evento "step").
+
+   1.3 · A bordo de pie: si no te agarras (G), los arranques y frenadas te
+   empujan, puedes trastabillar y chocar con otros viajeros; agarrado casi
+   no te mueves (caminar te suelta). En un coche muy lleno se camina más
+   lento y, si alguien te tapa el paso, te abres paso de a poco ("con
+   permiso"). Cada coche tiene su carga (engine/passengers.js · carLoads):
+   si el de tu puerta va lleno no cabes y conviene probar otra puerta. Un
+   tren que se retira del servicio no admite pasajeros.
 
    Choques: no se atraviesan columnas, bancos ni a los demás viajeros
    (stationLayout.js y el sistema de viajeros).
@@ -38,6 +46,7 @@ import * as THREE from "three";
 import { CONFIG, STATIONS } from "./config.js";
 import { ROUTES, ROUTE_A, ROUTE_B, routeForSide } from "./engine/route.js";
 import { TRAIN_LAYOUT, STOCK } from "./engine/consist.js";
+import { carAt, carLoads, CAR_CAPACITY } from "./engine/passengers.js";
 import { clamp } from "./utils.js";
 import { platformSolidAt, isArrivalOnly } from "./stationLayout.js";
 import { Elevator, inElevatorShaft } from "./elevators.js";
@@ -48,6 +57,9 @@ const WALK = 1.4, RUN = 3.2, BACK = 0.75;        // m/s: caminar, correr, retroc
 const ACCEL = 2.2, DECEL = 4.5;                   // m/s²: arrancar / detenerse
 const TURN = 1.7, TURN_RUN = 1.25;                // rad/s de giro (corriendo se gira más abierto)
 const LOOK = 0.9;                                 // rad/s al mirar arriba / abajo
+const PUSH = 0.3;                                 // m/s² de cambio brusco desde los que empuja al que va de pie sin agarrarse
+const STUMBLE = 0.6;                              // m/s² de cambio brusco: trastabillas
+const BRACE = 1.2;                                // 1/s: rapidez con que el cuerpo se afirma ante una aceleración pareja
 const S = CONFIG.station, MZ = CONFIG.mezzanine, F = CONFIG.train.floorY, EV = CONFIG.elevator;
 const EV_ZC = (EV.z0 + EV.z1) / 2, LEVEL_Y = [S.platformTop, MZ.y];
 /** dz de la boca del acceso (vereda): ahí el pasajero pasa de la estación a la calle, caminando. */
@@ -83,7 +95,15 @@ export class Walker {
     this.fullT = 0;          // aviso de tren lleno (no se repite en cada fotograma)
     this.obstructT = 0;      // aviso de puerta obstruida
     this.lean = 0;           // inercia a bordo: aceleración del tren suavizada (m/s²)
+    this.brace = 0;          // aceleración a la que el cuerpo ya se afirmó (m/s²)
     this.rideT = 0;          // fase de la vibración de marcha
+    this.holding = false;    // agarrado de una barra (a bordo, de pie)
+    this.jolt = 0;           // sacudida de la cámara al trastabillar o chocar
+    this.stumbleT = 0;       // no se repite el traspié en cada fotograma
+    this.tipT = 0;           // consejo de agarrarse (cada tanto)
+    this.bumpT = 0;          // aviso de choque con otro viajero
+    this.squeezeT = 0;       // tiempo empujando contra la gente (abrirse paso)
+    this.squeezeMsgT = 0;
     this.keys = new Set();
     this.holder = new THREE.Object3D();
     this.holder.add(camera);
@@ -146,6 +166,7 @@ export class Walker {
     this.keys.add(key);
     if (key === "f") return this.toggleSeat();
     if (key === "e") return this.interact();
+    if (key === "g") return this.toggleHold();
     return null;
   }
   keyUp(key) { this.keys.delete(key); }
@@ -343,10 +364,11 @@ export class Walker {
   }
 
   sitInTrain() {
-    // Con más viajeros que asientos (los cuenta el motor), todos están ocupados
-    const seats = this.unit.slots.filter(s => s.type === "seat").length;
-    const load = Math.round(this.unit.load || 0);
-    if (load >= seats) return { text: `No hay asientos libres: van ${load} personas y el tren tiene ${seats} asientos · agárrate de una barra`, level: "info" };
+    // Con más viajeros que asientos en este coche (los cuenta el motor), todos están ocupados
+    const car = carAt(this.pos.z);
+    const seats = this.unit.slots.filter(s => s.type === "seat" && s.car === car).length;
+    const load = Math.round(carLoads(this.unit)[car]);
+    if (load >= seats) return { text: `No hay asientos libres: en el coche ${car + 1} van ${load} personas y tiene ${seats} asientos · G agárrate de una barra`, level: "info" };
     const free = this.unit.slots
       .filter(s => s.type === "seat" && !s.occupant)
       .map(s => ({ s, d: Math.hypot(s.approach.x - this.pos.x, s.approach.z - this.pos.z) }))
@@ -354,6 +376,7 @@ export class Walker {
     if (!free || free.d > 1.2) return { text: "No hay ningún asiento libre a tu lado", level: "info" };
     const slot = free.s;
     slot.occupant = "player";
+    this.holding = false;
     this.seat = { place: slot, seatY: slot.seatY, stand: slot.approach.clone() };
     this.pos.set(slot.pos.x * 0.95, F, slot.pos.z);
     this.yaw = slot.yaw + Math.PI;
@@ -377,6 +400,18 @@ export class Walker {
     this.yaw = side > 0 ? Math.PI / 2 : -Math.PI / 2;           // mirando a la vía
     this.pitch = -0.05;
     return { text: "Te sientas en el banco · F para levantarte cuando llegue el tren", level: "ok" };
+  }
+
+  /** G: agarrarse de una barra o del pasamanos (a bordo y de pie) o soltarse. */
+  toggleHold() {
+    if (this.holding) { this.holding = false; return { text: "Te sueltas de la barra", level: "info" }; }
+    if (this.space !== "train") return { text: "Las barras para agarrarse están dentro del tren", level: "info" };
+    if (this.seat) return { text: "Vas sentado: no necesitas agarrarte", level: "info" };
+    if (TRAIN_LAYOUT.gangways.some(([g0, g1]) => this.pos.z > g0 - 0.3 && this.pos.z < g1 + 0.3)) {
+      return { text: "En el fuelle entre coches no hay barras: avanza un poco", level: "info" };
+    }
+    this.holding = true;
+    return { text: "Te agarras de la barra · caminar o G para soltarte", level: "ok" };
   }
 
   leaveSeat() {
@@ -441,17 +476,23 @@ export class Walker {
     this.space = "train";
     this.unit = unit;
     unit.group.add(this.holder);
+    this.holding = false;
+    this.brace = this.lean = unit.sim.netAccel || 0;
     this.onEvent("boarded", { unit });
   }
 
-  exitTrain() {
+  /** @param {boolean} [forced]  todos deben bajar (terminal, retiro del servicio): queda en el andén, fuera del vano */
+  exitTrain(forced = false) {
+    this.leaveSeat();                    // (si iba sentado, se levanta antes de bajar)
     const unit = this.unit;
     unit.group.updateMatrixWorld(true);
     unit.group.localToWorld(this.pos);
     this.pos.y = S.platformTop;
+    if (forced) { this.pos.x = unit.route.side * (S.platformEdgeX + 0.9); this.obstructT = 6; }
     this.yaw += unit.group.rotation.y;
     this.space = "world";
     this.unit = null;
+    this.holding = false;
     this.scene.add(this.holder);
     this.onEvent("alighted", { unit, station: this.stationAt(this.pos.z) });
   }
@@ -467,16 +508,20 @@ export class Walker {
     const blocked = this.obstructT <= 0 ? this.doorwayClosing() : null;
     if (blocked) { this.obstructT = 6; this.onEvent("doorObstructed", { unit: blocked }); }
 
+    this.stumbleT = Math.max(0, this.stumbleT - dt);
+    this.tipT = Math.max(0, this.tipT - dt);
+    this.bumpT = Math.max(0, this.bumpT - dt);
+    this.squeezeMsgT = Math.max(0, this.squeezeMsgT - dt);
+    this.jolt *= Math.max(0, 1 - dt * 3);
+
     // A bordo: inercia (te vas hacia atrás al acelerar y hacia adelante al frenar) y vibración
     if (this.space === "train") {
       const sim = this.unit.sim;
       this.lean += (sim.netAccel - this.lean) * Math.min(1, dt * 4);
+      this.brace += (sim.netAccel - this.brace) * Math.min(1, dt * (this.seat || this.holding ? 4 : BRACE));
       this.rideT += dt * (2 + sim.speed * 0.9);
-      // De pie, una frenada o un arranque fuerte te hace dar un paso (hacia adelante al frenar)
-      if (!this.seat && Math.abs(sim.netAccel) > 1.0 && dt > 0) {
-        const nz = this.pos.z + Math.sign(sim.netAccel) * 0.9 * dt;
-        if (this.trainWalkable(this.pos.x, nz)) this.pos.z = nz;
-      }
+      if (this.holding && this.moveKeys()) { this.holding = false; this.onEvent("notice", { text: "Te sueltas de la barra", level: "info" }); }
+      if (!this.seat && !this.holding && dt > 0) this.inertia(sim, dt);
     } else this.lean *= Math.max(0, 1 - dt * 4);
 
     if (!this.seat && dt > 0 && !this.frozen) this.move(dt);
@@ -547,10 +592,14 @@ export class Walker {
     if (this.space === "world" && Math.abs(this.pos.y - S.platformTop) < 0.3 && Math.abs(this.pos.x) < S.trackX + 1.42) {
       const st = this.stationAt(this.pos.z);
       const u = st && this.openUnit(st, Math.sign(this.pos.x));
-      if (u && (u.load || 0) >= STOCK.capacity - 4) {
-        // Tren lleno (6 personas/m²): no cabes, te quedas en el andén
+      const door = u ? this.traffic.doorAtWorldZ(u, this.pos.z, 1.0) : null;
+      const car = door === null ? 0 : carAt(door);
+      const closed = u && (u.ato?.outOfService || u.ato?.evacuating);
+      const full = u && ((u.load || 0) >= STOCK.capacity - 4 || carLoads(u)[car] >= CAR_CAPACITY - 1);
+      if (closed || full) {
+        // Tren lleno (6 personas/m²) en tu coche, o tren que se retira del servicio: te quedas en el andén
         this.pos.x = Math.sign(this.pos.x || 1) * (S.trackX + 1.6);
-        if (this.fullT <= 0) { this.fullT = 4; this.onEvent("trainFull", { unit: u }); }
+        if (this.fullT <= 0) { this.fullT = 4; this.onEvent(closed ? "noBoarding" : "trainFull", { unit: u, car }); }
       } else if (u) this.enterTrain(u);
     } else if (this.space === "train" && this.pos.x > 1.45) {
       this.exitTrain();
@@ -575,6 +624,49 @@ export class Walker {
     this.updateCamera();
   }
 
+  /** ¿Se está pulsando caminar o retroceder? */
+  moveKeys() {
+    const k = this.keys;
+    return k.has("w") || k.has("arrowup") || k.has("s") || k.has("arrowdown");
+  }
+
+  /**
+   * De pie y sin agarrarse: los CAMBIOS de aceleración del tren te empujan a
+   * lo largo del coche (hacia adelante al frenar; ante una aceleración pareja
+   * el cuerpo se afirma). Un cambio brusco (el tirón del arranque, el golpe
+   * final al detenerse, una frenada fuerte) te hace trastabillar, y si hay
+   * alguien en el camino chocas con él.
+   */
+  inertia(sim, dt) {
+    const a = sim.netAccel - this.brace, g = Math.abs(a);
+    if (g < PUSH) return;
+    const dz = Math.sign(a) * (g - PUSH * 0.8) * 1.4 * dt;          // en ejes del tren la cabeza está en −Z
+    const nz = this.pos.z + dz;
+    const crowd = this.isCrowded(this.pos.x, F, nz, this.pos.x, this.pos.z, this.unit);
+    if (!crowd && this.trainWalkable(this.pos.x, nz)) this.pos.z = nz;
+    if (g >= STUMBLE && this.stumbleT <= 0) {
+      this.stumbleT = 2.5;
+      this.jolt = Math.min(1.5, 0.6 + (g - STUMBLE) * 1.2);
+      this.onEvent("stumble", { braking: a < 0, bump: crowd });
+      if (crowd && this.bumpT <= 0) {
+        this.bumpT = 12;
+        this.onEvent("notice", { text: "Chocas con otro pasajero: «¡Perdón!» · G agárrate de una barra", level: "warn" });
+      } else if (this.tipT <= 0) {
+        this.tipT = 60;
+        const what = a < 0 ? "¡Casi te caes con la frenada!"
+          : this.brace < -0.3 ? "El tirón final al detenerse te hace trastabillar"
+          : "El arranque te hace trastabillar";
+        this.onEvent("notice", { text: `${what} · G agárrate de una barra`, level: "warn" });
+      }
+    }
+  }
+
+  /** Ocupación (0…1+) del coche en el que vas: viajeros / capacidad a 6 p/m². */
+  carCrowd() {
+    if (this.space !== "train") return 0;
+    return carLoads(this.unit)[carAt(this.pos.z)] / CAR_CAPACITY;
+  }
+
   updateCamera() {
     this.holder.position.copy(this.pos);
     if (this.seat) this.holder.position.y = this.seat.seatY - 0.62;
@@ -584,7 +676,7 @@ export class Walker {
     const side = Math.cos(this.stepPhase || 0) * 0.025 * amp;
     // A bordo: el cuerpo se va hacia atrás al acelerar y hacia adelante al frenar (en ejes
     // del tren, la cabeza está en −Z), y el coche vibra más cuanto más rápido va
-    let lz = 0, ly = 0, roll = 0, nod = 0;
+    let lz = 0, ly = 0, roll = 0, nod = 0;     // (lz y nod se atenúan si vas agarrado)
     if (this.space === "train") {
       const k = this.seat ? 0.025 : 0.08, v = Math.min(1, this.unit.sim.speed / 22);
       lz = clamp(this.lean, -1.4, 1.4) * k;
@@ -592,8 +684,12 @@ export class Walker {
       ly = (Math.sin(this.rideT * 2.3) * 0.6 + Math.sin(this.rideT * 5.1) * 0.4) * 0.006 * v;
       roll = Math.sin(this.rideT * 1.7) * 0.006 * v;
     }
-    this.camera.position.set(side * Math.cos(this.yaw), EYE - 0.02 * amp + bob + ly, -side * Math.sin(this.yaw) + lz);
-    this.camera.rotation.set(this.pitch + nod, this.yaw, (this.sway || 0) + side * 0.15 + roll);
+    if (this.space === "train" && this.holding) { lz *= 0.3; nod *= 0.3; }          // agarrado casi no te mueves
+    // Traspié o choque: sacudida breve de la cabeza
+    const j = this.jolt, t = this.rideT * 7;
+    const jy = j * Math.sin(t * 1.3) * 0.03, jp = j * Math.sin(t) * 0.05, jr = j * Math.sin(t * 0.7 + 1) * 0.06;
+    this.camera.position.set(side * Math.cos(this.yaw), EYE - 0.02 * amp + bob + ly + jy, -side * Math.sin(this.yaw) + lz);
+    this.camera.rotation.set(this.pitch + nod + jp, this.yaw, (this.sway || 0) + side * 0.15 + roll + jr);
   }
 
   move(dt) {
@@ -605,8 +701,9 @@ export class Walker {
     if (k.has("a") || k.has("arrowleft")) turn += 1;
     const running = k.has("shift") && f > 0;
 
-    // Velocidad con inercia: acelera y frena de a poco
-    const target = f > 0 ? (running ? RUN : WALK) : f < 0 ? -BACK : 0;
+    // Velocidad con inercia: acelera y frena de a poco (en un coche muy lleno se avanza más lento)
+    const packed = clamp((this.carCrowd() - 0.35) / 0.6, 0, 1);
+    const target = (f > 0 ? (running ? RUN : WALK) : f < 0 ? -BACK : 0) * (1 - 0.6 * packed);
     const rate = Math.abs(target) > Math.abs(this.speed) && Math.sign(target || 1) === Math.sign(this.speed || target || 1) ? ACCEL : DECEL;
     this.speed += Math.max(-rate * dt, Math.min(rate * dt, target - this.speed));
     if (Math.abs(this.speed) < 0.02 && !target) this.speed = 0;
@@ -643,9 +740,17 @@ export class Walker {
     const unit = this.space === "train" ? this.unit : null;
     const free = (nx, nz) => !this.isCrowded(nx, y, nz, x, z, unit);      // no se atraviesa a otros viajeros
     if (this.space === "train") {
-      if (this.trainWalkable(x + dx, z + dz) && free(x + dx, z + dz)) { this.pos.x += dx; this.pos.z += dz; }
+      if (this.trainWalkable(x + dx, z + dz) && free(x + dx, z + dz)) { this.pos.x += dx; this.pos.z += dz; this.squeezeT = 0; }
       else if (this.trainWalkable(x + dx, z) && free(x + dx, z)) this.pos.x += dx;
       else if (this.trainWalkable(x, z + dz) && free(x, z + dz)) this.pos.z += dz;
+      else if (this.trainWalkable(x + dx, z + dz)) {
+        // Alguien te tapa el paso: en un coche lleno te abres paso de a poco ("con permiso")
+        this.squeezeT += dt;
+        if (this.squeezeT > 0.6 && this.carCrowd() > 0.3) {
+          this.pos.x += dx * 0.35; this.pos.z += dz * 0.35;
+          if (this.squeezeMsgT <= 0) { this.squeezeMsgT = 20; this.onEvent("notice", { text: "«Con permiso…» · te abres paso entre la gente", level: "info" }); }
+        }
+      }
       return;
     }
     const tries = [[dx, dz], [dx, 0], [0, dz]];
@@ -662,7 +767,9 @@ export class Walker {
     if (this.space === "train") {
       const rs = this.unit.sim.dockedStation();
       const open = this.unit.sim.doorState === "open";
-      return open && rs ? `Puertas abiertas en ${rs.name} · camina hacia una puerta (lado derecho del pasillo) para bajar · F sentarse` : "F sentarse · puedes recorrer los 5 coches por el pasillo";
+      const hold = this.holding ? "Agarrado de la barra · G soltarte" : "G agarrarse";
+      if (open && rs) return `Puertas abiertas en ${rs.name} · camina hacia una puerta (lado derecho del pasillo) para bajar · F sentarse · ${hold}`;
+      return `${hold} · F sentarse · puedes recorrer los 5 coches por el pasillo${this.carCrowd() > 0.6 ? " (coche lleno: los de los extremos van más vacíos)" : ""}`;
     }
     const lift = this.elevatorNear();
     if (lift?.inside) {

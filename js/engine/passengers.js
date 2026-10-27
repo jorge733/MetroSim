@@ -24,10 +24,15 @@
 
    Los viajeros dibujados (people.js) son solo una muestra visual de estas
    cifras: el motor no depende de ellos.
+
+   1.3 · Carga por coche: la gente no se reparte pareja. Los coches que
+   quedan junto a la escalera del andén (por donde se entra y se sale) van
+   más llenos y los del otro extremo, más vacíos (carLoads). Un tren que se
+   retira del servicio (incidents.js) baja a todos y no admite pasajeros.
    ========================================================================== */
 
 import { CONFIG, demandAt, flowPeriodAt } from "../config.js";
-import { TRAIN_LAYOUT, STOCK } from "./consist.js";
+import { TRAIN_LAYOUT, STOCK, CAR, GAP } from "./consist.js";
 import { headwayAt } from "./schedule.js";
 import { clamp } from "./format.js";
 
@@ -44,6 +49,47 @@ const ALIGHT_PER_DOOR = 1.5, BOARD_PER_DOOR = 1.25;
 const PLATFORM_CAPACITY = 1200;
 /** Capacidad real de un tren AS-2014 de 5 coches a 6 personas/m² (sentados + de pie). */
 export const TRAIN_CAPACITY = STOCK.capacity;
+
+/** Capacidad de un coche a 6 p/m² (los cinco iguales, para simplificar). */
+export const CAR_CAPACITY = STOCK.capacity / STOCK.cars;
+
+/** Coche (0…4) en una coordenada z local del tren. */
+export const carAt = (localZ) => clamp(Math.floor(localZ / (CAR + GAP)), 0, STOCK.cars - 1);
+
+const SHARES = {};
+/**
+ * Parte de la carga que va en cada coche para un sentido (lado del andén
+ * +1 / −1). Pesa la distancia de cada coche, con el tren detenido en su
+ * marca, a la escalera del andén: ahí se agolpa la gente.
+ */
+export function carShares(side) {
+  if (SHARES[side]) return SHARES[side];
+  const S = CONFIG.station, MZ = CONFIG.mezzanine;
+  const head = (side === 1 ? S.platformZ0 : -S.platformZ1) + S.stopMargin;   // cabeza del tren (z de la ruta)
+  const stairs = (MZ.stairZ0 + MZ.stairZ1) / 2;
+  const w = Array.from({ length: STOCK.cars }, (_, i) => {
+    const dz = side * (head + i * (CAR + GAP) + CAR / 2);                    // centro del coche (z del mundo)
+    return 0.8 + Math.exp(-(((dz - stairs) / 40) ** 2));
+  });
+  const sum = w.reduce((a, b) => a + b, 0);
+  return (SHARES[side] = w.map(x => x / sum));
+}
+
+/**
+ * Viajeros en cada coche de un tren: su parte de la carga, sin pasar de lo
+ * que cabe en un coche (lo que sobra se reparte en los que tienen sitio).
+ */
+export function carLoads(unit) {
+  const shares = carShares(unit.route.side);
+  const loads = shares.map(s => s * (unit.load || 0));
+  for (let pass = 0; pass < 3; pass++) {
+    let extra = 0, room = 0;
+    loads.forEach((l, i) => { if (l > CAR_CAPACITY) { extra += l - CAR_CAPACITY; loads[i] = CAR_CAPACITY; } else room += shares[i]; });
+    if (extra < 0.01 || room <= 0) break;
+    loads.forEach((l, i) => { if (l < CAR_CAPACITY) loads[i] += extra * shares[i] / room; });
+  }
+  return loads;
+}
 
 /** Emisión y atracción de viajes de una estación según el periodo (c = centralidad 0..1). */
 const EMIT = { am: (c) => 1.6 - 1.3 * c, pm: (c) => 0.35 + 1.25 * c, off: () => 1 };
@@ -161,10 +207,15 @@ export class PassengerFlow {
       }
 
       const route = u.route, terminal = rs === route.last;
+      const evac = !!u.ato?.evacuating;                 // se retira del servicio: bajan todos y no sube nadie
+      const ends = terminal || evac;
       // Al abrir puertas en una estación nueva: cuántos bajan aquí
       if (u.pax?.stationIndex !== rs.index || u.pax.routeId !== route.id) {
-        const share = terminal ? 1 : (this.alight[route.id]?.[rs.index] ?? 0.2);
-        u.pax = { stationIndex: rs.index, routeId: route.id, toAlight: u.load * share, boarded: 0, alighted: 0, exchanging: true, full: 0 };
+        const normal = this.alight[route.id]?.[rs.index] ?? 0.2;
+        const share = ends ? 1 : normal;
+        // Si el tren se retira del servicio, quien no iba a esta estación espera el siguiente en el andén
+        const stay = evac ? 1 - normal : 0;
+        u.pax = { stationIndex: rs.index, routeId: route.id, toAlight: u.load * share, stay, boarded: 0, alighted: 0, exchanging: true, full: 0 };
       }
       const p = u.pax;
 
@@ -172,22 +223,23 @@ export class PassengerFlow {
       const down = Math.min(doors * ALIGHT_PER_DOOR * dt, p.toAlight, u.load);
       u.load -= down; p.toAlight -= down; p.alighted += down;
       this.totals.alighted += down;
-      if (down > 0) this.onAlight?.(rs.world, down);
+      const w = this.waiting[rs.world.index];
+      const side = route.side;
+      if (down > 0 && p.stay) w[side] = Math.min(PLATFORM_CAPACITY, w[side] + down * p.stay);
+      if (down > 0) this.onAlight?.(rs.world, down * (1 - (p.stay || 0)));
 
       // …luego suben (nunca en el andén de llegada de una terminal). Con el tren muy
       // lleno cuesta más subir (la gente se acomoda) y a 6 p/m² no cabe nadie más.
-      const w = this.waiting[rs.world.index];
-      const side = route.side;
-      if (!terminal && p.toAlight < 0.5) {
+      if (!ends && p.toAlight < 0.5) {
         const crowd = u.load <= comfort ? 1 : clamp(1 - 0.8 * (u.load - comfort) / (cap - comfort), 0.2, 1);
         const up = Math.min(doors * BOARD_PER_DOOR * crowd * dt, w[side], Math.max(0, cap - u.load));
         w[side] -= up; u.load += up; p.boarded += up;
         this.totals.boarded += up;
       }
-      if (terminal) u.load = Math.max(0, u.load);
+      if (ends) u.load = Math.max(0, u.load);
       const roomLeft = u.load < cap - 0.5;
-      p.full = !terminal && !roomLeft && w[side] >= 1 ? Math.round(w[side]) : 0;
-      p.exchanging = p.toAlight >= 0.5 || (!terminal && w[side] >= 1 && roomLeft);
+      p.full = !ends && !roomLeft && w[side] >= 1 ? Math.round(w[side]) : 0;
+      p.exchanging = p.toAlight >= 0.5 || (!ends && w[side] >= 1 && roomLeft);
     }
   }
 }

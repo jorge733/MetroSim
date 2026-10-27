@@ -50,6 +50,12 @@ export function trainLiveryMaterials() { return ASSETS ? { body: ASSETS.mat.body
 /** Material compartido del plano de línea de los coches (lo anima render/lineMapPanel.js). */
 export function trainLineMapMaterial() { return ASSETS?.mat.lineMap ?? null; }
 
+/** Materiales compartidos de las pantallas sobre las puertas (los anima render/carInfoPanel.js). */
+export function trainInfoMaterials() { return ASSETS ? { door: ASSETS.mat.infoDoor, other: ASSETS.mat.infoOther } : null; }
+
+/** Vidrio de las ventanas laterales (main.js lo oscurece en el túnel: reflejo del interior). */
+export function trainGlassMaterial() { return ASSETS?.mat.sideGlass ?? null; }
+
 function assets() {
   if (ASSETS) return ASSETS;
   const mat = {
@@ -81,6 +87,8 @@ function assets() {
     destination: glow(0xffffff, { map: toTexture(destinationCanvas(signName(ROUTE_A.last))) }),
     destinationB: glow(0xffffff, { map: toTexture(destinationCanvas(signName(ROUTE_B.last))) }),
     lineMap: glow(0xffffff, { map: toTexture(lineMapCanvas()) }),
+    infoDoor: glow(0xffffff),          // pantalla sobre las puertas, lado del andén (+X del tren)
+    infoOther: glow(0xffffff),         // pantalla sobre las puertas del lado contrario
   };
   ASSETS = { mat, templates: {} };
 
@@ -269,6 +277,13 @@ function buildCarStatic(g, car, mat, { dest, cabFiller, openFront, openRear }) {
   // Plano de línea sobre las ventanas
   [-1, 1].forEach(side => type.maps.forEach(zc => {
     addPlane(g, 2.0, 0.375, mat.lineMap, side * (W - 0.085), R - 0.24, zc, side > 0 ? -Math.PI / 2 : Math.PI / 2);
+  }));
+
+  // Pantallas de información sobre cada puerta (el lado del andén del tren es su +X; en el coche girado, el −X)
+  [-1, 1].forEach(side => type.doors.forEach(zc => {
+    const trainSide = car.flipped ? -side : side;
+    addBoxSpan(g, side * (W - 0.075), 0.03, F + T.doorHeight + 0.03, F + T.doorHeight + 0.17, zc - 0.33, zc + 0.33, mat.black);
+    addPlane(g, 0.6, 0.145, trainSide > 0 ? mat.infoDoor : mat.infoOther, side * (W - 0.092), F + T.doorHeight + 0.1, zc, side > 0 ? -Math.PI / 2 : Math.PI / 2);
   }));
 
   /* ----- Testero de cabina ----- */

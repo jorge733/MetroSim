@@ -331,6 +331,15 @@ export class TrainSim {
 
    Regulación (regulation.js): regulateUntil retrasa la salida para igualar
    intervalos; hurry acorta la parada de un tren que va con mucho hueco.
+
+   Detención en plena vía (1.3, incidents.js): con lineStop = { until } el
+   tren frena con suavidad entre dos estaciones y espera detenido hasta esa
+   hora (regulación de frecuencia, tren detenido más adelante…).
+
+   Retiro del servicio (1.3, incidents.js): al llegar a la estación
+   evacuateAt abre puertas y bajan TODOS (evacuating); desde ahí sigue vacío
+   hasta la terminal (outOfService): se detiene unos segundos en cada
+   estación sin abrir puertas y no admite pasajeros.
    ========================================================================== */
 
 /** Pérdida de velocidad permitida en deriva antes de volver a traccionar (m/s). */
@@ -365,6 +374,10 @@ export class AutoDriver {
     this.regulateUntil = null;         // regulación: no sale antes de esta hora
     this.regulating = false;
     this.hurry = false;                // regulación: parada mínima
+    this.lineStop = null;              // detención en plena vía: { until, reason }
+    this.evacuateAt = null;            // índice de la estación donde se retira del servicio
+    this.evacuating = false;           // bajando a todos los viajeros
+    this.outOfService = false;         // vacío hasta la terminal: no abre puertas
     sim.notch = NOTCH_INDEX.N;
     sim.reverser = 1;
   }
@@ -395,6 +408,12 @@ export class AutoDriver {
         if (clock >= this.holdUntil) this.state = "running";
         break;
       case "running": {
+        // Detenido en plena vía: frena con suavidad y espera
+        if (this.lineStop) {
+          if (clock < this.lineStop.until) { sim.autoDemand = sim.speed > 0.05 ? -0.7 : HOLD; break; }
+          this.lineStop = null;
+          this.onEvent("lineResume", { station: this.target });
+        }
         let d = sim.position - this.target.stopZ;
         // Rebase de la marca: retrocede a paso de hombre hasta ella (tolerancia ±2,5 m)
         if (this.backing || (sim.isStopped && d <= -1.0 && d > -60)) {
@@ -404,9 +423,18 @@ export class AutoDriver {
         d = sim.position - this.target.stopZ;
         if (sim.isStopped && Math.abs(d) < 1.0) {
           sim.autoDemand = HOLD;
+          this.arrivedAt = clock;
+          if (this.targetIndex === this.evacuateAt && this.targetIndex !== last) {
+            this.evacuating = this.outOfService = true;
+            this.onEvent("evacuate", { station: this.target });
+          } else if (this.outOfService && this.targetIndex !== last) {
+            // Sin pasajeros: se detiene un momento sin abrir puertas y sigue
+            this.state = "ready";
+            this.onEvent("arrived", { station: this.target, closed: true });
+            break;
+          }
           sim.toggleDoors({ automatic: true });
           this.state = "dwell";
-          this.arrivedAt = clock;
           this.extraWait = 0;
           this.onEvent("arrived", { station: this.target });
         }
@@ -420,7 +448,8 @@ export class AutoDriver {
         const timeOk = clock - this.arrivedAt >= minDwell && (leave === null || clock >= leave - CONFIG.train.doorTime - 3);
         if (!timeOk || sim.doorState !== "open" || this.held) break;
         // Mientras sube o baja gente se espera (hasta 45 s más): con mucha gente, la parada se alarga
-        if (this.isBoardingBusy() && this.extraWait < (this.hurry ? 15 : 45)) { this.extraWait += dt; break; }
+        // (al retirarse del servicio, hasta que baje todo el tren)
+        if (this.isBoardingBusy() && this.extraWait < (this.evacuating ? 120 : this.hurry ? 15 : 45)) { this.extraWait += dt; break; }
         sim.toggleDoors({ automatic: true });
         this.onEvent("doorsClosing", { station: this.target });
         this.state = "closing";
@@ -428,13 +457,13 @@ export class AutoDriver {
       }
       case "closing":
         sim.autoDemand = HOLD;
-        if (sim.doorsClosed) this.state = "ready";
+        if (sim.doorsClosed) { this.state = "ready"; this.evacuating = false; }
         break;
       case "ready": {
         sim.autoDemand = HOLD;
         if (this.targetIndex === last) { this.state = "retire"; break; }
         if (this.held) break;
-        const leave = this.leaveTime();
+        const leave = this.outOfService && !this.evacuating ? this.arrivedAt + 6 : this.leaveTime();
         const sig = this.signals?.startingSignal(this.target);
         if ((leave === null || clock >= leave) && (!sig || sig.aspect !== "red")) {
           this.onEvent("departing", { station: this.target, next: this.stations[this.targetIndex + 1] });

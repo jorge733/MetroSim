@@ -20,6 +20,36 @@ Compartir → *Agregar a inicio*. Se abre a pantalla completa y, tras la primera
 (el service worker `sw.js` guarda el juego, Three.js y las voces). La instalación necesita `https` o `localhost`.
 Los íconos están en `icons/` (los PNG se generan desde `icons/icon.svg`).
 
+## Versión 1.3 · Pasajero aún más realista
+
+- **Agárrate (G)**: de pie y sin agarrarte, los cambios bruscos del tren te empujan a lo largo del coche (el tirón
+  del arranque, el golpe final al detenerse, una frenada fuerte). Puedes trastabillar y chocar con otro viajero
+  («¡Perdón!»). Agarrado de una barra o del pasamanos casi no te mueves; caminar te suelta. Ante una aceleración
+  pareja el cuerpo se afirma solo. Botón **🤚 Agarrarse** en pantallas táctiles.
+- **Pantallas sobre las puertas** (`js/render/carInfoPanel.js`): próxima estación y combinaciones, estación actual,
+  "CIERRE DE PUERTAS" parpadeando, la hora y la dirección. Las del lado del andén avisan "SE ABRIRÁN LAS PUERTAS DE
+  ESTE LADO". Avisan también si el tren está detenido o si se retira del servicio. El plano luminoso de la línea sigue
+  marcando la próxima estación.
+- **Ventanas en el túnel**: la luminaria del túnel más cercana ilumina el coche al pasar (la luz barre asientos y piso)
+  y los vidrios se oscurecen y brillan como un espejo; al entrar a la estación vuelven a ser transparentes.
+- **Sonido**: el estruendo del túnel sube con la velocidad y baja al entrar a la estación, aire al soltar los frenos al
+  arrancar, el golpe de presión y el estruendo del tren que se cruza en la otra vía, y el roce de zapatos al trastabillar.
+- **"Permite bajar antes de subir"**: al abrirse las puertas, quienes van a subir se ponen a los costados de la puerta
+  y esperan a que bajen los que salen por ella. Cuando se acerca el tren, la gente que espera de pie se arrima al borde.
+  En un coche lleno caminas más lento y, si alguien te tapa el paso, te abres paso de a poco («con permiso»).
+- **Cada coche con su carga** (`carShares` / `carLoads` en `js/engine/passengers.js`): van más llenos los coches que
+  quedan junto a la escalera del andén y más vacíos los del otro extremo. Los asientos y el "no cabes" se cuentan por
+  coche: si el de tu puerta va repleto, prueba otra puerta. El HUD muestra cuántas personas van en tu coche
+  (holgado, cómodo, lleno, apretado, repleto).
+- **Detenciones entre estaciones** (`js/engine/incidents.js`): un tren puede detenerse en plena vía por regulación de
+  frecuencia, por un tren detenido más adelante o por inspección de vía. A los pocos segundos lo anuncia la megafonía
+  ("Estimados pasajeros, nuestro tren se encuentra detenido…") y al seguir: "Reanudamos la marcha". Si un tren queda
+  detenido sin motivo informado (una señal en rojo), también hay aviso. El HUD muestra el retraso respecto del horario.
+- **Tren que se retira del servicio**: en su próxima estación bajan todos ("Este tren se retira del servicio…") y
+  quien no llegaba ahí espera el siguiente en el andén. Después sigue vacío hasta la terminal, se detiene unos segundos
+  en cada estación sin abrir puertas y no admite pasajeros: el andén lo anuncia ("El próximo tren no admite
+  pasajeros") y las pantallas de andén muestran "NO SUBIR". Los incidentes le tocan a menudo al tren del pasajero.
+
 ## Versión 1.2 · Pendientes en 3D y pasajero realista
 
 - **La vía en 3D sigue las pendientes reales** (`js/render/trackLift.js`): el túnel baja y sube entre
@@ -181,6 +211,7 @@ depto con muebles y recuerdos) y compras, pasajes y cargas sin costo. Tu saldo y
 | A / ← · D / → | Girar |
 | Re Pág · Av Pág | Mirar arriba / abajo (al caminar la vista vuelve sola al frente) |
 | F | Sentarse / levantarse (en el tren o en un banco del andén) |
+| G | Agarrarse de una barra / soltarse (a bordo, de pie) |
 | E | Boletería, tótem, salida a la calle · en la calle: entrar a un local, bajar al Metro o sacar una foto del hito |
 | J | Misiones |
 
@@ -190,7 +221,7 @@ depto con muebles y recuerdos) y compras, pasajes y cargas sin costo. Tu saldo y
 pantalla completa y horizontal al empezar). Conductor: indicador de mando e inversor, ▲ / ▼ mando y EMERGENCIA abajo
 a la izquierda; Puertas, Inversor, Vista, Cabina, Tienda y Finalizar turno a la derecha; arrastra la pantalla para mirar. Pasajero:
 joystick abajo a la izquierda para caminar (al borde corre), arrastra a la derecha para mirar, botones Usar,
-Sentarse, Misiones, Correr y Tienda. El HUD se compacta en pantallas chicas y respeta la muesca del teléfono; en el
+Sentarse, Agarrarse, Misiones, Correr y Tienda. El HUD se compacta en pantallas chicas y respeta la muesca del teléfono; en el
 Centro de Control los esquemas se desplazan de lado y la ficha del tren aparece como hoja inferior.
 Para probarlos en el computador, abre la página con `?touch=1` al final de la dirección.
 
@@ -276,6 +307,7 @@ js/render/            dibujo del estado del motor
   trainViews.js       trenes
   signalViews.js      señales
   lineMapPanel.js     plano de línea dinámico de los coches
+  carInfoPanel.js     pantallas de información sobre las puertas de los coches
   trackLift.js        pendientes en 3D: dobla el dibujo de la vía según el perfil de la línea
 js/control/           Centro de Control
   controlCenter.js    esquema de la red, ficha de tren, incidencias y órdenes

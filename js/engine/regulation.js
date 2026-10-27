@@ -63,7 +63,8 @@ export class Regulator {
       for (const u of units) {
         const ato = u.ato;
         if (!ato) continue;
-        if (!this.enabled) { ato.regulateUntil = null; ato.regulating = false; ato.hurry = false; continue; }
+        // Sin regulación, o tren que se retira del servicio (incidents.js): no se retiene
+        if (!this.enabled || ato.outOfService) { ato.regulateUntil = null; ato.regulating = false; ato.hurry = false; continue; }
         if (ato.state !== "dwell" && ato.state !== "running") continue;
         const rs = ato.target;
         if (!rs || rs === route.last || rs === route.first) { ato.hurry = false; continue; }   // en terminales manda el horario

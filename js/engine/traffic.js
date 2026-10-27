@@ -251,7 +251,7 @@ export class TrafficManager {
    * Próximos trenes a una estación del mundo en una ruta.
    * Los trenes que ya circulan se estiman desde su posición real (eta.js);
    * los que aún no han salido de cocheras, por el horario.
-   * @returns {Array<{id, here, eta, minutes, at, scheduled, delay}>}  ordenados por llegada
+   * @returns {Array<{id, here, eta, minutes, at, scheduled, delay, noPax}>}  ordenados por llegada
    */
   arrivalsFor(worldStation, route, clock) {
     const rs = route.stationOf(worldStation);
@@ -262,7 +262,9 @@ export class TrafficManager {
       if (at === null) continue;
       const eta = Math.max(0, at - clock);
       const scheduled = u.trip.arr[rs.index];
-      list.push({ id: u.id, here: eta === 0, eta, minutes: Math.floor(eta / 60), at, scheduled, delay: at - scheduled });
+      const ev = u.ato?.evacuateAt;
+      const noPax = ev !== null && ev !== undefined && rs.index >= ev;      // se retira del servicio: no admite pasajeros
+      list.push({ id: u.id, here: eta === 0, eta, minutes: Math.floor(eta / 60), at, scheduled, delay: at - scheduled, noPax });
     }
     for (const t of this.timetables.get(route.id).upcomingAt(rs.index, clock, this.started)) {
       const at = t.arr[rs.index], eta = at - clock;

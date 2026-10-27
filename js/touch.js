@@ -11,7 +11,7 @@
                 atrás · Vista · Cambio de cabina. Arrastrar la pantalla: mirar.
      Pasajero   joystick a la izquierda para caminar (al borde: correr),
                 arrastrar a la derecha para mirar · E interactuar · F sentarse ·
-                Misiones (J).
+                G agarrarse · Misiones (J).
    ========================================================================== */
 
 /** ¿Hay que mostrar los controles táctiles? */
@@ -256,7 +256,7 @@ export class TouchControls {
       this.running = !this.running;
       this.runBtn.classList.toggle("on", this.running);
     });
-    col.append(this.button("✋ Usar", "e"), this.button("🪑 Sentarse", "f"), this.button("🎯 Misiones", "j", "touch-mid", { onClick: true }), this.runBtn, this.button("🛒 Tienda", "k", "touch-mid", { onClick: true }));
+    col.append(this.button("✋ Usar", "e"), this.button("🪑 Sentarse", "f"), this.button("🤚 Agarrarse", "g"), this.button("🎯 Misiones", "j", "touch-mid", { onClick: true }), this.runBtn, this.button("🛒 Tienda", "k", "touch-mid", { onClick: true }));
     // Marca dónde va el joystick hasta que se usa por primera vez
     this.ghost = document.createElement("div");
     this.ghost.className = "touch-stick-ghost";

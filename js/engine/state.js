@@ -62,6 +62,7 @@ export function trainState(u, signals) {
     if (docked) return departing ? "starting" : "ready";
     const sig = signals?.nextAhead(sim.position);
     if (sig && sig.aspect === "red" && sim.position - sig.z < SIGNAL_REACH) return "signalStop";
+    if (u.ato?.lineStop) return "stopped";                                            // detenido en plena vía (incidents.js)
     if (u.state === "approaching" && ato === "running") return "approaching";        // ajuste final a la marca
     return departing ? "starting" : "stopped";
   }

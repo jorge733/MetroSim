@@ -79,6 +79,8 @@ export class AudioSystem {
     this.rolling = this.noiseLayer(this.white, "lowpass", 400, 0.8);
     this.rumble = this.noiseLayer(this.brown, "lowpass", 150, 0.7);
     this.fan = this.noiseLayer(this.white, "bandpass", 480, 0.7);
+    // Estruendo del túnel: el aire que empuja el tren retumba entre las paredes (baja al entrar a la estación)
+    this.roar = this.noiseLayer(this.brown, "bandpass", 200, 0.6);
     // Calle: rumor del tránsito (grave) y siseo de neumáticos
     this.traffic = this.noiseLayer(this.white, "bandpass", 520, 0.5);   // rumor lejano (no grave, para no confundirse con el tren)
     this.trafficWander = 0;
@@ -205,7 +207,7 @@ export class AudioSystem {
     if (!this.ctx) return;
     // En la calle no se oye NADA del tren ni del túnel: solo la ciudad
     if (s.street) {
-      for (const layer of [this.rolling, this.rumble, this.fan, this.motor, this.motor2, this.carrier, this.squeal]) this.set(layer.gain.gain, 0, 0.15);
+      for (const layer of [this.rolling, this.rumble, this.roar, this.fan, this.motor, this.motor2, this.carrier, this.squeal]) this.set(layer.gain.gain, 0, 0.15);
       this.jointDistance = 0;
       this.overspeedTimer = 0;
       const busy = s.streetBusy ?? 1;
@@ -223,10 +225,13 @@ export class AudioSystem {
     const L = s.level ?? 1;                                                          // atenuación por distancia
     const underfloor = (s.view === "saloon" ? 1.25 : s.view === "cab" ? 0.8 : 1.0) * L;   // el salón está sobre los motores
 
-    // Rodadura y túnel
-    this.set(this.rolling.gain.gain, k > 0 ? (0.04 + k * 0.32) * (inside ? 0.85 : 1.1) * L : 0);
+    // Rodadura y túnel: dentro del túnel retumba; al entrar a la estación el ruido se abre y baja
+    const open = s.inStation ? 0.7 : 1;
+    this.set(this.rolling.gain.gain, k > 0 ? (0.04 + k * 0.32) * (inside ? 0.85 : 1.1) * L * open : 0);
     this.set(this.rolling.filter.frequency, 220 + kmh * 24);
     this.set(this.rumble.gain.gain, (0.05 + k * 0.5 * L) * (s.inStation ? 0.45 : 1));
+    this.set(this.roar.gain.gain, (inside ? k * k * 0.3 * (s.inStation ? 0.2 : 1) : k * 0.06) * L, 0.35);
+    this.set(this.roar.filter.frequency, 140 + kmh * 2.2, 0.2);
     this.set(this.fan.gain.gain, inside ? 0.022 : 0.004);
 
     // Motor: activo con tracción o con freno eléctrico (regenerativo) por encima de ~4 km/h
@@ -301,6 +306,28 @@ export class AudioSystem {
   airHiss(strength = 1) {
     if (!this.ctx) return;
     this.burst({ duration: 0.6 + strength * 0.8, gain: 0.05 + strength * 0.05, type: "highpass", freq: 3000, attack: 0.02, endFreq: 1800 });
+  }
+
+  /** Suelta de frenos al arrancar: escape breve de aire y golpe sordo de las zapatas. */
+  brakeRelease(level = 1) {
+    if (!this.ctx) return;
+    this.burst({ duration: 0.55, gain: 0.05 * level, type: "highpass", freq: 2600, attack: 0.01, endFreq: 4200 });
+    this.tone(105, { duration: 0.12, gain: 0.05 * level, attack: 0.003 });
+  }
+
+  /** Tren que se cruza en la vía de al lado: golpe de presión, estruendo y sus ruedas. */
+  passingTrain(strength = 1) {
+    if (!this.ctx) return;
+    this.burst({ duration: 2.4, gain: 0.3 * strength, type: "lowpass", freq: 520, attack: 0.3, buffer: this.brown, endFreq: 200 });
+    this.burst({ duration: 1.7, gain: 0.07 * strength, type: "bandpass", freq: 1400, q: 0.8, attack: 0.2, endFreq: 650 });
+    for (let i = 0; i < 10; i++) this.clack(0.2 + i * 0.17 + Math.random() * 0.04, 0.07 * strength);
+  }
+
+  /** Traspié a bordo: arrastre de zapatos y, si chocas con alguien, un golpe sordo. */
+  stumble(bump = false) {
+    if (!this.ctx) return;
+    [0, 0.13].forEach(t => this.burst({ start: t, duration: 0.12, gain: 0.05, type: "bandpass", freq: 900, q: 1.1, attack: 0.004 }));
+    if (bump) this.tone(85, { start: 0.1, duration: 0.15, gain: 0.08, attack: 0.003 });
   }
 
   /** Apertura: gong de dos tonos + motor neumático. */
