@@ -20,6 +20,27 @@ Compartir → *Agregar a inicio*. Se abre a pantalla completa y, tras la primera
 (el service worker `sw.js` guarda el juego, Three.js y las voces). La instalación necesita `https` o `localhost`.
 Los íconos están en `icons/` (los PNG se generan desde `icons/icon.svg`).
 
+## Versión 1.4 · Conductor más realista
+
+- **ATP (protección automática del tren)**: si pasas el límite por más de 5 km/h, el ATP frena de emergencia. Lo
+  mismo al rebasar una señal en rojo. Después la tracción queda bloqueada: detente y espera unos segundos a que el PCC
+  (Puesto Central de Control) revise y te autorice por radio. Si rebasaste una señal, sigues en **marcha a la vista**
+  a 15 km/h hasta la próxima señal. La DMI muestra el aviso bajo el velocímetro.
+- **Vigilancia (hombre muerto)**: con el tren en marcha, si en 45 s no tocas ningún mando suena un zumbador. Tienes
+  7 s para confirmar con **X** (mover el mando también cuenta); si no, frenado de emergencia y falta.
+- **Señal en falla**: detenido ante una señal en rojo por falla con el cantón libre, a los ~10 s el PCC te autoriza
+  por radio a rebasarla en marcha a la vista (25 km/h), sin falta.
+- **Personal en la vía**: durante los "TRABAJOS EN VÍA" hay trabajadores con chaleco reflectante y casco en el
+  andén de evacuación, con una baliza ámbar antes de ellos. Debes tocar la **bocina (B)** al acercarte (en los
+  últimos 350 m); si pasas sin tocarla es una falta. El personal levanta el brazo al verte.
+- **Radio del PCC**: los avisos de incidentes y las autorizaciones llegan por radio, con el chasquido del canal y la
+  voz del operador (voz sintetizada); el texto queda en el HUD con 📻.
+- **Cerrar con gente subiendo**: si cierras las puertas mientras aún suben pasajeros, es muy probable que alguien
+  obstruya una puerta (se reabre y tienes que volver a cerrar). Espera a que termine el embarque.
+- Botones táctiles **📯 Bocina** y **✋ Vigilancia** (la columna del conductor pasa a dos columnas).
+- Código: `js/roles/driverSafety.js` (vigilancia, ATP y PCC, personal en la vía); el bloqueo de tracción y la marcha
+  a la vista viven en la simulación del tren (`js/engine/sim.js`).
+
 ## Versión 1.3 · Pasajero aún más realista
 
 - **Agárrate (G)**: de pie y sin agarrarte, los cambios bruscos del tren te empujan a lo largo del coche (el tirón
@@ -198,6 +219,8 @@ depto con muebles y recuerdos) y compras, pasajes y cargas sin costo. Tu saldo y
 | Espacio | Freno de emergencia |
 | Q · E | Inversor adelante / atrás |
 | D | Abrir / cerrar puertas |
+| B | Bocina (obligatoria al pasar junto al personal en la vía) |
+| X | Confirmar la vigilancia (hombre muerto; mover el mando también cuenta) |
 | V · C | Vista exterior · centrar vista |
 | T | Cambio de cabina (en el cartel FIN DE MANIOBRA) |
 | R | Reiniciar servicio |
@@ -314,6 +337,7 @@ js/control/           Centro de Control
 js/touch.js           controles táctiles (celular y tablet)
 js/roles/             roles del jugador
   driverRole.js       Conductor: teclado → órdenes
+  driverSafety.js     Conductor: vigilancia (hombre muerto), ATP y PCC por radio, personal en la vía
 js/stationLayout.js   columnas, bancos y pantallas de los andenes (compartido)
 js/main.js            punto de entrada: une motor, render, roles, interfaz y audio
 js/config.js          línea, estaciones, geometría, mando, tarifas, demanda

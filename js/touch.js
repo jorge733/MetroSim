@@ -8,7 +8,8 @@
    motor exactamente igual que con el teclado.
 
      Conductor  ▲ / ▼ mando · EMERGENCIA · Puertas · Inversor adelante /
-                atrás · Vista · Cambio de cabina. Arrastrar la pantalla: mirar.
+                atrás · Bocina · Vigilancia · Vista · Cambio de cabina.
+                Arrastrar la pantalla: mirar.
      Pasajero   joystick a la izquierda para caminar (al borde: correr),
                 arrastrar a la derecha para mirar · E interactuar · F sentarse ·
                 G agarrarse · Misiones (J).
@@ -69,6 +70,7 @@ body.touch-mode .ticket-panel, body.touch-mode .summary { z-index: 14; }
 body.touch-mode .fade { z-index: 15; }
 .touch-left { left: 14px; bottom: 16px; }
 .touch-right { right: 12px; top: 84px; gap: 7px; }
+.touch-right.touch-two { grid-template-columns: repeat(2, auto); }     /* conductor: 9 botones en dos columnas */
 
 /* ---- Pantallas chicas (celular): HUD compacto, botones al alcance del pulgar ---- */
 @media (max-height: 520px), (max-width: 720px) {
@@ -213,11 +215,13 @@ export class TouchControls {
     );
     // Columna derecha: puertas, inversor, vista, cambio de cabina y tienda
     const row = document.createElement("div");
-    row.className = "touch-col touch-side touch-right";
+    row.className = "touch-col touch-side touch-right touch-two";
     row.append(
       this.button("🚪 Puertas", "d"),
       this.button("Inv. ▶", "q"),
       this.button("◀ Inv.", "e"),
+      this.button("📯 Bocina", "b"),
+      this.button("✋ Vigilancia", "x"),
       this.button("👁 Vista", "v"),
       this.button("⇄ Cabina", "t"),
       this.button("🛒 Tienda", "k", "touch-mid", { onClick: true }),

@@ -26,6 +26,15 @@
      · limitación de jerk (sacudida) para un arranque y frenado suaves;
      · consumo eléctrico: potencia, corriente de catenaria y energía
        (tracción, regenerada y auxiliares).
+
+   1.4 · Protección del tren (ATP) para el conductor:
+     · sobre el límite + ATP_MARGIN km/h el ATP aplica el freno de
+       emergencia (evento "atpTrip"); el rebase de una señal en rojo también
+       (lo detecta el tráfico);
+     · tractionLock: mientras tenga un texto, no hay tracción (tras una
+       intervención del ATP, hasta que el PCC autorice a seguir);
+     · restriction { kmh, untilZ, label }: marcha a la vista con un límite
+       bajo hasta pasar untilZ (autorización del PCC para rebasar una señal).
    ========================================================================== */
 
 import { CONFIG, NOTCHES, NOTCH_INDEX, REVERSER } from "../config.js";
@@ -39,6 +48,8 @@ const JERK = 0.9, JERK_EMERGENCY = 4;
 const HOLD_BRAKE = 0.7;
 /** Deceleración máxima de servicio que usa la conducción automática (m/s²). */
 const ATO_MAX_BRAKE = 0.95;
+/** km/h sobre el límite a los que el ATP frena de emergencia (bajo eso solo suena la alarma). */
+export const ATP_MARGIN = 5;
 
 
 /* ==========================================================================
@@ -75,6 +86,8 @@ export class TrainSim {
     this.power = 0;                  // potencia eléctrica tomada de la catenaria (W, negativa si regenera)
     this.current = 0;                // corriente de catenaria (A)
     this.voltage = STOCK.lineVoltage;
+    this.tractionLock = null;        // texto: tracción bloqueada (ATP, espera autorización del PCC)
+    this.restriction = null;         // marcha a la vista: { kmh, untilZ, label }
     this.onEvent("reset", { start });
   }
 
@@ -106,7 +119,8 @@ export class TrainSim {
 
   /** Límite efectivo: el de la vía o el de marcha atrás. */
   currentLimit() {
-    const track = this.route.speedLimitAt(this.position);
+    let track = this.route.speedLimitAt(this.position);
+    if (this.restriction && this.position > this.restriction.untilZ) track = Math.min(track, this.restriction.kmh);
     return this.reverser === -1 || this.movingBackwards ? Math.min(track, Math.round(CONFIG.train.reverseMaxSpeed * 3.6)) : track;
   }
 
@@ -134,6 +148,7 @@ export class TrainSim {
     this.notch++;
     this.onEvent("notch");
     if (this.notchData.type === "power") {
+      if (this.tractionLock) return { text: `Tracción bloqueada: ${this.tractionLock}`, level: "warn" };
       if (!this.doorsClosed) return { text: "Tracción bloqueada: cierra las puertas", level: "warn" };
       if (this.reverser === 0) return { text: "Inversor en NEUTRO: selecciona sentido (Q adelante · E atrás)", level: "warn" };
     }
@@ -202,7 +217,7 @@ export class TrainSim {
     let demand = this.emergency ? NOTCHES[NOTCH_INDEX.EM].accel : (this.autoDemand ?? this.notchData.accel);
 
     // 2. Enclavamientos: sin tracción con puertas abiertas o inversor en neutro
-    if (demand > 0 && (!this.doorsClosed || this.reverser === 0)) demand = 0;
+    if (demand > 0 && (!this.doorsClosed || this.reverser === 0 || this.tractionLock)) demand = 0;
     if (!this.doorsClosed) demand = Math.min(demand, -0.6);   // freno de estacionamiento con puertas abiertas
 
     // 3. Limitación de jerk (la emergencia se aplica de golpe)
@@ -299,10 +314,15 @@ export class TrainSim {
       if (this.doorProgress === 0) { this.doorState = "closed"; this.onEvent("doorsClosed", { station: this.dockedStation() }); }
     }
 
-    // 10. Vigilancia de velocidad
+    // 10. Vigilancia de velocidad (y ATP: emergencia si el conductor se pasa demasiado)
+    if (this.restriction && this.position <= this.restriction.untilZ) { this.onEvent("restrictionEnd", this.restriction); this.restriction = null; }
     const limit = this.currentLimit();
     if (this.speedKmh > limit + 2 && !this.overspeedWarned) { this.overspeedWarned = true; this.onEvent("overspeed", { limit }); }
     if (this.speedKmh < limit) this.overspeedWarned = false;
+    if (this.autoDemand === null && !this.emergency && this.speedKmh > limit + ATP_MARGIN) {
+      this.emergencyBrake(`ATP: exceso de velocidad (${Math.round(this.speedKmh)} km/h, límite ${limit}) · frenado de emergencia`);
+      this.onEvent("atpTrip", { limit, kmh: this.speedKmh });
+    }
   }
 }
 

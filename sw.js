@@ -1,5 +1,5 @@
 /* ==========================================================================
-   MetroSim — 1.3 · sw.js
+   MetroSim — 1.4 · sw.js
    Service worker de la PWA: permite instalar MetroSim y jugar sin conexión.
 
    Estrategia:
@@ -14,7 +14,7 @@
    sin conexión.
    ========================================================================== */
 
-const CACHE = "metrosim-v1.3";
+const CACHE = "metrosim-v1.4";
 const CDN = ["cdn.jsdelivr.net", "unpkg.com"];
 
 /** Lo mínimo para que la portada abra sin conexión aunque no se haya jugado. */

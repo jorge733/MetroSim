@@ -30,6 +30,16 @@ export class CabDisplay {
     g.fillStyle = revColor; g.font = "700 12px Arial"; g.textAlign = "left";
     g.fillText(rev.label, 64, 32);
 
+    /* --- Avisos de seguridad (vigilancia, ATP, marcha a la vista) --- */
+    if (info.alert) {
+      const blink = Math.floor(performance.now() / 400) % 2 === 0;
+      g.fillStyle = info.alert.level === "alert" ? (blink ? "#ff3030" : "#5a1414") : "#ffb000";
+      g.fillRect(14, 307, 316, 22);                      // bajo el velocímetro, sobre la pendiente
+      g.fillStyle = info.alert.level === "alert" && !blink ? "#ffd0d0" : "#0a121b";
+      g.font = "900 14px Arial"; g.textAlign = "center"; g.textBaseline = "middle";
+      g.fillText(info.alert.text, 172, 318);
+    }
+
     /* --- Próxima señal (aspecto y distancia) --- */
     if (info.signal) {
       const colors = { red: "#ff3030", yellow: "#ffb000", green: "#30ff7a" };

@@ -184,6 +184,7 @@ export class TrafficManager {
       const sig = this.signals.get(route.id);
       for (const u of units) {
         for (const s of sig.passedBetween(u.prevPos, u.sim.position)) {
+          if (s.permit === u) { s.permit = null; continue; }         // rebase autorizado por el PCC (marcha a la vista)
           if (s.aspect === "red") this.notify(u, "redSignal", { signal: s });
         }
       }

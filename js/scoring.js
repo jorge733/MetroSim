@@ -35,6 +35,8 @@ export const PENALTIES = {
   earlyDeparture: 100,
   offPosition: 50,
   jerk: 20,                         // cada tirón
+  vigilance: 150,                   // no respondió a la vigilancia (hombre muerto)
+  horn: 100,                        // pasó junto al personal en la vía sin tocar la bocina
 };
 
 /** Tirón: el mando pide un cambio de esfuerzo mayor que esto (m/s²) respecto

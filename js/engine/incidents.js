@@ -26,8 +26,8 @@
    text, ...datos }. No usa Three.js.
    ========================================================================== */
 
-/** Probabilidad de puerta obstruida en cada cierre de puertas. */
-const DOOR_CHANCE = { player: 0.12, auto: 0.03 };
+/** Probabilidad de puerta obstruida en cada cierre de puertas (el conductor que cierra con gente aún subiendo, mucho más). */
+const DOOR_CHANCE = { player: 0.08, playerBoarding: 0.55, auto: 0.03 };
 /** Minutos (de simulación) entre incidentes de vía/señal: mínimo y máximo. */
 const GAP_MIN = 4 * 60, GAP_MAX = 9 * 60;
 /** Segundos entre incidentes de un tren (detención en vía o retiro del servicio). */
@@ -60,7 +60,7 @@ export class IncidentManager {
     for (const inc of [...this.active]) {
       if (clock < inc.until) continue;
       if (inc.kind === "speedRestriction") inc.route.restrictions.splice(inc.route.restrictions.indexOf(inc.zone), 1);
-      if (inc.kind === "signalFault") inc.signal.fault = false;
+      if (inc.kind === "signalFault") { inc.signal.fault = false; inc.signal.permit = null; }
       if (inc.kind === "outOfService" && this.ls.traffic.units.includes(inc.unit) && inc.unit.ato?.evacuateAt != null) continue;  // dura hasta la terminal
       this.active.splice(this.active.indexOf(inc), 1);
       this.emit(inc, "end", inc.kind === "speedRestriction" ? `Fin de la limitación temporal de velocidad (${inc.zone.label})`
@@ -88,7 +88,9 @@ export class IncidentManager {
       if (sim.doorState !== "closing") { u.doorRolled = false; continue; }
       if (!u.doorRolled) {
         u.doorRolled = true;
-        u.doorBlocked = sim.dockedStation() !== u.route.last && Math.random() < (u.isPlayer ? DOOR_CHANCE.player : DOOR_CHANCE.auto);
+        u.closedBoarding = u.isPlayer && this.ls.traffic.isBoarding(u);
+        u.doorBlocked = sim.dockedStation() !== u.route.last
+          && Math.random() < (u.isPlayer ? (u.closedBoarding ? DOOR_CHANCE.playerBoarding : DOOR_CHANCE.player) : DOOR_CHANCE.auto);
       }
       if (u.doorBlocked && sim.doorProgress < 0.55) {
         u.doorBlocked = false;
@@ -96,7 +98,7 @@ export class IncidentManager {
         const car = 1 + Math.floor(Math.random() * 5);
         this.bus.emit("incident", {
           line: this.ls.line, route: u.route, kind: "doorObstruction", phase: "start", unit: u, car,
-          text: `Puerta obstruida en el coche ${car} · reapertura automática${u.isPlayer ? " · vuelve a cerrar (D)" : ""}`,
+          text: `Puerta obstruida en el coche ${car} · reapertura automática${u.closedBoarding ? " · cerraste con pasajeros aún subiendo" : ""}${u.isPlayer ? " · vuelve a cerrar (D)" : ""}`,
         });
         if (!u.isPlayer) this.recloses.push({ unit: u, at: clock + rand(4, 8) });
       }
@@ -183,6 +185,6 @@ export class IncidentManager {
   }
 
   emit(inc, phase, text, extra = {}) {
-    this.bus.emit("incident", { line: this.ls.line, route: inc.route, kind: inc.kind, phase, text, ...extra });
+    this.bus.emit("incident", { line: this.ls.line, route: inc.route, kind: inc.kind, phase, text, zone: inc.zone ?? null, ...extra });
   }
 }

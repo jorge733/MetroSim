@@ -26,6 +26,7 @@
      render/lineMapPanel.js plano de línea dinámico de los coches (luz parpadeante)
      render/carInfoPanel.js pantallas sobre las puertas (próxima estación, cierre de puertas, avisos)
      roles/driverRole.js    rol de Conductor: teclado → órdenes al motor
+     roles/driverSafety.js  vigilancia (hombre muerto), ATP y PCC por radio, personal en la vía
      control/controlCenter.js  rol de Centro de Control: esquema de la red y órdenes
      touch.js               controles táctiles (celular y tablet)
      stationLayout.js       columnas, bancos y pantallas de los andenes (compartido)
@@ -81,6 +82,7 @@ import { LineMapPanel } from "./render/lineMapPanel.js";
 import { CarInfoPanel } from "./render/carInfoPanel.js";
 import { carAt, carLoads, CAR_CAPACITY } from "./engine/passengers.js";
 import { DriverRole } from "./roles/driverRole.js";
+import { DriverSafety } from "./roles/driverSafety.js";
 import { ControlCenter } from "./control/controlCenter.js";
 import { TouchControls, wantsTouch } from "./touch.js";
 import { World } from "./world.js";
@@ -406,6 +408,11 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = {}) {
     applyLivery(player);
     game.score = newScore(direction);
     game.driverRole = new DriverRole(engine, () => game?.player);
+    game.safety = new DriverSafety({
+      scene, audio, signals,
+      notify: (text, level, ms) => hud.showMessage(text, level, ms),
+      penalty: (kind) => game?.score.penalty(kind),
+    });
     const rig = new CameraRig(camera, player.group);
     rig.setView("cab");
     rig.attach(renderer.domElement);
@@ -690,9 +697,12 @@ function onKeyDown(event) {
     const label = { cab: "Vista de cabina", saloon: "Vista interior del tren", exterior: "Vista exterior · arrastra para girar · Shift+arrastrar desplaza · rueda zoom · C encuadre inicial" }[next];
     return hud.showMessage(label, "info", next === "exterior" ? 4500 : 1200);
   }
-  // Mando del tren: el rol de Conductor envía órdenes al motor (la respuesta llega en onCommandResult)
-  if (game.driverRole.handleKey(key, event.repeat)) return;
+  // Mando del tren: el rol de Conductor envía órdenes al motor (la respuesta llega en onCommandResult).
+  // Cualquier mando confirma la vigilancia (hombre muerto)
+  if (game.driverRole.handleKey(key, event.repeat)) { game.safety.input(); return; }
   if (event.repeat) return;
+  if (key === "x") return game.safety.input();
+  if (key === "b") return game.safety.horn(game.player);
   if (key === "r") return restartGame();
   if (key === "t") return changeCab();
   if (key === "f") return requestEndShift();
@@ -782,13 +792,15 @@ function onIncident(inc) {
   if (!game || game.warming || inc.line !== ROUTE_A.line) return;
   const level = inc.phase === "end" ? "ok" : "warn";
   if (game.player) {
+    game.safety.onIncident(inc);                       // personal en la vía (se ve desde ambas vías)
     if (inc.kind === "doorObstruction") {
       if (inc.unit === game.player) { game.audio.airHiss(0.4); hud.showMessage(inc.text, "warn", 5000); }
       return;
     }
     if (inc.route !== game.player.route) return;
-    if (inc.phase === "start") game.audio.notchClick();
-    hud.showMessage(`PCC: ${inc.text}`, level, 7000);
+    // El PCC avisa por radio a los trenes de la vía
+    if (inc.phase === "start") game.audio.radio(`Atención trenes de la vía. ${inc.text.replace(/km\/h/g, "kilómetros por hora").replace(/ · /g, ". ")}.`);
+    hud.showMessage(`📻 PCC: ${inc.text}`, level, 7000);
     return;
   }
   const riding = game.walker?.unit;
@@ -820,7 +832,11 @@ function onTrainState({ unit, from, to }) {
 
 function onPlayerEvent(type, data) {
   const audio = game.audio, stats = game.stats;
+  game.safety?.onPlayerEvent(type, data);
   switch (type) {
+    case "atpTrip":
+      hud.showMessage(`ATP · exceso de velocidad (${Math.round(data.kmh)} km/h, límite ${data.limit}) · frenado de emergencia · detente y espera al PCC`, "alert", 6000);
+      break;
     case "notch": audio.notchClick(); break;
     case "reverser": audio.reverserClunk(); break;
     case "halt": audio.airHiss(0.6); break;
@@ -873,7 +889,7 @@ function onPlayerEvent(type, data) {
       stats.redSignals++;
       game.score.penalty("redSignal");
       game.player.sim.emergencyBrake();
-      hud.showMessage(`REBASE DE SEÑAL S${data.signal.id} EN ROJO · frenado de emergencia automático`, "alert", 5000);
+      hud.showMessage(`REBASE DE SEÑAL S${data.signal.id} EN ROJO · frenado de emergencia automático · detente y espera al PCC`, "alert", 6000);
       break;
     case "collision":
       audio.impact();
@@ -1701,7 +1717,9 @@ function loop(now) {
 
   // 6. HUD
   if (player) {
+    game.safety.update(dt, player);
     const info = getRouteInfo(player);
+    info.alert = game.safety.alert(player);
     updateCabVisuals(dt, player, info);
     if (player.sim.speed > 0.2) game.lastDecel = -player.sim.accel;
     game.score.update(dt, player.sim);

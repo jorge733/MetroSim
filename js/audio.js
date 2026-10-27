@@ -323,6 +323,42 @@ export class AudioSystem {
     for (let i = 0; i < 10; i++) this.clack(0.2 + i * 0.17 + Math.random() * 0.04, 0.07 * strength);
   }
 
+  /** Bocina del tren: dos tonos graves y potentes (como la de los trenes del Metro). */
+  horn(duration = 0.9) {
+    if (!this.ctx) return;
+    [311, 370].forEach(f => {
+      this.tone(f, { duration, gain: 0.09, wave: "sawtooth", attack: 0.04 });
+      this.tone(f * 2.01, { duration, gain: 0.03, wave: "square", attack: 0.04 });
+    });
+  }
+
+  /** Alarma de vigilancia (hombre muerto): zumbador intermitente. */
+  vigilanceBuzz() {
+    if (!this.ctx) return;
+    this.tone(1250, { duration: 0.22, gain: 0.07, wave: "square", attack: 0.003 });
+  }
+
+  /**
+   * Radio del PCC (Puesto Central de Control): chasquido de la radio, el mensaje
+   * con la voz sintetizada (más rápida, como un operador) y el cierre del canal.
+   */
+  radio(text) {
+    if (!this.ctx || this.muted) return;
+    this.burst({ duration: 0.12, gain: 0.06, type: "bandpass", freq: 1800, q: 0.8, attack: 0.002 });
+    this.tone(1650, { start: 0.1, duration: 0.07, gain: 0.04, wave: "square" });
+    if (!("speechSynthesis" in window)) return;
+    setTimeout(() => {
+      if (this.muted || !this.ctx) return;
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = this.voice?.lang || "es-CL";
+      if (this.voice) u.voice = this.voice;
+      u.rate = 1.08; u.pitch = 0.85; u.volume = 0.9;
+      u.onend = () => this.ctx && this.burst({ duration: 0.18, gain: 0.05, type: "bandpass", freq: 2200, q: 0.7, attack: 0.002 });
+      speechSynthesis.speak(u);
+    }, 350);
+  }
+
   /** Traspié a bordo: arrastre de zapatos y, si chocas con alguien, un golpe sordo. */
   stumble(bump = false) {
     if (!this.ctx) return;
