@@ -14,6 +14,8 @@ import { $, clamp, formatClock, formatStopError } from "./utils.js";
 import { formatDelay } from "./engine/schedule.js";
 import { BANK_NAME } from "./economy.js";
 import { MISSION_TYPES, MASTERY_REWARD } from "./missions.js";
+import { icon, textOn } from "./icons.js";
+import { renderShiftReport } from "./shiftReport.js";
 
 export class Hud {
   constructor() {
@@ -70,10 +72,12 @@ export class Hud {
    */
   setLine() {
     document.documentElement.style.setProperty("--line", LINE.color);
+    document.documentElement.style.setProperty("--on-line", textOn(LINE.color));
     this.setText($("hudLineBadge"), LINE.id);
     this.setText($("hudLineLabel"), `METRO DE SANTIAGO · ${LINE.name}`);
     this.setText($("hudLineRoute"), `${STATIONS[0].name} ⇄ ${STATIONS.at(-1).name}`);
     this.stripDots?.forEach(d => d.remove());
+    this.stripIdx = undefined;
     this.buildLineStrip();
   }
 
@@ -111,10 +115,10 @@ export class Hud {
   }
 
   setSound(on) {
-    // El texto va en su propio <span> para que el celular muestre solo el ícono
-    const html = on ? `🔊<span class="sound-label"> Sonido</span>` : `🔇<span class="sound-label"> Silencio</span>`;
+    const html = icon(on ? "soundOn" : "soundOff");
     if (this.el.soundButton.innerHTML !== html) this.el.soundButton.innerHTML = html;
     this.el.soundButton.setAttribute("aria-label", on ? "Sonido activado" : "Sonido desactivado");
+    this.el.soundButton.title = on ? "Sonido activado (M)" : "Sonido desactivado (M)";
     this.el.soundButton.classList.toggle("off", !on);
   }
 
@@ -124,7 +128,13 @@ export class Hud {
   updateStrip(z, highlight) {
     this.el.lineStripTrain.style.left = `${this.progressOf(z) * 100}%`;
     const idx = highlight ? (highlight.worldIndex ?? highlight.index) : -1;
+    if (idx === this.stripIdx) return;
+    this.stripIdx = idx;
     this.stripDots.forEach((d, i) => d.classList.toggle("current", i === idx));
+    // Si la estación resaltada queda junto a una terminal, se oculta el nombre de la terminal
+    const pos = (i) => parseFloat(this.stripDots[i].style.left);
+    const last = this.stripDots.length - 1;
+    for (const t of [0, last]) this.stripDots[t].classList.toggle("crowded", idx > 0 && idx < last && Math.abs(pos(idx) - pos(t)) < 16);
   }
 
   /* ---------------------------------------------------------------------
@@ -260,6 +270,10 @@ export class Hud {
     const e = this.el;
     this.setText(e.summaryKicker, s.kicker);
     this.setText(e.summaryTitle, s.title);
+    this.closeReport?.();
+    this.closeReport = null;
+    e.summary.classList.remove("summary-report");
+    e.summary.querySelector(".summary-card").classList.remove("hidden");
     e.summaryList.replaceChildren(...s.rows.map(([k, v]) => {
       const li = document.createElement("li");
       li.innerHTML = `<span></span><b></b>`;
@@ -276,7 +290,30 @@ export class Hud {
     if (document.pointerLockElement) document.exitPointerLock?.();
   }
 
-  hideSummary() { this.el.summary.classList.add("hidden"); }
+  hideSummary() {
+    this.el.summary.classList.add("hidden");
+    this.closeReport?.();
+    this.closeReport = null;
+  }
+
+  /**
+   * Informe animado de fin de turno del Conductor (shiftReport.js). Usa el mismo
+   * contenedor que el resumen, así el juego se pausa igual mientras está abierto.
+   * @param {object} r      datos del turno
+   * @param {object} sound  { tick, stamp, record, cash }
+   */
+  showShiftReport(r, sound) {
+    this.closeReport?.();
+    const box = this.el.summary;
+    box.querySelector(".summary-card").classList.add("hidden");
+    box.classList.add("summary-report");
+    this.closeReport = renderShiftReport(box, r, {
+      sound,
+      onAction: (fn) => { this.hideSummary(); fn?.(); },
+    });
+    box.classList.remove("hidden");
+    if (document.pointerLockElement) document.exitPointerLock?.();
+  }
 
   /* ---------------------------------------------------------------------
      Tarjeta bip!, boletería y tótem

@@ -18,6 +18,7 @@
    ========================================================================== */
 
 import { CONFIG } from "../config.js";
+import { textOn } from "../icons.js";
 import { describeTrain } from "../engine/engine.js";
 import { TRAIN_STATES } from "../engine/state.js";
 import { formatClock } from "../engine/format.js";
@@ -37,33 +38,34 @@ const L = CONFIG.train.length;
 /** Estilos propios del Centro de Control (se inyectan una vez). */
 const CSS = `
 .pcc { position: fixed; inset: 0; z-index: 30; display: grid; grid-template-rows: auto 1fr; background: var(--pcc-bg); color: var(--pcc-fg);
-  font-family: system-ui, "Segoe UI", Arial, sans-serif; --pcc-bg: #070b10; --pcc-fg: #dfe7ef; --pcc-panel: #0e1620; --pcc-border: #ffffff1c; --pcc-dim: #8b98a7; }
+  font-family: var(--f-body); --pcc-bg: var(--bg); --pcc-fg: var(--text); --pcc-panel: var(--surface); --pcc-border: var(--panel-border); --pcc-dim: var(--muted); }
 .pcc-top { display: flex; align-items: center; gap: 14px; padding: 10px 16px; border-bottom: 1px solid var(--pcc-border); flex-wrap: wrap; }
-.pcc-top h1 { margin: 0; font-size: 18px; letter-spacing: 1px; }
+.pcc-top h1 { margin: 0; font: 700 22px/1 var(--f-display); letter-spacing: .5px; }
 .pcc-top small { color: var(--pcc-dim); }
-.pcc-clock { margin-left: auto; font: 700 22px/1 ui-monospace, Consolas, monospace; }
-.pcc button { font: inherit; color: inherit; background: #1a2633; border: 1px solid var(--pcc-border); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
-.pcc button:hover { background: #24364a; }
-.pcc button.on { background: #1d5a36; border-color: #3fd07a88; }
+.pcc-clock { margin-left: auto; font: 700 22px/1 var(--f-data); font-variant-numeric: tabular-nums; }
+.pcc button { font: inherit; font-size: 14px; font-weight: 500; color: inherit; background: var(--raise); border: 1px solid #ffffff26; border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+.pcc button:hover { background: #1d2a38; }
+.pcc button.on { background: #123826; border-color: #34d17c88; color: #bff0d3; }
 .pcc button.danger { background: #5a1d1d; border-color: #ff4b4b88; }
 .pcc-body { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 12px; padding: 12px 16px; min-height: 0; overflow: auto; }
 .pcc-lines { display: grid; gap: 12px; align-content: start; min-width: 0; }
-.pcc-line { background: var(--pcc-panel); border: 1px solid var(--pcc-border); border-radius: 12px; padding: 10px 12px; min-width: 0; }
+.pcc-line { background: var(--pcc-panel); border: 1px solid var(--pcc-border); border-radius: var(--radius); padding: 12px 14px; min-width: 0; }
 .pcc-line header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
-.pcc-badge { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-weight: 900; color: #fff; }
+.pcc-badge { width: 30px; height: 30px; border-radius: 7px; display: grid; place-items: center; font: 700 18px/1 var(--f-display); color: #fff; }
+.pcc-line header strong { font: 700 20px/1 var(--f-display); letter-spacing: .4px; }
 .pcc-kpis { display: flex; gap: 14px; flex-wrap: wrap; color: var(--pcc-dim); font-size: 13px; }
-.pcc-kpis b { color: var(--pcc-fg); }
+.pcc-kpis b { color: var(--pcc-fg); font-family: var(--f-data); font-variant-numeric: tabular-nums; }
 .pcc-line canvas { width: 100%; height: 240px; display: block; cursor: pointer; }
 .pcc-side { display: grid; gap: 12px; align-content: start; min-width: 0; }
-.pcc-card { background: var(--pcc-panel); border: 1px solid var(--pcc-border); border-radius: 12px; padding: 12px; }
-.pcc-card h2 { margin: 0 0 8px; font-size: 13px; letter-spacing: 1px; color: var(--pcc-dim); font-weight: 700; }
+.pcc-card { background: var(--pcc-panel); border: 1px solid var(--pcc-border); border-radius: var(--radius); padding: 12px 14px; }
+.pcc-card h2 { margin: 0 0 10px; font: 600 10.5px/1.2 var(--f-data); letter-spacing: 1.3px; text-transform: uppercase; color: var(--pcc-dim); }
 .pcc-train dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; margin: 0 0 10px; font-size: 13px; }
 .pcc-train dt { color: var(--pcc-dim); }
 .pcc-train dd { margin: 0; }
 .pcc-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .pcc-log { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 12px; max-height: 300px; overflow: auto; }
 .pcc-log li { padding: 4px 6px; border-radius: 6px; background: #ffffff08; }
-.pcc-log time { color: var(--pcc-dim); margin-right: 6px; font-family: ui-monospace, Consolas, monospace; }
+.pcc-log time { color: var(--pcc-dim); margin-right: 6px; font-family: var(--f-data); }
 .pcc-log .warn { border-left: 3px solid #ffb020; } .pcc-log .alert { border-left: 3px solid #ff4b4b; } .pcc-log .ok { border-left: 3px solid #3fd07a; }
 .pcc-legend { display: flex; flex-wrap: wrap; gap: 8px 12px; font-size: 12px; color: var(--pcc-dim); }
 .pcc-legend i { display: inline-block; width: 12px; height: 8px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
@@ -141,7 +143,7 @@ export class ControlCenter {
       el.className = "pcc-line";
       el.innerHTML = `
         <header>
-          <span class="pcc-badge" style="background:${ls.line.color}">${ls.line.id}</span>
+          <span class="pcc-badge" style="background:${ls.line.color};color:${textOn(ls.line.color)}">${ls.line.id}</span>
           <strong>${ls.line.name}</strong>
           <small style="color:var(--pcc-dim)">${ls.line.stations[0].name} ⇄ ${ls.line.stations.at(-1).name}</small>
           <button data-act="reg" data-line="${ls.line.id}" style="margin-left:auto">Regulación</button>

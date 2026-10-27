@@ -109,10 +109,11 @@ const titleCase = (s) => s.charAt(0) + s.slice(1).toLowerCase();
 
 /**
  * Lluvia de confeti: dos cañonazos desde las esquinas inferiores y luego
- * confeti que cae desde arriba, girando y meciéndose.
+ * confeti que cae desde arriba, girando y meciéndose. También la usa el
+ * informe de fin de turno (shiftReport.js) cuando hay récord o nota alta.
  * @returns {() => void} detener
  */
-function confetti(canvas, colors, seconds) {
+export function confetti(canvas, colors, seconds) {
   const g = canvas.getContext("2d");
   let W = 0, H = 0;
   const resize = () => { W = canvas.width = innerWidth; H = canvas.height = innerHeight; };

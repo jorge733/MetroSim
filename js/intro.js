@@ -30,7 +30,7 @@ import { LICENSES, LIVERIES, CONTRACTS, FURNITURE } from "./shop.js";
 const TUNNEL_TIME = 4.6;           // segundos de viaje por el túnel antes de salir a la ciudad
 
 const CSS = `
-.intro{position:fixed;inset:0;z-index:50;background:#020305;overflow:hidden;transition:opacity .9s;color:#fff;font-family:Inter,system-ui,sans-serif}
+.intro{position:fixed;inset:0;z-index:50;background:#020305;overflow:hidden;transition:opacity .9s;color:#fff;font-family:var(--f-body)}
 .intro.leaving{opacity:0;pointer-events:none}
 .intro>canvas{position:absolute;inset:0;width:100%;height:100%}
 .intro-ui{position:relative;height:100%;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);align-items:safe center;overflow-y:auto;gap:28px;padding:28px clamp(16px,5vw,64px);opacity:0;transition:opacity 1.2s}
@@ -39,11 +39,11 @@ const CSS = `
 .intro-brand{display:flex;align-items:center;gap:16px}
 .intro-logo{width:clamp(84px,10vw,120px);height:auto;filter:drop-shadow(0 0 30px #e1251b88);transform:scale(.4) rotate(-12deg);opacity:0;transition:transform 1s cubic-bezier(.2,1.6,.4,1),opacity .6s}
 .intro.city .intro-logo{transform:none;opacity:1}
-.intro-title{font-weight:900;font-size:clamp(48px,8vw,104px);line-height:.9;letter-spacing:-3px;text-shadow:0 10px 50px #000c}
+.intro-title{font-family:var(--f-display);font-weight:700;font-size:clamp(52px,8.5vw,112px);line-height:.9;letter-spacing:-1px;text-shadow:0 10px 50px #000c}
 .intro-title span{display:inline-block;opacity:0;transform:translateY(-60px) rotate(-8deg)}
 .intro.city .intro-title span{animation:introDrop .7s cubic-bezier(.2,1.4,.4,1) forwards}
 .intro-brand>div{display:grid;gap:8px;justify-items:start}
-.intro-eyebrow{font-size:12px;letter-spacing:4px;color:#ffd166;font-weight:700}
+.intro-eyebrow{font-family:var(--f-data);font-size:12px;letter-spacing:3px;color:#ffd166;font-weight:700}
 .intro-version{display:inline-flex;align-items:center;gap:7px;padding:4px 10px 4px 8px;border:1px solid #ffd16655;border-radius:999px;background:#ffd16614;color:#ffe3a3;font-size:11px;font-weight:800;letter-spacing:2px;opacity:0;transform:translateY(8px);transition:opacity .6s 1.1s,transform .6s 1.1s}
 .intro-version::before{content:"";width:7px;height:7px;border-radius:50%;background:#3ddc84;box-shadow:0 0 8px #3ddc84}
 .intro.city .intro-version{opacity:1;transform:none}
@@ -51,14 +51,14 @@ const CSS = `
 .intro-sub .caret{display:inline-block;width:2px;height:1em;margin-left:2px;background:#ffd166;vertical-align:-2px;animation:introBlink .8s steps(2) infinite}
 .intro-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;width:min(100%,580px)}
 .intro-stats div{padding:9px 12px;border:1px solid #ffffff26;border-radius:12px;background:#08101acc;backdrop-filter:blur(8px)}
-.intro-stats b{display:block;font-size:26px;font-variant-numeric:tabular-nums}
+.intro-stats b{display:block;font-family:var(--f-data);font-size:26px;font-variant-numeric:tabular-nums}
 .intro-stats small{display:block;color:#9fb0c2;font-size:10.5px;line-height:1.2;letter-spacing:1px}
 .intro-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;width:min(100%,580px)}
 .intro-cards div{padding:9px 12px;border:1px solid #ffffff1f;border-left:4px solid var(--c);border-radius:11px;background:#08101add;backdrop-filter:blur(8px);color:#c9d5e2;font-size:12px;line-height:1.35;opacity:0;transform:translateX(-24px)}
 .intro.city .intro-cards div{animation:introSlide .6s ease-out forwards}
 .intro-cards b{display:block;margin-bottom:3px;color:#fff;font-size:14px}
 .intro-actions{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
-.intro-start{position:relative;padding:14px 30px;border:0;border-radius:14px;background:linear-gradient(135deg,#e1251b,#b3121f);color:#fff;font:800 17px Inter,system-ui,sans-serif;cursor:pointer;box-shadow:0 10px 30px #e1251b55;overflow:hidden}
+.intro-start{position:relative;padding:14px 30px;border:0;border-radius:14px;background:linear-gradient(135deg,#e1251b,#b3121f);color:#fff;font:700 17px var(--f-body);cursor:pointer;box-shadow:0 10px 30px #e1251b55;overflow:hidden}
 .intro-start::after{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 30%,#ffffff55 50%,transparent 70%);transform:translateX(-120%);animation:introShine 2.8s 2s infinite}
 .intro-start:hover{filter:brightness(1.12);transform:translateY(-1px)}
 .intro-hint{color:#8fa0b3;font-size:11px}
