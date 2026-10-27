@@ -76,6 +76,7 @@ export class Hud {
     this.setText($("hudLineLabel"), `METRO DE SANTIAGO · ${LINE.name}`);
     this.setText($("hudLineRoute"), `${STATIONS[0].name} ⇄ ${STATIONS.at(-1).name}`);
     this.stripDots?.forEach(d => d.remove());
+    this.stripIdx = undefined;
     this.buildLineStrip();
   }
 
@@ -113,10 +114,10 @@ export class Hud {
   }
 
   setSound(on) {
-    // El texto va en su propio <span> para que el celular muestre solo el ícono
-    const html = on ? `🔊<span class="sound-label"> Sonido</span>` : `🔇<span class="sound-label"> Silencio</span>`;
+    const html = icon(on ? "soundOn" : "soundOff");
     if (this.el.soundButton.innerHTML !== html) this.el.soundButton.innerHTML = html;
     this.el.soundButton.setAttribute("aria-label", on ? "Sonido activado" : "Sonido desactivado");
+    this.el.soundButton.title = on ? "Sonido activado (M)" : "Sonido desactivado (M)";
     this.el.soundButton.classList.toggle("off", !on);
   }
 
@@ -126,7 +127,13 @@ export class Hud {
   updateStrip(z, highlight) {
     this.el.lineStripTrain.style.left = `${this.progressOf(z) * 100}%`;
     const idx = highlight ? (highlight.worldIndex ?? highlight.index) : -1;
+    if (idx === this.stripIdx) return;
+    this.stripIdx = idx;
     this.stripDots.forEach((d, i) => d.classList.toggle("current", i === idx));
+    // Si la estación resaltada queda junto a una terminal, se oculta el nombre de la terminal
+    const pos = (i) => parseFloat(this.stripDots[i].style.left);
+    const last = this.stripDots.length - 1;
+    for (const t of [0, last]) this.stripDots[t].classList.toggle("crowded", idx > 0 && idx < last && Math.abs(pos(idx) - pos(t)) < 16);
   }
 
   /* ---------------------------------------------------------------------

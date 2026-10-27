@@ -287,12 +287,13 @@ function useLine(line) {
 }
 
 document.querySelectorAll("[data-mode]").forEach(btn => btn.addEventListener("click", () => startGame(btn.dataset.mode)));
-// "🎓 Tutorial" de cada modo: juega ese modo con el tutorial interactivo desde el principio
+// "¿Primera vez? Con tutorial" de cada modo: juega ese modo con el tutorial interactivo desde el principio
 document.querySelectorAll("[data-tutorial]").forEach(btn => btn.addEventListener("click", () => startGame(btn.dataset.tutorial, { tutorial: true })));
 $("backButton").addEventListener("click", stopGame);
 $("endShiftButton").addEventListener("click", requestEndShift);
 $("shopButton").addEventListener("click", () => openStore());
 $("soundButton").addEventListener("click", toggleSound);
+$("helpChip").addEventListener("click", () => hud.toggleHelp());
 window.addEventListener("keydown", onKeyDown);
 window.addEventListener("keyup", onKeyUp);
 window.addEventListener("resize", onResize);
@@ -451,7 +452,7 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = {}) {
     game.tutorial = new Tutorial({
       mode, parent: gameScreen, touch: wantsTouch(), step: opts.tutorialStep ?? 0,
       onStep: () => game?.audio.loadOk(),
-      onFinish: () => { if (game) { game.tutorial = null; hud.showMessage("Tutorial completado · H muestra los controles · 🎓 Tutorial en la portada para repetirlo", "ok", 5000); } },
+      onFinish: () => { if (game) { game.tutorial = null; hud.showMessage("Tutorial completado · H muestra los controles · se repite desde la portada", "ok", 5000); } },
     });
   }
 

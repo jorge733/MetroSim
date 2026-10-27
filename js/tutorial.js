@@ -9,11 +9,12 @@
    juego que le pasa main.js en cada fotograma.
 
    La primera vez que se juega cada modo el tutorial empieza solo; después
-   se puede repetir con el botón "🎓 Tutorial" de cada modo en la portada.
+   se puede repetir con el botón "¿Primera vez? Con tutorial" de cada modo en la portada.
    Progreso guardado en localStorage: metrosim.tutorial.<modo> = "done".
    ========================================================================== */
 
 import { CONFIG, NOTCH_INDEX, formatCLP, spokenName } from "./config.js";
+import { icon } from "./icons.js";
 
 const KEY = (mode) => `metrosim.tutorial.${mode}`;
 
@@ -228,7 +229,7 @@ export class Tutorial {
     const el = document.createElement("aside");
     el.className = `tutorial tutorial-${mode}`;
     el.innerHTML = `
-      <header><span class="tutorial-badge">🎓 TUTORIAL</span><span class="tutorial-count"></span></header>
+      <header><span class="tutorial-badge">${icon("cap")} TUTORIAL</span><span class="tutorial-count"></span></header>
       <div class="tutorial-bar"><i></i></div>
       <strong class="tutorial-title"></strong>
       <p class="tutorial-text"></p>

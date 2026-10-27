@@ -205,7 +205,7 @@
             <span id="scoreBest" class="score-best"></span>
             <span id="scoreFloat" class="score-float"></span>
           </div>
-          <button id="soundButton" class="sound-button">🔊<span class="sound-label"> Sonido</span></button>
+          <button id="soundButton" class="sound-button" aria-label="Sonido activado"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4zM16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/></svg></button>
           <div class="hud-clock">
             <span class="hud-label">HORA</span>
             <span id="clock">08:00:00</span>
@@ -311,6 +311,7 @@
         <span class="help-walker"><kbd>J</kbd> misiones</span>
         <span><kbd>M</kbd> sonido</span>
       </div>
+      <button id="helpChip" class="help-chip"><kbd>H</kbd> Controles</button>
 
       <div id="message" class="message" aria-live="polite"></div>
     </div>
@@ -338,7 +339,7 @@
             <span class="small-label" id="ticketKicker">BOLETERÍA</span>
             <strong id="ticketTitle">—</strong>
           </div>
-          <button id="ticketClose" class="ticket-close" aria-label="Cerrar">✕</button>
+          <button id="ticketClose" class="ticket-close" aria-label="Cerrar"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
         </header>
         <div class="ticket-balance">
           <div><span class="small-label">SALDO</span><strong id="ticketBalance">$0</strong></div>
@@ -367,7 +368,7 @@
             <span class="small-label" id="storeKicker">LOCAL</span>
             <strong id="storeTitle">—</strong>
           </div>
-          <button id="storeClose" class="ticket-close" aria-label="Cerrar">✕</button>
+          <button id="storeClose" class="ticket-close" aria-label="Cerrar"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
         </header>
         <div class="ticket-balance">
           <div><span class="small-label">TU CUENTA · DÉBITO</span><strong id="storeBalance">$0</strong></div>
@@ -382,12 +383,12 @@
     <div id="missionPanel" class="ticket-panel hidden">
       <div class="ticket-card mission-card">
         <header class="ticket-head">
-          <span class="store-icon">🎯</span>
+          <span class="store-icon"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg></span>
           <div class="ticket-head-text">
             <span class="small-label">MISIONES · J o Esc para cerrar</span>
             <strong id="missionPanelTitle">Misiones</strong>
           </div>
-          <button id="missionClose" class="ticket-close" aria-label="Cerrar">✕</button>
+          <button id="missionClose" class="ticket-close" aria-label="Cerrar"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
         </header>
         <div id="missionActive" class="mission-active"></div>
         <span class="small-label">DISPONIBLES</span>
@@ -405,8 +406,8 @@
     <!-- Fundido a negro (cambio de cabina) -->
     <div id="fade" class="fade"><span id="fadeText"></span></div>
 
-    <button id="backButton" class="back-button">← Menú</button>
-    <button id="endShiftButton" class="back-button end-shift-button hidden">🏁 Finalizar turno</button>
+    <button id="backButton" class="back-button"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg> Menú</button>
+    <button id="endShiftButton" class="back-button end-shift-button hidden"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg> Finalizar turno</button>
   </section>
 
   <script type="module" src="js/main.js"></script>
