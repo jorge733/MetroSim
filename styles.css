@@ -1190,7 +1190,11 @@ body.touch-mode .help-chip { display: none !important; }
 /* ---------- Versión móvil: celular y tablet ---------- */
 /* Toques sin zoom por doble toque ni menú de mantener presionado; sin "rebote" de la página */
 html, body { overscroll-behavior: none; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
-button, select { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+html { -webkit-tap-highlight-color: transparent; }        /* sin el destello azul al tocar (se hereda en toda la página) */
+button, select { touch-action: manipulation; }
+/* Pantallas táctiles: sin el anillo de foco celeste en el botón recién tocado (con teclado sigue) */
+body.touch-mode :focus, body.touch-mode :focus-visible { outline: none; }
+@media (hover: none) and (pointer: coarse) { :focus, :focus-visible { outline: none; } }
 .game-screen { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 /* Altura real de la pantalla (la barra del navegador del celular no tapa nada) */
 @supports (height: 100dvh) {
