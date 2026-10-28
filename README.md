@@ -13,6 +13,11 @@ Los módulos ES necesitan un servidor local (no funciona abriendo `index.html` c
 
 Three.js se carga desde CDN, así que la primera vez hace falta conexión a internet.
 
+## App para Android (APK)
+
+`dist/MetroSim.apk` instala el juego como app de Android (funciona sin internet). Se reconstruye con
+`python3 android/build/build.py`; detalles en [android/LEEME.md](android/LEEME.md).
+
 ## Instalar como app (PWA)
 
 MetroSim es instalable: en la pantalla inicial aparece **📲 Instalar MetroSim** (Chrome, Edge, Android). En iPhone/iPad:
