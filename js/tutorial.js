@@ -62,7 +62,7 @@ function driverSteps(k) {
     },
     {
       title: "El inversor",
-      text: `El inversor ya está en F (adelante). Se cambia con ${k("Q (adelante) y E (atrás)", "Inv. ▶ e ◀ Inv.")}, solo con el tren parado. En R (atrás) el tren va lento: sirve para corregir si te pasas de la marca.`,
+      text: `El inversor ya está en F (adelante). Se cambia con ${k("Q (adelante) y E (atrás)", "un toque en la letra F / N / R del indicador de la izquierda")}, solo con el tren parado. En R (atrás) el tren va lento: sirve para corregir si te pasas de la marca.`,
       focus: ["#selectorHud"],
       next: true,
     },
@@ -111,7 +111,7 @@ function driverSteps(k) {
         if (Math.abs(err) <= CONFIG.station.stopTolerance) return "¡En la marca!";
         return err > 0
           ? `Te faltan ${m(err)}: suelta el freno y avanza despacio con ${k("W", "▲")}`
-          : `Te pasaste ${m(-err)}: pon el inversor en R (${k("E", "◀ Inv.")}) y retrocede despacio`;
+          : `Te pasaste ${m(-err)}: pon el inversor en R (${k("E", "tocando la letra del inversor")}) y retrocede despacio`;
       },
       focus: [".station-panel"],
       usesDest: true,
@@ -119,13 +119,13 @@ function driverSteps(k) {
     },
     {
       title: "Abre las puertas",
-      text: (c) => `¡Bien detenido en ${nice(c.mem.dest.name)}! Si el inversor quedó en R, vuelve a F con ${k("Q", "Inv. ▶")}. Abre las puertas con ${k("D", "🚪 Puertas")}: cada estación bien servida te paga al instante en tu cuenta.`,
+      text: (c) => `¡Bien detenido en ${nice(c.mem.dest.name)}! Si el inversor quedó en R, vuelve a F con ${k("Q", "tocando la letra del inversor")}. Abre las puertas con ${k("D", "🚪 Puertas")}: cada estación bien servida te paga al instante en tu cuenta.`,
       focus: [".door-panel", "#bankPill"],
       done: (c) => c.sim.doorState === "open" || c.sim.doorState === "opening",
     },
     {
       title: "¡Ya eres conductor!",
-      text: `Así se sirve cada estación: abrir, esperar el embarque, cerrar, acelerar, rodar y frenar a tiempo. Al final de la línea verás tu puntaje y harás la maniobra de retorno (${k("T", "⇄ Cabina")}). ${k("H muestra los controles · V cambia la vista.", "👁 Vista cambia la cámara.")}`,
+      text: `Así se sirve cada estación: abrir, esperar el embarque, cerrar, acelerar, rodar y frenar a tiempo. Al final de la línea verás tu puntaje y harás la maniobra de retorno (${k("T", "⇄ Cambiar cabina, que aparece al detenerte en FIN DE MANIOBRA")}). ${k("H muestra los controles · V cambia la vista.", "En el menú ☰: Vista, Bocina, Tienda y Finalizar turno.")}`,
       next: "Terminar",
     },
   ];
@@ -140,7 +140,7 @@ function passengerSteps(k) {
   return [
     {
       title: "Bienvenido a Santiago",
-      text: (c) => `Estás en la calle de ${nice(c.walker.station.name)}. ${k("Camina con W/S, gira con A/D o arrastrando el ratón y corre con Shift.", "Camina con el joystick (izquierda) y mira arrastrando a la derecha. 🏃 Correr alterna la carrera.")} Da unos pasos.`,
+      text: (c) => `Estás en la calle de ${nice(c.walker.station.name)}. ${k("Camina con W/S, gira con A/D o arrastrando el ratón y corre con Shift.", "Camina con el joystick (izquierda) y mira arrastrando a la derecha. Empuja el joystick hasta el borde para correr.")} Da unos pasos.`,
       done: (c) => c.mem.start && c.walker.pos.distanceTo(c.mem.start) > 4,
     },
     {
@@ -158,8 +158,8 @@ function passengerSteps(k) {
     {
       title: "Tu tarjeta bip!",
       text: (c) => c.card.hasCard
-        ? `Para pasar el torniquete necesitas saldo. Ve a la BOLETERÍA (izquierda) o a un TÓTEM (derecha), acércate y pulsa ${k("E", "E · Usar")} para cargar con tu débito.`
-        : `Necesitas una tarjeta bip!. Ve a la BOLETERÍA (a la izquierda), acércate y pulsa ${k("E", "E · Usar")}: compra la tarjeta y cárgala con tu tarjeta de débito.`,
+        ? `Para pasar el torniquete necesitas saldo. Ve a la BOLETERÍA (izquierda) o a un TÓTEM (derecha), acércate y pulsa ${k("E", "✋ Usar")} para cargar con tu débito.`
+        : `Necesitas una tarjeta bip!. Ve a la BOLETERÍA (a la izquierda), acércate y pulsa ${k("E", "✋ Usar")}: compra la tarjeta y cárgala con tu tarjeta de débito.`,
       live: (c) => `bip! ${c.card.label} · pasaje ahora ${formatCLP(c.fare)}`,
       focus: ["#cardPill", "#bankPill"],
       done: (c) => c.card.hasCard && c.card.balance >= c.fare && !c.hud.ticketOpen,
@@ -176,13 +176,13 @@ function passengerSteps(k) {
     },
     {
       title: "Espera el tren",
-      text: `Abajo a la derecha ves en cuántos minutos llega el próximo tren y cuánta gente espera. Puedes sentarte en un banco con ${k("F", "F · Sentarse")}. Cuando el tren abra las puertas, camina hacia adentro.`,
+      text: `Abajo a la derecha ves en cuántos minutos llega el próximo tren y cuánta gente espera. Puedes sentarte en un banco con ${k("F", "🪑 Sentarse")}. Cuando el tren abra las puertas, camina hacia adentro.`,
       focus: ["#passengerHud"],
       done: (c) => c.walker.space === "train",
     },
     {
       title: "Viaja y bájate",
-      text: (c) => `Escucha la megafonía: anuncia la próxima estación y las combinaciones. ${k("F", "F · Sentarse")} te sienta en un asiento libre.${c.game.missions?.step?.station ? ` Tu misión te lleva a ${nice(c.game.missions.step.station)}.` : ""} Cuando el tren se detenga y abra las puertas, camina hacia afuera.`,
+      text: (c) => `Escucha la megafonía: anuncia la próxima estación y las combinaciones. ${k("F", "🪑 Sentarse")} te sienta en un asiento libre.${c.game.missions?.step?.station ? ` Tu misión te lleva a ${nice(c.game.missions.step.station)}.` : ""} Cuando el tren se detenga y abra las puertas, camina hacia afuera.`,
       live: (c) => c.walker.unit ? `${Math.round(c.walker.unit.sim.speedKmh)} km/h · próxima: ${c.walker.unit.sim.nextStation()?.name ?? "—"}` : "",
       done: (c) => c.walker.space === "world",
     },
@@ -193,7 +193,7 @@ function passengerSteps(k) {
     },
     {
       title: "¡Ya conoces el Metro!",
-      text: `En la calle hay locales (${k("E", "E · Usar")} para comprar), un hito para fotografiar y un cajero con tu saldo. ${k("J misiones · K Tienda Metro · H controles.", "🎯 Misiones para el tablero.")} Si te falta dinero, haz un turno como Conductor.`,
+      text: `En la calle hay locales (${k("E", "✋ Usar")} para comprar), un hito para fotografiar y un cajero con tu saldo. ${k("J misiones · K Tienda Metro · H controles.", "🎯 Misiones para el tablero · ☰ Tienda.")} Si te falta dinero, haz un turno como Conductor.`,
       next: "Terminar",
     },
   ];

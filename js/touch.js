@@ -7,12 +7,19 @@
    lo mismo que su tecla, así que el Conductor sigue mandando ÓRDENES al
    motor exactamente igual que con el teclado.
 
-     Conductor  ▲ / ▼ mando · EMERGENCIA · Puertas · Inversor adelante /
-                atrás · Bocina · Vigilancia · Vista · Cambio de cabina.
+   Minimalista: a la vista solo lo que se usa siempre; lo que sirve en un
+   momento puntual aparece solo entonces (context()), y lo poco usado va en
+   el menú ☰.
+
+     Conductor  ▲ / ▼ mando · EMERGENCIA · Puertas · tocar F/N/R del
+                indicador cambia el inversor · Vigilancia (solo con la alarma
+                de hombre muerto) · Cambiar cabina (solo en FIN DE MANIOBRA) ·
+                ☰ Bocina, Vista, Tienda, Finalizar turno.
                 Arrastrar la pantalla: mirar.
      Pasajero   joystick a la izquierda para caminar (al borde: correr),
-                arrastrar a la derecha para mirar · E interactuar · F sentarse ·
-                G agarrarse · Misiones (J).
+                arrastrar a la derecha para mirar · Misiones (J) · Usar (E, si
+                hay algo cerca) · Sentarse (F, en andén o tren) · Agarrarse (G,
+                de pie en el tren) · ☰ Tienda, Menú principal.
    ========================================================================== */
 
 /** ¿Hay que mostrar los controles táctiles? */
@@ -34,10 +41,22 @@ const CSS = `
 .touch-big { width: 74px; height: 74px; font-size: 30px !important; }
 .touch-mid { min-width: 64px; height: 48px; padding: 0 10px !important; }
 .touch-em { width: 74px; height: 56px; background: #7a1010dd !important; border-color: #ff6b6b99 !important; font-size: 12px !important; }
-.touch-side button { height: 42px; min-width: 96px; font-size: 13px; }
-.touch-run.on { background: #1d5a36dd; border-color: #3fd07a99; }
+/* Acciones a la derecha, abajo (al alcance del pulgar): las contextuales aparecen encima */
+.touch-actions { position: absolute; right: 14px; bottom: 16px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: none; }
+.touch-actions button { min-width: 118px; height: 48px; padding: 0 14px; font-size: 15px; }
+.touch-actions .touch-main { min-width: 132px; height: 64px; font-size: 17px; }
+.touch-actions .touch-alert { background: #8a5a00e6; border-color: #ffd166; animation: touchPulse .7s ease-in-out infinite alternate; }
+@keyframes touchPulse { to { box-shadow: 0 0 0 6px #ffd16655; } }
+.touch-actions button[hidden], .touch-menu button[hidden] { display: none; }
+/* Menú ☰ (arriba a la derecha) */
+.touch-menu-btn { position: absolute; top: 8px; right: 10px; width: 48px; height: 42px; font-size: 20px !important; }
+.touch-menu { position: absolute; top: 56px; right: 10px; display: grid; gap: 6px; padding: 8px; border-radius: 14px; pointer-events: auto;
+  background: #0b141ef0; border: 1px solid #ffffff2a; box-shadow: 0 12px 40px #000a; }
+.touch-menu[hidden] { display: none; }
+.touch-menu button { min-width: 170px; height: 44px; justify-items: start; padding: 0 14px; font-size: 14px; }
+.touch-notch { cursor: pointer; }
 /* Mando e inversor actuales, junto a los botones (reemplaza al selector lateral en pantallas chicas) */
-.touch-notch { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px; width: 74px; padding: 4px; border-radius: 12px;
+.touch-notch { pointer-events: auto; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px; width: 74px; padding: 4px; border-radius: 12px;
   background: #0b141ecc; border: 1px solid #ffffff2a; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
 .touch-notch b { display: grid; place-items: center; height: 30px; border-radius: 8px; font: 700 16px/1 var(--f-data); color: #0a121b; background: var(--neutral, #e8eef5); }
 .touch-notch b.power { background: var(--power, #4fd6ff); }
@@ -60,7 +79,7 @@ const CSS = `
 .touch-rotate { display: none; bottom: 46%; background: #5a3d00e8; color: #ffe7a8; font-weight: 700; }
 @media (orientation: portrait) { .touch-rotate { display: block; } }
 /* Con controles táctiles se ocultan las ayudas de teclado */
-body.touch-mode .controls-help, body.touch-mode .start-keys, body.touch-mode .end-shift-button { display: none !important; }
+body.touch-mode .controls-help, body.touch-mode .start-keys, body.touch-mode .end-shift-button, body.touch-mode #backButton { display: none !important; }
 body.touch-mode #gameContainer, body.touch-mode #gameContainer canvas { touch-action: none; }
 body.touch-mode .selector-hud { transform: scale(.78); transform-origin: right center; }
 /* El HUD respeta la muesca y las esquinas redondeadas del teléfono */
@@ -69,8 +88,6 @@ body.touch-mode #hud { inset: env(safe-area-inset-top) env(safe-area-inset-right
 body.touch-mode .ticket-panel, body.touch-mode .summary { z-index: 14; }
 body.touch-mode .fade { z-index: 15; }
 .touch-left { left: 14px; bottom: 16px; }
-.touch-right { right: 12px; top: 84px; gap: 7px; }
-.touch-right.touch-two { grid-template-columns: repeat(2, auto); }     /* conductor: 9 botones en dos columnas */
 
 /* ---- Pantallas chicas (celular): HUD compacto, botones al alcance del pulgar ---- */
 @media (max-height: 520px), (max-width: 720px) {
@@ -87,7 +104,6 @@ body.touch-mode .fade { z-index: 15; }
   body.touch-mode .sound-button { padding: 8px 10px; font-size: 15px; }
   body.touch-mode .sound-label { display: none; }
   body.touch-mode .back-button { top: calc(8px + env(safe-area-inset-top)); left: auto; right: calc(10px + env(safe-area-inset-right)); z-index: 13; padding: 8px 10px; }
-  .touch-right { top: 50px; right: 10px; }
   .touch-left { left: 10px; bottom: 10px; }
   body.touch-mode .message { top: 58px; font-size: 12px; white-space: normal; width: max-content; max-width: calc(100% - 230px); text-align: center; }
   body.touch-mode .mission-tracker { top: 58px; left: 10px; width: min(250px, 42%); padding: 6px 10px; gap: 2px; }
@@ -105,26 +121,26 @@ body.touch-mode .fade { z-index: 15; }
   .touch-big { width: 64px; height: 64px; }
   .touch-em { width: 64px; height: 48px; }
   .touch-notch { width: 64px; }
-  .touch-side button { height: 38px; min-width: 92px; font-size: 12px; }
   .touch-col { gap: 8px; }
+  .touch-actions { gap: 6px; }
+  .touch-actions button { min-width: 104px; height: 42px; font-size: 13px; }
+  .touch-actions .touch-main { min-width: 120px; height: 54px; font-size: 15px; }
 }
 @media (max-height: 360px) {
   .touch-big { width: 56px; height: 56px; font-size: 24px !important; }
   .touch-em { width: 56px; height: 42px; }
   .touch-notch { width: 56px; }
-  .touch-side button { height: 34px; min-width: 84px; }
   .touch-col { gap: 6px; }
 }
 /* Celular en vertical: el panel de conducción ocupa el ancho de abajo; los botones quedan sobre él */
 @media (orientation: portrait) and (max-width: 720px) {
   body.touch-mode .hud-top { flex-direction: column; align-items: flex-start; right: 70px; }
   body.touch-mode .hud-right { justify-content: flex-start; max-width: calc(100vw - 150px); }
-  .touch-right { top: 108px; }
   body.touch-mode .mission-tracker { top: 156px; width: calc(100% - 140px); }
   body.touch-mode .message { top: 156px; max-width: calc(100% - 140px); left: 10px; transform: none; }
   body.touch-mode .mission-tracker:not(.hidden) ~ .message { top: 250px; }
   .touch-hint { top: auto; bottom: 52%; }
-  .touch-driver .touch-left { bottom: 150px; }
+  .touch-driver .touch-left, .touch-driver .touch-actions { bottom: 150px; }
   /* Tutorial: a la izquierda de la columna de botones (sin taparlos) */
   body.touch-mode .tutorial { top: 156px; left: 10px; right: auto; transform: none; width: calc(100% - 132px); }
   .touch-stick-ghost { bottom: 240px; }
@@ -150,11 +166,18 @@ export class TouchControls {
    * @param {(key:string) => void} opts.press  pulsa una tecla del juego (mismo efecto que el teclado)
    * @param {object} [opts.walker]         pasajero a pie (modo pasajero)
    */
-  constructor({ mode, parent, canvas, press, walker = null }) {
+  /**
+   * @param {() => object} [opts.context]  qué acciones tienen sentido ahora:
+   *   conductor { vigilance, cab } · pasajero { use, sit, seated, hold, holding }
+   * @param {() => void} [opts.onMenu]      volver al menú principal (pasajero, con confirmación)
+   */
+  constructor({ mode, parent, canvas, press, walker = null, context = () => ({}), onMenu = null }) {
     injectCss();
     document.body.classList.add("touch-mode");
     this.mode = mode;
     this.press = press;
+    this.context = context;
+    this.onMenu = onMenu;
     this.walker = walker;
     this.canvas = canvas;
     this.root = document.createElement("div");
@@ -163,6 +186,7 @@ export class TouchControls {
     this.listeners = [];
     if (mode === "driver") this.buildDriver();
     else this.buildPassenger();
+    this.syncTimer = setInterval(() => this.sync(), 150);
     const rotate = document.createElement("div");
     rotate.className = "touch-rotate";
     rotate.textContent = "Gira el teléfono para jugar mejor ↻";
@@ -199,38 +223,83 @@ export class TouchControls {
     return b;
   }
 
+  /** Menú ☰ con las acciones poco usadas; se cierra al elegir una o al tocar fuera. */
+  buildMenu(items) {
+    const btn = document.createElement("button");
+    btn.className = "touch-menu-btn";
+    btn.textContent = "☰";
+    btn.setAttribute("aria-label", "Más opciones");
+    const menu = document.createElement("div");
+    menu.className = "touch-menu";
+    menu.hidden = true;
+    const close = () => { menu.hidden = true; };
+    btn.addEventListener("click", (ev) => { ev.preventDefault(); menu.hidden = !menu.hidden; });
+    for (const [label, action] of items) {
+      const b = document.createElement("button");
+      b.innerHTML = label;
+      b.addEventListener("click", (ev) => { ev.preventDefault(); close(); action(); });
+      menu.append(b);
+    }
+    const outside = (ev) => { if (!menu.hidden && !menu.contains(ev.target) && ev.target !== btn) close(); };
+    document.addEventListener("pointerdown", outside, true);
+    this.docListeners = [["pointerdown", outside]];
+    this.menu = menu;
+    this.root.append(btn, menu);
+  }
+
   /* ----- Conductor ----- */
   buildDriver() {
-    // Columna izquierda: mando actual, ▲ / ▼ y emergencia (abajo, al alcance del pulgar)
+    // Columna izquierda: mando actual (tocar el inversor lo cambia), ▲ / ▼ y emergencia
     const col = document.createElement("div");
     col.className = "touch-col touch-left";
     this.notch = document.createElement("div");
     this.notch.className = "touch-notch";
     this.notch.innerHTML = "<b>N</b><i>N</i>";
+    this.notch.title = "Toca F / N / R para cambiar el inversor";
+    // Inversor de tres posiciones: cada toque avanza una (F → N → R → N → F)
+    this.revStep = -1;
+    this.notch.addEventListener("pointerdown", (ev) => {
+      ev.preventDefault();
+      const dir = Number(this.notch.lastChild.dataset.dir || 0);
+      if (dir === 1) this.revStep = -1;
+      if (dir === -1) this.revStep = 1;
+      this.press(this.revStep > 0 ? "q" : "e");
+    });
     col.append(
       this.notch,
       this.button("▲", "w", "touch-big", { repeat: true }),
       this.button("▼", "s", "touch-big", { repeat: true }),
       this.button("EMER-<br>GENCIA", " ", "touch-em"),
     );
-    // Columna derecha: puertas, inversor, vista, cambio de cabina y tienda
-    const row = document.createElement("div");
-    row.className = "touch-col touch-side touch-right touch-two";
-    row.append(
-      this.button("🚪 Puertas", "d"),
-      this.button("Inv. ▶", "q"),
-      this.button("◀ Inv.", "e"),
-      this.button("📯 Bocina", "b"),
-      this.button("✋ Vigilancia", "x"),
-      this.button("👁 Vista", "v"),
-      this.button("⇄ Cabina", "t"),
-      this.button("🛒 Tienda", "k", "touch-mid", { onClick: true }),
-      this.button("🏁 Finalizar", "f", "touch-mid", { onClick: true }),
-    );
-    this.root.append(col, row);
-    // El mando y el inversor se leen del HUD (el selector lateral se oculta en el celular)
-    this.notchTimer = setInterval(() => this.syncNotch(), 120);
+    // Derecha, abajo: puertas siempre; vigilancia y cambio de cabina solo cuando hacen falta
+    const actions = document.createElement("div");
+    actions.className = "touch-actions";
+    this.ctxButtons = {
+      vigilance: this.button("✋ Vigilancia", "x", "touch-alert"),
+      cab: this.button("⇄ Cambiar cabina", "t"),
+    };
+    actions.append(this.ctxButtons.vigilance, this.ctxButtons.cab, this.button("🚪 Puertas", "d", "touch-main"));
+    this.root.append(col, actions);
+    this.buildMenu([
+      ["📯 Bocina", () => this.press("b")],
+      ["👁 Vista", () => this.press("v")],
+      ["🛒 Tienda", () => this.press("k")],
+      ["🏁 Finalizar turno", () => this.press("f")],
+    ]);
   }
+
+  /** Muestra solo las acciones que sirven ahora y copia el mando al indicador. */
+  sync() {
+    if (this.notch) this.syncNotch();
+    if (!this.ctxButtons) return;
+    let ctx = {};
+    try { ctx = this.context() || {}; } catch { /* partida terminando */ }
+    for (const [key, b] of Object.entries(this.ctxButtons)) b.hidden = !ctx[key];
+    if (this.seatBtn) this.setLabel(this.seatBtn, ctx.seated ? "🧍 Levantarse" : "🪑 Sentarse");
+    if (this.holdBtn) this.setLabel(this.holdBtn, ctx.holding ? "🤚 Soltarse" : "🤚 Agarrarse");
+  }
+
+  setLabel(b, text) { if (b.textContent !== text) b.textContent = text; }
 
   /** Copia el punto de mando y el inversor activos al indicador táctil. */
   syncNotch() {
@@ -253,18 +322,21 @@ export class TouchControls {
     this.stick.innerHTML = "<i></i>";
     this.knob = this.stick.firstChild;
 
-    const col = document.createElement("div");
-    col.className = "touch-col touch-side touch-right";
-    this.runBtn = this.button("🏃 Correr", "", "touch-mid touch-run");
-    this.runBtn.addEventListener("pointerdown", () => {
-      this.running = !this.running;
-      this.runBtn.classList.toggle("on", this.running);
-    });
-    col.append(this.button("✋ Usar", "e"), this.button("🪑 Sentarse", "f"), this.button("🤚 Agarrarse", "g"), this.button("🎯 Misiones", "j", "touch-mid", { onClick: true }), this.runBtn, this.button("🛒 Tienda", "k", "touch-mid", { onClick: true }));
+    // Derecha, abajo: misiones siempre; usar, sentarse y agarrarse solo donde se puede (correr: joystick al borde)
+    const actions = document.createElement("div");
+    actions.className = "touch-actions";
+    this.seatBtn = this.button("🪑 Sentarse", "f");
+    this.holdBtn = this.button("🤚 Agarrarse", "g");
+    this.ctxButtons = { use: this.button("✋ Usar", "e", "touch-main"), sit: this.seatBtn, hold: this.holdBtn };
+    actions.append(this.holdBtn, this.seatBtn, this.ctxButtons.use, this.button("🎯 Misiones", "j", "", { onClick: true }));
     // Marca dónde va el joystick hasta que se usa por primera vez
     this.ghost = document.createElement("div");
     this.ghost.className = "touch-stick-ghost";
-    this.root.append(this.ghost, this.stick, col);
+    this.root.append(this.ghost, this.stick, actions);
+    this.buildMenu([
+      ["🛒 Tienda", () => this.press("k")],
+      ["← Menú principal", () => this.onMenu?.()],
+    ]);
 
     // Joystick (mitad izquierda) y mirada (mitad derecha) sobre el lienzo 3D
     const touches = new Map();          // pointerId → { kind, x0, y0, x, y }
@@ -321,11 +393,12 @@ export class TouchControls {
     if (sector(0.39, 2.75)) keys.add("s");               // abajo
     if (Math.abs(ang) < 1.18) keys.add("d");             // derecha
     if (Math.abs(ang) > 1.96) keys.add("a");             // izquierda
-    if (this.running || d > R * 1.15) keys.add("shift"); // al borde (o con "Correr"): correr
+    if (d > R * 1.15) keys.add("shift");                 // al borde: correr
   }
 
   destroy() {
-    clearInterval(this.notchTimer);
+    clearInterval(this.syncTimer);
+    for (const [type, fn] of this.docListeners || []) document.removeEventListener(type, fn, true);
     for (const [type, fn] of this.listeners) this.canvas.removeEventListener(type, fn);
     this.root.remove();
   }

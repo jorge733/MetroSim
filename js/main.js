@@ -532,7 +532,7 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = {}) {
 
   // Controles táctiles (celular / tablet): cada botón equivale a su tecla
   if (wantsTouch()) {
-    game.touch = new TouchControls({ mode, parent: gameScreen, canvas: renderer.domElement, press: pressKey, walker: game.walker });
+    game.touch = new TouchControls({ mode, parent: gameScreen, canvas: renderer.domElement, press: pressKey, walker: game.walker, context: touchContext, onMenu: requestMenu });
   }
   loadingScreen.classList.add("hidden");
   gameScreen.classList.remove("hidden");
@@ -1716,6 +1716,32 @@ function goDriveForMoney() {
   stopGame({ keepFullscreen: true });
   selectLine(id);
   startGame("driver");
+}
+
+/**
+ * Acciones táctiles que tienen sentido ahora (el resto de los botones contextuales se ocultan).
+ * Conductor: vigilancia solo con la alarma de hombre muerto; cambio de cabina solo detenido en FIN DE MANIOBRA.
+ * Pasajero: usar si hay algo al alcance; sentarse en el andén o el tren; agarrarse de pie en el tren.
+ */
+function touchContext() {
+  if (!game || game.warming || game.transition) return {};
+  if (game.player) {
+    const sim = game.player.sim;
+    return {
+      vigilance: !!game.safety.alarm,
+      cab: sim.isStopped && !sim.nextStation() && Math.abs(sim.position - game.player.route.track.retireZ) <= 15,
+    };
+  }
+  const w = game.walker;
+  if (!w || w.frozen) return {};
+  const inTrain = w.space === "train";
+  return {
+    use: w.space === "street" ? !!game.city.nearest(w.pos) : !inTrain && !!(w.elevatorNear() || w.nearService() || w.nearExit()),
+    sit: !!w.seat || inTrain || w.platformSide() !== 0,
+    seated: !!w.seat,
+    hold: inTrain && !w.seat,
+    holding: !!w.holding,
+  };
 }
 
 /* ==========================================================================
