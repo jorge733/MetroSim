@@ -262,7 +262,8 @@ export class Walker {
       const inBooth = x < B.x1 + 0.1 && dz > B.z0 - 0.15 && dz < B.z1 + 0.1;
       const inTotem = MZ.totems.some(t => Math.abs(x - t) < 0.45) && Math.abs(dz - MZ.totemZ) < 0.32;
       let gateOk = !nearGates;
-      if (nearGates && inGate) gateOk = this.paid || this.gatePass || this.tryValidate();
+      // Solo se cobra al pasar hacia la zona pagada: salir (o seguir saliendo tras cruzar la línea) es gratis
+      if (nearGates && inGate) gateOk = this.paid || this.gatePass || dz >= MZ.gateZ || this.tryValidate();
       if (gateOk && !inBooth && !inTotem && !inShaft) candidates.push(MZ.y);
     }
     // Salida a la calle: puerta, pasillo y escaleras hasta la vereda

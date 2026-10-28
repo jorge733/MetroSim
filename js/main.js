@@ -636,6 +636,7 @@ window.addEventListener("popstate", () => {
   else if (game && hud.ticketOpen) hud.closeTicket();
   else if (game && hud.storeOpen) hud.closeStore();
   else if (game && hud.missionsOpen) hud.closeMissions();
+  else if (game?.walker) requestMenu();          // pasajero: pide confirmación, igual que el botón Menú
   else if (game) return stopGame();
   else if (control) return stopControl();
   else return;

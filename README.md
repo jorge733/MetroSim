@@ -28,7 +28,10 @@ Los íconos están en `icons/` (los PNG se generan desde `icons/icon.svg`).
   el esquema de línea de arriba. A bordo te dice cuántas estaciones faltan o si vas en sentido contrario.
 - **Sin dinero**: si no te alcanza para el pasaje ni para cargar la bip!, aparece el botón «Sin dinero · ir a
   Conductor» que te lleva a conducir (en la línea actual si tienes su licencia; si no, en la Línea 3) para ganar tu sueldo.
-- **Volver al menú** desde el modo Pasajero pide confirmación (Esc o «Seguir jugando» cancela; Enter confirma).
+- **Volver al menú** desde el modo Pasajero (botón Menú o gesto/botón «atrás» del celular) pide confirmación
+  (Esc, «Seguir jugando» u otro «atrás» cancela; Enter confirma).
+- **Salir por los torniquetes es gratis**: solo se cobra el pasaje al pasar hacia la zona pagada (antes, al terminar
+  de cruzar el torniquete de salida se cobraba un pasaje).
 
 ## Versión 1.5 · Realismo de la red
 
