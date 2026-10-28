@@ -6,7 +6,7 @@ Construye MetroSim.apk sin el SDK de Android.
 
 1. Copia el juego a assets/www (con Three.js local en vendor/three, sin CDN).
 2. Genera classes.dex (dex.py + app.py), AndroidManifest.xml y resources.arsc (axml.py).
-3. Empaqueta, firma con jarsigner (esquema v1) y alinea los archivos sin comprimir.
+3. Empaqueta, alinea los archivos sin comprimir y firma con el esquema v2 (firma.py, con openssl).
 
 Three.js: --three apunta al paquete npm "three" descomprimido (carpeta con
 build/ y examples/); si no se indica, se descarga con `npm pack three@VERSIÓN`.
@@ -33,9 +33,11 @@ sys.path.insert(0, HERE)
 from dex import build as build_dex          # noqa: E402
 from app import CLASSES                      # noqa: E402
 import axml                                  # noqa: E402
+import firma                                 # noqa: E402
 
 PACKAGE = "cl.metrosim.app"
 THREE_VERSION = "0.180.0"
+TARGET_SDK = 35                              # Android 15: Play Protect bloquea las apps hechas para versiones antiguas
 KEYSTORE = os.path.join(ANDROID, "metrosim.keystore")
 KEY_ALIAS, KEY_PASS = "metrosim", "metrosim"
 GAME = ["index.html", "styles.css", "favicon.svg", "logo.svg", "manifest.webmanifest", "js", "audio", "fonts", "icons"]
@@ -115,7 +117,7 @@ def manifest_xml(version_name, version_code):
         a("versionCode", version_code, I),
         a("versionName", version_name, S),
     ], [
-        ("uses-sdk", [a("minSdkVersion", 24, I), a("targetSdkVersion", 28, I)], []),
+        ("uses-sdk", [a("minSdkVersion", 24, I), a("targetSdkVersion", TARGET_SDK, I)], []),
         ("uses-permission", [a("name", "android.permission.INTERNET", S)], []),
         app,
     ]))
@@ -177,11 +179,10 @@ def main():
                     put("assets/www/" + os.path.relpath(full, www).replace(os.sep, "/"), open(full, "rb").read())
 
         keystore()
-        subprocess.run(["jarsigner", "-keystore", KEYSTORE, "-storepass", KEY_PASS, "-keypass", KEY_PASS,
-                        "-sigalg", "SHA256withRSA", "-digestalg", "SHA-256", unsigned, KEY_ALIAS],
-                       check=True, stdout=subprocess.DEVNULL)
         os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
         align(unsigned, args.out)
+        firma.sign(args.out, KEYSTORE, KEY_PASS)
+        firma.verify(args.out)
     print(f"{args.out} · MetroSim {version_name} (versionCode {version_code}) · {os.path.getsize(args.out) / 1e6:.1f} MB")
 
 

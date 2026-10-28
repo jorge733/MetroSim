@@ -8,7 +8,8 @@ internet; solo el clima real se consulta en línea (sin conexión usa el típico
 
 1. Copia `MetroSim.apk` al teléfono (o descárgalo desde GitHub en el teléfono).
 2. Ábrelo y acepta instalar «apps de origen desconocido» para el navegador o el gestor de archivos.
-3. Android puede advertir que la app no viene de Play Store: es normal en apps instaladas a mano.
+3. Play Protect puede preguntar si quieres analizarla o advertir que no viene de Play Store: es normal
+   en apps instaladas a mano (elige instalar de todas formas).
 
 Requiere Android 7.0 o superior con WebView actualizado (Chrome 89+).
 
@@ -18,13 +19,17 @@ Requiere Android 7.0 o superior con WebView actualizado (Chrome 89+).
 python3 android/build/build.py            # deja dist/MetroSim.apk
 ```
 
-Solo usa Python 3, `npm` (para descargar Three.js) y `keytool`/`jarsigner` del JDK: no necesita
+Solo usa Python 3, `npm` (para descargar Three.js), `keytool` del JDK y `openssl`: no necesita
 el SDK de Android ni Gradle. El script:
 
 - copia el juego a `assets/www` con Three.js local (sin CDN) y sin service worker;
 - arma `classes.dex` desde `build/app.py` (el bytecode Dalvik de `src/.../MainActivity.java`,
   ensamblado por `build/dex.py`), y el `AndroidManifest.xml` binario y `resources.arsc` con `build/axml.py`;
-- firma con `metrosim.keystore` (esquema v1) y alinea los archivos sin comprimir.
+- alinea los archivos sin comprimir y firma con `metrosim.keystore` usando el esquema de firma v2
+  (`build/firma.py`, con openssl), que exige Android para apps hechas para versiones recientes.
+
+La app declara `targetSdkVersion` 35 (Android 15): con una versión antigua, Google Play Protect la
+bloquea como «app no segura».
 
 La app sirve los archivos desde `https://appassets.androidplatform.net/` (interceptando las
 peticiones del WebView), así que módulos, `fetch` y `localStorage` funcionan como en el navegador.
