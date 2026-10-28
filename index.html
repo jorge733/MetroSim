@@ -303,6 +303,23 @@
         <span class="hud-label">MISIÓN · J ver todas</span>
         <strong id="trackerTitle">—</strong>
         <ol id="trackerSteps"></ol>
+        <!-- Mapa de la misión: hacia dónde ir (brújula) y dónde queda el destino en la línea -->
+        <div id="missionGuide" class="mission-guide hidden">
+          <div class="guide-compass" id="guideCompass" aria-hidden="true">
+            <svg id="guideArrow" class="guide-arrow" viewBox="0 0 24 24"><path d="M12 2 19 20 12 16 5 20z"/></svg>
+            <span id="guideDist" class="guide-dist"></span>
+          </div>
+          <div class="guide-text">
+            <span class="hud-label" id="guideLabel">DESTINO</span>
+            <strong id="guideTarget">—</strong>
+            <span id="guideHint" class="station-sub">—</span>
+          </div>
+          <div class="guide-strip" id="guideStrip">
+            <div class="guide-strip-track"></div>
+            <i class="guide-you" id="guideYou" title="Tú"></i>
+            <i class="guide-pin" id="guidePin" title="Destino"></i>
+          </div>
+        </div>
       </div>
 
       <!-- Ayuda de controles -->
@@ -416,8 +433,22 @@
     <!-- Fundido a negro (cambio de cabina) -->
     <div id="fade" class="fade"><span id="fadeText"></span></div>
 
+    <!-- Confirmación antes de volver al menú (modo pasajero) -->
+    <div id="confirmPanel" class="ticket-panel hidden">
+      <div class="ticket-card confirm-card" role="alertdialog" aria-labelledby="confirmTitle" aria-describedby="confirmText">
+        <span class="small-label">MENÚ</span>
+        <strong id="confirmTitle">¿Volver al menú?</strong>
+        <p id="confirmText" class="station-sub">Saldrás de la partida. Tu cuenta, tu tarjeta bip! y el avance de tus misiones se guardan.</p>
+        <footer class="ticket-actions">
+          <button id="confirmCancel" class="ghost-button">Seguir jugando</button>
+          <button id="confirmOk" class="go-button">Volver al menú</button>
+        </footer>
+      </div>
+    </div>
+
     <button id="backButton" class="back-button"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg> Menú</button>
     <button id="endShiftButton" class="back-button end-shift-button hidden"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg> Finalizar turno</button>
+    <button id="driverJobButton" class="back-button driver-job-button hidden" title="Sin dinero: gana tu sueldo conduciendo"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12a2 2 0 0 1 2 2v10a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V5a2 2 0 0 1 2-2zM4 11h16M8 21l2-3M16 21l-2-3"/><circle cx="8.5" cy="14.5" r="1"/><circle cx="15.5" cy="14.5" r="1"/></svg> Sin dinero · ir a Conductor</button>
   </section>
 
   <script type="module" src="js/main.js"></script>

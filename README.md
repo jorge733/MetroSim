@@ -20,6 +20,16 @@ Compartir → *Agregar a inicio*. Se abre a pantalla completa y, tras la primera
 (el service worker `sw.js` guarda el juego, Three.js y las voces). La instalación necesita `https` o `localhost`.
 Los íconos están en `icons/` (los PNG se generan desde `icons/icon.svg`).
 
+## Mejoras del modo Pasajero
+
+- **Mapa de la misión**: bajo la misión activa hay una brújula que apunta al lugar del paso actual, con la distancia,
+  qué es y cómo llegar (boletería o tótem, acceso al Metro, torniquetes, escalera al andén del sentido correcto,
+  salida a la calle, el local o el hito), y una línea con tu posición y el destino. El destino también se marca en
+  el esquema de línea de arriba. A bordo te dice cuántas estaciones faltan o si vas en sentido contrario.
+- **Sin dinero**: si no te alcanza para el pasaje ni para cargar la bip!, aparece el botón «Sin dinero · ir a
+  Conductor» que te lleva a conducir (en la línea actual si tienes su licencia; si no, en la Línea 3) para ganar tu sueldo.
+- **Volver al menú** desde el modo Pasajero pide confirmación (Esc o «Seguir jugando» cancela; Enter confirma).
+
 ## Versión 1.5 · Realismo de la red
 
 - **El tren real de cada línea** (`js/engine/fleet.js`): las líneas 1, 2 y 5 usan trenes de **neumáticos** de Alstom

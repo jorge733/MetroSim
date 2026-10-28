@@ -42,6 +42,9 @@ export class Hud {
       ticketConfirm: $("ticketConfirm"), ticketClose: $("ticketClose"), ticketBuy: $("ticketBuy"),
       bankPill: $("bankPill"), bankAmount: $("bankAmount"), moneyFloat: $("moneyFloat"),
       tracker: $("missionTracker"), trackerTitle: $("trackerTitle"), trackerSteps: $("trackerSteps"),
+      guide: $("missionGuide"), guideCompass: $("guideCompass"), guideArrow: $("guideArrow"), guideDist: $("guideDist"),
+      guideLabel: $("guideLabel"), guideTarget: $("guideTarget"), guideHint: $("guideHint"),
+      guideStrip: $("guideStrip"), guideYou: $("guideYou"), guidePin: $("guidePin"),
       store: $("storePanel"), storeIcon: $("storeIcon"), storeKicker: $("storeKicker"), storeTitle: $("storeTitle"),
       storeBalance: $("storeBalance"), storeCardNo: $("storeCardNo"), storeList: $("storeList"), storeStatus: $("storeStatus"), storeClose: $("storeClose"),
       missions: $("missionPanel"), missionActive: $("missionActive"), missionOffers: $("missionOffers"),
@@ -83,6 +86,17 @@ export class Hud {
 
   /** Estaciones colocadas según su distancia; solo se rotulan terminales y la actual. */
   buildLineStrip() {
+    // Mapa de la misión: las mismas estaciones en pequeño
+    this.guideStops?.forEach(d => d.remove());
+    this.guideStops = STATIONS.map(s => {
+      const dot = document.createElement("i");
+      dot.className = "guide-stop";
+      dot.style.left = `${this.progressOf(s.z) * 100}%`;
+      dot.title = s.name;
+      this.el.guideStrip.insertBefore(dot, this.el.guideYou);
+      return dot;
+    });
+    this.stripTarget = -1;
     this.stripDots = STATIONS.map((s, i) => {
       const dot = document.createElement("div");
       dot.className = "line-strip-stop" + (i === 0 || i === STATIONS.length - 1 ? " terminal" : "") + (s.combos.length ? " combo" : "");
@@ -111,6 +125,7 @@ export class Hud {
     this.el.crosshair.classList.toggle("hidden", driver);
     document.querySelectorAll(".help-driver").forEach(e => e.classList.toggle("hidden", !driver));
     document.querySelectorAll(".help-walker").forEach(e => e.classList.toggle("hidden", driver));
+    this.updateGuide(null);
     this.hideSummary();
   }
 
@@ -135,6 +150,14 @@ export class Hud {
     const pos = (i) => parseFloat(this.stripDots[i].style.left);
     const last = this.stripDots.length - 1;
     for (const t of [0, last]) this.stripDots[t].classList.toggle("crowded", idx > 0 && idx < last && Math.abs(pos(idx) - pos(t)) < 16);
+  }
+
+  /** Estación de destino de la misión, marcada en el esquema de línea (−1: ninguna). */
+  setStripTarget(idx) {
+    if (idx === this.stripTarget) return;
+    this.stripDots[this.stripTarget]?.classList.remove("target");
+    this.stripDots[idx]?.classList.add("target");
+    this.stripTarget = idx;
   }
 
   /* ---------------------------------------------------------------------
@@ -458,6 +481,37 @@ export class Hud {
       li.className = i < m.step ? "done" : i === m.step ? "current" : "";
       return li;
     }));
+  }
+
+  /**
+   * Mapa de la misión (bajo el seguimiento): brújula hacia el lugar del paso
+   * actual, qué es y cómo llegar, y la línea con tu posición y el destino.
+   * @param {null|{label, target, hint, angle?:number|null, dist?:number|null, here?:boolean, you:number, pin:number|null, pinIndex:number}} g
+   */
+  updateGuide(g) {
+    const e = this.el;
+    e.guide.classList.toggle("hidden", !g);
+    if (!g) { this.setStripTarget(-1); return; }
+    this.setText(e.guideLabel, g.label);
+    this.setText(e.guideTarget, g.target);
+    this.setText(e.guideHint, g.hint);
+    const off = g.angle == null;
+    e.guideCompass.classList.toggle("off", off && !g.here);
+    e.guideCompass.classList.toggle("here", !!g.here);
+    if (!off) {
+      // Sin saltos al pasar por ±180°: se gira por el camino corto desde el ángulo anterior
+      const prev = this.guideAngle ?? g.angle;
+      let a = g.angle;
+      while (a - prev > Math.PI) a -= 2 * Math.PI;
+      while (a - prev < -Math.PI) a += 2 * Math.PI;
+      this.guideAngle = a;
+      e.guideArrow.style.transform = `rotate(${a.toFixed(3)}rad)`;
+    }
+    this.setText(e.guideDist, g.here || g.dist == null ? "" : g.dist < 1000 ? `${Math.round(g.dist)} m` : `${(g.dist / 1000).toFixed(1).replace(".", ",")} km`);
+    e.guideYou.style.left = `${(g.you * 100).toFixed(1)}%`;
+    e.guidePin.classList.toggle("hidden", g.pin == null);
+    if (g.pin != null) e.guidePin.style.left = `${(g.pin * 100).toFixed(1)}%`;
+    this.setStripTarget(g.pinIndex ?? -1);
   }
 
   /**

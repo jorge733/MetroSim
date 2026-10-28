@@ -97,10 +97,11 @@ import { DriverScore } from "./scoring.js";
 import { BankAccount, BANK_NAME, stationWage, shiftBonus } from "./economy.js";
 import { MissionSystem, MASTERY_REWARD, GRAND_REWARD, lineMastered } from "./missions.js";
 import { celebrate } from "./celebration.js";
-import { Inventory, souvenirId, SOUVENIR_PRICE, ALBUM_REWARD, LICENSES } from "./shop.js";
+import { Inventory, souvenirId, SOUVENIR_PRICE, ALBUM_REWARD, LICENSES, FREE_LINE } from "./shop.js";
 import { openShopUI } from "./shopUI.js";
 import { trainLiveryMaterials } from "./train.js";
 import { City } from "./city/city.js";
+import { STREET, streetPlan } from "./city/plan.js";
 import { Tutorial, tutorialDone } from "./tutorial.js";
 import { installTrackLift, setTrackLiftLine, updateTrackLift, pitchCamera } from "./render/trackLift.js";
 import { OutdoorView } from "./render/outdoor.js";
@@ -364,7 +365,11 @@ function useLine(line) {
 document.querySelectorAll("[data-mode]").forEach(btn => btn.addEventListener("click", () => startGame(btn.dataset.mode)));
 // "¿Primera vez? Con tutorial" de cada modo: juega ese modo con el tutorial interactivo desde el principio
 document.querySelectorAll("[data-tutorial]").forEach(btn => btn.addEventListener("click", () => startGame(btn.dataset.tutorial, { tutorial: true })));
-$("backButton").addEventListener("click", stopGame);
+$("backButton").addEventListener("click", requestMenu);
+$("confirmOk").addEventListener("click", () => closeConfirm(true));
+$("confirmCancel").addEventListener("click", () => closeConfirm(false));
+$("confirmPanel").addEventListener("click", (ev) => { if (ev.target === ev.currentTarget) closeConfirm(false); });
+$("driverJobButton").addEventListener("click", goDriveForMoney);
 $("endShiftButton").addEventListener("click", requestEndShift);
 $("shopButton").addEventListener("click", () => openStore());
 $("soundButton").addEventListener("click", toggleSound);
@@ -574,6 +579,9 @@ function stopGame({ keepFullscreen = false } = {}) {
   game.renderer.dispose();
   gameContainer.replaceChildren();
   game = null;
+  confirmOpen = false;
+  $("confirmPanel").classList.add("hidden");
+  $("driverJobButton").classList.add("hidden");
   hud.hideSummary();
   gameScreen.classList.add("hidden");
   loadingScreen.classList.add("hidden");
@@ -624,6 +632,7 @@ window.addEventListener("popstate", () => {
   // Primero cierra la ventana que esté abierta (tienda, boletería, local, misiones) y se sigue jugando
   const shopClose = document.querySelector(".shop-overlay .shop-close");
   if (shopClose) shopClose.click();
+  else if (confirmOpen) closeConfirm(false);
   else if (game && hud.ticketOpen) hud.closeTicket();
   else if (game && hud.storeOpen) hud.closeStore();
   else if (game && hud.missionsOpen) hud.closeMissions();
@@ -746,6 +755,7 @@ function onKeyDown(event) {
   const key = event.key.toLowerCase();
   if (["arrowup", "arrowdown", "arrowleft", "arrowright", " ", "pageup", "pagedown"].includes(key)) event.preventDefault();
   if (hud.summaryOpen) return;
+  if (confirmOpen) { if (key === "escape") closeConfirm(false); else if (key === "enter") closeConfirm(true); return; }
   if (hud.ticketOpen) { if (key === "escape" || key === "e") hud.closeTicket(); return; }
   if (hud.storeOpen) { if (key === "escape" || key === "e") hud.closeStore(); return; }
   if (hud.missionsOpen) { if (key === "escape" || key === "j") hud.closeMissions(); return; }
@@ -1522,6 +1532,216 @@ function openMissionBoard() {
 
 
 /* ==========================================================================
+   Mapa de la misión (modo Pasajero): hacia dónde ir para cumplir el paso actual
+   ========================================================================== */
+
+/**
+ * Guía del paso actual de la misión: qué lugar es, cómo llegar y hacia
+ * dónde queda (ángulo respecto de donde miras, para la brújula del HUD).
+ * Dentro de las estaciones guía por tramos: andén → escalera → mezanina →
+ * torniquetes → salida (o al revés para bajar al andén del sentido correcto).
+ */
+function missionGuide() {
+  const w = game.walker, ms = game.missions, step = ms?.step;
+  if (!w || !step) return null;
+  const MZ = CONFIG.mezzanine, ST = CONFIG.station;
+  const target = step.station ? ms.byName(step.station) : null;
+  const you = w.space === "street" ? hud.progressOf(w.station.z) : hud.progressOf(w.worldZ);
+  const g = { label: "", target: "", hint: "", angle: null, dist: null, here: false, you, pin: null, pinIndex: -1 };
+  if (target) { g.pin = hud.progressOf(target.z); g.pinIndex = target.index; }
+
+  // Punto a seguir (coordenadas del mundo) → ángulo relativo a la mirada y distancia
+  const toward = (x, z) => {
+    const dx = x - w.pos.x, dz = z - w.pos.z;
+    let rel = Math.atan2(-dx, -dz) - w.yaw;                 // 0 = al frente, + = a la izquierda
+    rel = Math.atan2(Math.sin(rel), Math.cos(rel));
+    g.angle = -rel;                                          // la flecha gira en sentido horario
+    g.dist = Math.hypot(dx, dz);
+  };
+  const dirLabel = (route) => `dirección ${spokenName(route.last.name)}`;
+  const plural = (n) => `${n} ${n === 1 ? "estación" : "estaciones"}`;
+  const routeTo = (from) => (target.index > from.index ? ROUTE_A : ROUTE_B);
+
+  /* --- A bordo de un tren --- */
+  if (w.space === "train") {
+    if (!target) { g.label = "BOLETERÍA"; g.target = "En la mezanina de cualquier estación"; g.hint = "Bájate en la próxima estación y sube a la mezanina"; return g; }
+    const sim = w.unit.sim, route = w.unit.route;
+    const docked = sim.dockedStation(), next = sim.nextStation();
+    const tIdx = route.stations.findIndex(s => s.name === target.name);
+    g.target = target.name;
+    if (docked && tIdx === docked.index) {
+      g.here = true;
+      g.label = "ESTÁS EN EL DESTINO";
+      g.hint = "Bájate aquí y sal a la calle";
+    } else if (tIdx >= 0 && (docked ? tIdx > docked.index : next && tIdx >= next.index)) {
+      const n = docked ? tIdx - docked.index : tIdx - next.index + 1;
+      g.label = `DESTINO · ${plural(n)}`;
+      g.hint = n === 1 ? "Bájate en la próxima estación" : `Vas bien: quédate a bordo ${plural(n)} más`;
+    } else {
+      g.label = "SENTIDO CONTRARIO";
+      g.hint = `Bájate y toma el tren ${dirLabel(route === ROUTE_A ? ROUTE_B : ROUTE_A)}`;
+    }
+    return g;
+  }
+
+  /* --- En la calle --- */
+  if (w.space === "street") {
+    const o = game.city.origin, a = STREET.access;
+    const goMetro = (hint) => { toward(o.x + a.x, o.z + a.z + a.mouthZ - 0.8); g.hint = hint; };
+    if (!target) {
+      g.label = "BOLETERÍA";
+      g.target = `Estación ${w.station.name}`;
+      goMetro(step.kind === "bipCard" ? "Baja al Metro: la boletería está en la mezanina" : "Baja al Metro: boletería o tótem en la mezanina");
+      return g;
+    }
+    if (target.name !== w.station.name) {
+      const n = Math.abs(target.index - w.station.index);
+      g.label = `DESTINO · ${plural(n)}`;
+      g.target = target.name;
+      goMetro(`Entra al Metro y toma el tren ${dirLabel(routeTo(w.station))}`);
+      return g;
+    }
+    // En la calle del destino: el local, el hito o (si ya está todo) nada
+    const plan = streetPlan(target);
+    g.label = "ESTÁS EN EL DESTINO";
+    if (step.kind === "buy" || step.kind === "action") {
+      const shop = plan.shops.find(sh => sh.kind === step.shop);
+      g.target = shop ? `${shop.icon} ${shop.name}` : target.name;
+      if (shop) toward(o.x + shop.door.x, o.z + shop.door.z);
+      g.hint = shop?.stand ? "Puesto en la vereda del Metro · E para atender" : "En la vereda del Metro · E en la puerta para entrar";
+      if (g.dist != null && g.dist < 2.6) { g.here = true; g.hint = "¡Aquí es! Pulsa E"; }
+    } else if (step.kind === "photo" && plan.landmark) {
+      g.target = `📷 ${plan.landmark.name}`;
+      toward(o.x - STREET.walkHalf - 3, o.z);
+      g.hint = "Al frente, cruzando la avenida · E para sacar la foto";
+      if (w.pos.x - o.x < -3 && Math.abs(w.pos.z - o.z) < (game.city.landmark?.halfZ ?? 10) + 6) { g.here = true; g.hint = "¡Aquí es! Pulsa E para sacar la foto"; }
+    } else {
+      g.target = target.name;
+      g.here = true;
+      g.hint = step.fare ? "Para que cuente tienes que llegar viajando en Metro" : "Ya estás aquí";
+    }
+    return g;
+  }
+
+  /* --- Dentro de una estación (andenes, escaleras, mezanina, salida) --- */
+  const st = w.stationAt(w.pos.z) || w.station;
+  const dz = w.pos.z - st.z;
+  const onPlatform = Math.abs(w.pos.y - ST.platformTop) < 0.3;
+  const onMezz = Math.abs(w.pos.y - MZ.y) < 0.3 && dz <= MZ.z1 + 0.5;
+  const inExit = !onPlatform && !onMezz && dz > MZ.z1 - 0.5;
+  const mySide = Math.sign(w.pos.x) || 1;
+  const stairX = (side) => side * (MZ.stairX0 + MZ.stairX1) / 2;
+  // Subir a la mezanina por la escalera del andén en que estás (o seguir subiendo si ya vas en ella)
+  const goUp = () => (onPlatform ? toward(stairX(mySide), st.z + MZ.stairZ0 - 1) : toward(stairX(mySide), st.z + MZ.stairZ1 + 1));
+  const goOut = () => {
+    if (inExit) return toward(0, st.z + CONFIG.exit.streetDz + 6);
+    if (!onMezz) return goUp();
+    if (dz < MZ.gateZ - 0.3) return toward(0, st.z + MZ.gateZ + 1);          // zona pagada: primero los torniquetes
+    return toward(0, st.z + MZ.z1 + 1);                                      // la salida, al fondo de la mezanina
+  };
+
+  if (!target) {
+    g.label = "BOLETERÍA";
+    const totem = step.kind === "bipLoad";
+    g.target = totem ? "Boletería o tótem de carga" : "Boletería";
+    if (onMezz && dz >= MZ.gateZ) {
+      const booth = { x: MZ.booth.x1 + 0.6, z: st.z + MZ.booth.windowZ };
+      const spots = totem ? [booth, ...MZ.totems.map(x => ({ x, z: st.z + MZ.totemZ - 0.8 }))] : [booth];
+      const best = spots.reduce((b, p) => (Math.hypot(p.x - w.pos.x, p.z - w.pos.z) < Math.hypot(b.x - w.pos.x, b.z - w.pos.z) ? p : b));
+      toward(best.x, best.z);
+      g.hint = totem ? "Boletería a la izquierda, tótems a la derecha · E para atender" : "A la izquierda de los torniquetes · E para atender";
+      if (g.dist < 1.4) { g.here = true; g.hint = "¡Aquí es! Pulsa E"; }
+    } else if (inExit) {
+      toward(0, st.z + MZ.z1 - 2);
+      g.hint = "Vuelve a la mezanina: está en la zona no pagada";
+    } else {
+      goOut();
+      g.hint = "Está en la mezanina, antes de los torniquetes";
+    }
+    return g;
+  }
+
+  g.target = target.name;
+  if (target.name === st.name) {
+    g.label = "ESTÁS EN EL DESTINO";
+    goOut();
+    g.hint = "Sal a la calle: la salida está al fondo de la mezanina";
+    return g;
+  }
+  const route = routeTo(st), side = route.side;
+  g.label = `DESTINO · ${plural(Math.abs(target.index - st.index))}`;
+  if (onPlatform) {
+    if (mySide === side) { g.here = true; g.hint = `Andén correcto: espera el tren ${dirLabel(route)}`; }
+    else { goUp(); g.hint = `Andén equivocado: sube y baja al andén ${dirLabel(route)}`; }
+  } else if (onMezz && dz >= MZ.gateZ) {
+    toward(0, st.z + MZ.gateZ - 1);
+    g.hint = `Pasa los torniquetes y baja al andén ${dirLabel(route)}`;
+  } else if (onMezz) {
+    toward(stairX(side), st.z + MZ.stairZ1 - 0.5);
+    g.hint = `Baja por la escalera al andén ${dirLabel(route)}`;
+  } else if (inExit) {
+    toward(0, st.z + MZ.z1 - 2);
+    g.hint = `Vuelve a la mezanina y baja al andén ${dirLabel(route)}`;
+  } else if (mySide === side) {
+    toward(stairX(side), st.z + MZ.stairZ0 - 1);
+    g.hint = `Sigue bajando: andén ${dirLabel(route)}`;
+  } else {
+    goUp();
+    g.hint = `Esta escalera va al otro andén: vuelve y baja al andén ${dirLabel(route)}`;
+  }
+  return g;
+}
+
+/* ==========================================================================
+   Sin dinero (modo Pasajero): atajo al modo Conductor para ganar el sueldo
+   ========================================================================== */
+
+/** ¿No alcanza ni para pagar el pasaje ni para cargar la bip!? */
+function passengerBroke() {
+  const fare = fareBandAt(game.clock).price;
+  if (card.hasCard && card.balance >= fare) return false;
+  return bank.balance < (card.hasCard ? FARES.loadAmounts[0] : FARES.cardPrice + FARES.loadAmounts[0]);
+}
+
+function updateDriverJobButton() {
+  const show = !!game?.walker && !game.transition && passengerBroke();
+  $("driverJobButton").classList.toggle("hidden", !show);
+}
+
+/** Deja el modo Pasajero y entra al de Conductor (en la línea actual si tiene licencia; si no, en la gratuita). */
+function goDriveForMoney() {
+  if (!game?.walker) return;
+  const id = inventory.canDrive(LINE.id) ? LINE.id : FREE_LINE;
+  stopGame({ keepFullscreen: true });
+  selectLine(id);
+  startGame("driver");
+}
+
+/* ==========================================================================
+   Volver al menú desde el modo Pasajero: con confirmación
+   ========================================================================== */
+
+let confirmOpen = false;
+
+function requestMenu() {
+  if (!game?.walker) return stopGame();
+  if (confirmOpen) return;
+  confirmOpen = true;
+  game.walker.frozen = true;
+  game.walker.keys.clear();
+  $("confirmPanel").classList.remove("hidden");
+  $("confirmCancel").focus();
+}
+
+function closeConfirm(leave) {
+  if (!confirmOpen) return;
+  confirmOpen = false;
+  $("confirmPanel").classList.add("hidden");
+  if (leave) return stopGame();
+  if (game?.walker) { game.walker.frozen = false; game.walker.keys.clear(); }
+}
+
+/* ==========================================================================
    Megafonía y sonidos de estado
    ========================================================================== */
 
@@ -1814,6 +2034,7 @@ function loop(now) {
     game.missionT = 1;
     report(game.missions.tick(missionCtx()));
     hud.updateTracker(game.missions);
+    updateDriverJobButton();
   }
 
   // 4. Luces del tren en foco (la interior sigue al pasajero a lo largo del tren)
@@ -1872,6 +2093,7 @@ function loop(now) {
     game.tutorial?.update(dt, { game, sim: player.sim, info });
   } else {
     hud.updatePassenger(walkerHudData());
+    hud.updateGuide(missionGuide());
     game.tutorial?.update(dt, { game, walker, card, hud, fare: fareBandAt(game.clock).price });
   }
 
