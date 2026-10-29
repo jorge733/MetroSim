@@ -19,6 +19,16 @@
                        su próxima estación bajan todos y sigue vacío hasta la
                        terminal sin admitir pasajeros.
 
+   Modo Centro de Control (engine.pcc = { lines: Set de ids de línea, quiet }): solo
+   hay incidentes en las líneas que supervisa el jugador y esperan su
+   decisión (órdenes de commands.js):
+     · signalFault dura varios minutos (cuadrilla de reparación): cada tren
+       detenido ante la señal necesita "control.authorize" (marcha a la vista).
+     · lineStop no reanuda solo hasta pasados unos minutos: "control.resume".
+     · doorFault sustituye a outOfService: un tren con falla de puertas tarda
+       más en cada parada hasta que se retire ("control.withdraw") o llegue a
+       la terminal.
+
    focus: tren en el que se fija el juego (el del pasajero o el que se acerca
    a su andén). Los incidentes le tocan a él a menudo, como al del conductor.
 
@@ -39,6 +49,13 @@ const STOP_REASONS = [
   [0.15, "inspección de vía", "nos encontramos detenidos por una inspección de vía"],
 ];
 
+/** Motivos de una detención en plena vía en modo Centro de Control (todos necesitan su autorización). */
+const PCC_STOP_REASONS = [
+  [0.4, "aviso de objeto en la vía", "nos encontramos detenidos por un aviso de objeto en la vía"],
+  [0.35, "activación de alarma de pasajero", "nos encontramos detenidos porque un pasajero activó la alarma"],
+  [0.25, "inspección de vía", "nos encontramos detenidos por una inspección de vía"],
+];
+
 const rand = (a, b) => a + Math.random() * (b - a);
 
 export class IncidentManager {
@@ -54,20 +71,27 @@ export class IncidentManager {
     for (const r of lineSystem.routes) r.restrictions = [];   // las rutas son compartidas entre partidas
   }
 
+  /** Modo Centro de Control: { lines } o null. */
+  get pcc() { return this.ls.engine?.pcc ?? null; }
+
   update(dt, clock) {
     this.doors(clock);
     // Fin de los incidentes temporales
     for (const inc of [...this.active]) {
-      if (clock < inc.until) continue;
+      if (!this.ended(inc, clock)) continue;
       if (inc.kind === "speedRestriction") inc.route.restrictions.splice(inc.route.restrictions.indexOf(inc.zone), 1);
       if (inc.kind === "signalFault") { inc.signal.fault = false; inc.signal.permit = null; }
-      if (inc.kind === "outOfService" && this.ls.traffic.units.includes(inc.unit) && inc.unit.ato?.evacuateAt != null) continue;  // dura hasta la terminal
+      if (inc.kind === "doorFault" && inc.unit.ato === inc.ato) inc.ato.doorFault = false;
       this.active.splice(this.active.indexOf(inc), 1);
       this.emit(inc, "end", inc.kind === "speedRestriction" ? `Fin de la limitación temporal de velocidad (${inc.zone.label})`
         : inc.kind === "signalFault" ? `Señal S${inc.signal.id} reparada · circulación normal`
         : inc.kind === "lineStop" ? `${inc.unit.id} reanuda la marcha`
-        : `${inc.unit.id} llegó a la terminal vacío`, { unit: inc.unit });
+        : inc.kind === "doorFault" ? (inc.ato.outOfService ? `${inc.unit.id} retirado del servicio · va vacío a la terminal` : `${inc.unit.id} terminó su recorrido · pasa a mantenimiento`)
+        : `${inc.unit.id} llegó a la terminal vacío`, { unit: inc.unit, signal: inc.signal ?? null });
     }
+    // Centro de Control: solo hay incidentes en las líneas que supervisa el jugador (y ninguno al azar durante el tutorial)
+    const pcc = this.pcc;
+    if (pcc && (!pcc.lines.has(this.ls.line.id) || pcc.quiet)) return;
     // Nuevo incidente
     if (clock >= this.nextAt) {
       this.nextAt = clock + rand(GAP_MIN, GAP_MAX);
@@ -76,8 +100,37 @@ export class IncidentManager {
     if (clock >= this.nextTrainAt) {
       this.nextTrainAt = clock + rand(TRAIN_GAP_MIN, TRAIN_GAP_MAX);
       if (Math.random() < 0.7) this.startLineStop(clock);
+      else if (pcc) { if (!this.active.some(i => i.kind === "doorFault")) this.startDoorFault(clock); }
       else if (!this.active.some(i => i.kind === "outOfService")) this.startOutOfService(clock);
     }
+  }
+
+  /** ¿Terminó este incidente? */
+  ended(inc, clock) {
+    const alive = this.ls.traffic.units.includes(inc.unit);
+    switch (inc.kind) {
+      case "lineStop": return clock >= inc.until || !alive || !inc.unit.ato?.lineStop;   // el PCC puede autorizar antes
+      case "outOfService": return clock >= inc.until && !(alive && inc.unit.ato?.evacuateAt != null);   // dura hasta la terminal
+      case "doorFault": {
+        const ato = inc.ato;
+        return !alive || inc.unit.ato !== ato || (ato.outOfService && !ato.evacuating) || ato.state === "retire" || ato.state === "retired";
+      }
+      default: return clock >= inc.until;
+    }
+  }
+
+  /**
+   * Provoca un incidente ahora (tutorial del Centro de Control).
+   * @param {"signalFault"|"lineStop"|"doorFault"} kind
+   * @param {object} [unit]  tren afectado (o el que tendrá la señal averiada por delante)
+   * @returns {boolean} si se pudo crear
+   */
+  force(kind, unit = null, clock = this.ls.time) {
+    const n = this.active.length;
+    if (kind === "signalFault") this.startSignalFault(clock, unit);
+    else if (kind === "lineStop") this.startLineStop(clock, unit);
+    else if (kind === "doorFault") this.startDoorFault(clock, unit);
+    return this.active.length > n;
   }
 
   /* ----- Puertas obstruidas ----- */
@@ -138,16 +191,20 @@ export class IncidentManager {
   }
 
   /* ----- Falla de señal ----- */
-  startSignalFault(clock) {
-    const { route, z } = this.place(500, 1800);
+  startSignalFault(clock, unit = null) {
+    const { route, z } = unit ? { route: unit.route, z: unit.sim.position - rand(500, 900) } : this.place(500, 1800);
     const sys = this.ls.signals.get(route.id);
     const signal = sys?.nextAhead(z);
     if (!signal || signal.fault) return;
     signal.fault = true;
-    const until = clock + rand(40, 100);
+    // En el Centro de Control la reparación tarda más: el PCC autoriza a cada tren a pasar
+    const until = clock + (this.pcc ? rand(240, 420) : rand(40, 100));
     const inc = { kind: "signalFault", route, signal, until };
     this.active.push(inc);
-    this.emit(inc, "start", `Falla de señal S${signal.id} · permanece en ROJO · espera ante ella la reparación`, { signal });
+    const near = route.stations.find(s => s.stopZ < signal.z) || route.last;
+    this.emit(inc, "start", this.pcc
+      ? `Falla de señal S${signal.id} antes de ${near.name} · queda en ROJO: autoriza a cada tren a pasar en marcha a la vista`
+      : `Falla de señal S${signal.id} · permanece en ROJO · espera ante ella la reparación`, { signal, station: near });
   }
 
   /** Tren automático para un incidente: el que mira el juego (60 %) si sirve, o uno al azar. */
@@ -159,17 +216,32 @@ export class IncidentManager {
   }
 
   /* ----- Detención en plena vía ----- */
-  startLineStop(clock) {
-    const u = this.pickUnit(v => v.ato.state === "running" && !v.ato.lineStop && v.sim.speed > 8
-      && v.sim.position - v.ato.target.stopZ > 700);
+  startLineStop(clock, unit = null) {
+    const ok = v => v.ato && v.ato.state === "running" && !v.ato.lineStop && v.sim.speed > 8 && v.sim.position - v.ato.target.stopZ > 700;
+    const u = unit ? (ok(unit) ? unit : null) : this.pickUnit(ok);
     if (!u) return;
-    let r = Math.random(), reason = STOP_REASONS[0];
-    for (const x of STOP_REASONS) { if (r < x[0]) { reason = x; break; } r -= x[0]; }
-    const until = clock + rand(25, 75);
+    const reasons = this.pcc ? PCC_STOP_REASONS : STOP_REASONS;
+    let r = Math.random(), reason = reasons[0];
+    for (const x of reasons) { if (r < x[0]) { reason = x; break; } r -= x[0]; }
+    // En el Centro de Control espera tu autorización (o, si no llega, a que se resuelva solo varios minutos después)
+    const until = clock + (this.pcc ? rand(180, 300) : rand(25, 75));
     u.ato.lineStop = { until, reason: reason[1], speech: reason[2] };
     const inc = { kind: "lineStop", route: u.route, unit: u, until: until + 2 };
     this.active.push(inc);
-    this.emit(inc, "start", `${u.id} detenido antes de ${u.ato.target.name} por ${reason[1]}`, { unit: u, reason: reason[1], speech: reason[2], station: u.ato.target });
+    this.emit(inc, "start", `${u.id} detenido antes de ${u.ato.target.name} por ${reason[1]}${this.pcc ? " · espera tu autorización para seguir" : ""}`, { unit: u, reason: reason[1], speech: reason[2], station: u.ato.target });
+  }
+
+  /* ----- Falla de puertas (Centro de Control) ----- */
+  startDoorFault(clock, unit = null) {
+    const ok = v => v.ato && !v.ato.doorFault && !v.ato.outOfService && v.ato.evacuateAt == null
+      && (v.ato.state === "running" || v.ato.state === "dwell") && v.ato.targetIndex >= 1 && v.ato.targetIndex <= v.route.stations.length - 4;
+    const u = unit ? (ok(unit) ? unit : null) : this.pickUnit(ok);
+    if (!u) return;
+    u.ato.doorFault = true;
+    const car = 1 + Math.floor(Math.random() * 5);
+    const inc = { kind: "doorFault", route: u.route, unit: u, ato: u.ato, until: Infinity };
+    this.active.push(inc);
+    this.emit(inc, "start", `Falla de puertas en el coche ${car} de ${u.id}: cada parada tarda más · decide si retirarlo del servicio`, { unit: u, car });
   }
 
   /* ----- Tren que se retira del servicio ----- */

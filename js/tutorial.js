@@ -1,6 +1,7 @@
 /* ==========================================================================
    MetroSim — 1.0 · tutorial.js
-   Tutorial interactivo para el jugador nuevo (Conductor y Pasajero).
+   Tutorial interactivo para el jugador nuevo (Conductor y Pasajero; los
+   pasos del Centro de Control están en control/controlTutorial.js).
 
    Una tarjeta en pantalla explica un paso a la vez y AVANZA SOLA cuando el
    jugador hace lo que se le pide (abrir puertas, acelerar, bajar al Metro,
@@ -206,20 +207,21 @@ function passengerSteps(k) {
 export class Tutorial {
   /**
    * @param {object} opts
-   * @param {"driver"|"passenger"} opts.mode
+   * @param {"driver"|"passenger"|"control"} opts.mode
+   * @param {Array} [opts.steps]            pasos propios (Centro de Control: control/controlTutorial.js)
    * @param {HTMLElement} opts.parent       contenedor (pantalla de juego)
    * @param {boolean} opts.touch            pantalla táctil (textos con los botones en vez de teclas)
    * @param {number} [opts.step]            paso donde retomar (combinación entre líneas)
    * @param {() => void} [opts.onStep]      un paso se cumplió (sonido)
    * @param {() => void} [opts.onFinish]    terminado o saltado
    */
-  constructor({ mode, parent, touch = false, step = 0, onStep = () => {}, onFinish = () => {} }) {
+  constructor({ mode, parent, touch = false, step = 0, steps = null, onStep = () => {}, onFinish = () => {} }) {
     this.mode = mode;
     this.onStep = onStep;
     this.onFinish = onFinish;
     this.touch = touch;
     const k = (keys, touchLabel) => touch ? touchLabel : keys;
-    this.steps = mode === "driver" ? driverSteps(k) : passengerSteps(k);
+    this.steps = steps ?? (mode === "driver" ? driverSteps(k) : passengerSteps(k));
     this.index = Math.min(step, this.steps.length - 1);
     this.mem = {};
     this.timer = 0;
@@ -285,6 +287,10 @@ export class Tutorial {
     this.timer = 0.2;                                 // 5 veces por segundo basta
     this.ctx = c;
     const s = this.step;
+    // enter(c): se llama al empezar el paso hasta que devuelva algo distinto de false (prepara una situación)
+    if (s.enter && this.entered !== this.index) {
+      try { if (s.enter(c) !== false) this.entered = this.index; } catch { /* el estado aún no está listo */ }
+    }
     if (s.done && s.done(c)) {
       this.doneDelay = 0.9;
       this.el.classList.add("passed");

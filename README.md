@@ -25,6 +25,30 @@ Compartir → *Agregar a inicio*. Se abre a pantalla completa y, tras la primera
 (el service worker `sw.js` guarda el juego, Three.js y las voces). La instalación necesita `https` o `localhost`.
 Los íconos están en `icons/` (los PNG se generan desde `icons/icon.svg`).
 
+## Centro de Control renovado
+
+- **Elige qué supervisar** al empezar el turno: la Línea 3 (aprendiz), las líneas 1, 2 y 3 (operador) o toda la red
+  (jefe de turno). Solo en esas líneas hay incidentes, y **esperan tu decisión**:
+  - **Señal averiada:** queda en rojo varios minutos (la cuadrilla la repara). Autoriza a cada tren a rebasarla en
+    **marcha a la vista** (20 km/h hasta el final del cantón); si el cantón está ocupado, hay que esperar.
+  - **Tren detenido en la vía** (objeto en la vía, alarma de pasajero, inspección): sin tu autorización tarda minutos
+    en seguir.
+  - **Falla de puertas:** cada parada tarda ~25 s más. Retíralo del servicio (bajan todos en la próxima estación) o
+    mantenlo y asume el retraso.
+  - **Tren muy atrasado** (más de 5 min): puedes hacer que se salte su próxima parada.
+- **Órdenes nuevas** en la ficha del tren: retener 30 s, 60 s o sin límite (se libera solo; en marcha cuenta desde
+  que llega a la estación), liberar, saltar la próxima parada y retirar del servicio.
+- **Interfaz más fácil:** botones para ver toda la red o una línea en grande (con nombres de estaciones), indicadores
+  arriba, alarmas con sus botones a la derecha (con sonido), anillo en los trenes con alarma, X en las señales
+  averiadas, franja en las limitaciones de velocidad, ayuda al pasar el ratón, pestañas Trenes (ordenable por retraso o
+  carga) y Registro (filtrable), avisos de cada orden y atajos de teclado (Espacio, + −, 0–9, R, L, S, A, Esc).
+- **El tiempo:** pausa y ×1, ×2, ×5, ×10.
+- **Nota del turno** (S a D): puntualidad (45 %), rapidez con que atiendes las alarmas (40 %) y tiempo que los trenes
+  te esperan detenidos (15 %). **Terminar turno** muestra el informe y cobra el sueldo en tu cuenta: $700 por alarma
+  atendida más el bono por nota (en turnos de 20 min o más).
+- **Tutorial interactivo** la primera vez (o con «¿Primera vez? Con tutorial» y desde Ayuda): enseña el esquema, a
+  seleccionar y retener un tren, el control del tiempo y provoca una señal averiada y un tren detenido para practicar.
+
 ## Mejoras del modo Pasajero
 
 - **Mapa de la misión**: bajo la misión activa hay una brújula que apunta al lugar del paso actual, con la distancia,
@@ -268,7 +292,7 @@ depto con muebles y recuerdos) y compras, pasajes y cargas sin costo. Tu saldo y
 ## Modos
 
 - **Conductor:** eliges servicio de ida o de vuelta (sale ~15–20 s después de la hora actual; en cada estación, si cierras las puertas con el embarque completo, sales de inmediato y tu horario se adelanta) y conduces respetando señales, límites y horario. Cada estación te paga en tu cuenta. Al final recibes un resumen con tu sueldo y el bono, y puedes hacer la maniobra de retorno para seguir con el servicio contrario. Si quieres terminar antes, el botón **🏁 Finalizar turno** muestra el resumen hasta donde llegaste.
-- **Centro de Control:** supervisas toda la red (L3 y L6) en un esquema en tiempo real: trenes coloreados según su estado, ficha de cada tren, indicadores por línea (puntualidad, retraso máximo, gente esperando), registro de incidencias, botones para retener o liberar trenes y para activar o apagar la regulación de intervalos.
+- **Centro de Control:** eres jefe de turno del PCC. Supervisas una línea, tres o toda la red en un esquema en tiempo real, atiendes las alarmas (señales averiadas, trenes detenidos en la vía, fallas de puertas, trenes atrasados) y das órdenes a los trenes: retener, liberar, saltar una parada o retirar del servicio. Controlas la regulación de intervalos de cada línea y la velocidad del tiempo; al terminar el turno recibes una nota y tu sueldo.
 - **Pasajero a pie:** apareces en la calle de la estación que elijas, frente a su hito. Bajas por el acceso, compras y cargas tu bip! con débito, validas en el torniquete, viajas y sales a la calle de otra estación para cumplir tus misiones.
 
 ## Controles
@@ -335,11 +359,16 @@ la **posición real** de cada tren, no solo desde el horario. El juego escucha a
 
 Los **roles** no tocan la simulación: mandan **órdenes** al buzón del motor y este decide si se pueden cumplir.
 El Conductor convierte sus teclas en órdenes (`driver.notchUp`, `driver.doors`...). Desde la consola del
-navegador se puede probar el futuro Centro de Control:
+navegador se pueden dar las mismas órdenes que el Centro de Control:
 
 ```
-MetroSim.game.engine.command("control.hold",    { trainId: "L3-1405" })   // retener un tren en su próxima estación
-MetroSim.game.engine.command("control.release", { trainId: "L3-1405" })   // liberarlo
+MetroSim.game.engine.command("control.hold",      { trainId: "L3-1405" })              // retener en su próxima estación
+MetroSim.game.engine.command("control.hold",      { trainId: "L3-1405", seconds: 60 }) // …durante 60 s
+MetroSim.game.engine.command("control.release",   { trainId: "L3-1405" })              // liberarlo
+MetroSim.game.engine.command("control.skip",      { trainId: "L3-1405" })              // pasar sin parar por la próxima parada
+MetroSim.game.engine.command("control.withdraw",  { trainId: "L3-1405" })              // retirarlo del servicio
+MetroSim.game.engine.command("control.authorize", { trainId: "L3-1405" })              // rebasar en marcha a la vista una señal averiada
+MetroSim.game.engine.command("control.resume",    { trainId: "L3-1405" })              // seguir tras una detención en la vía
 ```
 
 Al retener un tren, el siguiente se queda detenido ante la señal en rojo: causa y efecto.
@@ -403,7 +432,9 @@ js/render/            dibujo del estado del motor
   trackLift.js        pendientes en 3D: dobla el dibujo de la vía según el perfil de la línea
   outdoor.js          al aire libre: viaductos, trincheras, la avenida y los edificios, cielo y lluvia
 js/control/           Centro de Control
-  controlCenter.js    esquema de la red, ficha de tren, incidencias y órdenes
+  controlCenter.js    esquema de la red, ficha de tren, alarmas, órdenes, tiempo, informe del turno
+  alarms.js           mesa de alarmas (incidentes que piden una decisión) y nota del turno
+  controlTutorial.js  pasos del tutorial del Centro de Control
 js/touch.js           controles táctiles (celular y tablet)
 js/roles/             roles del jugador
   driverRole.js       Conductor: teclado → órdenes

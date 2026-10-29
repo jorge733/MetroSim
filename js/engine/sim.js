@@ -393,6 +393,11 @@ export class TrainSim {
 /** Pérdida de velocidad permitida en deriva antes de volver a traccionar (m/s). */
 const COAST_BAND = 4 / 3.6;
 
+/** Marcha a la vista tras una señal averiada autorizada por el PCC (km/h). */
+const ON_SIGHT_KMH = 20;
+/** Segundos de más en cada parada con una falla de puertas. */
+const DOOR_FAULT_DWELL = 25;
+
 export class AutoDriver {
   /**
    * @param {TrainSim} sim
@@ -419,6 +424,11 @@ export class AutoDriver {
     this.coasting = false;
     this.backing = false;              // retrocediendo hasta la marca tras un rebase
     this.held = false;                 // retenido por el Centro de Control
+    this.heldUntil = null;             // retención con duración: se libera sola a esta hora
+    this.holdFor = null;               // …o tantos segundos desde que llegue a la próxima parada
+    this.permit = null;                // señal averiada que el PCC le autoriza a rebasar (marcha a la vista)
+    this.sightUntil = null;            // marcha a la vista hasta esta coordenada (final del cantón autorizado)
+    this.doorFault = false;            // falla de puertas: cada parada tarda más (incidents.js, modo PCC)
     this.regulateUntil = null;         // regulación: no sale antes de esta hora
     this.regulating = false;
     this.hurry = false;                // regulación: parada mínima
@@ -450,6 +460,11 @@ export class AutoDriver {
     const sim = this.sim;
     const last = this.stations.length - 1;
     const HOLD = -1.0;
+    if (this.held && this.heldUntil !== null && clock >= this.heldUntil) {
+      this.held = false;
+      this.heldUntil = null;
+      this.onEvent("released", { station: this.target });
+    }
     switch (this.state) {
       case "depot":
         sim.autoDemand = HOLD;
@@ -472,6 +487,7 @@ export class AutoDriver {
         if (sim.isStopped && Math.abs(d) < 1.0) {
           sim.autoDemand = HOLD;
           this.arrivedAt = clock;
+          if (this.held && this.holdFor) { this.heldUntil = clock + this.holdFor; this.holdFor = null; }
           if (this.targetIndex === this.evacuateAt && this.targetIndex !== last) {
             this.evacuating = this.outOfService = true;
             this.onEvent("evacuate", { station: this.target });
@@ -492,6 +508,7 @@ export class AutoDriver {
         sim.autoDemand = HOLD;
         let minDwell = this.targetIndex === last ? CONFIG.schedule.minDwell + 10 : CONFIG.schedule.minDwell;
         if (this.hurry) minDwell = Math.min(minDwell, 12);
+        if (this.doorFault && !this.outOfService) minDwell += DOOR_FAULT_DWELL;
         const leave = this.leaveTime();
         const timeOk = clock - this.arrivedAt >= minDwell && (leave === null || clock >= leave - CONFIG.train.doorTime - 3);
         if (!timeOk || sim.doorState !== "open" || this.held) break;
@@ -513,7 +530,7 @@ export class AutoDriver {
         if (this.held) break;
         const leave = this.outOfService && !this.evacuating ? this.arrivedAt + 6 : this.leaveTime();
         const sig = this.signals?.startingSignal(this.target);
-        if ((leave === null || clock >= leave) && (!sig || sig.aspect !== "red")) {
+        if ((leave === null || clock >= leave) && (!sig || sig.aspect !== "red" || sig === this.permit)) {
           const nextIdx = nextStopIndex(this.trip, this.targetIndex, last);
           this.onEvent("departing", { station: this.target, next: this.stations[nextIdx] });
           this.targetIndex = nextIdx;
@@ -556,10 +573,17 @@ export class AutoDriver {
     // ¿Hay una señal en rojo antes del punto de parada?
     let targetZ = stopZ;
     let cruiseCap = Infinity;
+    // Marcha a la vista (señal averiada autorizada por el PCC): lento hasta el final de su cantón
+    if (this.permit && sim.position < this.permit.z) { this.sightUntil = this.permit.endZ; this.permit = null; }
+    if (this.sightUntil !== null) {
+      if (sim.position > this.sightUntil) cruiseCap = ON_SIGHT_KMH / 3.6;
+      else this.sightUntil = null;
+    }
     const sig = this.signals?.nextAhead(sim.position);
     if (sig) {
-      if (sig.aspect === "red" && sig.z > stopZ) targetZ = Math.min(sig.z + CONFIG.signals.stopMargin, sim.position);
-      if (sig.aspect === "yellow" && sim.position - sig.z < 400) cruiseCap = 45 / 3.6;
+      if (sig === this.permit && sim.position - sig.z < 400) cruiseCap = ON_SIGHT_KMH / 3.6;
+      if (sig.aspect === "red" && sig.z > stopZ && sig !== this.permit) targetZ = Math.min(sig.z + CONFIG.signals.stopMargin, sim.position);
+      if (sig.aspect === "yellow" && sim.position - sig.z < 400) cruiseCap = Math.min(cruiseCap, 45 / 3.6);
     }
     if (this.brakeTarget === null || Math.abs(this.brakeTarget.z - targetZ) > 1) this.brakeTarget = { z: targetZ, braking: false };
 

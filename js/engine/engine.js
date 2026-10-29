@@ -98,6 +98,9 @@ export class MetroEngine {
     this.bus = new EventBus();
     this.clock = new SimClock(startTime);
     this.onUnitEvent = onUnitEvent;
+    // Modo Centro de Control: { lines: Set de ids } con las líneas que supervisa el jugador
+    // (sus incidentes esperan las órdenes del PCC, incidents.js). null en los demás modos.
+    this.pcc = null;
     this.lines = new Map(LINES.map(line => [line.id, new LineSystem(this, line, startTime)]));
     this.commands = new CommandQueue(this);
 

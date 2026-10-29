@@ -27,7 +27,7 @@
      render/carInfoPanel.js pantallas sobre las puertas (próxima estación, cierre de puertas, avisos)
      roles/driverRole.js    rol de Conductor: teclado → órdenes al motor
      roles/driverSafety.js  vigilancia (hombre muerto), ATP y PCC por radio, personal en la vía
-     control/controlCenter.js  rol de Centro de Control: esquema de la red y órdenes
+     control/controlCenter.js  rol de Centro de Control: esquema de la red, alarmas, órdenes y tutorial
      touch.js               controles táctiles (celular y tablet)
      stationLayout.js       columnas, bancos y pantallas de los andenes (compartido)
      config.js    Línea 3 de Santiago, geometría, mando, horarios y demanda
@@ -391,7 +391,7 @@ window.MetroSim = { get game() { return game; }, hud, bank, card, CONFIG, get ST
 
 function startGame(mode, opts = {}) {
   if (game) stopGame();
-  if (mode === "control") return startControl();
+  if (mode === "control") return startControl(opts);
   if (mode === "driver" && !inventory.canDrive(driverLineSelect.value)) {
     const lic = LICENSES.find(x => x.lineId === driverLineSelect.value);
     return openStore({ tab: "driver", notice: `Para conducir la ${lic.name.replace("Licencia ", "")} necesitas su licencia (${formatCLP(lic.price)}). La Línea 3 es gratis: gana ahí tu primer sueldo.` });
@@ -638,8 +638,10 @@ window.addEventListener("popstate", () => {
   else if (game && hud.missionsOpen) hud.closeMissions();
   else if (game?.walker) requestMenu();          // pasajero: pide confirmación, igual que el botón Menú
   else if (game) return stopGame();
-  else if (control) return stopControl();
-  else return;
+  else if (control) {                            // cierra su ventana o muestra el informe del turno antes de salir
+    control.ui.requestExit();
+    if (!control) return;                         // salió directo al menú (turno corto)
+  } else return;
   armBackTrap();
 });
 
@@ -671,23 +673,28 @@ document.addEventListener("visibilitychange", () => {
 });
 
 /* ==========================================================================
-   Centro de Control: solo el motor y un esquema 2D (sin mundo 3D ni sonido)
+   Centro de Control: solo el motor y un esquema 2D (sin mundo 3D)
    ========================================================================== */
 
 let control = null;
+/** Paso de simulación del Centro de Control (s): sin dibujo 3D basta uno más largo, y deja acelerar el tiempo. */
+const CONTROL_STEP = 0.1;
 
-function startControl() {
+function startControl(opts = {}) {
   startScreen.classList.add("hidden");
   loadingScreen.classList.remove("hidden");
   setTimeout(() => {
     // Hora local, igual que en los otros modos
-    const startClock = localClock(), startEpoch = performance.now();
+    const startClock = localClock();
     CONFIG.startTime = startClock;
     CONFIG.schedule.playerDeparture = Math.ceil((startClock + 90) / 30) * 30;
     const engine = new MetroEngine({ startTime: startClock - 45 * 60 });
     engine.runUntil(startClock);                     // la red ya tiene trenes al empezar el turno
-    const ui = new ControlCenter({ engine, onExit: stopControl });
-    control = { engine, ui, startClock, startEpoch, last: performance.now(), uiT: 0, raf: 0 };
+    const ui = new ControlCenter({
+      engine, onExit: stopControl, tutorial: !!opts.tutorial, touch: wantsTouch(),
+      onPay: (amount, concept) => bank.deposit(amount, concept, { wage: true }),
+    });
+    control = { engine, ui, last: performance.now(), acc: 0, uiT: 0, raf: 0 };
     window.MetroSim.control = control;
     loadingScreen.classList.add("hidden");
     control.raf = requestAnimationFrame(controlLoop);
@@ -699,12 +706,20 @@ function startControl() {
 function controlLoop(now) {
   if (!control) return;
   const c = control;
-  const realDt = Math.max(0, (now - c.last) / 1000);
+  const realDt = Math.min(0.25, Math.max(0, (now - c.last) / 1000));   // tras una pausa larga (pestaña oculta) no da saltos
   c.last = now;
-  c.engine.update(realDt);
-  // Seguir la hora local (recupera pausas y pestañas en segundo plano)
-  const target = c.startClock + (performance.now() - c.startEpoch) / 1000;
-  if (target - c.engine.time > 1) c.engine.runUntil(c.engine.time + Math.min(target - c.engine.time, 120));
+  // Pausa y velocidad del tiempo (×1, ×2, ×5, ×10) las decide el jugador
+  let simDt = 0;
+  if (!c.ui.paused) {
+    c.acc += realDt * c.ui.speed;
+    const n = Math.floor(c.acc / CONTROL_STEP);
+    if (n > 0) {
+      c.acc -= n * CONTROL_STEP;
+      simDt = n * CONTROL_STEP;
+      c.engine.runUntil(c.engine.time + simDt, { step: CONTROL_STEP });
+    }
+  }
+  c.ui.tick(realDt, simDt);
   c.uiT -= realDt;
   if (c.uiT <= 0) { c.uiT = 0.1; c.ui.update(); }       // el esquema se redibuja 10 veces por segundo
   c.raf = requestAnimationFrame(controlLoop);
