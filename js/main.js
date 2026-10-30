@@ -116,7 +116,7 @@ import { LINE_FLEETS, STOCKS, stockLabel } from "./engine/fleet.js";
 import { tripStopsAt, nextStopIndex, EXPRESS_LABEL } from "./engine/express.js";
 import { SECTION_LABEL } from "./engine/sections.js";
 import { joinDriverRoom } from "./net/netClient.js";
-import { cleanRoomCode, localNetwork } from "./net/transport.js";
+import { cleanRoomCode, localNetwork, NET_LEVEL } from "./net/transport.js";
 import { startPoint } from "./net/replica.js";
 
 // La vía en 3D sigue las pendientes reales: se engancha antes de compilar ningún material
@@ -386,6 +386,7 @@ $("netJoinToggle").addEventListener("click", () => {
   if (!panel.hidden) { $("netName").value ||= loadSetting("metrosim.net.name") || ""; ($("netName").value ? $("netCode") : $("netName")).focus(); }
 });
 $("netJoinGo").addEventListener("click", joinRoomAsDriver);
+$("netLevel").textContent = `Versión de red ${NET_LEVEL}.`;
 $("netCode").addEventListener("keydown", (ev) => { if (ev.key === "Enter") joinRoomAsDriver(); });
 $("endShiftButton").addEventListener("click", requestEndShift);
 $("shopButton").addEventListener("click", () => openStore());

@@ -14,7 +14,7 @@
    sin conexión.
    ========================================================================== */
 
-const CACHE = "metrosim-v1.5";
+const CACHE = "metrosim-v1.5-red3";
 const CDN = ["cdn.jsdelivr.net", "unpkg.com"];
 
 /** Lo mínimo para que la portada abra sin conexión aunque no se haya jugado. */
@@ -51,7 +51,9 @@ self.addEventListener("fetch", (e) => {
 async function networkFirst(req) {
   const cache = await caches.open(CACHE);
   try {
-    const res = await fetch(req);
+    // no-cache: siempre se pregunta al servidor si hay versión nueva (la caché HTTP podía
+    // entregar un archivo viejo varios minutos y dos jugadores quedaban con versiones distintas)
+    const res = await fetch(req, { cache: "no-cache" });
     if (res.ok) cache.put(stripSearch(req), res.clone());
     return res;
   } catch {

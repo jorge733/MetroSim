@@ -44,7 +44,7 @@ import { Tutorial, tutorialDone } from "../tutorial.js";
 import { AlarmDesk } from "./alarms.js";
 import { controlSteps } from "./controlTutorial.js";
 import { NetHost, MAX_DRIVERS } from "../net/netHost.js";
-import { localNetwork } from "../net/transport.js";
+import { localNetwork, NET_LEVEL } from "../net/transport.js";
 
 /** Color de cada estado de tren en el esquema. */
 const STATE_COLORS = {
@@ -714,6 +714,7 @@ export class ControlCenter {
       <h3>Conductores (${drivers.length} de ${MAX_DRIVERS})</h3>
       ${list}
       <p>Sus trenes reciben tus órdenes por radio: retener y liberar (desde su ficha) y autorizar el paso por una señal averiada (desde la alarma). Con la sala abierta el tiempo corre a ×1 y no se pausa.</p>
+      <p class="pcc-detail">Versión de red ${NET_LEVEL}: los conductores deben ver la misma bajo «Unirse a una sala» (si no, recarguen la página).</p>
       <footer>
         <button class="danger" data-act="room-close">Cerrar sala</button>
         ${net.online ? "" : `<button data-act="room-retry">Reintentar ahora</button>`}

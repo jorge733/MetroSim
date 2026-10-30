@@ -50,8 +50,10 @@ pestaña (sobre todo en el celular), el navegador lo pausa y quien se una no lo 
 pestañas.
 
 Necesita internet: los navegadores se conectan directo entre ellos (WebRTC con [Trystero](https://github.com/dmotz/trystero), que se
-carga solo al abrir o unirse a una sala). Para encontrarse usa a la vez varios servidores públicos de Nostr, así que
-no depende de uno solo; después los datos van directo entre los jugadores. Para probar en un solo computador, abre dos pestañas con `?red=local` al final
+carga solo al abrir o unirse a una sala). Para encontrarse usa a la vez dos vías con varios servidores públicos cada
+una (Nostr y rastreadores de WebTorrent), así que no depende de uno solo; después los datos van directo entre los
+jugadores. 👥 Sala muestra cuántos servidores están conectados y la versión de red, que debe ser la misma que ve el
+conductor bajo «Unirse a una sala» (si no, recarguen la página). Para probar en un solo computador, abre dos pestañas con `?red=local` al final
 de la dirección: una como Centro de Control y otra como conductor (sin internet).
 
 **Cómo funciona** (`js/net/`): el motor del PCC es el que vale. Cada conductor corre su propio motor completo, pero como
