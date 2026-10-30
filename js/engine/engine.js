@@ -244,6 +244,7 @@ export function describeTrain(u) {
   if (docked) location = `en ${docked.name}`;
   else if (sim.position > route.first.stopZ + 5) location = `cocheras de ${route.first.name}`;
   else if (!next) location = `cola de maniobras tras ${route.last.name}`;
+  else if (next.index === 0) location = `entrando a ${next.name}`;                // de la cochera al andén de origen
   else location = `entre ${route.stations[next.index - 1].name} y ${next.name}`;
 
   const label = TRAIN_STATES[u.state] ?? "—";

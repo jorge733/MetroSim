@@ -25,6 +25,35 @@ Compartir → *Agregar a inicio*. Se abre a pantalla completa y, tras la primera
 (el service worker `sw.js` guarda el juego, Three.js y las voces). La instalación necesita `https` o `localhost`.
 Los íconos están en `icons/` (los PNG se generan desde `icons/icon.svg`).
 
+## Multijugador: Centro de Control + conductores
+
+Un jugador hace de **Centro de Control** y hasta **4 amigos conducen** trenes de verdad en su red, cada uno desde su
+computador o celular.
+
+1. **El PCC abre la sala:** empieza un turno del Centro de Control y pulsa **👥 Sala → Abrir sala**. Aparece un código
+   de 4 letras.
+2. **Cada conductor se une:** en la portada elige una de las líneas que supervisa el PCC y su servicio (ida o vuelta), y
+   en la tarjeta Conductor pulsa **Unirse a una sala**, escribe su nombre y el código. El PCC le asigna el próximo tren
+   que sale de la terminal (si el andén está ocupado, sale de la cochera).
+3. **Se juega en la misma red:** el conductor ve los mismos trenes, señales averiadas, limitaciones y horarios que el
+   PCC. En el esquema del PCC su tren lleva su nombre y un borde amarillo, y su puntualidad cuenta en la nota del turno.
+4. **Órdenes por radio:** desde la ficha del tren el PCC puede **retenerlo** 30 s, 60 s o sin límite (el conductor
+   escucha la orden y no puede traccionar en ese andén hasta que se cumpla o el PCC pulse **Puede salir**). Las
+   **señales averiadas** ya no se autorizan solas: el conductor espera ante la señal hasta que el PCC lo autorice desde
+   la alarma.
+5. Con la sala abierta el tiempo corre a ×1 y no se pausa. Si un conductor se va, su tren sigue como tren automático;
+   si el conductor pierde la conexión, sigue jugando solo.
+
+Necesita internet: los navegadores se conectan directo entre ellos (WebRTC con [PeerJS](https://peerjs.com/), que se
+carga solo al abrir o unirse a una sala). Para probar en un solo computador, abre dos pestañas con `?red=local` al final
+de la dirección: una como Centro de Control y otra como conductor (sin internet).
+
+**Cómo funciona** (`js/net/`): el motor del PCC es el que vale. Cada conductor corre su propio motor completo, pero como
+**réplica**: cinco veces por segundo recibe el estado de los trenes de su línea y lo corrige, y los incidentes llegan del
+PCC. Su propio tren lo simula su computador (el mando responde sin retardo) y manda su estado diez veces por segundo.
+`node tools/probar-red.mjs` prueba esto sin navegador: un PCC y un conductor en dos hilos, con 150 ms de retardo; los
+trenes de los dos motores quedan a ~1 m (mediana).
+
 ## Centro de Control renovado
 
 - **Elige qué supervisar** al empezar el turno: la Línea 3 (aprendiz), las líneas 1, 2 y 3 (operador) o toda la red
@@ -410,6 +439,13 @@ node tools/simular.mjs 09:30 5    # hasta las 09:30, informe cada 5 min
 node tools/simular.mjs 09:00 10 "ÑUÑOA"         # pantallas de andén de otra estación (L3 y L6)
 ```
 
+Y el multijugador, también sin gráficos (un PCC y un conductor en dos hilos):
+
+```
+node tools/probar-red.mjs           # 20 min en la Línea 3
+node tools/probar-red.mjs 30 1      # 30 min en la Línea 1
+```
+
 (Requiere Node 22 o superior.)
 
 ## Estructura
@@ -453,6 +489,11 @@ js/control/           Centro de Control
   controlCenter.js    esquema de la red, ficha de tren, alarmas, órdenes, tiempo, informe del turno
   alarms.js           mesa de alarmas (incidentes que piden una decisión) y nota del turno
   controlTutorial.js  pasos del tutorial del Centro de Control
+js/net/               multijugador (sala del Centro de Control con conductores)
+  transport.js        conexión entre navegadores con código de sala (PeerJS; ?red=local para dos pestañas)
+  replica.js          estado de los trenes de una línea y cómo se aplica en el motor de otro jugador
+  netHost.js          sala del PCC: reserva servicios, manda el estado, radio a los conductores
+  netClient.js        conductor en una sala: motor réplica, radio del PCC, sin conexión sigue solo
 js/encounters.js      encuentros del Pasajero con otros viajeros (asiento, turista, objeto, vendedor, músico, citófono)
 js/routeQuiz.js       preguntas de ruta del turista (con la red real)
 js/civics.js          civismo del Pasajero: puntos, niveles y objeto olvidado que llevas
@@ -487,6 +528,7 @@ js/pwa.js             registro del service worker y botón "Instalar MetroSim"
 js/creator.js         Modo Creador (todo desbloqueado y gratis, con clave)
 js/utils.js           utilidades y texturas procedurales
 tools/simular.mjs     ejecuta el motor sin navegador
+tools/probar-red.mjs  prueba el multijugador sin navegador (PCC y conductor en dos hilos)
 ```
 
 Las distancias entre estaciones son aproximadas; los nombres, el orden y las combinaciones son los reales.

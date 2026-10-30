@@ -204,6 +204,30 @@ kbd {
 .mode-lock { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; font-size: 13px; color: #ffd9a0; }
 .mode-lock[hidden] { display: none; }
 
+/* Multijugador: unirse a la sala de un Centro de Control (net/) */
+.net-launch { grid-column: 1 / -1; justify-self: start; color: var(--muted); }
+.net-join { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) 110px auto; gap: 10px 12px; align-items: end; }
+.net-join[hidden] { display: none; }
+.net-join input {
+  width: 100%; min-height: 40px; padding: 0 12px; border-radius: 8px; border: 1px solid #ffffff26;
+  background: var(--bg); color: var(--text); font-size: 14px;
+}
+#netCode { font-family: var(--f-data); letter-spacing: 4px; text-transform: uppercase; }
+.net-join input:focus-visible { outline: 2px solid var(--line); outline-offset: 1px; }
+.net-join .go-button { min-height: 40px; }
+.net-join .go-button:disabled { opacity: .6; cursor: progress; }
+.net-msg { grid-column: 1 / -1; margin: 0; min-height: 0; font-size: 13px; color: #ffd9a0; }
+.net-msg:empty { display: none; }
+.net-join small { grid-column: 1 / -1; color: var(--muted); font-size: 12px; line-height: 1.4; }
+@media (max-width: 560px) { .net-join { grid-template-columns: minmax(0, 1fr) 96px; } .net-join .go-button { grid-column: 1 / -1; } }
+.net-badge {
+  position: absolute; left: calc(18px + env(safe-area-inset-left)); top: calc(118px + env(safe-area-inset-top)); z-index: 6;
+  padding: 4px 10px; border-radius: 999px; background: #0b1a12cc; border: 1px solid #34d17c66; color: #bff0d3;
+  font: 600 12px/1.3 var(--f-data); pointer-events: none; white-space: nowrap;
+}
+.touch-mode .net-badge { left: 50%; top: calc(12px + env(safe-area-inset-top)); transform: translateX(-50%); }
+.net-badge.off { background: #2a1a0ccc; border-color: #ffb02066; color: #ffd9a0; }
+
 .shop-launch {
   display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: center; gap: 12px; width: 100%;
   padding: 14px 18px; border-radius: 12px; border: 1px dashed #ffffff2e; background: transparent;

@@ -22,6 +22,10 @@
      · Nota del turno y, al terminar, informe con el sueldo (se cobra en la
        cuenta del jugador, la misma del Conductor).
      · Tutorial interactivo (controlTutorial.js) la primera vez.
+     · Multijugador (net/netHost.js): «Sala» abre una sala con código para
+       que otros jugadores conduzcan trenes de las líneas supervisadas. Sus
+       trenes se ven con su nombre; las órdenes les llegan por radio. Con la
+       sala abierta el tiempo corre a ×1 y no se pausa.
 
    Igual que el Conductor, el Centro de Control nunca toca la simulación: usa
    engine.command(...) y escucha el bus del motor.
@@ -39,6 +43,7 @@ import { shiftBonus } from "../economy.js";
 import { Tutorial, tutorialDone } from "../tutorial.js";
 import { AlarmDesk } from "./alarms.js";
 import { controlSteps } from "./controlTutorial.js";
+import { NetHost, MAX_DRIVERS } from "../net/netHost.js";
 
 /** Color de cada estado de tren en el esquema. */
 const STATE_COLORS = {
@@ -99,6 +104,12 @@ const CSS = `
 .pcc-score b { font-size: 15px; }
 .pcc-icon-btn { display: inline-flex; align-items: center; gap: 6px; }
 .pcc-end { background: #2a2312 !important; border-color: #ffc24788 !important; color: #ffe2a6; }
+.pcc-room.live { background: #123826; border-color: #34d17c88; color: #bff0d3; }
+.pcc-code { font: 700 46px/1 var(--f-data); letter-spacing: 10px; text-align: center; padding: 14px 0 10px; color: #ffd166; user-select: all; }
+.pcc-dialog .pcc-drivers { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.pcc-dialog .pcc-drivers li { display: flex; gap: 8px; align-items: center; background: var(--raise); border-radius: 8px; padding: 7px 10px; font-size: 14px; }
+.pcc-dialog .pcc-drivers li small { margin-left: auto; color: #9fb0c0; font-family: var(--f-data); }
+.pcc-error { color: #ff8a8a !important; }
 
 /* Cuerpo */
 .pcc-body { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 12px; padding: 12px 14px; min-height: 0; overflow: auto; }
@@ -204,6 +215,7 @@ const CSS = `
 .pcc-modal[hidden] { display: none; }
 .pcc-dialog { width: min(560px, 100%); background: var(--surface); border: 1px solid #ffffff2e; border-radius: 14px; padding: 20px 22px; box-shadow: 0 30px 80px #000c; display: grid; gap: 12px; }
 .pcc-dialog h2 { margin: 0; font: 700 26px/1.05 var(--f-display); letter-spacing: .4px; }
+.pcc-dialog h3 { margin: 4px 0 0; font: 600 15px/1.2 var(--f-body); color: #c9d4df; }
 .pcc-dialog p { margin: 0; color: #c9d4df; font-size: 14px; line-height: 1.45; }
 .pcc-dialog ul { margin: 0; padding-left: 18px; color: #c9d4df; font-size: 13.5px; line-height: 1.5; display: grid; gap: 3px; }
 .pcc-scopes { display: grid; gap: 8px; }
@@ -316,6 +328,7 @@ export class ControlCenter {
         <span class="pcc-clock" title="Hora de la simulación">--:--:--</span>
         <button class="pcc-score" data-act="report" title="Nota del turno (toca para ver el detalle)">Nota <b>—</b></button>
         <button class="pcc-icon-btn" data-act="sound" title="Sonido de las alarmas"></button>
+        <button class="pcc-icon-btn pcc-room" data-act="room" title="Multijugador: que otros jugadores conduzcan en tu red" hidden>👥<span>Sala</span></button>
         <button class="pcc-icon-btn" data-act="help" title="Ayuda y atajos">${icon("help")}<span>Ayuda</span></button>
         <button class="pcc-end" data-act="end">${icon("flag")} Terminar turno</button>
       </div>
@@ -436,12 +449,14 @@ export class ControlCenter {
   }
 
   setSpeed(s) {
+    if (this.net && s !== 1) return this.toast("Con la sala abierta el tiempo corre a ×1 para todos", "info");
     this.speed = s;
     this.paused = false;
     this.renderTimeButtons();
   }
 
   togglePause() {
+    if (this.net) return this.toast("Con la sala abierta no se puede pausar: los conductores siguen en la vía", "info");
     this.paused = !this.paused;
     this.renderTimeButtons();
   }
@@ -506,6 +521,9 @@ export class ControlCenter {
         case "pause": return this.togglePause();
         case "sound": this.sound = !this.sound; writePref("sound", this.sound ? "on" : "off"); return this.renderSoundBtn();
         case "help": return this.showHelp();
+        case "room": return this.showRoom();
+        case "room-open": return this.openRoom();
+        case "room-close": this.closeRoom(); return this.showRoom();
         case "report": return this.showReport({ ending: false });
         case "end": return this.showReport({ ending: true });
         case "view": return this.setView(d.view);
@@ -607,6 +625,7 @@ export class ControlCenter {
     this.started = true;
     this.paused = false;
     this.renderTimeButtons();
+    this.root.querySelector(".pcc-room").hidden = false;
     this.addLog(`Turno iniciado en el Puesto Central de Control · ${this.scope.title}`, "ok");
     unlockAudio();
     if (tutorial) this.startTutorial();
@@ -671,6 +690,74 @@ export class ControlCenter {
       </footer>`);
   }
 
+  /* ======================================================================
+     Multijugador: sala para conductores
+     ====================================================================== */
+  showRoom(error = null) {
+    const net = this.net;
+    const drivers = net?.drivers ?? [];
+    const list = drivers.length ? `<ul class="pcc-drivers">${drivers.map(p => `<li>👤 <b>${escapeHtml(p.name)}</b> L${p.line} · ${escapeHtml(p.unit?.id ?? p.trip?.id ?? "")}<small>${p.unit ? TRAIN_STATES[p.unit.state] ?? "" : "cargando…"}</small></li>`).join("")}</ul>`
+      : `<p>Aún no entra nadie. Cuando un conductor se una, su tren aparece en el esquema con su nombre.</p>`;
+    this.openModal("room", true, net ? `
+      <h2>Sala abierta</h2>
+      <p>Comparte este código. Cada conductor abre MetroSim, elige una de tus líneas (${[...this.lines].map(id => `L${id}`).join(", ")}) y su servicio, y pulsa <b>«Unirse a una sala»</b> en la tarjeta Conductor.</p>
+      <div class="pcc-code" aria-label="Código de la sala">${net.code}</div>
+      <h3>Conductores (${drivers.length} de ${MAX_DRIVERS})</h3>
+      ${list}
+      <p>Sus trenes reciben tus órdenes por radio: retener y liberar (desde su ficha) y autorizar el paso por una señal averiada (desde la alarma). Con la sala abierta el tiempo corre a ×1 y no se pausa.</p>
+      <footer>
+        <button class="danger" data-act="room-close">Cerrar sala</button>
+        <button class="primary" data-act="modal-close">Volver al turno</button>
+      </footer>` : `
+      <h2>Multijugador</h2>
+      <p>Abre una sala para que hasta ${MAX_DRIVERS} amigos conduzcan trenes de verdad en tu red, desde su propio computador o celular: tú los ves en el esquema, les das órdenes por radio y su puntualidad cuenta en tu nota.</p>
+      <p>Necesita internet (la conexión es directa entre los navegadores). Mientras la sala esté abierta, el tiempo corre a ×1 y no se puede pausar.</p>
+      ${error ? `<p class="pcc-error">${escapeHtml(error)}</p>` : ""}
+      <footer>
+        <button class="ghost" data-act="modal-close">Ahora no</button>
+        <button class="primary" data-act="room-open">${this.opening ? "Abriendo…" : "Abrir sala"}</button>
+      </footer>`);
+  }
+
+  async openRoom() {
+    if (this.net || this.opening) return;
+    this.opening = true;
+    this.showRoom();
+    const net = new NetHost({
+      engine: this.engine, lines: () => this.lines,
+      log: (text, level = "info", line = null, trainId = null) => { this.addLog(text, level, line, trainId); this.toast(text, level === "warn" ? "alert" : level); },
+      onChange: () => { this.renderRoomBtn(); if (this.modal === "room") this.showRoom(); this.lastTrainActions = null; },
+    });
+    try {
+      await net.open();
+      this.net = net;
+      this.speed = 1;
+      this.paused = false;
+      this.pausedBeforeModal = false;
+    } catch (err) {
+      this.opening = false;
+      return this.showRoom(err.message);
+    }
+    this.opening = false;
+    this.renderTimeButtons();
+    this.renderRoomBtn();
+    this.showRoom();
+  }
+
+  closeRoom() {
+    if (!this.net) return;
+    this.net.close();
+    this.net = null;
+    this.addLog("Sala cerrada", "info");
+    this.renderRoomBtn();
+  }
+
+  renderRoomBtn() {
+    const btn = this.root.querySelector(".pcc-room");
+    btn.classList.toggle("live", !!this.net);
+    btn.querySelector("span").textContent = this.net ? `Sala ${this.net.code} · ${this.net.drivers.length}` : "Sala";
+  }
+
   showHelp() {
     this.openModal("help", true, `
       <h2>Cómo se juega</h2>
@@ -680,6 +767,7 @@ export class ControlCenter {
         <li><b>Toca un tren</b> para ver su ficha y darle órdenes: retenerlo en la estación, saltar su próxima parada o retirarlo del servicio.</li>
         <li><b>Regulación automática:</b> separa sola a los trenes que van muy juntos. Si la apagas, te toca hacerlo a ti reteniendo trenes.</li>
         <li><b>El tiempo:</b> pausa o acelera ×2, ×5, ×10 cuando está tranquilo.</li>
+        <li><b>Sala (👥):</b> otros jugadores conducen trenes de tus líneas. Se ven con su nombre y borde amarillo; les das órdenes por radio.</li>
       </ul>
       ${this.touch ? "" : `<div class="pcc-keys">
         <kbd>Espacio</kbd><span>pausa / seguir</span>
@@ -700,7 +788,7 @@ export class ControlCenter {
     if (!this.modal) this.pausedBeforeModal = this.paused;
     this.modal = kind;
     this.modalClosable = closable;
-    this.paused = true;
+    if (!this.net) this.paused = true;            // con la sala abierta el tiempo sigue para los conductores
     this.dialogEl.innerHTML = html;
     this.modalEl.hidden = false;
     this.renderTimeButtons();
@@ -866,6 +954,7 @@ export class ControlCenter {
   /** Paso del bucle (cada fotograma): alarmas y tutorial. */
   tick(realDt, simDt) {
     if (!this.started) return;
+    this.net?.update();
     this.desk.update(simDt);
     this.tutorial?.update(realDt, { ui: this, engine: this.engine, desk: this.desk });
   }
@@ -959,10 +1048,12 @@ export class ControlCenter {
       }
       const sel = u.id === this.selected;
       if (sel) { ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2; ctx.strokeRect(pt.x - g.len / 2 - 3, pt.y - th / 2 - 3, g.len + 6, th + 6); }
-      // Etiqueta: en la vista grande, todas; en la compacta, solo las que importan
+      else if (u.remote) { ctx.strokeStyle = "#ffd166"; ctx.lineWidth = 2; ctx.strokeRect(pt.x - g.len / 2 - 2, pt.y - th / 2 - 2, g.len + 4, th + 4); }
+      // Etiqueta: en la vista grande, todas; en la compacta, solo las que importan (y siempre los trenes de jugadores)
       const late = u.arrivedIdx !== null && u.delay > CONFIG.schedule.punctualWindow;
-      if (!g.big && !sel && !level && !(late && u.delay > 180)) continue;
-      let label = u.id.replace(/^L\w+?-/, "");
+      if (!g.big && !sel && !level && !u.remote && !(late && u.delay > 180)) continue;
+      let label = u.remote ? `👤${u.remote.name}` : u.id.replace(/^L\w+?-/, "");
+      if (u.remote?.hold && !u.remote.hold.pending) label += " ⏸";
       if (late) label += ` +${Math.round(u.delay / 60)}′`;
       if (u.ato?.held) label += u.ato.heldUntil ? ` ⏸${Math.max(0, Math.ceil(u.ato.heldUntil - this.engine.time))}` : " ⏸";
       ctx.fillStyle = sel ? "#ffffff" : level ? LEVEL_COLORS[level] : late ? "#ff8a8a" : "#e8eef4";
@@ -1060,12 +1151,15 @@ export class ControlCenter {
     if (ato?.doorFault && !ato.outOfService) notes.push("Falla de puertas: cada parada tarda ~25 s más");
     if (ato?.sightUntil != null || ato?.permit) notes.push("Marcha a la vista (20 km/h) por una señal averiada");
     if (ato?.lineStop) notes.push(`Detenido en la vía: ${ato.lineStop.reason}`);
+    if (u.remote?.hold) notes.push(u.remote.hold.until ? `Retenido por radio · sale en ${Math.max(0, Math.ceil(u.remote.hold.until - this.engine.time))} s`
+      : u.remote.hold.pending ? `Orden por radio: retenerse${u.remote.hold.seconds ? ` ${u.remote.hold.seconds} s` : ""} en su próxima parada`
+      : "Retenido por radio hasta nueva orden (pulsa Puede salir)");
     const skipped = u.trip?.skip && !u.trip.express ? [...u.trip.skip].filter(i => i >= (ato?.targetIndex ?? 0)).map(i => u.route.stations[i].name) : [];
     if (skipped.length) notes.push(`Pasa sin parar por ${skipped.join(", ")}`);
     const info = `
       <div class="pcc-train-head">
         <span class="pcc-badge" style="background:${u.route.line.color};color:${textOn(u.route.line.color)}">${u.route.line.id}</span>
-        <div><b>${t.id}</b><small>hacia ${u.route.last.name}</small></div>
+        <div><b>${t.id}${u.remote ? ` · 👤 ${escapeHtml(u.remote.name)}` : ""}</b><small>hacia ${u.route.last.name}</small></div>
       </div>
       <span class="pcc-state" style="--c:${color}">● ${TRAIN_STATES[u.state] ?? "—"}</span>
       <dl>
@@ -1086,7 +1180,15 @@ export class ControlCenter {
 
     // Órdenes (solo se rehacen cuando cambian, para no perder clics)
     let acts;
-    if (!ato) acts = `<small>Tren conducido por una persona: no recibe órdenes del PCC.</small>`;
+    if (u.remote) {
+      const hold = u.remote.hold;
+      acts = (hold
+        ? `<button class="on wide" data-act="cmd" data-cmd="control.release">📻 Puede salir${this.touch ? "" : " (L)"}</button>`
+        : `<button class="danger" data-act="cmd" data-cmd="control.hold" data-seconds="30">📻 Retener 30 s</button>
+           <button class="danger" data-act="cmd" data-cmd="control.hold" data-seconds="60">📻 Retener 60 s${this.touch ? "" : " (R)"}</button>
+           <button class="danger" data-act="cmd" data-cmd="control.hold">📻 Retener sin límite</button>`)
+        + `<small>Lo conduce <b>${escapeHtml(u.remote.name)}</b> (jugador): tus órdenes le llegan por radio. Al retenerlo, no puede arrancar del andén hasta que lo liberes o se cumpla el tiempo.</small>`;
+    } else if (!ato) acts = `<small>Tren conducido por una persona: no recibe órdenes del PCC.</small>`;
     else {
       const last = u.route.stations.length - 1;
       const busy = ato.state === "depot" || ato.state === "retire" || ato.state === "retired" || ato.outOfService;
@@ -1173,6 +1275,7 @@ export class ControlCenter {
   }
 
   destroy() {
+    this.net?.close();
     this.unsub.forEach(f => f());
     this.desk?.destroy();
     this.tutorial?.destroy();

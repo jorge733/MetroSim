@@ -32,6 +32,11 @@
    focus: tren en el que se fija el juego (el del pasajero o el que se acerca
    a su andén). Los incidentes le tocan a él a menudo, como al del conductor.
 
+   Multijugador (net/): en el motor RÉPLICA de un conductor (engine.replica)
+   no se crea ningún incidente; llegan del anfitrión. Solo queda la puerta
+   obstruida del tren propio. Los trenes de otros jugadores (remote, puppet)
+   no tiran los dados de las puertas: eso lo hace el computador de su conductor.
+
    Avisa por el bus con "incident" { line, route, kind, phase: "start"|"end",
    text, ...datos }. No usa Three.js.
    ========================================================================== */
@@ -76,6 +81,7 @@ export class IncidentManager {
 
   update(dt, clock) {
     this.doors(clock);
+    if (this.ls.engine?.replica) return;         // conductor en una sala: los incidentes los manda el anfitrión
     // Fin de los incidentes temporales
     for (const inc of [...this.active]) {
       if (!this.ended(inc, clock)) continue;
@@ -135,9 +141,10 @@ export class IncidentManager {
 
   /* ----- Puertas obstruidas ----- */
   doors(clock) {
+    const replica = !!this.ls.engine?.replica;
     for (const u of this.ls.traffic.units) {
       const sim = u.sim;
-      if (!sim) continue;
+      if (!sim || u.remote || u.puppet || (replica && !u.isPlayer)) continue;
       if (sim.doorState !== "closing") { u.doorRolled = false; continue; }
       if (!u.doorRolled) {
         u.doorRolled = true;
