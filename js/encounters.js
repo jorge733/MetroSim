@@ -264,6 +264,7 @@ export class EncounterSystem {
 
   startSeat() {
     const w = this.walker;
+    if (w.space !== "train" || w.seat?.place?.type !== "seat") return false;
     const npc = this.inCar(6, p => p.slot.type === "stand").sort((x, y) => this.dist(x) - this.dist(y))[0];
     if (!npc) return false;
     // Pelo canoso: es una persona mayor
