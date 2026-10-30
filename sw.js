@@ -20,7 +20,7 @@ const CDN = ["cdn.jsdelivr.net", "unpkg.com"];
 /** Lo mínimo para que la portada abra sin conexión aunque no se haya jugado. */
 const SHELL = [
   "./", "index.html", "styles.css", "logo.svg", "favicon.svg",
-  "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png",
+  "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/bip.png",
   "js/main.js",
   // Fuentes de la interfaz (si faltan, la portada usa letras del sistema)
   "fonts/barlow-latin-400-normal.woff2", "fonts/barlow-latin-500-normal.woff2",

@@ -35,6 +35,7 @@ export class Hud {
       summary: $("summary"), summaryKicker: $("summaryKicker"), summaryTitle: $("summaryTitle"), summaryList: $("summaryList"),
       summaryContinue: $("summaryContinue"), summaryMenu: $("summaryMenu"), summaryAlt: $("summaryAlt"),
       cardPill: $("cardPill"),
+      cardPillText: $("cardPillText"),
       scorePill: $("scorePill"), scoreTotal: $("scoreTotal"), scoreStreak: $("scoreStreak"), scoreBest: $("scoreBest"), scoreFloat: $("scoreFloat"), fade: $("fade"), fadeText: $("fadeText"),
       ticket: $("ticketPanel"), ticketKicker: $("ticketKicker"), ticketTitle: $("ticketTitle"),
       ticketBalance: $("ticketBalance"), ticketCardNo: $("ticketCardNo"), ticketFares: $("ticketFares"),
@@ -342,7 +343,7 @@ export class Hud {
      Tarjeta bip!, boletería y tótem
      --------------------------------------------------------------------- */
   setCard(card) {
-    this.setText(this.el.cardPill, card.hasCard ? `bip! ${formatCLP(card.balance)}` : "bip! · sin tarjeta");
+    this.setText(this.el.cardPillText, card.hasCard ? formatCLP(card.balance) : "sin tarjeta");
     this.el.cardPill.classList.toggle("low", card.hasCard && card.balance < fareBandAt(0 + (this.lastClock || 0)).price);
   }
 

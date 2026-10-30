@@ -139,7 +139,7 @@ function createWorldMaterials() {
     boothLight: glow(0xfff4e0),
     reader: glow(0x2ee07a),
     fareBoard: glow(0xffffff, { map: toTexture(fareBoardCanvas()) }),
-    totemScreen: glow(0xffffff, { map: toTexture(totemScreenCanvas()) }),
+    totemScreen: glow(0xffffff, { map: totemScreenTexture() }),
     stanchion: std(0xc9cfd4, { metal: 0.8, rough: 0.25 }),
     belt: std(0x1d3f95, { rough: 0.6 }),
     endBoard: glow(0xffffff, { map: toTexture(signCanvas("FIN DE MANIOBRA", "#c41e2a", 512, 128, "800 50px Arial")) }),
@@ -223,6 +223,20 @@ function totemScreenCanvas() {
   g.font = "600 18px Arial"; g.fillStyle = "#cfe0f1";
   g.fillText("Débito o crédito", 128, 238); g.fillText("Toca la pantalla", 128, 266);
   return c;
+}
+
+/** Pantalla del tótem con la imagen real de la tarjeta bip! (reemplaza el dibujo al cargar). */
+function totemScreenTexture() {
+  const c = totemScreenCanvas(), tex = toTexture(c);
+  const img = new Image();
+  img.onload = () => {
+    const g = c.getContext("2d");
+    g.fillStyle = "#0c2f6b"; g.fillRect(40, 128, 176, 80);
+    g.drawImage(img, 52, 130, 152, 152 * img.height / img.width);
+    tex.needsUpdate = true;
+  };
+  img.src = "icons/bip.png";
+  return tex;
 }
 
 /* ==========================================================================

@@ -803,8 +803,11 @@ body.touch-mode .help-chip { display: none !important; }
 
 /* ---------- 11. Alpha 0.6: tarjeta bip!, boletería, fundido de cabina ---------- */
 .card-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   align-self: center;
-  padding: 9px 12px;
+  padding: 5px 12px 5px 6px;
   border-radius: var(--radius);
   background: #e1251b;
   color: #fff;
@@ -812,6 +815,7 @@ body.touch-mode .help-chip { display: none !important; }
   font-variant-numeric: tabular-nums;
   box-shadow: 0 6px 18px #0006;
 }
+.card-pill-logo { width: 34px; height: auto; border-radius: 3px; }
 .card-pill.low { background: #5a1a1a; box-shadow: 0 0 0 2px #ff6b6b inset; }
 
 .ticket-panel {
@@ -840,14 +844,10 @@ body.touch-mode .help-chip { display: none !important; }
 .ticket-head-text { display: grid; flex: 1; }
 .ticket-head-text strong { font: 700 22px/1.1 var(--f-display); letter-spacing: .3px; }
 .bip-logo {
-  display: grid;
-  place-items: center;
-  width: 56px;
-  height: 36px;
-  border-radius: 9px;
-  background: #e1251b;
-  font-weight: 900;
-  font-size: 18px;
+  flex: none;
+  width: 64px;
+  height: auto;
+  border-radius: 5px;
 }
 .ticket-close { display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid #ffffff2e; border-radius: 8px; background: transparent; color: var(--text); font-size: 16px; cursor: pointer; }
 .ticket-close:hover { background: var(--raise); }
