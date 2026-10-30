@@ -809,7 +809,7 @@ body.touch-mode .help-chip { display: none !important; }
   align-self: center;
   padding: 5px 12px 5px 6px;
   border-radius: var(--radius);
-  background: #e1251b;
+  background: #214b87;
   color: #fff;
   font: 700 13px/1 var(--f-data);
   font-variant-numeric: tabular-nums;
@@ -836,7 +836,7 @@ body.touch-mode .help-chip { display: none !important; }
   padding: 18px 20px;
   border-radius: 14px;
   border: 1px solid var(--panel-border);
-  border-top: 4px solid #e1251b;
+  border-top: 4px solid #f7a421;
   background: var(--surface);
   box-shadow: 0 24px 70px #000b;
 }
@@ -877,13 +877,13 @@ body.touch-mode .help-chip { display: none !important; }
 }
 .ticket-amounts button { font-variant-numeric: tabular-nums; }
 .ticket-amounts button:hover, .ticket-pay button:hover { background: var(--raise); }
-.ticket-amounts button.selected, .ticket-pay button.selected { background: #e1251b; border-color: #e1251b; color: #fff; }
+.ticket-amounts button.selected, .ticket-pay button.selected { background: #f7a421; border-color: #f7a421; color: #14305c; }
 .ticket-status { min-height: 38px; padding: 9px 12px; border-radius: 8px; background: #ffffff08; font-size: 13px; line-height: 1.4; color: #cfdae6; }
 .ticket-status.ok { background: #34d17c1f; color: #c4f2d7; }
 .ticket-status.error { background: #ff4d4d22; color: #ffd6d6; }
 .ticket-actions { display: flex; justify-content: space-between; gap: 8px; }
 .ticket-panel.busy .ticket-actions button { opacity: .5; pointer-events: none; }
-#ticketPanel { --line: #e1251b; --on-line: #fff; }      /* boletería y tótem: colores de la tarjeta bip! */
+#ticketPanel { --line: #f7a421; --on-line: #14305c; }      /* boletería y tótem: colores de la tarjeta bip! */
 .ticket-panel.busy .ticket-status::after { content: " ⏳"; }
 
 .fade {

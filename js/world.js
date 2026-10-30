@@ -218,8 +218,8 @@ function totemScreenCanvas() {
   g.fillStyle = "#0c2f6b"; g.fillRect(0, 0, 256, 320);
   g.fillStyle = "#ffffff"; g.font = "800 40px Arial"; g.textAlign = "center"; g.textBaseline = "middle";
   g.fillText("CARGA", 128, 60); g.fillText("TU", 128, 105);
-  g.fillStyle = "#e1251b"; g.fillRect(58, 135, 140, 64);
-  g.fillStyle = "#fff"; g.font = "900 44px Arial"; g.fillText("bip!", 128, 168);
+  g.fillStyle = "#214b87"; g.fillRect(58, 135, 140, 64);
+  g.fillStyle = "#f7a421"; g.font = "900 44px Arial"; g.fillText("bip!", 128, 168);
   g.font = "600 18px Arial"; g.fillStyle = "#cfe0f1";
   g.fillText("Débito o crédito", 128, 238); g.fillText("Toca la pantalla", 128, 266);
   return c;
