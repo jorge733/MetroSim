@@ -70,6 +70,8 @@ export class NetHost {
   get online() { return this.room?.online ?? false; }
   /** Estado de los servidores para encontrarse (para mostrarlo en 👥 Sala). */
   get detail() { return this.room?.detail ?? null; }
+  /** Último intento de unirse que no logró conectar (o null). */
+  get failed() { return this.room?.failed ?? null; }
   /** Volver a anunciar la sala ahora. */
   retry() { this.room?.retry?.(); }
 

@@ -709,6 +709,7 @@ export class ControlCenter {
       ${localNetwork() ? `<p class="pcc-error">Modo local (?red=local en la dirección): solo se pueden unir pestañas de este mismo navegador. Para jugar con otro computador o celular, abre MetroSim sin ?red=local.</p>` : ""}
       <p class="${net.online ? "pcc-ok" : "pcc-error"}">${net.online ? "✓ Sala visible: ya pueden unirse." : "⚠ Sin conexión con los servidores para encontrarse, reconectando… Nadie nuevo puede unirse hasta que vuelva."}</p>
       ${net.detail ? `<p class="pcc-detail">${escapeHtml(net.detail)}</p>` : ""}
+      ${net.failed ? `<p class="pcc-error">⚠ ${escapeHtml(net.failed)}</p>` : ""}
       <p>Deja esta pantalla abierta y a la vista mientras se unen: si cambias de app o de pestaña (sobre todo en el celular), la sala deja de verse. Para jugar en un solo equipo, abre la sala y el conductor en <b>dos ventanas</b> lado a lado, no en pestañas.</p>
       <h3>Conductores (${drivers.length} de ${MAX_DRIVERS})</h3>
       ${list}

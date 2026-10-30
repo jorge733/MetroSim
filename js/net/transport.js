@@ -16,8 +16,16 @@
 const TRYSTERO_URL = "https://cdn.jsdelivr.net/npm/@trystero-p2p/nostr@0.25.4/+esm";
 /** Servidores para encontrarse usados a la vez (si alguno falla, bastan los demás). */
 const RELAYS = 6;
-/** Servidores TURN públicos (los de PeerJS): retransmiten cuando la red no deja conectar directo. */
-const TURN = [{ urls: ["turn:eu-0.turn.peerjs.com:3478", "turn:us-0.turn.peerjs.com:3478"], username: "peerjs", credential: "peerjsp" }];
+/**
+ * Servidores TURN públicos: retransmiten cuando la red no deja conectar directo (datos móviles,
+ * redes de empresa). El del puerto 443 por TCP pasa la mayoría de los cortafuegos.
+ */
+const TURN = [
+  { urls: ["turn:eu-0.turn.peerjs.com:3478", "turn:us-0.turn.peerjs.com:3478"], username: "peerjs", credential: "peerjsp" },
+  { urls: ["turn:openrelay.metered.ca:80", "turn:openrelay.metered.ca:443", "turn:openrelay.metered.ca:443?transport=tcp"], username: "openrelayproject", credential: "openrelayproject" },
+];
+/** Texto cuando los dos se encontraron pero la conexión directa no se logró. */
+const NO_DIRECT = "la conexión directa entre los dos equipos no se logró (la red la bloquea). Prueben con los dos en la misma red Wi-Fi, o con el celular en Wi-Fi en vez de datos móviles";
 /** Nombre del canal en el modo local (?red=local). */
 const PREFIX = "metrosim-sala-";
 const LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ";       // sin I ni O (se confunden con 1 y 0)
@@ -80,7 +88,11 @@ export async function hostRoom(onJoin, onStatus = () => {}) {
   if (localNetwork()) return hostLocal(onJoin);
   const T = await loadTrystero();
   const code = newRoomCode();
-  const room = T.joinRoom(roomConfig(), code);
+  const info = { code, online: true, detail: null, failed: null };
+  // Alguien encontró la sala pero no se pudo conectar con él
+  const room = T.joinRoom(roomConfig(), code, {
+    onJoinError: (e) => { console.warn("[MetroSim sala]", e.error); info.failed = `Alguien intentó unirse, pero ${NO_DIRECT}`; onStatus(info.online, false); },
+  });
   const msg = room.makeAction("m");
   const links = new Map();                 // conductor (id de Trystero) → conexión
   room.onPeerJoin = (id) => {
@@ -93,13 +105,13 @@ export async function hostRoom(onJoin, onStatus = () => {}) {
       if (links.has(peerId)) return;
       const link = new Link((x) => msg.send(x, { target: peerId }), () => { links.delete(peerId); msg.send({ type: "__bye" }, { target: peerId }); });
       links.set(peerId, link);
+      info.failed = null;
       return onJoin(link);
     }
     if (m?.type === "__bye") { links.get(peerId)?.closed(); links.delete(peerId); return; }
     links.get(peerId)?.receive(m);
   };
   // Estado: ¿hay algún servidor para encontrarse conectado?
-  const info = { code, online: true, detail: null };
   const check = () => {
     const sockets = Object.values(T.getRelaySockets?.() ?? {});
     const open = sockets.filter(ws => ws.readyState === 1).length;
@@ -122,14 +134,16 @@ export async function hostRoom(onJoin, onStatus = () => {}) {
 export async function joinRoom(code) {
   if (localNetwork()) return joinLocal(code);
   const T = await loadTrystero();
-  const room = T.joinRoom(roomConfig(), code);
+  let failed = null;                       // se encontró a alguien en la sala, pero no se pudo conectar
+  const room = T.joinRoom(roomConfig(), code, { onJoinError: (e) => { console.warn("[MetroSim sala]", e.error); failed = e.error; } });
   const msg = room.makeAction("m");
   return new Promise((resolve, reject) => {
     let host = null, link = null;
     const timer = setTimeout(() => {
       room.leave();
       const sockets = Object.values(T.getRelaySockets?.() ?? {});
-      reject(new Error(sockets.some(ws => ws.readyState === 1)
+      reject(new Error(failed ? `La sala ${code} existe, pero ${NO_DIRECT}`
+        : sockets.some(ws => ws.readyState === 1)
         ? `No se encontró la sala ${code}. Revisa el código y que el Centro de Control siga con la sala abierta (👥 Sala en verde) y su pantalla encendida`
         : "Sin conexión con los servidores para encontrarse: revisa tu internet"));
     }, JOIN_TIMEOUT);
