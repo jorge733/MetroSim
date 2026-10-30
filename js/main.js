@@ -96,6 +96,8 @@ import { Hud } from "./hud.js";
 import { DriverScore } from "./scoring.js";
 import { BankAccount, BANK_NAME, stationWage, shiftBonus } from "./economy.js";
 import { MissionSystem, MASTERY_REWARD, GRAND_REWARD, lineMastered } from "./missions.js";
+import { EncounterSystem } from "./encounters.js";
+import { Civics } from "./civics.js";
 import { celebrate } from "./celebration.js";
 import { Inventory, souvenirId, SOUVENIR_PRICE, ALBUM_REWARD, LICENSES, FREE_LINE } from "./shop.js";
 import { openShopUI } from "./shopUI.js";
@@ -125,6 +127,7 @@ hud.setSound(!muted);
 const card = new BipCard();               // la tarjeta bip! del jugador (saldo persistente)
 hud.setCard(card);
 const bank = new BankAccount();           // cuenta bancaria con tarjeta de débito (compartida por los dos modos)
+const civics = new Civics();              // civismo del pasajero (ayudar a otros viajeros, encounters.js)
 hud.setBank(bank);
 const directionSelect = $("startDirection");
 
@@ -510,6 +513,25 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = {}) {
     });
     walker.attach(renderer.domElement);
     game.walker = walker;
+    // Encuentros con otros viajeros: ceder el asiento, turistas, objetos olvidados, vendedores, músicos…
+    game.encounters = new EncounterSystem({
+      people: game.people, walker, engine, line: ROUTE_A.line, civics, audio,
+      say: (text, level, ms) => game && hud.showMessage(text, level, ms),
+      reward: (amount, concept) => { if (!amount) return; bank.deposit(amount, concept); hud.setBank(bank); hud.moneyFloat(amount); },
+      charge: (amount, concept, bagItem) => {
+        const r = bank.charge(amount, concept);
+        if (!r.ok) return `Fondos insuficientes en tu cuenta (${bank.label})`;
+        if (bagItem) bank.addToBag(bagItem);
+        hud.setBank(bank);
+        hud.moneyFloat(-amount);
+        return null;
+      },
+      dialog: (o) => {
+        walker.frozen = true;
+        walker.keys.clear();
+        hud.openStore({ ...o, bank, onClose: () => { if (game?.walker) { game.walker.frozen = false; game.walker.keys.clear(); } o.onClose?.(); } });
+      },
+    });
     scene.add(game.trainLights);
     // Luz de la luminaria del túnel más cercana: barre el coche al pasar (el pasajero la ve por las ventanas)
     game.passLight = new THREE.PointLight(0xffd7a3, 0, 9, 1.4);
@@ -784,6 +806,7 @@ function onKeyDown(event) {
   if (game.walker) {
     if (game.transition) return;
     if (key === "j") return openMissionBoard();
+    if (key === "e" && game.encounters?.interact()) return;   // un encuentro cerca (turista, objeto, vendedor…)
     const result = game.walker.keyDown(key);
     if (result) hud.showMessage(result.text, result.level);
     return;
@@ -811,6 +834,7 @@ function onKeyDown(event) {
 /** Respuesta del motor a una orden (del conductor o desde la consola / Centro de Control). */
 function onCommandResult(r) {
   if (!game || game.warming || !r.result?.text) return;
+  if (r.payload?.source === "pasajero") return;          // el citófono del pasajero ya avisa con su propio texto
   if (game.driverRole?.owns(r) || r.type.startsWith("control.")) hud.showMessage(r.result.text, r.result.level);
 }
 
@@ -1231,6 +1255,9 @@ function validateFare() {
 /** Abre la boletería o el tótem de autoservicio. */
 function openService({ kind, station }) {
   const walker = game.walker;
+  // Objeto olvidado que llevas: se entrega en la ventanilla de la boletería
+  const delivered = kind === "boleteria" ? game.encounters?.deliverAtBooth() : null;
+  if (delivered) return hud.showMessage(delivered, "ok", 6500);
   walker.frozen = true;
   walker.keys.clear();
   const booth = kind === "boleteria";
@@ -1532,6 +1559,7 @@ function openMissionBoard() {
   ms.ensure(missionCtx());
   hud.openMissions({
     missions: ms,
+    civics: () => `Civismo: ${civics.label}${civics.carrying ? ` · llevas ${civics.carrying.name}: entrégala en una boletería` : ""}`,
     onAccept: (i) => {
       const m = ms.accept(i, missionCtx());
       if (m) hud.showMessage(`Misión aceptada: ${m.icon} ${m.title}`, "ok", 3500);
@@ -1751,7 +1779,7 @@ function touchContext() {
   if (!w || w.frozen) return {};
   const inTrain = w.space === "train";
   return {
-    use: w.space === "street" ? !!game.city.nearest(w.pos) : !inTrain && !!(w.elevatorNear() || w.nearService() || w.nearExit()),
+    use: !!game.encounters?.near() || (w.space === "street" ? !!game.city.nearest(w.pos) : !inTrain && !!(w.elevatorNear() || w.nearService() || w.nearExit())),
     sit: !!w.seat || inTrain || w.platformSide() !== 0,
     seated: !!w.seat,
     hold: inTrain && !w.seat,
@@ -2071,6 +2099,8 @@ function loop(now) {
   if (game.city) game.city.update(dt, inStreet ? walker.pos : null, game.clock);
   const ridden = player && game.rig.view !== "exterior" ? player : walker?.unit;
   game.outdoor.update(dt, cameraWorld, game.clock, { street: inStreet, cityOutdoor: game.city?.outdoor || 0, dry: ridden ? trainBounds(ridden) : null });
+  // Encuentros con otros viajeros (no durante el tutorial ni en un cambio de línea)
+  if (game.encounters && !game.tutorial && !game.transition) game.encounters.update(dt);
   game.missionT = (game.missionT || 0) - dt;
   if (game.missions && game.missionT <= 0) {
     game.missionT = 1;
@@ -2227,7 +2257,7 @@ function walkerHudData() {
   // Fuera del horario comercial el Metro real está cerrado: el juego mantiene un servicio especial
   const [h0, h1] = SERVICE_HOURS[CONFIG.dayType];
   const closed = inService(clock) ? "" : `Fuera del horario comercial (${String(h0 | 0).padStart(2, "0")}:${h0 % 1 ? "30" : "00"}–${h1 | 0}:${h1 % 1 ? "30" : "00"}): servicio especial del juego cada 15 min · `;
-  const base = { clock, worldZ: w.worldZ, hint: closed + w.hint() };
+  const base = { clock, worldZ: w.worldZ, hint: closed + (game.encounters?.hint() ?? w.hint()) };
   if (w.space === "street") {
     const lm = game.city.landmark, band = fareBandAt(clock);
     return {

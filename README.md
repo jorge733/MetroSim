@@ -51,6 +51,24 @@ Los íconos están en `icons/` (los PNG se generan desde `icons/icon.svg`).
 
 ## Mejoras del modo Pasajero
 
+- **Encuentros con otros viajeros** (`js/encounters.js`): cada uno o dos minutos pasa algo que pide una decisión.
+  Quien lo protagoniza es uno de los viajeros dibujados, marcado con un ícono flotante; acércate y pulsa **E**
+  (o **F** para ceder el asiento):
+  - **Ceder el asiento:** vas sentado, el coche va lleno y sube una persona mayor (de pelo canoso). Levántate y
+    se sienta en tu lugar.
+  - **Turista perdido** (`js/routeQuiz.js`): pregunta cómo llegar a otra estación. Elige la indicación correcta
+    (línea, dirección y, si hace falta, dónde combinar), calculada con la red real. Si aciertas te deja una propina;
+    si te equivocas, se va por el camino equivocado.
+  - **Objeto olvidado** (mochila, celular, billetera, paraguas…) en un asiento del coche: recógelo y entrégalo en
+    cualquier boletería. El dueño te deja una recompensa. Lo llevas aunque cambies de línea o cierres el juego.
+  - **Vendedor ambulante:** chocolates «tres por mil», calugas, pañuelos… lo que compras queda en tu bolsa.
+  - **Músico** que toca en el coche (se oye): puedes darle una moneda.
+  - **Pasajero que se siente mal:** avisa por el citófono de emergencia. El conductor responde por radio y el tren
+    espera en la próxima estación a que suba personal de Metro.
+- **Civismo** (`js/civics.js`): ayudar suma puntos (equivocarte con el turista resta) y subes de nivel: Buen
+  vecino, Pasajero ejemplar y Orgullo del Metro, cada uno con un premio en tu cuenta. Se ve en la libreta de
+  misiones (J).
+
 - **Mapa de la misión**: bajo la misión activa hay una brújula que apunta al lugar del paso actual, con la distancia,
   qué es y cómo llegar (boletería o tótem, acceso al Metro, torniquetes, escalera al andén del sentido correcto,
   salida a la calle, el local o el hito), y una línea con tu posición y el destino. El destino también se marca en
@@ -435,6 +453,9 @@ js/control/           Centro de Control
   controlCenter.js    esquema de la red, ficha de tren, alarmas, órdenes, tiempo, informe del turno
   alarms.js           mesa de alarmas (incidentes que piden una decisión) y nota del turno
   controlTutorial.js  pasos del tutorial del Centro de Control
+js/encounters.js      encuentros del Pasajero con otros viajeros (asiento, turista, objeto, vendedor, músico, citófono)
+js/routeQuiz.js       preguntas de ruta del turista (con la red real)
+js/civics.js          civismo del Pasajero: puntos, niveles y objeto olvidado que llevas
 js/touch.js           controles táctiles (celular y tablet)
 js/roles/             roles del jugador
   driverRole.js       Conductor: teclado → órdenes

@@ -534,7 +534,7 @@ export class Hud {
         button: m ? "Cambiar a esta" : "Aceptar",
         onClick: () => { o.onAccept(i); render(); },
       })));
-      this.setText(e.missionStats, `Cumplidas: ${ms.completed} · fallidas: ${ms.failed}`);
+      this.setText(e.missionStats, `Cumplidas: ${ms.completed} · fallidas: ${ms.failed}${o.civics ? ` · ${o.civics()}` : ""}`);
       this.renderMissionBook(ms);
     };
     render();
@@ -632,7 +632,7 @@ export class Hud {
         btn.className = "store-item" + (item.action ? " mission" : "") + (!item.action && !o.bank.canPay(item.price) ? " expensive" : "");
         btn.innerHTML = "<span></span><b></b>";
         btn.firstChild.textContent = item.name + (item.note ? ` · ${item.note}` : "");
-        btn.lastChild.textContent = item.action ? "misión" : formatCLP(item.price);
+        btn.lastChild.textContent = item.action ? (item.tag ?? "misión") : formatCLP(item.price);
         btn.onclick = () => run(item);
         return btn;
       }));
