@@ -54,7 +54,7 @@ export class NetHost {
 
   async open() {
     this.room = await hostRoom((link) => this.join(link), (online, changed) => {
-      if (changed) this.log(online ? "Sala visible otra vez en el servidor de salas" : "Se cortó la conexión con el servidor de salas: reconectando… (mientras tanto nadie nuevo puede unirse)", online ? "ok" : "warn");
+      if (changed) this.log(online ? "La sala se puede encontrar otra vez" : "Sin conexión con los servidores para encontrarse: reconectando… (mientras tanto nadie nuevo puede unirse)", online ? "ok" : "warn");
       this.onChange();
     });
     this.code = this.room.code;
@@ -66,9 +66,9 @@ export class NetHost {
     return this.code;
   }
 
-  /** ¿Se puede encontrar la sala ahora (anunciada en el servidor de salas)? */
+  /** ¿Se puede encontrar la sala ahora (algún servidor para encontrarse conectado)? */
   get online() { return this.room?.online ?? false; }
-  /** Último error del servidor de salas (para mostrarlo si la sala no se ve). */
+  /** Estado de los servidores para encontrarse (para mostrarlo en 👥 Sala). */
   get detail() { return this.room?.detail ?? null; }
   /** Volver a anunciar la sala ahora. */
   retry() { this.room?.retry?.(); }

@@ -45,12 +45,13 @@ computador o celular.
    si el conductor pierde la conexión, sigue jugando solo.
 
 **Mientras se unen, el Centro de Control debe quedar con la pantalla encendida y a la vista**: si cambia de app o de
-pestaña (sobre todo en el celular), el navegador corta su enlace con el servidor de salas y quien se una recibe «No se
-encontró la sala» hasta que vuelva (la sala se reconecta sola y lo indica en 👥 Sala). Para jugar en un solo
-computador, usa dos ventanas lado a lado, no dos pestañas.
+pestaña (sobre todo en el celular), el navegador lo pausa y quien se una no lo encuentra («No se encontró la sala»).
+👥 Sala muestra si la sala se puede encontrar. Para jugar en un solo computador, usa dos ventanas lado a lado, no dos
+pestañas.
 
-Necesita internet: los navegadores se conectan directo entre ellos (WebRTC con [PeerJS](https://peerjs.com/), que se
-carga solo al abrir o unirse a una sala). Para probar en un solo computador, abre dos pestañas con `?red=local` al final
+Necesita internet: los navegadores se conectan directo entre ellos (WebRTC con [Trystero](https://github.com/dmotz/trystero), que se
+carga solo al abrir o unirse a una sala). Para encontrarse usa a la vez varios servidores públicos de Nostr, así que
+no depende de uno solo; después los datos van directo entre los jugadores. Para probar en un solo computador, abre dos pestañas con `?red=local` al final
 de la dirección: una como Centro de Control y otra como conductor (sin internet).
 
 **Cómo funciona** (`js/net/`): el motor del PCC es el que vale. Cada conductor corre su propio motor completo, pero como
@@ -495,7 +496,7 @@ js/control/           Centro de Control
   alarms.js           mesa de alarmas (incidentes que piden una decisión) y nota del turno
   controlTutorial.js  pasos del tutorial del Centro de Control
 js/net/               multijugador (sala del Centro de Control con conductores)
-  transport.js        conexión entre navegadores con código de sala (PeerJS; ?red=local para dos pestañas)
+  transport.js        conexión entre navegadores con código de sala (Trystero; ?red=local para dos pestañas)
   replica.js          estado de los trenes de una línea y cómo se aplica en el motor de otro jugador
   netHost.js          sala del PCC: reserva servicios, manda el estado, radio a los conductores
   netClient.js        conductor en una sala: motor réplica, radio del PCC, sin conexión sigue solo

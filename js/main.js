@@ -49,7 +49,7 @@
      net/         multijugador: el Centro de Control abre una sala (netHost.js) y
                   otros jugadores conducen en ella (netClient.js); replica.js
                   pasa el estado de los trenes de un motor a otro, transport.js
-                  conecta los navegadores (PeerJS / WebRTC)
+                  conecta los navegadores (Trystero / WebRTC)
    tutorial.js  tutorial interactivo del jugador nuevo (conductor y pasajero)
      announcements.js  frases reales de megafonía del Metro de Santiago
 

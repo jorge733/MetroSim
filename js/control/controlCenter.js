@@ -705,8 +705,8 @@ export class ControlCenter {
       <h2>Sala abierta</h2>
       <p>Comparte este código. Cada conductor abre MetroSim, elige una de tus líneas (${[...this.lines].map(id => `L${id}`).join(", ")}) y su servicio, y pulsa <b>«Unirse a una sala»</b> en la tarjeta Conductor.</p>
       <div class="pcc-code" aria-label="Código de la sala">${net.code}</div>
-      <p class="${net.online ? "pcc-ok" : "pcc-error"}">${net.online ? "✓ Sala visible: ya pueden unirse." : "⚠ Sin conexión con el servidor de salas, reconectando… Nadie nuevo puede unirse hasta que vuelva."}</p>
-      ${!net.online && net.detail ? `<p class="pcc-detail">Detalle: ${escapeHtml(net.detail)}</p>` : ""}
+      <p class="${net.online ? "pcc-ok" : "pcc-error"}">${net.online ? "✓ Sala visible: ya pueden unirse." : "⚠ Sin conexión con los servidores para encontrarse, reconectando… Nadie nuevo puede unirse hasta que vuelva."}</p>
+      ${net.detail ? `<p class="pcc-detail">${escapeHtml(net.detail)}</p>` : ""}
       <p>Deja esta pantalla abierta y a la vista mientras se unen: si cambias de app o de pestaña (sobre todo en el celular), la sala deja de verse. Para jugar en un solo equipo, abre la sala y el conductor en <b>dos ventanas</b> lado a lado, no en pestañas.</p>
       <h3>Conductores (${drivers.length} de ${MAX_DRIVERS})</h3>
       ${list}

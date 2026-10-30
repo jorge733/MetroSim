@@ -2,26 +2,37 @@
    MetroSim — Multijugador · transport.js
    Conexión entre jugadores, con un código de sala de 4 letras.
 
-     · Normal: WebRTC entre los navegadores con PeerJS (se carga del CDN solo
-       al abrir o unirse a una sala). El servidor público de PeerJS solo
-       presenta a los jugadores; después los datos van directo entre ellos.
+     · Normal: WebRTC directo entre los navegadores con Trystero (se carga
+       del CDN solo al abrir o unirse a una sala). Para encontrarse usa a la
+       vez varios servidores públicos de Nostr (RELAYS): si uno falla, sirven
+       los otros. Los datos del juego van directo entre los jugadores (o por
+       un servidor TURN si la red no deja conectar directo).
      · ?red=local: BroadcastChannel, para probar en dos pestañas del mismo
        navegador sin internet.
 
    Las dos dan la misma conexión: { send(obj), onmessage, onclose, close() }.
    ========================================================================== */
 
-const PEER_URL = "https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js";
-const PREFIX = "metrosim-sala-";
+const TRYSTERO_URL = "https://cdn.jsdelivr.net/npm/@trystero-p2p/nostr@0.25.4/+esm";
+/** Servidores para encontrarse usados a la vez (si alguno falla, bastan los demás). */
+const RELAYS = 6;
+/** Servidores TURN públicos (los de PeerJS): retransmiten cuando la red no deja conectar directo. */
+const TURN = [{ urls: ["turn:eu-0.turn.peerjs.com:3478", "turn:us-0.turn.peerjs.com:3478"], username: "peerjs", credential: "peerjsp" }];
 const LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ";       // sin I ni O (se confunden con 1 y 0)
-const TIMEOUT = 12000;
-/** Para unirse: intentos si el servidor no encuentra la sala (el anfitrión puede estar reconectándose) y espera total. */
-const JOIN_TRIES = 4, JOIN_RETRY = 2500, JOIN_TIMEOUT = 25000;
+/** Tiempo para encontrar al Centro de Control al unirse. */
+const JOIN_TIMEOUT = 30000;
 
 /** ¿Probar en el mismo navegador (dos pestañas)? */
 export const localNetwork = () => {
   try { return new URLSearchParams(location.search).get("red") === "local"; } catch { return false; }
 };
+
+/** Configuración de Trystero (?relay=wss://… usa solo ese servidor, para pruebas). */
+function roomConfig() {
+  let relay = null;
+  try { relay = new URLSearchParams(location.search).get("relay"); } catch { /* sin dirección */ }
+  return { appId: "metrosim.app", turnConfig: TURN, relayConfig: relay ? { urls: [relay] } : { redundancy: RELAYS } };
+}
 
 /** Código nuevo de sala (4 letras). */
 export function newRoomCode() {
@@ -58,161 +69,93 @@ class Link {
 }
 
 /**
- * Abre una sala. Si el código ya está en uso, prueba con otro.
- * Mientras esté abierta, se mantiene anunciada en el servidor de salas: si
- * se corta (red, pantalla apagada, pestaña en segundo plano), un vigilante
- * la vuelve a anunciar; mientras tanto, quien intente unirse recibe «no se
- * encontró la sala». Los conductores ya conectados siguen (van directo).
+ * Abre una sala con un código nuevo.
  * @param {(link: Link) => void} onJoin  llega un jugador
- * @param {(online: boolean, changed: boolean) => void} [onStatus]  la sala se ve (o no) en el servidor de salas
+ * @param {(online: boolean, changed: boolean) => void} [onStatus]  la sala se ve (o no) en los servidores para encontrarse
  * @returns {Promise<{ code, online, detail, retry(), close() }>}
  */
 export async function hostRoom(onJoin, onStatus = () => {}) {
   if (localNetwork()) return hostLocal(onJoin);
-  const Peer = await loadPeer();
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const code = newRoomCode();
-    const peer = new Peer(PREFIX + code);
-    const ok = await new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error("Sin respuesta del servidor de salas")), TIMEOUT);
-      peer.on("open", () => { clearTimeout(timer); resolve(true); });
-      peer.on("error", (err) => {
-        clearTimeout(timer);
-        if (err.type === "unavailable-id") resolve(false);
-        else reject(new Error(peerError(err)));
-      });
-    }).catch((err) => { peer.destroy(); throw err; });
-    if (!ok) { peer.destroy(); continue; }
-    return keepAnnounced(Peer, peer, code, onJoin, onStatus);
-  }
-  throw new Error("No se pudo crear la sala: inténtalo otra vez");
-}
-
-/** Vigilante de la sala: la mantiene anunciada en el servidor de salas. */
-function keepAnnounced(Peer, first, code, onJoin, onStatus) {
-  const WATCH = 3000, RESET_AFTER = 10000;
-  let peer = null, closing = false, offlineSince = null, lastReset = Date.now();
-  const room = {
-    code, online: true, detail: null, retry: () => reset(),
-    close: () => {
-      closing = true;
-      clearInterval(timer);
-      removeEventListener("visibilitychange", onVisible);
-      for (const p of peers) p.destroy();
-    },
+  const T = await loadTrystero();
+  const code = newRoomCode();
+  const room = T.joinRoom(roomConfig(), code);
+  const msg = room.makeAction("m");
+  const links = new Map();                 // conductor (id de Trystero) → conexión
+  room.onPeerJoin = (id) => {
+    // Se presenta como el Centro de Control (los conductores también se ven entre ellos, pero solo hablan con él)
+    msg.send({ type: "__host" }, { target: id });
   };
-  const peers = new Set();                 // el actual y los anteriores que aún llevan conductores conectados
-  const status = (online) => { if (room.online !== online) { room.online = online; onStatus(online, true); } };
-
-  const wire = (p) => {
-    p.links = 0;
-    peers.add(p);
-    p.on("connection", (c) => {
-      const link = new Link((m) => c.send(m), () => c.close());
-      c.on("open", () => { p.links++; onJoin(link); });
-      c.on("data", (m) => link.receive(m));
-      c.on("close", () => { p.links = Math.max(0, p.links - 1); link.closed(); retire(p); });
-      c.on("error", () => link.closed());
-    });
-    p.on("open", () => { if (p === peer) { offlineSince = null; room.detail = null; status(true); } });
-    p.on("disconnected", () => { if (p === peer && !closing) check(); });
-    p.on("error", (err) => {
-      if (p !== peer) return;
-      room.detail = `${err.type || "error"}: ${err.message || ""}`.slice(0, 160);
-      console.warn("[MetroSim sala]", room.detail);
-      onStatus(room.online, false);                // solo para mostrar el detalle
-    });
+  room.onPeerLeave = (id) => { links.get(id)?.closed(); links.delete(id); };
+  msg.onMessage = (m, { peerId }) => {
+    if (m?.type === "__driver") {
+      if (links.has(peerId)) return;
+      const link = new Link((x) => msg.send(x, { target: peerId }), () => { links.delete(peerId); msg.send({ type: "__bye" }, { target: peerId }); });
+      links.set(peerId, link);
+      return onJoin(link);
+    }
+    if (m?.type === "__bye") { links.get(peerId)?.closed(); links.delete(peerId); return; }
+    links.get(peerId)?.receive(m);
   };
-  /** Un enlace anterior sin conductores ya no sirve. */
-  const retire = (p) => { if (p !== peer && !p.links && !closing) { p.destroy(); peers.delete(p); } };
-
-  /** Conexión nueva con el mismo código (los conductores conectados siguen por el enlace anterior). */
-  const reset = () => {
-    if (closing) return;
-    const old = peer;
-    lastReset = Date.now();
-    try { if (!old.destroyed && !old.disconnected) old.disconnect(); } catch { /* ya estaba fuera */ }
-    peer = new Peer(PREFIX + code);
-    wire(peer);
-    retire(old);
-  };
-
+  // Estado: ¿hay algún servidor para encontrarse conectado?
+  const info = { code, online: true, detail: null };
   const check = () => {
-    if (closing) return;
-    if (peer.open) { offlineSince = null; status(true); return; }
-    status(false);
-    offlineSince ??= Date.now();
-    // Primero lo simple: volver con la misma conexión; si no resulta en unos segundos, una nueva
-    if (peer.disconnected && !peer.destroyed) { try { peer.reconnect(); } catch { /* se intenta de nuevo */ } }
-    if (Date.now() - offlineSince > RESET_AFTER && Date.now() - lastReset > RESET_AFTER) reset();
+    const sockets = Object.values(T.getRelaySockets?.() ?? {});
+    const open = sockets.filter(ws => ws.readyState === 1).length;
+    const online = open > 0;
+    info.detail = `${open} de ${sockets.length} servidores para encontrarse conectados`;
+    if (online !== info.online) { info.online = online; onStatus(online, true); }
   };
-  const onVisible = () => { if (!document.hidden) check(); };
-
-  peer = first;
-  wire(first);
-  const timer = setInterval(check, WATCH);
-  addEventListener("visibilitychange", onVisible);
-  return room;
+  const timer = setInterval(check, 3000);
+  setTimeout(check, 1500);
+  return Object.assign(info, {
+    retry: () => { try { T.resumeRelayReconnection?.(); } catch { /* sin reconexión manual */ } check(); },
+    close: () => { clearInterval(timer); links.forEach(l => l.close()); room.leave(); },
+  });
 }
 
 /**
- * Se une a una sala.
+ * Se une a una sala: busca al Centro de Control que la abrió.
  * @returns {Promise<Link>}
  */
 export async function joinRoom(code) {
   if (localNetwork()) return joinLocal(code);
-  const Peer = await loadPeer();
-  const peer = new Peer();
+  const T = await loadTrystero();
+  const room = T.joinRoom(roomConfig(), code);
+  const msg = room.makeAction("m");
   return new Promise((resolve, reject) => {
-    let done = false, tries = 0, found = false;
-    const fail = (text) => { if (done) return; done = true; clearTimeout(timer); peer.destroy(); reject(new Error(text)); };
-    // Sin respuesta: si el servidor no dijo que la sala no existe, la sala está, pero la conexión directa no se logró
-    const timer = setTimeout(() => fail(found || tries > 0
-      ? `La sala ${code} existe, pero no se pudo conectar directo con ella: algunas redes lo bloquean. Prueben con los dos equipos en la misma red Wi-Fi`
-      : "Sin respuesta del servidor de salas: revisa tu internet"), JOIN_TIMEOUT);
-    const attempt = () => {
-      if (done) return;
-      tries++;
-      const c = peer.connect(PREFIX + code, { reliable: true, serialization: "json" });
-      c.on("open", () => {
-        if (done) return c.close();
-        done = true;
+    let host = null, link = null;
+    const timer = setTimeout(() => {
+      room.leave();
+      const sockets = Object.values(T.getRelaySockets?.() ?? {});
+      reject(new Error(sockets.some(ws => ws.readyState === 1)
+        ? `No se encontró la sala ${code}. Revisa el código y que el Centro de Control siga con la sala abierta (👥 Sala en verde) y su pantalla encendida`
+        : "Sin conexión con los servidores para encontrarse: revisa tu internet"));
+    }, JOIN_TIMEOUT);
+    msg.onMessage = (m, { peerId }) => {
+      if (m?.type === "__host" && !host) {
+        host = peerId;
         clearTimeout(timer);
-        const link = new Link((m) => c.send(m), () => { c.close(); peer.destroy(); });
-        c.on("data", (m) => link.receive(m));
-        c.on("close", () => { link.closed(); peer.destroy(); });
-        c.on("error", () => link.closed());
-        resolve(link);
-      });
+        link = new Link((x) => msg.send(x, { target: host }), () => { msg.send({ type: "__bye" }, { target: host }); setTimeout(() => room.leave(), 300); });
+        msg.send({ type: "__driver" }, { target: host });
+        addEventListener("pagehide", () => link.close());      // al cerrar la página, el PCC se entera al tiro
+        return resolve(link);
+      }
+      if (peerId !== host) return;                     // otros conductores de la sala
+      if (m?.type === "__bye") { link.closed(); room.leave(); return; }
+      link.receive(m);
     };
-    peer.on("error", (err) => {
-      if (err.type !== "peer-unavailable") return fail(peerError(err));
-      // El servidor no ve la sala: puede que el anfitrión se esté reconectando; se reintenta unas veces
-      if (tries < JOIN_TRIES) return setTimeout(attempt, JOIN_RETRY);
-      fail(`No se encontró la sala ${code}. Revisa el código y que el Centro de Control siga con la sala abierta y su pantalla encendida y a la vista (si cambia de app o de pestaña, la sala deja de verse)`);
-    });
-    peer.on("open", attempt);
+    room.onPeerLeave = (id) => { if (id === host && link) { link.closed(); room.leave(); } };
   });
 }
 
-function peerError(err) {
-  if (err.type === "browser-incompatible") return "Este navegador no permite el multijugador (WebRTC)";
-  if (err.type === "network" || err.type === "server-error" || err.type === "socket-error") return "Sin conexión con el servidor de salas: revisa tu internet";
-  return `Error de conexión (${err.type || err.message})`;
-}
-
-/** Carga PeerJS del CDN una sola vez. */
-let peerLoading = null;
-function loadPeer() {
-  if (globalThis.Peer) return Promise.resolve(globalThis.Peer);
-  peerLoading ??= new Promise((resolve, reject) => {
-    const s = document.createElement("script");
-    s.src = PEER_URL;
-    s.onload = () => (globalThis.Peer ? resolve(globalThis.Peer) : reject(new Error("No se pudo cargar PeerJS")));
-    s.onerror = () => { peerLoading = null; reject(new Error("Sin internet: el multijugador necesita conexión")); };
-    document.head.append(s);
+/** Carga Trystero del CDN una sola vez. */
+let trysteroLoading = null;
+function loadTrystero() {
+  trysteroLoading ??= import(TRYSTERO_URL).catch(() => {
+    trysteroLoading = null;
+    throw new Error("Sin internet: el multijugador necesita conexión");
   });
-  return peerLoading;
+  return trysteroLoading;
 }
 
 /* ----- Modo local (dos pestañas del mismo navegador) ----- */
