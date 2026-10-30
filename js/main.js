@@ -1829,7 +1829,7 @@ function walkerOnPlatformOf(unit, station = null) {
  */
 function updateOnboardAnnouncements(unit) {
   if (!unit) return;
-  const sim = unit.sim, next = sim.nextStation();
+  const sim = unit.sim, next = nextStopOf(unit);
   unit.announced ??= { next: null, safety: 0 };
   if (!next || sim.movingBackwards) return;
   // Al salir de una estación: "Próxima estación, <nombre>[, combinación a línea N]"
@@ -1923,16 +1923,18 @@ function driverBriefing(unit) {
   return parts.join(" · ");
 }
 
+/** Ruta Expresa: la próxima PARADA del servicio (las saltadas se pasan sin detenerse). */
+function nextStopOf(unit) {
+  const physical = unit.sim.nextStation();
+  if (!physical || !unit.trip?.skip || tripStopsAt(unit.trip, physical.index)) return physical;
+  return unit.route.stations[nextStopIndex(unit.trip, physical.index, unit.route.stations.length - 1)];
+}
+
 function getRouteInfo(unit) {
   const sim = unit.sim;
   const docked = sim.isStopped ? sim.dockedStation() : null;
-  // Ruta Expresa: la próxima es la próxima PARADA; las saltadas antes de ella se pasan sin detenerse
-  const physical = sim.nextStation();
-  let next = physical, passing = null;
-  if (physical && unit.trip?.skip && !tripStopsAt(unit.trip, physical.index)) {
-    passing = physical;
-    next = unit.route.stations[nextStopIndex(unit.trip, physical.index, unit.route.stations.length - 1)];
-  }
+  const physical = sim.nextStation(), next = nextStopOf(unit);
+  const passing = physical !== next ? physical : null;
   const near = sim.nearestStation();
   const nearError = sim.position - near.stopZ;
   let approach = null;
