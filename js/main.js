@@ -116,7 +116,7 @@ import { LINE_FLEETS, STOCKS, stockLabel } from "./engine/fleet.js";
 import { tripStopsAt, nextStopIndex, EXPRESS_LABEL } from "./engine/express.js";
 import { SECTION_LABEL } from "./engine/sections.js";
 import { joinDriverRoom } from "./net/netClient.js";
-import { cleanRoomCode } from "./net/transport.js";
+import { cleanRoomCode, localNetwork } from "./net/transport.js";
 import { startPoint } from "./net/replica.js";
 
 // La vía en 3D sigue las pendientes reales: se engancha antes de compilar ningún material
@@ -423,7 +423,7 @@ async function joinRoomAsDriver() {
   if (wantsTouch()) enterMobileFullscreen();
   joining = true;
   btn.disabled = true;
-  msg.textContent = `Conectando con la sala ${code}…`;
+  msg.textContent = localNetwork() ? `Modo local (?red=local): buscando la sala ${code} en otra pestaña de este navegador…` : `Conectando con la sala ${code}…`;
   try {
     const net = await joinDriverRoom(code, { name, line: driverLineSelect.value, dir: directionSelect.value });
     msg.textContent = "";

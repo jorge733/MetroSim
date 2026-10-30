@@ -44,6 +44,7 @@ import { Tutorial, tutorialDone } from "../tutorial.js";
 import { AlarmDesk } from "./alarms.js";
 import { controlSteps } from "./controlTutorial.js";
 import { NetHost, MAX_DRIVERS } from "../net/netHost.js";
+import { localNetwork } from "../net/transport.js";
 
 /** Color de cada estado de tren en el esquema. */
 const STATE_COLORS = {
@@ -705,6 +706,7 @@ export class ControlCenter {
       <h2>Sala abierta</h2>
       <p>Comparte este código. Cada conductor abre MetroSim, elige una de tus líneas (${[...this.lines].map(id => `L${id}`).join(", ")}) y su servicio, y pulsa <b>«Unirse a una sala»</b> en la tarjeta Conductor.</p>
       <div class="pcc-code" aria-label="Código de la sala">${net.code}</div>
+      ${localNetwork() ? `<p class="pcc-error">Modo local (?red=local en la dirección): solo se pueden unir pestañas de este mismo navegador. Para jugar con otro computador o celular, abre MetroSim sin ?red=local.</p>` : ""}
       <p class="${net.online ? "pcc-ok" : "pcc-error"}">${net.online ? "✓ Sala visible: ya pueden unirse." : "⚠ Sin conexión con los servidores para encontrarse, reconectando… Nadie nuevo puede unirse hasta que vuelva."}</p>
       ${net.detail ? `<p class="pcc-detail">${escapeHtml(net.detail)}</p>` : ""}
       <p>Deja esta pantalla abierta y a la vista mientras se unen: si cambias de app o de pestaña (sobre todo en el celular), la sala deja de verse. Para jugar en un solo equipo, abre la sala y el conductor en <b>dos ventanas</b> lado a lado, no en pestañas.</p>

@@ -18,6 +18,8 @@ const TRYSTERO_URL = "https://cdn.jsdelivr.net/npm/@trystero-p2p/nostr@0.25.4/+e
 const RELAYS = 6;
 /** Servidores TURN públicos (los de PeerJS): retransmiten cuando la red no deja conectar directo. */
 const TURN = [{ urls: ["turn:eu-0.turn.peerjs.com:3478", "turn:us-0.turn.peerjs.com:3478"], username: "peerjs", credential: "peerjsp" }];
+/** Nombre del canal en el modo local (?red=local). */
+const PREFIX = "metrosim-sala-";
 const LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ";       // sin I ni O (se confunden con 1 y 0)
 /** Tiempo para encontrar al Centro de Control al unirse. */
 const JOIN_TIMEOUT = 30000;
