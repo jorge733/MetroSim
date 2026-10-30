@@ -44,6 +44,11 @@ computador o celular.
 5. Con la sala abierta el tiempo corre a ×1 y no se pausa. Si un conductor se va, su tren sigue como tren automático;
    si el conductor pierde la conexión, sigue jugando solo.
 
+**Mientras se unen, el Centro de Control debe quedar con la pantalla encendida y a la vista**: si cambia de app o de
+pestaña (sobre todo en el celular), el navegador corta su enlace con el servidor de salas y quien se una recibe «No se
+encontró la sala» hasta que vuelva (la sala se reconecta sola y lo indica en 👥 Sala). Para jugar en un solo
+computador, usa dos ventanas lado a lado, no dos pestañas.
+
 Necesita internet: los navegadores se conectan directo entre ellos (WebRTC con [PeerJS](https://peerjs.com/), que se
 carga solo al abrir o unirse a una sala). Para probar en un solo computador, abre dos pestañas con `?red=local` al final
 de la dirección: una como Centro de Control y otra como conductor (sin internet).

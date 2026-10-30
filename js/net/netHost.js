@@ -53,7 +53,10 @@ export class NetHost {
   }
 
   async open() {
-    this.room = await hostRoom((link) => this.join(link));
+    this.room = await hostRoom((link) => this.join(link), (online) => {
+      this.log(online ? "Sala visible otra vez en el servidor de salas" : "Se cortó la conexión con el servidor de salas: reconectando… (mientras tanto nadie nuevo puede unirse)", online ? "ok" : "warn");
+      this.onChange();
+    });
     this.code = this.room.code;
     this.engine.remoteOrder = (type, payload, unit) => this.order(type, payload, unit);
     const bus = this.engine.bus;
@@ -62,6 +65,9 @@ export class NetHost {
     this.log(`Sala abierta · código ${this.code} · los conductores entran desde la portada («Unirse a una sala»)`, "ok");
     return this.code;
   }
+
+  /** ¿Se puede encontrar la sala ahora (anunciada en el servidor de salas)? */
+  get online() { return this.room?.online ?? false; }
 
   /** Conductores conectados (para la interfaz del PCC). */
   get drivers() { return this.players.filter(p => p.ready); }

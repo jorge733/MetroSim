@@ -15,6 +15,8 @@ const PEER_URL = "https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js";
 const PREFIX = "metrosim-sala-";
 const LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ";       // sin I ni O (se confunden con 1 y 0)
 const TIMEOUT = 12000;
+/** Para unirse: intentos si el servidor no encuentra la sala (el anfitrión puede estar reconectándose) y espera total. */
+const JOIN_TRIES = 4, JOIN_RETRY = 2500, JOIN_TIMEOUT = 25000;
 
 /** ¿Probar en el mismo navegador (dos pestañas)? */
 export const localNetwork = () => {
@@ -57,10 +59,14 @@ class Link {
 
 /**
  * Abre una sala. Si el código ya está en uso, prueba con otro.
+ * Mientras esté abierta, se mantiene anunciada en el servidor de salas: si
+ * se corta (red, pantalla apagada, pestaña en segundo plano) se reconecta sola;
+ * mientras tanto, quien intente unirse recibe «no existe la sala».
  * @param {(link: Link) => void} onJoin  llega un jugador
- * @returns {Promise<{ code: string, close: () => void }>}
+ * @param {(online: boolean) => void} [onStatus]  la sala se ve (o no) en el servidor de salas
+ * @returns {Promise<{ code: string, online: boolean, close: () => void }>}
  */
-export async function hostRoom(onJoin) {
+export async function hostRoom(onJoin, onStatus = () => {}) {
   if (localNetwork()) return hostLocal(onJoin);
   const Peer = await loadPeer();
   for (let attempt = 0; attempt < 4; attempt++) {
@@ -83,9 +89,23 @@ export async function hostRoom(onJoin) {
       c.on("close", () => link.closed());
       c.on("error", () => link.closed());
     });
-    // Si se corta el enlace con el servidor de salas, las conexiones ya hechas siguen; se intenta volver
-    peer.on("disconnected", () => { if (!peer.destroyed) peer.reconnect(); });
-    return { code, close: () => peer.destroy() };
+    // Si se corta el enlace con el servidor de salas, las conexiones ya hechas siguen,
+    // pero nadie nuevo encuentra la sala: se reintenta cada pocos segundos y al volver a la pestaña
+    let retry = null, closing = false;
+    const room = { code, online: true, close: () => { closing = true; clearInterval(retry); removeEventListener("visibilitychange", onVisible); peer.destroy(); } };
+    const status = (online) => { if (room.online !== online) { room.online = online; onStatus(online); } };
+    const reconnect = () => { if (!peer.destroyed && peer.disconnected) { try { peer.reconnect(); } catch { /* se reintenta */ } } };
+    const onVisible = () => { if (!document.hidden) reconnect(); };
+    peer.on("disconnected", () => {
+      if (closing) return;
+      status(false);
+      clearInterval(retry);
+      retry = setInterval(reconnect, 3000);
+      reconnect();
+    });
+    peer.on("open", () => { clearInterval(retry); status(true); });     // también tras reconectarse
+    addEventListener("visibilitychange", onVisible);
+    return room;
   }
   throw new Error("No se pudo crear la sala: inténtalo otra vez");
 }
@@ -99,17 +119,34 @@ export async function joinRoom(code) {
   const Peer = await loadPeer();
   const peer = new Peer();
   return new Promise((resolve, reject) => {
-    const fail = (text) => { clearTimeout(timer); peer.destroy(); reject(new Error(text)); };
-    const timer = setTimeout(() => fail(`No se encontró la sala ${code}`), TIMEOUT);
-    peer.on("error", (err) => fail(err.type === "peer-unavailable" ? `No existe la sala ${code} (¿el código está bien?)` : peerError(err)));
-    peer.on("open", () => {
+    let done = false, tries = 0, found = false;
+    const fail = (text) => { if (done) return; done = true; clearTimeout(timer); peer.destroy(); reject(new Error(text)); };
+    // Sin respuesta: si el servidor no dijo que la sala no existe, la sala está, pero la conexión directa no se logró
+    const timer = setTimeout(() => fail(found || tries > 0
+      ? `La sala ${code} existe, pero no se pudo conectar directo con ella: algunas redes lo bloquean. Prueben con los dos equipos en la misma red Wi-Fi`
+      : "Sin respuesta del servidor de salas: revisa tu internet"), JOIN_TIMEOUT);
+    const attempt = () => {
+      if (done) return;
+      tries++;
       const c = peer.connect(PREFIX + code, { reliable: true, serialization: "json" });
-      const link = new Link((m) => c.send(m), () => { c.close(); peer.destroy(); });
-      c.on("open", () => { clearTimeout(timer); resolve(link); });
-      c.on("data", (m) => link.receive(m));
-      c.on("close", () => { link.closed(); peer.destroy(); });
-      c.on("error", () => link.closed());
+      c.on("open", () => {
+        if (done) return c.close();
+        done = true;
+        clearTimeout(timer);
+        const link = new Link((m) => c.send(m), () => { c.close(); peer.destroy(); });
+        c.on("data", (m) => link.receive(m));
+        c.on("close", () => { link.closed(); peer.destroy(); });
+        c.on("error", () => link.closed());
+        resolve(link);
+      });
+    };
+    peer.on("error", (err) => {
+      if (err.type !== "peer-unavailable") return fail(peerError(err));
+      // El servidor no ve la sala: puede que el anfitrión se esté reconectando; se reintenta unas veces
+      if (tries < JOIN_TRIES) return setTimeout(attempt, JOIN_RETRY);
+      fail(`No se encontró la sala ${code}. Revisa el código y que el Centro de Control siga con la sala abierta y su pantalla encendida y a la vista (si cambia de app o de pestaña, la sala deja de verse)`);
     });
+    peer.on("open", attempt);
   });
 }
 
