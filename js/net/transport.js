@@ -60,11 +60,12 @@ class Link {
 /**
  * Abre una sala. Si el código ya está en uso, prueba con otro.
  * Mientras esté abierta, se mantiene anunciada en el servidor de salas: si
- * se corta (red, pantalla apagada, pestaña en segundo plano) se reconecta sola;
- * mientras tanto, quien intente unirse recibe «no existe la sala».
+ * se corta (red, pantalla apagada, pestaña en segundo plano), un vigilante
+ * la vuelve a anunciar; mientras tanto, quien intente unirse recibe «no se
+ * encontró la sala». Los conductores ya conectados siguen (van directo).
  * @param {(link: Link) => void} onJoin  llega un jugador
- * @param {(online: boolean) => void} [onStatus]  la sala se ve (o no) en el servidor de salas
- * @returns {Promise<{ code: string, online: boolean, close: () => void }>}
+ * @param {(online: boolean, changed: boolean) => void} [onStatus]  la sala se ve (o no) en el servidor de salas
+ * @returns {Promise<{ code, online, detail, retry(), close() }>}
  */
 export async function hostRoom(onJoin, onStatus = () => {}) {
   if (localNetwork()) return hostLocal(onJoin);
@@ -82,32 +83,76 @@ export async function hostRoom(onJoin, onStatus = () => {}) {
       });
     }).catch((err) => { peer.destroy(); throw err; });
     if (!ok) { peer.destroy(); continue; }
-    peer.on("connection", (c) => {
-      const link = new Link((m) => c.send(m), () => c.close());
-      c.on("open", () => onJoin(link));
-      c.on("data", (m) => link.receive(m));
-      c.on("close", () => link.closed());
-      c.on("error", () => link.closed());
-    });
-    // Si se corta el enlace con el servidor de salas, las conexiones ya hechas siguen,
-    // pero nadie nuevo encuentra la sala: se reintenta cada pocos segundos y al volver a la pestaña
-    let retry = null, closing = false;
-    const room = { code, online: true, close: () => { closing = true; clearInterval(retry); removeEventListener("visibilitychange", onVisible); peer.destroy(); } };
-    const status = (online) => { if (room.online !== online) { room.online = online; onStatus(online); } };
-    const reconnect = () => { if (!peer.destroyed && peer.disconnected) { try { peer.reconnect(); } catch { /* se reintenta */ } } };
-    const onVisible = () => { if (!document.hidden) reconnect(); };
-    peer.on("disconnected", () => {
-      if (closing) return;
-      status(false);
-      clearInterval(retry);
-      retry = setInterval(reconnect, 3000);
-      reconnect();
-    });
-    peer.on("open", () => { clearInterval(retry); status(true); });     // también tras reconectarse
-    addEventListener("visibilitychange", onVisible);
-    return room;
+    return keepAnnounced(Peer, peer, code, onJoin, onStatus);
   }
   throw new Error("No se pudo crear la sala: inténtalo otra vez");
+}
+
+/** Vigilante de la sala: la mantiene anunciada en el servidor de salas. */
+function keepAnnounced(Peer, first, code, onJoin, onStatus) {
+  const WATCH = 3000, RESET_AFTER = 10000;
+  let peer = null, closing = false, offlineSince = null, lastReset = Date.now();
+  const room = {
+    code, online: true, detail: null, retry: () => reset(),
+    close: () => {
+      closing = true;
+      clearInterval(timer);
+      removeEventListener("visibilitychange", onVisible);
+      for (const p of peers) p.destroy();
+    },
+  };
+  const peers = new Set();                 // el actual y los anteriores que aún llevan conductores conectados
+  const status = (online) => { if (room.online !== online) { room.online = online; onStatus(online, true); } };
+
+  const wire = (p) => {
+    p.links = 0;
+    peers.add(p);
+    p.on("connection", (c) => {
+      const link = new Link((m) => c.send(m), () => c.close());
+      c.on("open", () => { p.links++; onJoin(link); });
+      c.on("data", (m) => link.receive(m));
+      c.on("close", () => { p.links = Math.max(0, p.links - 1); link.closed(); retire(p); });
+      c.on("error", () => link.closed());
+    });
+    p.on("open", () => { if (p === peer) { offlineSince = null; room.detail = null; status(true); } });
+    p.on("disconnected", () => { if (p === peer && !closing) check(); });
+    p.on("error", (err) => {
+      if (p !== peer) return;
+      room.detail = `${err.type || "error"}: ${err.message || ""}`.slice(0, 160);
+      console.warn("[MetroSim sala]", room.detail);
+      onStatus(room.online, false);                // solo para mostrar el detalle
+    });
+  };
+  /** Un enlace anterior sin conductores ya no sirve. */
+  const retire = (p) => { if (p !== peer && !p.links && !closing) { p.destroy(); peers.delete(p); } };
+
+  /** Conexión nueva con el mismo código (los conductores conectados siguen por el enlace anterior). */
+  const reset = () => {
+    if (closing) return;
+    const old = peer;
+    lastReset = Date.now();
+    try { if (!old.destroyed && !old.disconnected) old.disconnect(); } catch { /* ya estaba fuera */ }
+    peer = new Peer(PREFIX + code);
+    wire(peer);
+    retire(old);
+  };
+
+  const check = () => {
+    if (closing) return;
+    if (peer.open) { offlineSince = null; status(true); return; }
+    status(false);
+    offlineSince ??= Date.now();
+    // Primero lo simple: volver con la misma conexión; si no resulta en unos segundos, una nueva
+    if (peer.disconnected && !peer.destroyed) { try { peer.reconnect(); } catch { /* se intenta de nuevo */ } }
+    if (Date.now() - offlineSince > RESET_AFTER && Date.now() - lastReset > RESET_AFTER) reset();
+  };
+  const onVisible = () => { if (!document.hidden) check(); };
+
+  peer = first;
+  wire(first);
+  const timer = setInterval(check, WATCH);
+  addEventListener("visibilitychange", onVisible);
+  return room;
 }
 
 /**

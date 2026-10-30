@@ -53,8 +53,8 @@ export class NetHost {
   }
 
   async open() {
-    this.room = await hostRoom((link) => this.join(link), (online) => {
-      this.log(online ? "Sala visible otra vez en el servidor de salas" : "Se cortó la conexión con el servidor de salas: reconectando… (mientras tanto nadie nuevo puede unirse)", online ? "ok" : "warn");
+    this.room = await hostRoom((link) => this.join(link), (online, changed) => {
+      if (changed) this.log(online ? "Sala visible otra vez en el servidor de salas" : "Se cortó la conexión con el servidor de salas: reconectando… (mientras tanto nadie nuevo puede unirse)", online ? "ok" : "warn");
       this.onChange();
     });
     this.code = this.room.code;
@@ -68,6 +68,10 @@ export class NetHost {
 
   /** ¿Se puede encontrar la sala ahora (anunciada en el servidor de salas)? */
   get online() { return this.room?.online ?? false; }
+  /** Último error del servidor de salas (para mostrarlo si la sala no se ve). */
+  get detail() { return this.room?.detail ?? null; }
+  /** Volver a anunciar la sala ahora. */
+  retry() { this.room?.retry?.(); }
 
   /** Conductores conectados (para la interfaz del PCC). */
   get drivers() { return this.players.filter(p => p.ready); }

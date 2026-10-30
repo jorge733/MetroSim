@@ -111,6 +111,7 @@ const CSS = `
 .pcc-dialog .pcc-drivers li small { margin-left: auto; color: #9fb0c0; font-family: var(--f-data); }
 .pcc-error { color: #ff8a8a !important; }
 .pcc-ok { color: #8fe3b0 !important; }
+.pcc-detail { font: 12px/1.4 var(--f-data); color: #9fb0c0 !important; word-break: break-word; }
 
 /* Cuerpo */
 .pcc-body { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 12px; padding: 12px 14px; min-height: 0; overflow: auto; }
@@ -525,6 +526,7 @@ export class ControlCenter {
         case "room": return this.showRoom();
         case "room-open": return this.openRoom();
         case "room-close": this.closeRoom(); return this.showRoom();
+        case "room-retry": this.net?.retry(); this.toast("Reconectando la sala…", "info"); return;
         case "report": return this.showReport({ ending: false });
         case "end": return this.showReport({ ending: true });
         case "view": return this.setView(d.view);
@@ -704,12 +706,14 @@ export class ControlCenter {
       <p>Comparte este código. Cada conductor abre MetroSim, elige una de tus líneas (${[...this.lines].map(id => `L${id}`).join(", ")}) y su servicio, y pulsa <b>«Unirse a una sala»</b> en la tarjeta Conductor.</p>
       <div class="pcc-code" aria-label="Código de la sala">${net.code}</div>
       <p class="${net.online ? "pcc-ok" : "pcc-error"}">${net.online ? "✓ Sala visible: ya pueden unirse." : "⚠ Sin conexión con el servidor de salas, reconectando… Nadie nuevo puede unirse hasta que vuelva."}</p>
+      ${!net.online && net.detail ? `<p class="pcc-detail">Detalle: ${escapeHtml(net.detail)}</p>` : ""}
       <p>Deja esta pantalla abierta y a la vista mientras se unen: si cambias de app o de pestaña (sobre todo en el celular), la sala deja de verse. Para jugar en un solo equipo, abre la sala y el conductor en <b>dos ventanas</b> lado a lado, no en pestañas.</p>
       <h3>Conductores (${drivers.length} de ${MAX_DRIVERS})</h3>
       ${list}
       <p>Sus trenes reciben tus órdenes por radio: retener y liberar (desde su ficha) y autorizar el paso por una señal averiada (desde la alarma). Con la sala abierta el tiempo corre a ×1 y no se pausa.</p>
       <footer>
         <button class="danger" data-act="room-close">Cerrar sala</button>
+        ${net.online ? "" : `<button data-act="room-retry">Reintentar ahora</button>`}
         <button class="primary" data-act="modal-close">Volver al turno</button>
       </footer>` : `
       <h2>Multijugador</h2>
