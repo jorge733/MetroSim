@@ -46,6 +46,10 @@
      city/        la calle de cada estación: plan.js (locales), catalog.js (hitos),
                   landmarks.js (modelos de los hitos), kit.js (piezas), city.js (calle 3D)
      scoring.js   puntaje del conductor: parada, horario, confort, rachas y récord
+     net/         multijugador: el Centro de Control abre una sala (netHost.js) y
+                  otros jugadores conducen en ella (netClient.js); replica.js
+                  pasa el estado de los trenes de un motor a otro, transport.js
+                  conecta los navegadores (PeerJS / WebRTC)
    tutorial.js  tutorial interactivo del jugador nuevo (conductor y pasajero)
      announcements.js  frases reales de megafonía del Metro de Santiago
 
@@ -111,6 +115,9 @@ import { WEATHER, WEATHER_KINDS, setWeather, typicalWeather, kindFromWmo, weathe
 import { LINE_FLEETS, STOCKS, stockLabel } from "./engine/fleet.js";
 import { tripStopsAt, nextStopIndex, EXPRESS_LABEL } from "./engine/express.js";
 import { SECTION_LABEL } from "./engine/sections.js";
+import { joinDriverRoom } from "./net/netClient.js";
+import { cleanRoomCode } from "./net/transport.js";
+import { startPoint } from "./net/replica.js";
 
 // La vía en 3D sigue las pendientes reales: se engancha antes de compilar ningún material
 installTrackLift();
@@ -373,6 +380,13 @@ $("confirmOk").addEventListener("click", () => closeConfirm(true));
 $("confirmCancel").addEventListener("click", () => closeConfirm(false));
 $("confirmPanel").addEventListener("click", (ev) => { if (ev.target === ev.currentTarget) closeConfirm(false); });
 $("driverJobButton").addEventListener("click", goDriveForMoney);
+$("netJoinToggle").addEventListener("click", () => {
+  const panel = $("netJoin");
+  panel.hidden = !panel.hidden;
+  if (!panel.hidden) { $("netName").value ||= loadSetting("metrosim.net.name") || ""; ($("netName").value ? $("netCode") : $("netName")).focus(); }
+});
+$("netJoinGo").addEventListener("click", joinRoomAsDriver);
+$("netCode").addEventListener("keydown", (ev) => { if (ev.key === "Enter") joinRoomAsDriver(); });
 $("endShiftButton").addEventListener("click", requestEndShift);
 $("shopButton").addEventListener("click", () => openStore());
 $("soundButton").addEventListener("click", toggleSound);
@@ -392,6 +406,38 @@ window.MetroSim = { get game() { return game; }, hud, bank, card, CONFIG, get ST
    Inicio y fin de partida
    ========================================================================== */
 
+/* Multijugador: conducir en la sala de un Centro de Control (net/netClient.js) */
+let joining = false;
+async function joinRoomAsDriver() {
+  if (joining) return;
+  const msg = $("netJoinMsg"), btn = $("netJoinGo");
+  const code = cleanRoomCode($("netCode").value);
+  const name = $("netName").value.trim().slice(0, 16) || "Conductor";
+  if (!code) { msg.textContent = "Escribe el código de 4 letras que te dio el Centro de Control"; return; }
+  if (!inventory.canDrive(driverLineSelect.value)) return startGame("driver");     // muestra la licencia que falta
+  saveSetting("metrosim.net.name", name);
+  // Sonido y pantalla completa se piden ahora, dentro del clic (después de esperar a la red ya no se puede)
+  const audio = new AudioSystem();
+  audio.muted = muted;
+  audio.start();
+  if (wantsTouch()) enterMobileFullscreen();
+  joining = true;
+  btn.disabled = true;
+  msg.textContent = `Conectando con la sala ${code}…`;
+  try {
+    const net = await joinDriverRoom(code, { name, line: driverLineSelect.value, dir: directionSelect.value });
+    msg.textContent = "";
+    startGame("driver", { net, audio });
+  } catch (err) {
+    audio.stop();
+    exitMobileFullscreen();
+    msg.textContent = err.message;
+  } finally {
+    joining = false;
+    btn.disabled = false;
+  }
+}
+
 function startGame(mode, opts = {}) {
   if (game) stopGame();
   if (mode === "control") return startControl(opts);
@@ -401,13 +447,17 @@ function startGame(mode, opts = {}) {
   }
   useLine(lineById(mode === "driver" ? driverLineSelect.value : paxLineSelect.value));
   const stationIndex = Number(stationSelect.value) || 0;
-  const direction = directionSelect.value === "B" ? ROUTE_B : ROUTE_A;
+  // En una sala, el sentido es el del servicio que asignó el Centro de Control
+  const direction = opts.net ? [ROUTE_A, ROUTE_B].find(r => r.id === opts.net.welcome.trip.r) : directionSelect.value === "B" ? ROUTE_B : ROUTE_A;
   startScreen.classList.add("hidden");
   loadingScreen.classList.remove("hidden");
-  if (wantsTouch()) enterMobileFullscreen();     // dentro del gesto del usuario
-  const audio = new AudioSystem();          // dentro del gesto del usuario
-  audio.muted = muted;
-  audio.start();
+  let audio = opts.audio;
+  if (!audio) {
+    if (wantsTouch()) enterMobileFullscreen();     // dentro del gesto del usuario
+    audio = new AudioSystem();                     // dentro del gesto del usuario
+    audio.muted = muted;
+    audio.start();
+  }
   setTimeout(() => buildGame(mode, stationIndex, audio, direction, opts), 40);
 }
 
@@ -434,17 +484,29 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = {}) {
   pmrem.dispose();
   const camera = new THREE.PerspectiveCamera(mode === "driver" ? 62 : 70, innerWidth / innerHeight, 0.03, 340);
 
-  /* --- Hora local: la partida empieza "ahora" --- */
-  const startClock = localClock(), startEpoch = performance.now();
-  CONFIG.startTime = startClock;
-  CONFIG.schedule.playerDeparture = Math.ceil((startClock + 15) / 5) * 5;     // tu servicio sale en ~15–20 s
+  /* --- Hora local: la partida empieza "ahora" (en una sala, a la hora del Centro de Control) --- */
+  const net = opts.net || null;
+  let startClock = localClock();
+  const startEpoch = performance.now();
+  if (net) {
+    // Mismo tipo de día, mismas mallas de horario, misma hora y mismo tiempo que el anfitrión
+    startClock = net.hostTime();
+    CONFIG.dayType = net.welcome.dayType;
+    CONFIG.startTime = net.welcome.start;
+    CONFIG.schedule.playerDeparture = net.welcome.dep;
+    setWeather(net.welcome.weather.kind, { temp: net.welcome.weather.temp, source: "elegido" });
+  } else {
+    CONFIG.startTime = startClock;
+    CONFIG.schedule.playerDeparture = Math.ceil((startClock + 15) / 5) * 5;     // tu servicio sale en ~15–20 s
+  }
 
   /* --- Motor MetroSim (el "cerebro") y su dibujo --- */
   setTrackLiftLine();                                         // cotas de la línea activa (pendientes en 3D)
   const world = new World(scene);
   const outdoor = new OutdoorView(scene);                     // viaductos, trincheras, cielo y lluvia (1.5)
-  const warmStart = CONFIG.startTime - 45 * 60;
+  const warmStart = startClock - 45 * 60;
   const engine = new MetroEngine({ startTime: warmStart });
+  if (net) engine.replica = true;                             // los demás trenes y los incidentes los manda el anfitrión
   const { traffic, signals, timetables } = engine;
   // El juego escucha al motor por su bus: sucesos y cambios de estado de cada tren
   engine.bus.on("train:event", ({ unit, type, data }) => onUnitEvent(unit, type, data));
@@ -453,7 +515,7 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = {}) {
   engine.bus.on("incident", (inc) => onIncident(inc));
   const trainViews = new TrainViews(scene, engine.bus);       // dibuja los trenes que crea el motor
   const signalViews = new SignalViews(scene, signals.values());
-  const playerTrip = timetables.get(direction.id).anchorTrip;
+  const playerTrip = net ? net.trip(engine) : timetables.get(direction.id).anchorTrip;
 
   game = {
     mode, renderer, scene, camera, world, outdoor, engine, signals, timetables, traffic, trainViews, signalViews, audio, playerTrip,
@@ -468,7 +530,7 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = {}) {
   const people = new PeopleSystem(scene, traffic, engine.passengers);    // muestra visible de los pasajeros del motor
   people.elevators = world.elevators;                                  // algunos viajeros usan el ascensor
   game.people = people;
-  engine.runUntil(CONFIG.startTime, { onStep: (step, t) => people.update(step, t, { cameraZ: 1e9, render: false }) });
+  engine.runUntil(startClock, { onStep: (step, t) => people.update(step, t, { cameraZ: 1e9, render: false }) });
   game.clock = engine.time;
   game.realClock = { epoch: startEpoch, clock: startClock };           // ancla para seguir la hora local (recupera el tiempo de carga)
   game.warming = false;
@@ -481,14 +543,17 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = {}) {
   game.trainLights = createTrainLights({ cab: mode === "driver" });
   game.innerLight = game.trainLights.getObjectByName("innerLight");
   if (mode === "driver") {
-    const player = traffic.createUnit(playerTrip, { isPlayer: true, start: direction.first });
-    player.arrivedIdx = player.dockedIdx = 0;
+    // En una sala, el andén de origen puede estar ocupado por el tren anterior: entonces se sale de la cochera
+    const start = net ? startPoint(engine, direction) : direction.first;
+    const player = traffic.createUnit(playerTrip, { isPlayer: true, start });
+    if (start === direction.first) player.arrivedIdx = player.dockedIdx = 0;
     game.player = player;
     applyLivery(player);
     game.score = newScore(direction);
     game.driverRole = new DriverRole(engine, () => game?.player);
     game.safety = new DriverSafety({
       scene, audio, signals,
+      radioPcc: () => !!game?.net?.connected,           // en una sala, las señales averiadas las autoriza el jugador del PCC
       notify: (text, level, ms) => hud.showMessage(text, level, ms),
       penalty: (kind) => game?.score.penalty(kind),
     });
@@ -499,6 +564,20 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = {}) {
     player.group.add(game.trainLights);
     game.lightsUnit = player;
     setTimeout(() => game?.player === player && hud.showMessage(driverBriefing(player), "info", 9000), 1500);
+    if (net) {
+      const badge = document.createElement("div");
+      badge.className = "net-badge";
+      gameScreen.append(badge);
+      game.net = net;
+      net.attach(game, {
+        badge,
+        notify: (text, level, ms) => game && hud.showMessage(text, level, ms),
+        radio: (speech, text, level) => game?.safety.pcc(speech, text, level),
+      });
+      if (start !== direction.first) {
+        setTimeout(() => game?.player === player && hud.showMessage(`El andén de ${direction.first.name} está ocupado: sales de la cochera · entra cuando la señal lo permita`, "info", 8000), 11000);
+      }
+    }
   } else {
     const city = new City(scene);
     city.sound = (type, data) => game?.audio.cityEvent(type, data);     // autos, bocinas, pájaros...
@@ -578,7 +657,7 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = {}) {
     hud.fadeIn();
     hud.showMessage(`Combinación desde la Línea ${opts.transferFrom} · ${STATIONS[stationIndex].name} · ${LINE.name.charAt(0) + LINE.name.slice(1).toLowerCase()} · sigues en zona pagada`, "ok", 6000);
   } else hud.showMessage(mode === "driver"
-    ? `Servicio ${playerTrip.id} · ${direction.label} · salida ${formatClock(playerTrip.departure)} · cada estación bien servida te paga en tu cuenta`
+    ? `${net ? `Sala ${net.code} · ` : ""}Servicio ${playerTrip.id} · ${direction.label} · salida ${formatClock(playerTrip.departure)} · cada estación bien servida te paga en tu cuenta`
     : `Calle de ${STATIONS[stationIndex].name} · cuenta ${bank.label} · ${game.touch ? "joystick para caminar · arrastra para mirar · 🎯 misiones" : "W/S caminar · A/D girar · Shift correr · J misiones"}`, "info", 7000);
 
   game.raf = requestAnimationFrame(loop);
@@ -588,6 +667,7 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = {}) {
 
 function stopGame({ keepFullscreen = false } = {}) {
   if (!game) return;
+  if (game.net) { game.net.leave(); applyWeatherChoice(); }     // sale de la sala y vuelve al tiempo elegido
   game.touch?.destroy();
   game.tutorial?.destroy();
   cancelAnimationFrame(game.raf);
@@ -717,6 +797,14 @@ function startControl(opts = {}) {
       onPay: (amount, concept) => bank.deposit(amount, concept, { wage: true }),
     });
     control = { engine, ui, last: performance.now(), acc: 0, uiT: 0, raf: 0 };
+    // Con la sala abierta, el turno sigue aunque la pestaña quede en segundo plano (ahí no hay fotogramas):
+    // los conductores no pueden quedarse con la red congelada
+    control.background = setInterval(() => {
+      if (!control || !document.hidden || !control.ui.net) return;
+      const now = performance.now();
+      controlStep(Math.min(2, (now - control.last) / 1000));
+      control.last = now;
+    }, 1000);
     window.MetroSim.control = control;
     loadingScreen.classList.add("hidden");
     control.raf = requestAnimationFrame(controlLoop);
@@ -728,8 +816,15 @@ function startControl(opts = {}) {
 function controlLoop(now) {
   if (!control) return;
   const c = control;
+  c.raf = requestAnimationFrame(controlLoop);           // antes del paso: un error en un fotograma no detiene el turno (ni la sala)
   const realDt = Math.min(0.25, Math.max(0, (now - c.last) / 1000));   // tras una pausa larga (pestaña oculta) no da saltos
   c.last = now;
+  controlStep(realDt);
+}
+
+/** Un paso del Centro de Control: motor, alarmas y esquema. */
+function controlStep(realDt) {
+  const c = control;
   // Pausa y velocidad del tiempo (×1, ×2, ×5, ×10) las decide el jugador
   let simDt = 0;
   if (!c.ui.paused) {
@@ -744,12 +839,12 @@ function controlLoop(now) {
   c.ui.tick(realDt, simDt);
   c.uiT -= realDt;
   if (c.uiT <= 0) { c.uiT = 0.1; c.ui.update(); }       // el esquema se redibuja 10 veces por segundo
-  c.raf = requestAnimationFrame(controlLoop);
 }
 
 function stopControl() {
   if (!control) return;
   cancelAnimationFrame(control.raf);
+  clearInterval(control.background);
   control.ui.destroy();
   control = null;
   startScreen.classList.remove("hidden");
@@ -759,6 +854,7 @@ function stopControl() {
 }
 
 function restartGame() {
+  if (game.net) return stopGame();            // en una sala: "Nuevo servicio" vuelve al menú (se entra de nuevo con el código)
   const mode = game.mode;
   stopGame();
   startGame(mode);
@@ -826,7 +922,7 @@ function onKeyDown(event) {
   if (event.repeat) return;
   if (key === "x") return game.safety.input();
   if (key === "b") return game.safety.horn(game.player);
-  if (key === "r") return restartGame();
+  if (key === "r") return game.net ? hud.showMessage("En una sala no se reinicia el servicio: Finalizar turno (F) te lleva al menú", "info") : restartGame();
   if (key === "t") return changeCab();
   if (key === "f") return requestEndShift();
 }
@@ -835,6 +931,7 @@ function onKeyDown(event) {
 function onCommandResult(r) {
   if (!game || game.warming || !r.result?.text) return;
   if (r.payload?.source === "pasajero") return;          // el citófono del pasajero ya avisa con su propio texto
+  if (r.payload?.source === "red") return;               // órdenes del PCC de la sala a otros trenes (solo se replican)
   if (game.driverRole?.owns(r) || r.type.startsWith("control.")) hud.showMessage(r.result.text, r.result.level);
 }
 
@@ -1055,6 +1152,7 @@ function advanceSchedule(unit, station) {
   if (shift < 3) return;
   trip.dep[i] -= shift;
   for (let j = i + 1; j < trip.arr.length; j++) { trip.arr[j] -= shift; trip.dep[j] -= shift; }
+  game.net?.shift(trip, i, shift);                     // el Centro de Control de la sala también lo ve adelantado
   hud.showMessage(`Embarque completo · puedes salir ya (horario adelantado ${formatDelay(shift).replace("+", "")})`, "ok", 3500);
 }
 
@@ -1157,10 +1255,15 @@ function changeCab() {
 
   const other = oppositeRoute(player.route);
   hud.fadeOut("Cambiando de cabina · cruzando a la vía contraria…");
-  setTimeout(() => {
+  setTimeout(async () => {
     if (!game) return;
-    const trip = game.traffic.nextTripFor(other, game.clock, 120, 1200) || makeTrip(other, Math.ceil((game.clock + 300) / 60) * 60);
+    // En una sala, el servicio de vuelta lo asigna el Centro de Control
+    let trip = null;
+    if (game.net?.connected) trip = await game.net.requestTurn().catch(() => { game?.net?.lost("El Centro de Control no asignó el servicio de vuelta"); return null; });
+    if (!game || game.player !== player) return;
+    trip ??= game.traffic.nextTripFor(other, game.clock, 120, 1200) || makeTrip(other, Math.ceil((game.clock + 300) / 60) * 60);
     game.traffic.turnback(player, trip);
+    game.net?.turned();
     game.rig.setTrain(player.group);
     player.group.add(game.trainLights);
     game.lightsUnit = player;
@@ -2057,7 +2160,7 @@ function loop(now) {
   const { engine, traffic, people, world, audio, walker, player } = game;
 
   // 1. Motor: trenes y señales avanzan con su propio reloj de paso fijo
-  engine.update(realDt);
+  engine.update(game.net ? game.net.pace(realDt, engine.time) : realDt);    // en una sala, al ritmo del reloj del anfitrión
   if (!game) return;
   syncWithLocalTime();
   game.clock = engine.time;
@@ -2156,6 +2259,7 @@ function loop(now) {
   // 6. HUD
   if (player) {
     game.safety.update(dt, player);
+    game.net?.update(dt);                              // sala: estado del tren al anfitrión y retención del PCC
     const info = getRouteInfo(player);
     info.alert = game.safety.alert(player);
     updateCabVisuals(dt, player, info);
@@ -2237,9 +2341,10 @@ function renderFrame() {
 function syncWithLocalTime() {
   const target = game.realClock.clock + (performance.now() - game.realClock.epoch) / 1000;
   const behind = target - game.engine.time;
-  if (behind < 1) return;
+  if (behind < (game.net?.connected ? 0.25 : 1)) return;      // en una sala se sigue de cerca el reloj del anfitrión
   const cameraZ = game.player ? game.player.group.position.z : game.walker.worldZ;
   game.engine.runUntil(game.engine.time + Math.min(behind, 60), {
+    step: behind < 2 ? 1 / 30 : 0.5,
     onStep: (step, t) => game.people.update(step, t, { cameraZ, render: false }),
   });
 }

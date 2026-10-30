@@ -11,7 +11,8 @@
        si se rebasó una señal, en MARCHA A LA VISTA (15 km/h) hasta la próxima.
      · SEÑAL EN FALLA: detenido ante una señal en rojo por falla (y con el
        cantón libre), el PCC autoriza por radio a rebasarla en marcha a la
-       vista a 25 km/h, sin falta.
+       vista a 25 km/h, sin falta. En una sala multijugador lo autoriza el
+       jugador del Centro de Control (net/netClient.js).
      · PERSONAL EN LA VÍA: durante los "TRABAJOS EN VÍA" (incidents.js) hay
        trabajadores con chaleco reflectante en el andén de evacuación. El
        conductor debe tocar la bocina (B) al acercarse; si no, es una falta.
@@ -36,8 +37,8 @@ const HORN_RANGE = 350, WORK_WARN = 600;
 
 /** Número del tren como se dice por radio: "L3-0805" → "cero ocho cero cinco". */
 const DIGITS = ["cero", "uno", "dos", "tres", "cuatro", "cinco", "seis", "siete", "ocho", "nueve"];
-const spokenTrain = (id) => (id.match(/\d+$/)?.[0] || id).split("").map(d => DIGITS[+d] ?? d).join(" ");
-const spokenSignal = (id) => String(id).split("").map(d => DIGITS[+d] ?? d).join(" ");
+export const spokenTrain = (id) => (id.match(/\d+$/)?.[0] || id).split("").map(d => DIGITS[+d] ?? d).join(" ");
+export const spokenSignal = (id) => String(id).split("").map(d => DIGITS[+d] ?? d).join(" ");
 
 export class DriverSafety {
   /**
@@ -48,8 +49,9 @@ export class DriverSafety {
    * @param {(text, level, ms?) => void} opts.notify   mensaje en el HUD
    * @param {(kind) => void} opts.penalty  falta en el puntaje
    */
-  constructor({ scene, audio, signals, notify, penalty }) {
+  constructor({ scene, audio, signals, notify, penalty, radioPcc = () => false }) {
     this.scene = scene;
+    this.radioPcc = radioPcc;      // multijugador: un jugador hace de PCC y autoriza él las señales averiadas
     this.audio = audio;
     this.signals = signals;
     this.notify = notify;
@@ -141,7 +143,7 @@ export class DriverSafety {
     const s = this.signals.get(unit.route.id)?.nextAhead(sim.position);
     const waiting = s && s.fault && s.aspect === "red" && !s.occupied && !s.permit && !this.trip
       && sim.isStopped && sim.position - s.z < 120;
-    if (!waiting) { this.faultWait = 0; return; }
+    if (!waiting || this.radioPcc()) { this.faultWait = 0; return; }
     this.faultWait += dt;
     if (this.faultWait < FAULT_WAIT) return;
     this.faultWait = 0;

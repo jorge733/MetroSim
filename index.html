@@ -119,6 +119,14 @@
                 </select>
               </div>
               <button class="tutorial-launch" data-tutorial="driver"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m2 9 10-5 10 5-10 5zM6 11v5c0 1.5 3 3 6 3s6-1.5 6-3v-5M22 9v6"/></svg> ¿Primera vez? Con tutorial</button>
+              <button class="tutorial-launch net-launch" id="netJoinToggle" aria-controls="netJoin"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M16 5a3 3 0 0 1 0 6M18 14c2 .8 3 2.7 3 6"/></svg> Unirse a una sala (multijugador)</button>
+              <div id="netJoin" class="net-join" hidden>
+                <label class="field"><span class="small-label">Tu nombre</span><input id="netName" maxlength="16" autocomplete="nickname" placeholder="Cómo te verá el PCC"></label>
+                <label class="field"><span class="small-label">Código de la sala</span><input id="netCode" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCD"></label>
+                <button class="go-button" id="netJoinGo">Unirse</button>
+                <p id="netJoinMsg" class="net-msg" aria-live="polite"></p>
+                <small>El código lo da quien abre la sala en el Centro de Control (botón 👥 Sala). Conduces la línea y el servicio elegidos arriba; el PCC te asigna el próximo tren que sale.</small>
+              </div>
               <p id="driverLock" class="mode-lock" hidden></p>
             </div>
           </article>

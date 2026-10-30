@@ -12,6 +12,9 @@
    Centro de Control, pruebas en Node) usa las mismas reglas.
 
    Los trenes se identifican por su id de servicio (por ejemplo "L3-0805").
+
+   Multijugador: si el tren lo conduce otro jugador (unit.remote), las
+   órdenes del Centro de Control van a engine.remoteOrder (avisos por radio).
    ========================================================================== */
 
 import { nextStopIndex } from "./express.js";
@@ -161,6 +164,8 @@ export class CommandQueue {
     if (!handler) return fail(`Orden desconocida: ${type}`, "alert");
     const unit = NO_TRAIN.has(type) ? null : this.engine.findTrain(payload.trainId);
     if (!unit && !NO_TRAIN.has(type)) return fail(`No hay ningún tren ${payload.trainId ?? ""} en la red`);
+    // Multijugador: un tren que conduce otro jugador recibe las órdenes del PCC por radio (net/netHost.js)
+    if (unit?.remote && type.startsWith("control.") && this.engine.remoteOrder) return this.engine.remoteOrder(type, payload, unit);
     return handler(this.engine, payload, unit);
   }
 }
