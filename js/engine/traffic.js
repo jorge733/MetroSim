@@ -133,9 +133,24 @@ export class TrafficManager {
     return this.timetables.get(route.id).trips.find(t => !this.started.has(t.id) && t.departure - clock >= minLead && t.departure - clock <= maxLead) || null;
   }
 
-  /** ¿Está libre el punto de entrada (cocheras) de una ruta? */
+  /**
+   * ¿Está libre el punto de entrada (cocheras) de una ruta? Un tren que hace la
+   * maniobra de retorno (crossing) no lo bloquea: el siguiente cruzará detrás,
+   * cuando la señal de maniobra lo deje.
+   */
   depotFree(route) {
-    return !this.units.some(u => u.route === route && u.sim.position > route.first.stopZ + 40);
+    return !this.units.some(u => u.route === route && !u.crossing && u.sim.position > route.first.stopZ + 40);
+  }
+
+  /**
+   * ¿Viene un tren de vuelta que servirá esta ruta? (uno de la ruta contraria
+   * yendo a la cola tras su terminal, o uno de esta ruta cruzando). Entonces no
+   * se saca otro de cocheras: el servicio lo toma el que vuelve.
+   */
+  turnbackComing(route) {
+    const other = oppositeRoute(route);
+    return this.units.some(u => (u.route === route && u.crossing)
+      || (u.route === other && !u.isPlayer && (u.ato?.state === "retire" || u.ato?.state === "retired")));
   }
 
   /**
@@ -176,7 +191,7 @@ export class TrafficManager {
   spawnDue(clock) {
     for (const route of this.routes) {
       const depotBusy = this.units.some(u => u.route === route && u.sim.position > route.first.stopZ + 40);
-      if (depotBusy) continue;
+      if (depotBusy || this.turnbackComing(route)) continue;
       const tt = this.timetables.get(route.id);
       // Solo entran los servicios que aún llegan a tiempo (los que ya deberían haber salido no se lanzan con retraso)
       const due = tt.trips.find(t => !this.started.has(t.id) && clock >= t.departure - 150 && clock < t.departure + 30);
@@ -233,10 +248,10 @@ export class TrafficManager {
       u.retiredFor = (u.retiredFor || 0) + dt;
       if (u.retiredFor < CONFIG.turnback.cabChangeTime) continue;
       const other = oppositeRoute(u.route);
-      // 1.7: el primer servicio pendiente del andén de salida (hasta 30 s atrasado): el tren cruza al
-      // andén y sale apenas embarca. Uno más lejano lo tendría ocupando el andén minutos, y la cola de
-      // la vía de llegada (por donde cruza) quedaría bloqueada: la terminal no daría abasto en punta.
-      const trip = this.depotFree(other) ? this.nextTripFor(other, clock, -30, 420) : null;
+      // 1.7: el primer servicio pendiente del andén de salida (aunque vaya hasta 2 min atrasado): el
+      // tren cruza al andén y sale apenas embarca. Uno más lejano lo tendría ocupando el andén minutos,
+      // y la cola de la vía de llegada (por donde cruza) quedaría bloqueada: la terminal no daría abasto.
+      const trip = this.depotFree(other) ? this.nextTripFor(other, clock, -120, 420) : null;
       if (trip) { u.retiredFor = 0; this.turnback(u, trip); }
       else this.removeUnit(u);              // sin servicio próximo o vía contraria ocupada: a cocheras (libera la cola)
     }
