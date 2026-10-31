@@ -1077,7 +1077,7 @@ function onPlayerEvent(type, data) {
     case "atpTrip":
       hud.showMessage(`ATP · exceso de velocidad (${Math.round(data.kmh)} km/h, límite ${data.limit}) · frenado de emergencia · detente y espera al PCC`, "alert", 6000);
       break;
-    case "notch": audio.notchClick(); break;
+    case "notch": audio.notchClick(); noteBrakeTest(game.player.sim); break;
     case "reverser": audio.reverserClunk(); break;
     case "halt": audio.airHiss(0.6); break;
     case "emergency": audio.emergency(); stats.emergencies++; game.score.penalty("emergency"); break;
@@ -1389,8 +1389,7 @@ function updateTurn(dt, player) {
   }
   if (turn.phase === "activate") {
     if (!sim.tractionLock) sim.tractionLock = CAB_LOCK;
-    if (sim.notch === NOTCH_INDEX.B1) turn.test.b1 = true;
-    if (turn.test.b1 && sim.notch <= NOTCH_INDEX.B3) turn.test.b3 = true;
+    noteBrakeTest(sim);
     if (sim.reverser === 1 && turn.test.b1 && turn.test.b3) {
       if (sim.tractionLock === CAB_LOCK) sim.tractionLock = null;
       turn.phase = "shunt";
@@ -1403,6 +1402,14 @@ function updateTurn(dt, player) {
     game.turn = null;
     hud.showMessage(`Maniobra completa · en el andén de ${player.route.first.name} · abre puertas (D) y sal a las ${formatClock(turn.trip.departure)}`, "ok", 7000);
   }
+}
+
+/** Prueba de frenos (paso 3): se anota en cada cambio del mando, aunque pase rápido por FRENO 1. */
+function noteBrakeTest(sim) {
+  const turn = game?.turn;
+  if (turn?.phase !== "activate") return;
+  if (sim.notch === NOTCH_INDEX.B1) turn.test.b1 = true;
+  if (turn.test.b1 && sim.notch <= NOTCH_INDEX.B3) turn.test.b3 = true;
 }
 
 /** Lista de pasos de la maniobra para el HUD (null si no hay maniobra en curso ni el tren está en FIN DE MANIOBRA). */
