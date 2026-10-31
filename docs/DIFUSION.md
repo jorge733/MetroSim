@@ -1,6 +1,6 @@
 # Kit de difusión · MetroSim
 
-Enlace del juego: **https://metrosimulator.vercel.app/**
+Enlace del juego: **https://metrosim.app/**
 Código: https://github.com/jorge733/MetroSim
 
 ---
@@ -42,7 +42,7 @@ Hecho por una persona, con HTML, JavaScript y Three.js. Código abierto en GitHu
 > Llevo un tiempo armando MetroSim: puedes manejar un tren de la L3 con física real, viajar como
 > pasajero desde la calle hasta el andén, o dirigir la red desde un Centro de Control. Están las
 > 7 líneas y usa la hora real (si es hora punta, los andenes se llenan).
-> Juégalo aquí: https://metrosimulator.vercel.app/
+> Juégalo aquí: https://metrosim.app/
 > Es un proyecto personal y abierto; cualquier comentario o error que encuentren me sirve mucho. 🚇
 
 *Revisar las reglas de cada subreddit (algunos piden flair "OC" o solo permiten autopromoción ciertos días).*
@@ -52,7 +52,7 @@ Hecho por una persona, con HTML, JavaScript y Three.js. Código abierto en GitHu
 > MetroSim runs in any browser (and on phones). Drive a real-spec AS-2014 train with force-based
 > physics, regenerative braking and real gradients; ride as a passenger from street to platform;
 > or run the network from a control center. All 7 lines, real local time, offline PWA.
-> Play: https://metrosimulator.vercel.app/ · Source: https://github.com/jorge733/MetroSim
+> Play: https://metrosim.app/ · Source: https://github.com/jorge733/MetroSim
 > (UI is in Spanish for now.)
 
 *En r/threejs funciona mejor contar el truco técnico: las pendientes se doblan en el shader con una
@@ -69,11 +69,11 @@ Hashtags: `#MetroDeSantiago #Santiago #Chile #Simulador #IndieDev #GameDev #Tren
 ### X / Bluesky / Mastodon
 > Hice MetroSim 🚇 un simulador 3D del Metro de Santiago que se juega en el navegador:
 > conduce, viaja como pasajero o dirige la red. Gratis y en el celular.
-> 👉 https://metrosimulator.vercel.app/ #gamedev #indiedev #MetroDeSantiago
+> 👉 https://metrosim.app/ #gamedev #indiedev #MetroDeSantiago
 
 ### WhatsApp / Discord (amigos, grupos de trenes)
 > Oigan, hice un juego del Metro de Santiago 🚇 se juega en el navegador o el celu, sin instalar:
-> https://metrosimulator.vercel.app/ — díganme qué les parece o si algo falla 🙏
+> https://metrosim.app/ — díganme qué les parece o si algo falla 🙏
 
 ## 4. Dónde más publicarlo
 

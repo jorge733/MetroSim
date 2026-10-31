@@ -3,19 +3,60 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <title>MetroSim 1.5</title>
+  <title>MetroSim · Simulador del Metro de Santiago en 3D (gratis, en el navegador)</title>
   <!-- Difusión: descripción para buscadores y vista previa al compartir el enlace (WhatsApp, X, Discord...) -->
-  <meta name="description" content="Simulador 3D gratuito del Metro de Santiago en el navegador: conduce trenes AS-2014, viaja como pasajero o dirige el Centro de Control en las líneas 1 a 6.">
+  <meta name="description" content="Simulador 3D gratuito del Metro de Santiago de Chile en el navegador y el celular: conduce trenes, viaja como pasajero o dirige el Centro de Control en las 7 líneas reales (1, 2, 3, 4, 4A, 5 y 6). Sin descargas.">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <link rel="canonical" href="https://metrosim.app/">
+  <meta name="author" content="MetroSim">
+  <meta name="application-name" content="MetroSim">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="MetroSim">
   <meta property="og:title" content="MetroSim · Simulador del Metro de Santiago">
   <meta property="og:description" content="Conduce, viaja o dirige el Metro de Santiago en 3D. Gratis, en el navegador y en el celular.">
-  <meta property="og:url" content="https://metrosimulator.vercel.app/">
-  <meta property="og:image" content="https://metrosimulator.vercel.app/icons/og.jpg">
+  <meta property="og:url" content="https://metrosim.app/">
+  <meta property="og:image" content="https://metrosim.app/icons/og.jpg">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Portada de MetroSim con el mapa de las 7 líneas del Metro de Santiago">
   <meta property="og:locale" content="es_CL">
   <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="MetroSim · Simulador del Metro de Santiago">
+  <meta name="twitter:description" content="Conduce, viaja o dirige el Metro de Santiago en 3D. Gratis, en el navegador y en el celular.">
+  <meta name="twitter:image" content="https://metrosim.app/icons/og.jpg">
+  <!-- Datos estructurados (schema.org) para que Google entienda que es un juego web gratuito -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": "https://metrosim.app/#website",
+        "url": "https://metrosim.app/",
+        "name": "MetroSim",
+        "alternateName": ["MetroSim Santiago", "Simulador del Metro de Santiago"],
+        "inLanguage": "es-CL"
+      },
+      {
+        "@type": ["VideoGame", "WebApplication"],
+        "@id": "https://metrosim.app/#game",
+        "name": "MetroSim · Simulador del Metro de Santiago",
+        "url": "https://metrosim.app/",
+        "image": "https://metrosim.app/icons/og.jpg",
+        "description": "Simulador 3D gratuito del Metro de Santiago de Chile: conduce trenes, viaja como pasajero o dirige el Centro de Control en las líneas 1, 2, 3, 4, 4A, 5 y 6. Funciona en el navegador, en el celular y como app instalable, con multijugador.",
+        "inLanguage": "es-CL",
+        "genre": ["Simulación", "Simulador de trenes"],
+        "gamePlatform": ["Navegador web", "Android", "iOS", "PC"],
+        "applicationCategory": "GameApplication",
+        "operatingSystem": "Cualquiera con navegador moderno (Windows, macOS, Linux, Android, iOS)",
+        "playMode": ["SinglePlayer", "MultiPlayer"],
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "CLP" },
+        "isPartOf": { "@id": "https://metrosim.app/#website" }
+      }
+    ]
+  }
+  </script>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <!-- App instalable (PWA): manifiesto, color de la barra e íconos para iPhone -->
   <link rel="manifest" href="manifest.webmanifest">
@@ -469,5 +510,15 @@
   </section>
 
   <script type="module" src="js/main.js"></script>
+  <!-- Sin JavaScript (o para buscadores que no lo ejecutan): explica qué es MetroSim -->
+  <noscript>
+    <div style="max-width:720px;margin:2rem auto;padding:0 16px;color:#e8eef7;font-family:system-ui,sans-serif;line-height:1.5">
+      <h1>MetroSim · Simulador del Metro de Santiago</h1>
+      <p>MetroSim es un simulador 3D gratuito del Metro de Santiago de Chile que funciona en el navegador y en el celular.
+      Conduce trenes por las siete líneas reales (1, 2, 3, 4, 4A, 5 y 6) con sus estaciones, horarios y combinaciones,
+      viaja como pasajero o dirige el Centro de Control, solo o en multijugador.</p>
+      <p>Para jugar necesitas activar JavaScript en tu navegador.</p>
+    </div>
+  </noscript>
 </body>
 </html>

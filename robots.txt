@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /android/
+Disallow: /tools/
+
+Sitemap: https://metrosim.app/sitemap.xml
