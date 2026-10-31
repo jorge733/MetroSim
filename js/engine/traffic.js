@@ -249,9 +249,10 @@ export class TrafficManager {
       if (u.retiredFor < CONFIG.turnback.cabChangeTime) continue;
       const other = oppositeRoute(u.route);
       // 1.7: el primer servicio pendiente del andén de salida (aunque vaya hasta 2 min atrasado): el
-      // tren cruza al andén y sale apenas embarca. Uno más lejano lo tendría ocupando el andén minutos,
-      // y la cola de la vía de llegada (por donde cruza) quedaría bloqueada: la terminal no daría abasto.
-      const trip = this.depotFree(other) ? this.nextTripFor(other, clock, -120, 420) : null;
+      // tren cruza al andén y sale apenas embarca. Si el próximo sale en más de 4 min (fuera de punta
+      // sobran trenes), se va a cocheras: esperando tanto ocuparía el andén y la cola de la vía de
+      // llegada (por donde cruza), y la terminal no daría abasto.
+      const trip = this.depotFree(other) ? this.nextTripFor(other, clock, -120, 240) : null;
       if (trip) { u.retiredFor = 0; this.turnback(u, trip); }
       else this.removeUnit(u);              // sin servicio próximo o vía contraria ocupada: a cocheras (libera la cola)
     }
