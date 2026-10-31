@@ -133,6 +133,13 @@ Ayudas para no pasarse de la estación (`js/engine/stopAssist.js`; se activan o 
 - Al detenerse fuera de posición, el mensaje dice si te pasaste o te quedaste antes, cuántos metros y cómo
   corregirlo; la estación rebasada sigue siendo el objetivo hasta 60 m.
 
+### 1.6.1 · Visibilidad en Google
+
+- Título y descripción de la página pensados para búsquedas («simulador del Metro de Santiago»), con las 7 líneas.
+- Enlace canónico, `robots` y datos estructurados schema.org (`VideoGame`/`WebApplication`, gratis, multijugador).
+- `robots.txt` y `sitemap.xml` en la raíz para que Google descubra y rastree el sitio.
+- Texto `<noscript>` que describe el juego para buscadores sin JavaScript; etiquetas de X/Twitter completas.
+
 ## Versión 1.5 · Realismo de la red
 
 - **El tren real de cada línea** (`js/engine/fleet.js`): las líneas 1, 2 y 5 usan trenes de **neumáticos** de Alstom

@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /android/
+Disallow: /tools/
+
+Sitemap: https://metrosimulator.vercel.app/sitemap.xml
