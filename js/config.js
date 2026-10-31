@@ -161,7 +161,7 @@ export const CONFIG = {
   defaultSpeedLimit: 80,
   renderRadius: 420,
   turnback: {
-    cabChangeTime: 45,                 // segundos que tarda un conductor automático en cambiar de cabina
+    cabChangeTime: 20,                 // s del cambio de cabina de un tren automático (1.7: con conductor de relevo esperando en la cola, como en las terminales de alta frecuencia)
     crossoverFrom: 100, crossoverTo: 165,  // tramo del cambio de vía tras cada terminal (m desde el centro de la estación)
   },
 };

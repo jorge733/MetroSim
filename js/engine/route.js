@@ -62,7 +62,9 @@ function makeRoute(line, dir, profile) {
   });
   const first = stations[0], last = stations.at(-1);
 
-  const DEPOT = 245;                               // m entre el centro de la terminal y la cabeza del tren en cocheras
+  // m entre el centro de la terminal y la cabeza del tren en cocheras (1.7: 195, lo justo para que el tren
+  // que espera en la cola deje libres las agujas del cambio de vía, a 100–165 m, y la señal de maniobra)
+  const DEPOT = 195;
   const track = {
     start: first.z + tail,                         // fondo de saco tras la terminal de origen
     end: last.z - tail,                            // fondo de saco tras la terminal de destino
@@ -81,8 +83,8 @@ function makeRoute(line, dir, profile) {
     return { ...l, from: Math.max(a, b), to: Math.min(a, b) };
   });
   limits.push({ from: last.z + 320, to: track.end, kmh: 40, label: "ENTRADA A TERMINAL" });
-  limits.push({ from: last.hallOut, to: track.end, kmh: 25, label: "COLA DE MANIOBRAS" });
-  limits.push({ from: track.start, to: first.hallIn, kmh: 25, label: "SALIDA DE COCHERAS" });
+  limits.push({ from: last.hallOut, to: track.end, kmh: 30, label: "COLA DE MANIOBRAS" });
+  limits.push({ from: track.start, to: first.hallIn, kmh: 30, label: "SALIDA DE COCHERAS Y CAMBIO DE VÍA" });
 
   const route = {
     id: line.routeIds[k],

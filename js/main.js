@@ -1240,7 +1240,7 @@ function showDriverSummary({ early = false } = {}) {
       ? { continueLabel: "Nuevo servicio", onContinue: restartGame, onMenu: stopGame }
       : {
         continueLabel: "Maniobra de retorno",
-        onContinue: () => hud.showMessage("Cierra puertas (D), avanza a la cola de maniobras (máx. 25 km/h) y detente en el cartel FIN DE MANIOBRA. Ahí asegura el tren (freno e inversor en N) y pulsa T", "info", 9000),
+        onContinue: () => hud.showMessage("Cierra puertas (D), avanza a la cola de maniobras (máx. 30 km/h) y detente en el cartel FIN DE MANIOBRA. Ahí asegura el tren (freno e inversor en N) y pulsa T", "info", 9000),
         altLabel: "Reiniciar",
         onAlt: restartGame,
         onMenu: stopGame,
@@ -1263,7 +1263,7 @@ function showDriverSummary({ early = false } = {}) {
      3. ACTIVAR la cabina: inversor ADELANTE y prueba de frenos (soltar a
         FRENO 1 y volver a FRENO 3). Hasta entonces no hay tracción.
      4. MANIOBRAR: esperar la señal de maniobra (S…00) en verde, cruzar el
-        cambio de vía (máx. 25 km/h) y detenerse en la marca del andén de
+        cambio de vía (máx. 30 km/h) y detenerse en la marca del andén de
         salida. El tren cruza las agujas de verdad (traffic.js, trainViews.js).
    ========================================================================== */
 
@@ -1395,7 +1395,7 @@ function updateTurn(dt, player) {
       turn.phase = "shunt";
       audio_(a => a.chime?.());
       const man = game.signals.get(player.route.id).signals.find(s => s.type === "maniobra");
-      hud.showMessage(`Cabina activa · espera la señal de maniobra S${man?.id ?? ""} en verde y cruza el cambio de vía (máx. 25 km/h) hasta la marca del andén de ${player.route.first.name}`, "ok", 8000);
+      hud.showMessage(`Cabina activa · espera la señal de maniobra S${man?.id ?? ""} en verde y cruza el cambio de vía (máx. 30 km/h) hasta la marca del andén de ${player.route.first.name}`, "ok", 8000);
     }
   }
   if (turn.phase === "shunt" && sim.isStopped && sim.dockedStation() === player.route.first) {
@@ -1448,7 +1448,7 @@ function turnSteps(player) {
   const crossed = !player.crossing;
   return { title: "MANIOBRA DE RETORNO · 4/4 · AL ANDÉN DE SALIDA", steps: [
     step(passed, passed ? `Señal de maniobra S${man?.id ?? ""} rebasada` : `Señal de maniobra S${man.id}: ${aspect}`, !passed),
-    step(crossed, `Cruza el cambio de vía (máx. 25 km/h)`, passed && !crossed),
+    step(crossed, `Cruza el cambio de vía (máx. 30 km/h)`, passed && !crossed),
     step(false, `Detente en la marca del andén de ${player.route.first.name}`, crossed),
   ] };
 }
