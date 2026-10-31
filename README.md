@@ -140,7 +140,9 @@ Al final de la línea el tren ya no salta de vía: hace la maniobra como en el M
 - Los trenes automáticos salen de la cola apenas el andén de salida queda libre y esperan su hora en el andén. Para
   que la terminal dé abasto con trenes cada 2 minutos (L1), cambian de cabina con un **conductor de relevo** que espera
   en la cola (20 s), el tren se detiene en la cola lo justo para dejar libres las agujas (195 m tras la terminal) y
-  la cola y el cambio de vía se recorren a 30 km/h.
+  la cola y el cambio de vía se recorren a 30 km/h. El tren que vuelve toma el primer servicio pendiente del andén
+  de salida y no se saca otro de cocheras mientras viene uno de vuelta; fuera de punta, si el próximo servicio sale en
+  más de 4 minutos, el tren se retira a cocheras.
 - En el multijugador, el estado de cruce se replica a los demás jugadores.
 - Tu librea se conserva tras el cambio de cabina.
 
