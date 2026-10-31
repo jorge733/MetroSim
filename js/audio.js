@@ -325,6 +325,30 @@ export class AudioSystem {
     this.burst({ duration: 0.08, gain: 0.07, type: "bandpass", freq: 1200, q: 1.5, attack: 0.002 });
   }
 
+  /**
+   * Avisos del asistente de parada (cabina):
+   *   brake      → dos tonos descendentes: "frena ya"
+   *   more       → tono corto: "te pasarías, sube el freno"
+   *   late       → tres pitidos agudos: ni con FRENO 3 alcanzas
+   *   passed     → zumbido grave: el testero rebasó la marca
+   *   inPosition → campanilla ascendente: detenido en la marca
+   */
+  stopAssistCue(kind) {
+    if (!this.ctx) return;
+    const t = (f, o) => this.tone(f, { wave: "sine", attack: 0.004, ...o });
+    if (kind === "brake") { t(988, { duration: 0.16, gain: 0.07 }); t(740, { start: 0.18, duration: 0.24, gain: 0.07 }); }
+    else if (kind === "more") t(880, { duration: 0.14, gain: 0.06, wave: "triangle" });
+    else if (kind === "late") [0, 0.14, 0.28].forEach(s => t(1320, { start: s, duration: 0.1, gain: 0.08, wave: "square" }));
+    else if (kind === "passed") t(220, { duration: 0.6, gain: 0.09, wave: "sawtooth", endFreq: 160 });
+    else if (kind === "inPosition") { t(784, { duration: 0.14, gain: 0.06 }); t(1175, { start: 0.12, duration: 0.3, gain: 0.06 }); }
+  }
+
+  /** Pitido de aproximación a la marca (más agudo dentro de la tolerancia). */
+  stopAssistBeep(inZone) {
+    if (!this.ctx) return;
+    this.tone(inZone ? 1568 : 1046, { duration: inZone ? 0.06 : 0.07, gain: 0.045, wave: "sine", attack: 0.003 });
+  }
+
   /** Escape de aire comprimido (freno). */
   airHiss(strength = 1) {
     if (!this.ctx) return;

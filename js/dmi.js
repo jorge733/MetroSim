@@ -161,21 +161,44 @@ export class CabDisplay {
       g.fillText(`${Math.max(0, Math.round(info.distance))} m`, x0 + w, 168);
     }
 
-    // Precisión de parada
-    if (info.approach) {
-      const sx = x0, sy = 222, sw = w, range = 10;
+    // Precisión de parada y asistente: escala amplia (±50 m) al acercarse, fina
+    // (±10 m) en los últimos 60 m; punto = testero, anillo = parada prevista
+    const as = info.assist, ap = info.approach;
+    if (ap || as) {
+      const sx = x0, sy = 222, sw = w;
+      const wide = !ap && !!as?.wide, range = wide ? 50 : 10;
+      const err = ap ? ap.error : as.dist;
+      const at = x => sx + sw / 2 + clamp(-x / range, -1, 1) * (sw / 2);
       g.fillStyle = "#1a242e"; g.fillRect(sx, sy, sw, 14);
       const tol = CONFIG.station.stopTolerance / range * (sw / 2);
       g.fillStyle = "#2f7a4b"; g.fillRect(sx + sw / 2 - tol, sy, tol * 2, 14);
       g.fillStyle = "#6fe39a"; g.fillRect(sx + sw / 2 - 1, sy - 3, 2, 20);
-      const px = sx + sw / 2 + clamp(-info.approach.error / range, -1, 1) * (sw / 2);
-      g.fillStyle = "#ffffff"; g.beginPath(); g.arc(px, sy + 7, 7, 0, Math.PI * 2); g.fill();
-      g.fillStyle = "#cfe0f1"; g.font = "600 13px Arial"; g.textAlign = "left";
-      g.fillText(`MARCA: ${formatStopError(info.approach.error)}`, sx, sy + 34);
+      const pred = as ? as.predicted : ap.predicted;
+      if (pred !== null && pred !== undefined) {
+        g.strokeStyle = Math.abs(pred) <= CONFIG.station.stopTolerance ? "#6fe39a" : "#ff6b5b"; g.lineWidth = 3;
+        g.beginPath(); g.arc(at(pred), sy + 7, 9, 0, Math.PI * 2); g.stroke();
+      }
+      g.fillStyle = "#ffffff"; g.beginPath(); g.arc(at(err), sy + 7, 6, 0, Math.PI * 2); g.fill();
+      if (as && as.cue !== "far") {
+        const blink = Math.floor(performance.now() / 300) % 2 === 0;
+        const bg = { ok: "#1f5a37", info: "#24384c", warn: "#ffb000", alert: blink ? "#ff3030" : "#5a1414" }[as.level];
+        g.fillStyle = bg; g.fillRect(sx, sy + 22, sw, 22);
+        g.fillStyle = as.level === "warn" ? "#0a121b" : "#ffffff"; g.textAlign = "center"; g.textBaseline = "middle";
+        // Ajusta el texto al ancho: primero achica la letra, luego recorta
+        let t = as.text.toUpperCase(), size = 13;
+        g.font = `900 ${size}px Arial`;
+        while (size > 10 && g.measureText(t).width > sw - 8) g.font = `900 ${--size}px Arial`;
+        while (t.length > 4 && g.measureText(t).width > sw - 8) t = t.slice(0, -2) + "…";
+        g.fillText(t, sx + sw / 2, sy + 33);
+        g.textBaseline = "alphabetic";
+      } else {
+        g.fillStyle = "#cfe0f1"; g.font = "600 13px Arial"; g.textAlign = "left";
+        g.fillText(wide ? `FALTAN ${Math.round(err)} m · ESCALA ±${range} m` : `MARCA: ${formatStopError(err)}`, sx, sy + 34);
+      }
     }
 
     // Tren de adelante (cuando no se muestra la marca de parada): distancia a su cola, barra y estado
-    if (!info.approach && info.ahead) {
+    if (!info.approach && !info.assist && info.ahead) {
       const a = info.ahead, sy = 215;
       const color = a.gap < 300 ? "#ff4b4b" : a.gap < 800 ? "#ffb000" : "#6fe39a";
       g.textAlign = "left"; g.fillStyle = "#8b9bab"; g.font = "600 13px Arial";

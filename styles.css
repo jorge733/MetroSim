@@ -538,8 +538,9 @@ body.touch-mode .start-keys { display: none; }
 }
 .precision-ok {
   position: absolute;
-  left: 37.5%;
+  left: 50%;
   width: 25%;
+  transform: translateX(-50%);
   top: 0;
   bottom: 0;
   background: #34d17c40;
@@ -555,6 +556,36 @@ body.touch-mode .start-keys { display: none; }
   background: #fff;
   box-shadow: 0 0 6px #fff;
 }
+
+/* Asistente de parada: punto previsto (anillo) y aviso de frenado */
+.precision.wide .precision-scale { background: linear-gradient(90deg, #ffffff10, #ffffff1c 50%, #ff4b4b30); }
+.precision-ghost {
+  position: absolute;
+  top: -1px;
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  border-radius: 50%;
+  border: 2px solid var(--ok);
+  box-sizing: border-box;
+  transition: left .12s linear;
+}
+.precision-ghost.bad { border-color: #ff6b5b; }
+.precision-scale { overflow: visible; }
+.assist-cue {
+  display: block;
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .2px;
+  color: #cfe0f1;
+  background: #ffffff10;
+}
+.assist-cue.ok { color: #6fe39a; background: #34d17c22; }
+.assist-cue.warn { color: #1a1205; background: #ffb000; }
+.assist-cue.alert { color: #fff; background: #d42026; animation: assist-blink .5s steps(2) infinite; }
+@keyframes assist-blink { 50% { background: #6a1010; } }
 
 /* Puertas */
 .door-panel { min-width: 180px; }

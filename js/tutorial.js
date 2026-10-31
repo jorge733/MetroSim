@@ -97,7 +97,7 @@ function driverSteps(k) {
     },
     {
       title: "Prepara la llegada",
-      text: (c) => `Vas hacia ${nice(c.mem.dest.name)}. Cuando falten unos 300 m, frena con ${k("S", "▼")} hasta FRENO 1 o FRENO 2. Frenar suave da más puntos (sin tirones).`,
+      text: (c) => `Vas hacia ${nice(c.mem.dest.name)}. Cuando falten unos 300 m (verás letreros amarillos de 300, 200, 100 y 50 m junto a la vía), frena con ${k("S", "▼")} hasta FRENO 1 o FRENO 2. Si se enciende «¡FRENA YA!», frena en ese momento. Frenar suave da más puntos (sin tirones).`,
       live: (c) => `Faltan ${m(c.sim.position - c.mem.dest.stopZ)} · ${Math.round(c.sim.speedKmh)} km/h`,
       focus: [".station-panel"],
       usesDest: true,
@@ -105,7 +105,7 @@ function driverSteps(k) {
     },
     {
       title: "Detente en la marca",
-      text: `Ajusta el freno (${k("W/S", "▲/▼")}) para que el frente del tren pare justo en la marca del andén. Al acercarte aparece la barra de PRECISIÓN: el centro es la marca.`,
+      text: `Ajusta el freno (${k("W/S", "▲/▼")}) para que el frente del tren pare justo en la marca del andén. En la barra de PRECISIÓN el centro es la marca, el punto blanco es tu tren y el ANILLO es donde pararías con el freno que llevas: llévalo al centro subiendo o bajando el freno. En los últimos metros suenan pitidos cada vez más seguidos.`,
       live: (c) => {
         const err = c.sim.position - c.mem.dest.stopZ;
         if (!c.sim.isStopped) return `Faltan ${err > 0 ? m(err) : "0 m (¡te pasas!)"} · ${Math.round(c.sim.speedKmh)} km/h`;

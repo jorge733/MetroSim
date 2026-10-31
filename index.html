@@ -178,6 +178,7 @@
           <span><kbd>D</kbd> puertas</span>
           <span><kbd>B</kbd> bocina</span>
           <span><kbd>X</kbd> vigilancia</span>
+          <span><kbd>N</kbd> asistente de parada</span>
           <span><kbd>F</kbd> sentarse</span>
           <span><kbd>G</kbd> agarrarse</span>
           <span><kbd>T</kbd> cambio de cabina</span>
@@ -274,11 +275,13 @@
           <span id="scheduleMini" class="schedule-mini"><span id="scheduleMiniLabel">—</span> · <b id="scheduleMiniDelay" class="delay">0:00</b></span>
           <div id="precision" class="precision hidden">
             <div class="precision-scale">
-              <div class="precision-ok"></div>
+              <div id="precisionOk" class="precision-ok"></div>
               <div class="precision-center"></div>
+              <div id="precisionGhost" class="precision-ghost hidden"></div>
               <div id="precisionMarker" class="precision-marker"></div>
             </div>
             <span id="precisionText">0.0 m</span>
+            <span id="assistCue" class="assist-cue hidden"></span>
           </div>
         </div>
 
@@ -340,6 +343,7 @@
         <span class="help-driver"><kbd>Q</kbd> inversor adelante · <kbd>E</kbd> inversor atrás</span>
         <span class="help-driver"><kbd>Espacio</kbd> emergencia · <kbd>D</kbd> puertas · <kbd>R</kbd> reiniciar · <kbd>F</kbd> finalizar turno</span>
         <span class="help-driver"><kbd>B</kbd> bocina · <kbd>X</kbd> confirmar vigilancia (hombre muerto; mover el mando también cuenta)</span>
+        <span class="help-driver"><kbd>N</kbd> asistente de parada: anillo = dónde paras con el freno actual · aviso «¡FRENA YA!» · pitidos en los últimos metros</span>
         <span class="help-driver">Arrastrar ratón: mirar · <kbd>C</kbd> centrar · <kbd>V</kbd> vista (cabina · interior · exterior)</span>
         <span class="help-driver">Vista exterior: arrastrar gira · <kbd>Shift</kbd>+arrastrar desplaza · rueda zoom</span>
         <span class="help-driver"><kbd>T</kbd> cambio de cabina (al final de la cola de maniobras)</span>

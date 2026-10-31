@@ -38,7 +38,7 @@ import { PLATFORM_COLUMNS, PLATFORM_BENCHES, COLUMN_X, BENCH_X, PID_OFFSETS, isA
 import {
   std, glow, addBox, addBoxSpan, addPlane, makeCanvas, toTexture, tunnelTexture, concreteTexture,
   terrazzoTexture, tileTexture, stationNameCanvas, lineMapCanvas, directionMapCanvas, transferSignCanvas, transferCorridorCanvas, lineMapU, signCanvas, stopBoardCanvas,
-  milepostCanvas, formatClock,
+  milepostCanvas, approachBoardCanvas, formatClock,
 } from "./utils.js";
 
 const S = CONFIG.station, MZ = CONFIG.mezzanine;
@@ -261,6 +261,7 @@ export class World {
     buildTrack(scene, this.M);
     this.buildTunnels();
     STATIONS.forEach(st => this.stations.push(buildStation(scene, this.M, st, this.gates, this.elevators)));
+    buildApproachBoards(scene, this.M);
     buildTrackEnds(scene, this.M);
 
     // Pool de luces de estación: 3 luces reales que siguen a la cámara
@@ -542,6 +543,44 @@ function buildTunnelSegment(scene, M, zA, zB, lampList = []) {
     if (z >= zA - 2 || z <= zB + 2 || d < 0) continue;
     const board = addPlane(scene, 0.45, 0.45, glow(0xffffff, { map: toTexture(milepostCanvas((d / 1000).toFixed(1))) }), 5.25, 1.6, z, -Math.PI / 2);
     board.material.color.setScalar(0.55);
+  }
+}
+
+
+/* ==========================================================================
+   Letreros de aproximación a la marca de parada
+   ========================================================================== */
+
+/** Distancias (m) hasta la marca de parada en las que hay letrero. */
+const APPROACH_BOARDS = [300, 200, 100, 50];
+
+/**
+ * Letreros de cuenta atrás antes de cada marca de parada, para cada sentido:
+ * a la derecha de la vía, mirando al tren que llega (en el andén, junto a su
+ * borde; en el túnel o el viaducto, sobre el pasillo de evacuación). Se omiten
+ * los que caerían dentro de otra estación o fuera de la vía.
+ */
+function buildApproachBoards(scene, M) {
+  const mats = Object.fromEntries(APPROACH_BOARDS.map(d => [d, glow(0xffffff, { map: toTexture(approachBoardCanvas(d)) })]));
+  const SEC = ROUTE_A.line.sectionsInfo;
+  const zMin = Math.min(WORLD.start, WORLD.end) + 5, zMax = Math.max(WORLD.start, WORLD.end) - 5;
+  const bw = 0.5, bh = bw * 320 / 256;
+  for (const route of [ROUTE_A, ROUTE_B]) {
+    const side = Math.sign(route.trackX), x = side * (S.platformEdgeX + 0.9);
+    for (const st of STATIONS) {
+      const rs = route.stationOf(st);
+      for (const d of APPROACH_BOARDS) {
+        const z = route.toWorldZ(rs.stopZ + d);
+        if (z < zMin || z > zMax) continue;
+        const onPlatform = z >= st.z + S.platformZ0 && z <= st.z + S.platformZ1;
+        if (!onPlatform && STATIONS.some(o => z >= o.z + S.hallZ0 - 2 && z <= o.z + S.hallZ1 + 2)) continue;
+        const base = onPlatform ? S.platformTop : SEC.exposedAt?.(z) ? 0.45 : 0;
+        const cy = base + 1.75;
+        addBox(scene, 0.06, cy - bh / 2 - base, 0.06, M.steel, x, (base + cy - bh / 2) / 2, z);
+        addBox(scene, bw + 0.06, bh + 0.06, 0.04, M.screenHousing, x, cy, z);
+        addPlane(scene, bw, bh, mats[d], x, cy, z + (side > 0 ? 0.025 : -0.025), side > 0 ? 0 : Math.PI);
+      }
+    }
   }
 }
 

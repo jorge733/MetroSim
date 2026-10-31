@@ -331,6 +331,28 @@ export function stopBoardCanvas() {
   return c;
 }
 
+/**
+ * Letrero de aproximación a la marca de parada (300, 200, 100, 50 m): fondo
+ * amarillo, franjas negras (una por cada 100 m, como cuenta atrás) y la cifra.
+ * El de 50 m lleva borde rojo: ya deberías venir frenando.
+ */
+export function approachBoardCanvas(meters) {
+  const c = makeCanvas(256, 320), g = c.getContext("2d");
+  g.fillStyle = "#f2c230"; g.fillRect(0, 0, 256, 320);
+  g.strokeStyle = meters <= 50 ? "#d42026" : "#111"; g.lineWidth = meters <= 50 ? 22 : 12;
+  g.strokeRect(g.lineWidth / 2, g.lineWidth / 2, 256 - g.lineWidth, 320 - g.lineWidth);
+  const stripes = Math.max(0, Math.round(meters / 100));
+  g.fillStyle = "#111";
+  for (let i = 0; i < stripes; i++) {
+    const y = 34 + i * 34;
+    g.beginPath(); g.moveTo(40, y + 22); g.lineTo(64, y); g.lineTo(216, y); g.lineTo(192, y + 22); g.closePath(); g.fill();
+  }
+  g.font = "900 104px Arial"; g.textAlign = "center"; g.textBaseline = "middle";
+  g.fillText(String(meters), 128, stripes ? 232 : 150);
+  g.font = "800 40px Arial"; g.fillText("m", 128, stripes ? 290 : 240);
+  return c;
+}
+
 /** Hito kilométrico del túnel. */
 export function milepostCanvas(text) {
   const c = makeCanvas(128, 128), g = c.getContext("2d");

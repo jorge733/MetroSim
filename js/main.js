@@ -78,6 +78,7 @@ import { setupPWA } from "./pwa.js";
 import { setupCreator } from "./creator.js";
 import { icon, textOn } from "./icons.js";
 import { $, clamp, formatClock, formatStopError, gradeStop } from "./utils.js";
+import { stopAssist } from "./engine/stopAssist.js";
 import { formatDelay, makeTrip } from "./engine/schedule.js";
 import { MetroEngine } from "./engine/engine.js";
 import { TrainViews } from "./render/trainViews.js";
@@ -130,6 +131,8 @@ const hud = new Hud();
 
 let game = null;
 let muted = loadMuted();
+/** Asistente de parada (punto previsto, aviso de frenado y pitidos): se activa/desactiva con N. */
+let stopAssistOn = loadSetting("metrosim.stopAssist") !== "0";
 hud.setSound(!muted);
 const card = new BipCard();               // la tarjeta bip! del jugador (saldo persistente)
 hud.setCard(card);
@@ -923,6 +926,11 @@ function onKeyDown(event) {
   if (event.repeat) return;
   if (key === "x") return game.safety.input();
   if (key === "b") return game.safety.horn(game.player);
+  if (key === "n") {
+    stopAssistOn = !stopAssistOn;
+    saveSetting("metrosim.stopAssist", stopAssistOn ? "1" : "0");
+    return hud.showMessage(stopAssistOn ? "Asistente de parada ACTIVADO · parada prevista, aviso de frenado y pitidos" : "Asistente de parada desactivado (N para volver a activarlo)", "info", 2500);
+  }
   if (key === "r") return game.net ? hud.showMessage("En una sala no se reinicia el servicio: Finalizar turno (F) te lleva al menú", "info") : restartGame();
   if (key === "t") return changeCab();
   if (key === "f") return requestEndShift();
@@ -1071,9 +1079,13 @@ function onPlayerEvent(type, data) {
     case "stopped":
       game.lastStop = data;
       game.score.stopped(game.lastDecel);
-      if (Math.abs(data.error) > CONFIG.station.stopTolerance) {
+      if (Math.abs(data.error) <= CONFIG.station.stopTolerance) { if (stopAssistOn && tripStopsAt(game.player.trip, data.station.index)) audio.stopAssistCue("inPosition"); }
+      else {
         game.score.penalty("offPosition");
-        hud.showMessage(`${data.station.name} · FUERA DE POSICIÓN (${formatStopError(data.error)}) · usa marcha atrás (E) si te pasaste`, "warn", 4500);
+        const e = Math.abs(data.error).toFixed(1).replace(".", ",");
+        hud.showMessage(data.error < 0
+          ? `${data.station.name} · TE PASASTE ${e} m · inversor atrás (E) y retrocede despacio hasta la marca (máx. ${Math.round(CONFIG.train.reverseMaxSpeed * 3.6)} km/h)`
+          : `${data.station.name} · TE QUEDASTE ${e} m ANTES · avanza despacio en TRACCIÓN 1 hasta la marca`, "warn", 6000);
       }
       break;
     case "arrivedStation": {
@@ -2041,9 +2053,21 @@ function getRouteInfo(unit) {
   const passing = physical !== next ? physical : null;
   const near = sim.nearestStation();
   const nearError = sim.position - near.stopZ;
+  // Estación a la que te acercabas para parar: si te pasas de su marca, sigue
+  // siendo el objetivo (y no la siguiente) hasta que te detengas en ella o la
+  // dejes 60 m atrás. Al salir de una estación en la que ya paraste no cuenta.
+  // (sim.nextStation() ya da la siguiente en cuanto el testero entra en la tolerancia.)
+  if (docked || sim.doorState !== "closed") unit.stopTarget = null;
+  const keep = !!unit.stopTarget && unit.stopTarget === near && nearError > -60;
+  if (!keep) unit.stopTarget = next && !docked && sim.position - next.stopZ < 1500 ? next : null;
   let approach = null;
-  if (next && sim.position - next.stopZ < 60) approach = { station: next, error: sim.position - next.stopZ };
+  if (keep && nearError < 60) approach = { station: near, error: nearError };
+  else if (next && sim.position - next.stopZ < 60) approach = { station: next, error: sim.position - next.stopZ };
   else if (Math.abs(nearError) < 15 && tripStopsAt(unit.trip, near.index)) approach = { station: near, error: nearError };
+
+  // Asistente de parada: dónde paras con el freno actual y cuándo frenar (engine/stopAssist.js)
+  const assist = stopAssistOn && !docked ? stopAssist(sim, keep ? near : next) : null;
+  if (approach) approach.predicted = assist?.predicted ?? null;
 
   const s = game.signals.get(unit.route.id).nextAhead(sim.position);
   const signal = s ? { id: s.id, aspect: s.aspect, distance: sim.position - s.z } : null;
@@ -2067,11 +2091,35 @@ function getRouteInfo(unit) {
     docked, next, passing,
     express: unit.trip?.express || null,
     distance: next ? sim.position - next.stopZ : 0,
-    approach,
+    approach, assist,
     limit: sim.currentLimit(),
     signal, schedule,
     ahead: trainAhead(unit),
   };
+}
+
+/**
+ * Sonidos del asistente de parada: un aviso al cambiar a "frena", "te pasas"
+ * o "pasaste la marca", y en los últimos metros pitidos cada vez más seguidos
+ * (como un sensor de estacionamiento), rápidos y agudos dentro de la tolerancia.
+ */
+function updateStopAssistSound(dt, sim, info) {
+  const audio = game.audio, a = info.assist;
+  const cue = a?.cue || null;
+  game.assistCueT = (game.assistCueT ?? 0) - dt;
+  if (cue !== game.assistCue) {
+    // Los avisos urgentes suenan siempre; "frena" y "te pasarías", como mucho uno cada 3 s (sin repiquetear)
+    const urgent = cue === "late" || cue === "passed";
+    if (urgent || ((cue === "brake" || cue === "more") && game.assistCueT <= 0)) { audio.stopAssistCue(cue); game.assistCueT = 3; }
+    game.assistCue = cue;
+  }
+  game.assistBeepT = (game.assistBeepT ?? 0) - dt;
+  if (!a || a.cue === "passed" || a.dist > 15 || sim.speed < 0.05) return;
+  const tol = CONFIG.station.stopTolerance, inZone = Math.abs(a.dist) <= tol;
+  if (game.assistBeepT <= 0) {
+    audio.stopAssistBeep(inZone);
+    game.assistBeepT = inZone ? 0.1 : 0.12 + (a.dist - tol) / (15 - tol) * 0.5;
+  }
 }
 
 /** Distancia (m) hasta la que la DMI muestra el tren de adelante. */
@@ -2269,6 +2317,7 @@ function loop(now) {
     const boardingBusy = engine.isBoarding(player);
     if (player.sim.doorState === "open") game.boardingDone = !boardingBusy;     // ¿terminó el embarque antes de cerrar?
     hud.updateDriver(player.sim, info, { clock: game.clock, onboard: people.onboardCount(player), boardingBusy });
+    updateStopAssistSound(dt, player.sim, info);
     game.tutorial?.update(dt, { game, sim: player.sim, info });
   } else {
     hud.updatePassenger(walkerHudData());

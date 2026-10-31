@@ -9,7 +9,7 @@
    misiones y destello de la cámara de fotos.
    ========================================================================== */
 
-import { STATIONS, LINE, NOTCHES, NOTCH_INDEX, WORLD, FARES, formatCLP, fareBandAt } from "./config.js";
+import { CONFIG, STATIONS, LINE, NOTCHES, NOTCH_INDEX, WORLD, FARES, formatCLP, fareBandAt } from "./config.js";
 import { $, clamp, formatClock, formatStopError } from "./utils.js";
 import { formatDelay } from "./engine/schedule.js";
 import { BANK_NAME } from "./economy.js";
@@ -26,6 +26,7 @@ export class Hud {
       speed: $("speed"), speedArc: $("speedArc"), limitTick: $("limitTick"), speedLimit: $("speedLimit"),
       stationTitle: $("stationTitle"), nextStation: $("nextStation"), distance: $("distance"),
       precision: $("precision"), precisionMarker: $("precisionMarker"), precisionText: $("precisionText"),
+      precisionGhost: $("precisionGhost"), precisionOk: $("precisionOk"), assistCue: $("assistCue"),
       signalId: $("signalId"), signalDist: $("signalDist"), scheduleLabel: $("scheduleLabel"), scheduleDelay: $("scheduleDelay"),
       signalMiniText: $("signalMiniText"), scheduleMiniLabel: $("scheduleMiniLabel"), scheduleMiniDelay: $("scheduleMiniDelay"),
       doorLamp: $("doorLamp"), doorStatus: $("doorStatus"), doorHint: $("doorHint"), onboard: $("onboardCount"),
@@ -199,12 +200,34 @@ export class Hud {
       this.setText(e.distance, Math.abs(d) <= 15 && sim.isStopped ? "En posición · pulsa T para cambiar de cabina" : `${d} m · detente en el cartel`);
     }
 
-    // Precisión de parada (±10 m en la escala)
-    e.precision.classList.toggle("hidden", !info.approach);
-    if (info.approach) {
-      const err = info.approach.error;
-      e.precisionMarker.style.left = `${50 + clamp(-err / 10, -1, 1) * 50}%`;
-      this.setText(e.precisionText, `Marca de parada: ${formatStopError(err)}`);
+    // Precisión de parada. Dos escalas: amplia (±50 m) mientras te acercas y
+    // fina (±10 m) en los últimos 60 m. El punto blanco es el testero; el
+    // anillo es dónde pararías con el freno actual (asistente de parada).
+    const as = info.assist, ap = info.approach;
+    const showBar = !!(ap || as);
+    e.precision.classList.toggle("hidden", !showBar);
+    if (showBar) {
+      const wide = !ap && !!as?.wide;
+      const range = wide ? 50 : 10;
+      const err = ap ? ap.error : as.dist;
+      const pos = x => `${50 + clamp(-x / range, -1, 1) * 50}%`;
+      e.precision.classList.toggle("wide", wide);
+      e.precisionOk.style.width = `${CONFIG.station.stopTolerance / range * 100}%`;
+      e.precisionMarker.style.left = pos(err);
+      const pred = as ? as.predicted : ap.predicted;
+      e.precisionGhost.classList.toggle("hidden", pred === null || pred === undefined);
+      if (pred !== null && pred !== undefined) {
+        e.precisionGhost.style.left = pos(pred);
+        e.precisionGhost.classList.toggle("bad", Math.abs(pred) > CONFIG.station.stopTolerance);
+      }
+      this.setText(e.precisionText, wide
+        ? `Faltan ${Math.round(err)} m · escala ±${range} m`
+        : `Marca de parada: ${formatStopError(err)}${pred !== null && pred !== undefined && sim.speed > 0.3 ? ` · paras ${formatStopError(pred)}` : ""}`);
+      e.assistCue.classList.toggle("hidden", !as || as.cue === "far");
+      if (as && as.cue !== "far") {
+        this.setText(e.assistCue, as.text);
+        e.assistCue.className = `assist-cue ${as.level} cue-${as.cue}`;
+      }
     }
 
     // Señal

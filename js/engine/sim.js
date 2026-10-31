@@ -51,7 +51,7 @@ import { clamp, formatStopError } from "./format.js";
 
 const G = 9.81;
 /** Sacudida máxima (m/s³) en servicio y al aplicar la emergencia. */
-const JERK = 0.9, JERK_EMERGENCY = 4;
+export const JERK = 0.9, JERK_EMERGENCY = 4;
 /** Freno de mantenimiento automático (m/s² equivalentes) con el tren detenido. */
 const HOLD_BRAKE = 0.7;
 /** Deceleración máxima de servicio que usa la conducción automática (m/s²). */
