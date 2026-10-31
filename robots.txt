@@ -3,4 +3,4 @@ Allow: /
 Disallow: /android/
 Disallow: /tools/
 
-Sitemap: https://metrosimulator.vercel.app/sitemap.xml
+Sitemap: https://metrosim.app/sitemap.xml

@@ -140,6 +140,11 @@ Ayudas para no pasarse de la estación (`js/engine/stopAssist.js`; se activan o 
 - `robots.txt` y `sitemap.xml` en la raíz para que Google descubra y rastree el sitio.
 - Texto `<noscript>` que describe el juego para buscadores sin JavaScript; etiquetas de X/Twitter completas.
 
+### 1.6.2 · Dominio propio e imagen para compartir
+
+- Enlace canónico, datos estructurados, `robots.txt` y `sitemap.xml` apuntan al dominio **https://metrosim.app/**.
+- Nueva `icons/og.jpg` (1200×630, vista previa al compartir el enlace) con la intro de la versión actual.
+
 ## Versión 1.5 · Realismo de la red
 
 - **El tren real de cada línea** (`js/engine/fleet.js`): las líneas 1, 2 y 5 usan trenes de **neumáticos** de Alstom
