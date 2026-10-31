@@ -1262,7 +1262,7 @@ function showDriverSummary({ early = false } = {}) {
         automático (T).
      3. ACTIVAR la cabina: inversor ADELANTE y prueba de frenos (soltar a
         FRENO 1 y volver a FRENO 3). Hasta entonces no hay tracción.
-     4. MANIOBRAR: esperar la señal de maniobra (S…00) en verde, cruzar el
+     4. MANIOBRAR: esperar la señal de maniobra (S…00) abierta, cruzar el
         cambio de vía (máx. 30 km/h) y detenerse en la marca del andén de
         salida. El tren cruza las agujas de verdad (traffic.js, trainViews.js).
    ========================================================================== */
@@ -1395,7 +1395,7 @@ function updateTurn(dt, player) {
       turn.phase = "shunt";
       audio_(a => a.chime?.());
       const man = game.signals.get(player.route.id).signals.find(s => s.type === "maniobra");
-      hud.showMessage(`Cabina activa · espera la señal de maniobra S${man?.id ?? ""} en verde y cruza el cambio de vía (máx. 30 km/h) hasta la marca del andén de ${player.route.first.name}`, "ok", 8000);
+      hud.showMessage(`Cabina activa · espera la señal de maniobra S${man?.id ?? ""} (verde o amarillo) y cruza el cambio de vía (máx. 30 km/h) hasta la marca del andén de ${player.route.first.name}`, "ok", 8000);
     }
   }
   if (turn.phase === "shunt" && sim.isStopped && sim.dockedStation() === player.route.first) {
@@ -1444,7 +1444,7 @@ function turnSteps(player) {
   const sys = game.signals.get(player.route.id);
   const man = sys.signals.find(s => s.type === "maniobra");
   const passed = !man || sim.position < man.z;
-  const aspect = man ? { red: "ROJO · espera", yellow: "AMARILLO · paso libre", green: "VERDE · paso libre" }[man.aspect] : "";
+  const aspect = man ? { red: "ROJO · espera", yellow: "AMARILLO · avanza, el andén aún está ocupado: para ante la señal de entrada", green: "VERDE · paso libre al andén" }[man.aspect] : "";
   const crossed = !player.crossing;
   return { title: "MANIOBRA DE RETORNO · 4/4 · AL ANDÉN DE SALIDA", steps: [
     step(passed, passed ? `Señal de maniobra S${man?.id ?? ""} rebasada` : `Señal de maniobra S${man.id}: ${aspect}`, !passed),

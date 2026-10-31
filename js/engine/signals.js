@@ -14,9 +14,11 @@
    Tipos: "entrada" (antes de cada estación), "salida" (final de andén) e
    "intermedia" (en túnel, separación ≤ CONFIG.signals.maxBlock).
    1.7 · "maniobra": señal baja antes del cambio de vía tras la terminal de
-   origen (S…00). Da paso al andén de salida solo si la ruta está libre: la
-   señal de entrada a la terminal no está en rojo. Los enclavamientos de la
-   maniobra de retorno (traffic.js) ponen s.interlock = true → rojo.
+   origen (S…00). Como toda señal de maniobra, autoriza a avanzar hasta la
+   señal siguiente (la de entrada a la terminal, junto al andén): rojo si
+   ese tramo está ocupado, amarillo si el andén aún está ocupado. Los
+   enclavamientos de la maniobra de retorno (traffic.js) ponen
+   s.interlock = true → rojo.
 
    Hay un SignalSystem por ruta (sentido), en coordenadas de la ruta.
    Este módulo es SOLO lógica: el dibujo de los postes y lámparas está en
@@ -104,7 +106,6 @@ export class SignalSystem {
     for (let i = list.length - 1; i >= 0; i--) {
       const s = list[i], next = list[i + 1];
       if (s.occupied || s.hold || s.fault || s.interlock) s.aspect = "red";     // fault: falla de señal (incidents.js)
-      else if (s.type === "maniobra" && next && next.aspect === "red") s.aspect = "red";   // la ruta al andén no está libre
       else if (next && next.aspect === "red") s.aspect = "yellow";
       else s.aspect = "green";
     }

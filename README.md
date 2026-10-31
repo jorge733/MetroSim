@@ -128,13 +128,14 @@ Al final de la línea el tren ya no salta de vía: hace la maniobra como en el M
      con pasos y vaivén) o con el recorrido automático (**T** otra vez).
   3. *Activar la cabina nueva*: inversor ADELANTE y prueba de frenos (soltar a FRENO 1 y volver a FRENO 3). Hasta
      entonces no hay tracción.
-  4. *Maniobrar*: esperar la señal de maniobra en verde, cruzar el cambio de vía (máx. 30 km/h) y parar en la marca
+  4. *Maniobrar*: esperar la señal de maniobra (verde o amarillo), cruzar el cambio de vía (máx. 30 km/h) y parar en la marca
      del andén de salida.
 - **El tren cruza las agujas de verdad**: mientras cruza se dibuja articulado y cada coche sigue el cambio de vía de
   una vía a la otra (`js/train.js`, `js/render/trainViews.js`, `trackXAt` en `js/engine/traffic.js`). Los trenes
   automáticos hacen lo mismo.
-- **Señal de maniobra** (S…00, una señal baja entre las vías antes del cambio de vía) y **enclavamientos**: solo abre
-  si el andén de salida está libre; mientras un tren cruzando ocupe la cola de llegada, la señal de salida de esa
+- **Señal de maniobra** (S…00, una señal baja entre las vías antes del cambio de vía) y **enclavamientos**: autoriza a
+  avanzar hasta la señal de entrada de la terminal (amarillo si el andén aún está ocupado); no abre mientras otro tren
+  entre a la cola de la vía contraria; mientras un tren cruzando ocupe la cola de llegada, la señal de salida de esa
   terminal queda en rojo y el tren siguiente espera en el andén (`js/engine/signals.js`, `js/engine/traffic.js`).
 - Los trenes automáticos salen de la cola apenas el andén de salida queda libre y esperan su hora en el andén. Para
   que la terminal dé abasto con trenes cada 2 minutos (L1), cambian de cabina con un **conductor de relevo** que espera
