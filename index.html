@@ -57,7 +57,7 @@
         <header class="start-brand">
           <img class="metro-mark" src="logo.svg" alt="">
           <h1>MetroSim</h1>
-          <span class="start-ver">v1.6</span>
+          <span class="start-ver">v1.7</span>
         </header>
         <div class="start-hero">
           <p class="eyebrow">Simulador del Metro de Santiago</p>
@@ -251,6 +251,8 @@
       </aside>
 
       <!-- Panel inferior del conductor -->
+      <!-- 1.7 · Pasos de la maniobra de retorno (asegurar, recorrido, activar cabina, maniobra) -->
+      <div id="turnPanel" class="turn-panel hidden"><b id="turnTitle"></b><ol id="turnSteps"></ol></div>
       <div id="driverHud" class="driver-hud">
         <div class="panel speed-panel">
           <svg class="speed-gauge" viewBox="0 0 120 120" aria-hidden="true">
@@ -346,7 +348,7 @@
         <span class="help-driver"><kbd>N</kbd> asistente de parada: anillo = dónde paras con el freno actual · aviso «¡FRENA YA!» · pitidos en los últimos metros</span>
         <span class="help-driver">Arrastrar ratón: mirar · <kbd>C</kbd> centrar · <kbd>V</kbd> vista (cabina · interior · exterior)</span>
         <span class="help-driver">Vista exterior: arrastrar gira · <kbd>Shift</kbd>+arrastrar desplaza · rueda zoom</span>
-        <span class="help-driver"><kbd>T</kbd> cambio de cabina (al final de la cola de maniobras)</span>
+        <span class="help-driver"><kbd>T</kbd> maniobra de retorno: en FIN DE MANIOBRA, con freno aplicado e inversor en N, deja la cabina · camina por el tren (<kbd>W</kbd> caminar · <kbd>S</kbd> detenerte · <kbd>Shift</kbd> correr) o pulsa <kbd>T</kbd> otra vez para el recorrido automático</span>
         <span class="help-walker"><kbd>W</kbd>/<kbd>S</kbd> caminar · <kbd>A</kbd>/<kbd>D</kbd> girar · <kbd>Shift</kbd> correr</span>
         <span class="help-walker"><kbd>Re Pág</kbd>/<kbd>Av Pág</kbd> mirar arriba / abajo</span>
         <span class="help-walker"><kbd>F</kbd> sentarse · <kbd>G</kbd> agarrarse de una barra (a bordo) · <kbd>E</kbd> boletería, tótem, locales, acceso o foto</span>

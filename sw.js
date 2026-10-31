@@ -14,7 +14,7 @@
    sin conexión.
    ========================================================================== */
 
-const CACHE = "metrosim-v1.6";
+const CACHE = "metrosim-v1.7";
 const CDN = ["cdn.jsdelivr.net", "unpkg.com"];
 
 /** Lo mínimo para que la portada abra sin conexión aunque no se haya jugado. */

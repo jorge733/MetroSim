@@ -48,6 +48,7 @@ export function lineSnapshot(engine, lineId) {
       i: u.id, r: u.route.id, p: r2(s.position), v: r2(s.velocity), a: r2(s.accel), ad: s.autoDemand,
       n: s.notch, rv: s.reverser, ds: s.doorState, dp: r2(s.doorProgress), l: Math.round(u.load || 0), d: Math.round(u.delay || 0),
     };
+    if (u.crossing) rec.x = 1;                      // maniobra de retorno: cruzando el cambio de vía
     if (u.ato) {
       const o = {};
       for (const k of ATO_FIELDS) o[k] = u.ato[k];
@@ -138,6 +139,7 @@ function applyUnit(u, rec, lag) {
   sim.notch = rec.n;
   sim.reverser = rec.rv;
   sim.doorState = rec.ds;
+  if (rec.x) u.crossing = true;                    // (deja de cruzar sola en traffic.update al pasar las agujas)
   sim.doorProgress = rec.dp;
   u.load = rec.l;
   u.delay = rec.d;

@@ -242,6 +242,7 @@ export function describeTrain(u) {
   const next = sim.nextStation();
   let location;
   if (docked) location = `en ${docked.name}`;
+  else if (u.crossing) location = `maniobra de retorno en ${route.first.name} (cambio de vía)`;
   else if (sim.position > route.first.stopZ + 5) location = `cocheras de ${route.first.name}`;
   else if (!next) location = `cola de maniobras tras ${route.last.name}`;
   else if (next.index === 0) location = `entrando a ${next.name}`;                // de la cochera al andén de origen

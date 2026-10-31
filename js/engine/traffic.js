@@ -19,6 +19,16 @@
      servicio próximo, se retira a cocheras.
    · 1.5 · Cada tren es de un modelo de la flota de su línea (fleet.js),
      elegido al entrar en servicio; lo conserva en las maniobras de retorno.
+   · 1.7 · Maniobra de retorno REAL: tras cambiar de cabina el tren no salta
+     de vía: queda en la cola de la vía por la que llegó (unit.crossing) y
+     sale por el CAMBIO DE VÍA hacia el andén de salida, coche a coche
+     (trackXAt da la x de la vía bajo cada punto del tren). Enclavamientos:
+       · la señal de MANIOBRA (antes de las agujas) solo abre si la ruta
+         hasta el andén está libre (la señal de entrada no está en rojo) y
+         no hay otro tren entrando en la cola de la vía contraria;
+       · mientras un tren cruzando siga en la cola de llegada, la señal de
+         salida de la terminal de esa vía queda en ROJO: el tren siguiente
+         espera en el andén y no entra a la cola ocupada.
    ========================================================================== */
 
 import { CONFIG } from "../config.js";
@@ -31,6 +41,21 @@ import { estimateArrival } from "./eta.js";
 import { stockFor } from "./fleet.js";
 
 const L = CONFIG.train.length;
+const XO = CONFIG.turnback;
+
+/**
+ * x del mundo de la vía bajo un punto del tren (coordenada z de su ruta).
+ * Lo normal es la vía de su ruta; un tren que hace la maniobra de retorno
+ * (unit.crossing) está aún en la cola de la vía contraria y pasa de una a
+ * otra por el cambio de vía (de crossoverTo a crossoverFrom m tras la terminal).
+ */
+export function trackXAt(unit, z) {
+  const route = unit.route;
+  if (!unit.crossing) return route.trackX;
+  const s = z - route.first.z;                     // m desde el centro de la terminal hacia la cola
+  const t = Math.min(1, Math.max(0, (XO.crossoverTo - s) / (XO.crossoverTo - XO.crossoverFrom)));
+  return oppositeRoute(route).trackX + (route.trackX - oppositeRoute(route).trackX) * t;
+}
 
 export class TrafficManager {
   /**
@@ -131,9 +156,12 @@ export class TrafficManager {
     unit.exchangeIdx = null;
     unit.sim.route = route;
     unit.sim.reset(route.track.depotZ);
+    unit.crossing = true;                            // aún en la cola de la otra vía: saldrá por el cambio de vía
     unit.prevPos = unit.sim.position;
     this.bus.emit("train:rebuilt", unit);          // el dibujo cambia de vía y de cabina
-    unit.ato = unit.isPlayer ? null : this.makeDriver(unit, 0, trip.departure - 150);
+    // Sale de la cola en cuanto la señal de maniobra lo deja (la ruta al andén libre) y espera su
+    // hora en el andén de salida: así deja libre cuanto antes la cola de la vía de llegada
+    unit.ato = unit.isPlayer ? null : this.makeDriver(unit, 0, 0);
     this.started.add(trip.id);
     this.notify(unit, "turnback", { trip });
   }
@@ -167,6 +195,10 @@ export class TrafficManager {
       u.sim.update(dt);
       this.trackSchedule(u, clock);
     }
+
+    // Fin del cruce: todo el tren ya pasó las agujas y está en su vía
+    for (const u of this.units) if (u.crossing && u.sim.position + L < u.route.first.z + XO.crossoverFrom - 5) u.crossing = false;
+    this.interlock();
 
     for (const route of this.routes) {
       const units = this.units.filter(u => u.route === route);
@@ -207,6 +239,30 @@ export class TrafficManager {
     }
 
     this.updateStates(clock);
+  }
+
+  /**
+   * Enclavamientos de la maniobra de retorno (se aplican antes de recalcular
+   * las señales; signals.js pone en rojo las que tienen interlock).
+   */
+  interlock() {
+    for (const route of this.routes) for (const s of this.signals.get(route.id)?.signals || []) s.interlock = false;
+    for (const route of this.routes) {
+      const other = oppositeRoute(route);
+      const sys = this.signals.get(route.id), otherSys = this.signals.get(other.id);
+      if (!sys || !otherSys) continue;
+      // Un tren de esta ruta cruzando que aún ocupa la cola de la vía contraria:
+      // la señal de salida de la terminal de la otra ruta queda en rojo
+      // (el cambio de vía invade la vía de llegada desde su aguja, a crossoverTo m, hasta ~15 m antes: gálibo)
+      const blocking = this.units.some(u => u.route === route && u.crossing && u.sim.position + L - route.first.z > XO.crossoverTo - 15);
+      if (blocking) { const s = otherSys.startingSignal(other.last); if (s) s.interlock = true; }
+      // Señal de maniobra: no abre a un tren que va a cruzar si otro entra en la cola de la vía contraria
+      const man = sys.signals.find(s => s.type === "maniobra");
+      if (!man) continue;
+      const waiting = this.units.find(u => u.route === route && u.sim.position > man.z && u.sim.position < man.z + 150);
+      const tailBusy = this.units.some(u => u.route === other && !u.crossing && u.sim.position < other.last.platformOut - 5);
+      if (waiting?.crossing && tailBusy) man.interlock = true;
+    }
   }
 
   /** Recalcula el estado explícito de cada tren y avisa de los cambios. */

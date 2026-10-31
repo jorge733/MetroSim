@@ -518,6 +518,7 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = {}) {
   engine.bus.on("command:result", (r) => onCommandResult(r));
   engine.bus.on("incident", (inc) => onIncident(inc));
   const trainViews = new TrainViews(scene, engine.bus);       // dibuja los trenes que crea el motor
+  trainViews.onCreate = onTrainModel;          // modelo rehecho (cambio de cabina, cambio de vía): cámara, luces y librea
   const signalViews = new SignalViews(scene, signals.values());
   const playerTrip = net ? net.trip(engine) : timetables.get(direction.id).anchorTrip;
 
@@ -561,11 +562,11 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = {}) {
       notify: (text, level, ms) => hud.showMessage(text, level, ms),
       penalty: (kind) => game?.score.penalty(kind),
     });
-    const rig = new CameraRig(camera, player.group);
+    const rig = new CameraRig(camera, trainHead(player));
     rig.setView("cab");
     rig.attach(renderer.domElement);
     game.rig = rig;
-    player.group.add(game.trainLights);
+    trainHead(player).add(game.trainLights);
     game.lightsUnit = player;
     setTimeout(() => game?.player === player && hud.showMessage(driverBriefing(player), "info", 9000), 1500);
     if (net) {
@@ -673,6 +674,7 @@ function stopGame({ keepFullscreen = false } = {}) {
   if (!game) return;
   if (game.net) { game.net.leave(); applyWeatherChoice(); }     // sale de la sala y vuelve al tiempo elegido
   game.touch?.destroy();
+  hud.setTurnPanel(null);
   game.tutorial?.destroy();
   cancelAnimationFrame(game.raf);
   game.audio.stop();
@@ -912,6 +914,7 @@ function onKeyDown(event) {
     return;
   }
 
+  if (turnWalkKey(key, true)) return;               // recorrido a la otra cabina (maniobra de retorno)
   if (key === "c") return game.rig.recenter();
   if (key === "v") {
     // Ciclo de vistas del conductor: cabina → interior del tren (salón) → exterior
@@ -963,7 +966,9 @@ function pressKey(key) {
 }
 
 function onKeyUp(event) {
-  game?.walker?.keyUp(event.key.toLowerCase());
+  const key = event.key.toLowerCase();
+  game?.walker?.keyUp(key);
+  if (game?.turn) turnWalkKey(key, false);
 }
 
 
@@ -977,7 +982,7 @@ function onUnitEvent(unit, type, data = {}) {
   if (type === "removed") { game.people?.clearUnit(unit); return; }
   if (type === "turnbackStart") { game.people?.clearUnit(unit); return; }
   if (type === "turnback") {
-    if (game.lightsUnit === unit) unit.group.add(game.trainLights);    // las luces siguen al tren
+    if (game.lightsUnit === unit) trainHead(unit).add(game.trainLights);    // las luces siguen al tren
     return;
   }
   if (unit === game.player) return onPlayerEvent(type, data);
@@ -1235,7 +1240,7 @@ function showDriverSummary({ early = false } = {}) {
       ? { continueLabel: "Nuevo servicio", onContinue: restartGame, onMenu: stopGame }
       : {
         continueLabel: "Maniobra de retorno",
-        onContinue: () => hud.showMessage("Cierra puertas (D), avanza a la cola de maniobras y detente en el cartel FIN DE MANIOBRA. Luego pulsa T", "info", 9000),
+        onContinue: () => hud.showMessage("Cierra puertas (D), avanza a la cola de maniobras (máx. 25 km/h) y detente en el cartel FIN DE MANIOBRA. Ahí asegura el tren (freno e inversor en N) y pulsa T", "info", 9000),
         altLabel: "Reiniciar",
         onAlt: restartGame,
         onMenu: stopGame,
@@ -1248,46 +1253,197 @@ function showDriverSummary({ early = false } = {}) {
   });
 }
 
-/**
- * Cambio de cabina al final de la cola de maniobras: el conductor pasa al
- * otro extremo, el tren cruza el cambio de vía y empieza el servicio de vuelta.
- */
-function changeCab() {
+/* ==========================================================================
+   Maniobra de retorno (1.7): como en un tren real, por pasos
+     1. ASEGURAR el tren en FIN DE MANIOBRA: detenido, puertas cerradas,
+        freno aplicado e inversor en N. T retira la llave.
+     2. RECORRIDO hasta la cabina del otro extremo por dentro del tren vacío:
+        caminando (W caminar · S detenerse · Shift correr) o en recorrido
+        automático (T).
+     3. ACTIVAR la cabina: inversor ADELANTE y prueba de frenos (soltar a
+        FRENO 1 y volver a FRENO 3). Hasta entonces no hay tracción.
+     4. MANIOBRAR: esperar la señal de maniobra (S…00) en verde, cruzar el
+        cambio de vía (máx. 25 km/h) y detenerse en la marca del andén de
+        salida. El tren cruza las agujas de verdad (traffic.js, trainViews.js).
+   ========================================================================== */
+
+/** Bloqueo de tracción mientras la cabina nueva no esté activada. */
+const CAB_LOCK = "cabina sin activar · completa la prueba de frenos";
+/** Velocidades del recorrido por el tren (m/s): caminando, corriendo y automático. */
+const WALK_SPEED = 1.4, RUN_SPEED = 2.8, AUTO_SPEED = 8;
+/** El recorrido termina al llegar a esta distancia (m) del testero: entras a la cabina. */
+const WALK_END = 4.5;
+
+/** ¿El tren del jugador está detenido en el cartel FIN DE MANIOBRA? */
+function atTurnbackBoard(player) {
+  const sim = player.sim;
+  return sim.isStopped && !sim.nextStation() && Math.abs(sim.position - player.route.track.retireZ) <= 15;
+}
+
+/** Condiciones para dejar la cabina (paso 1). */
+function securedChecks(sim) {
+  const t = sim.notchData.type;
+  return [
+    { ok: sim.doorsClosed, text: "Puertas cerradas (D)" },
+    { ok: t === "brake" || t === "emergency", text: "Freno aplicado (S/▼)" },
+    { ok: sim.reverser === 0, text: "Inversor en N (Q/E)" },
+  ];
+}
+
+/** T: retirar la llave (paso 1 → 2), o saltar al recorrido automático durante el paso 2. */
+async function changeCab() {
   const player = game.player, sim = player.sim;
-  const endZ = player.route.track.retireZ;
+  const turn = game.turn;
+  if (turn?.phase === "walk") { turn.auto = true; return; }
+  if (turn) return hud.showMessage(turn.phase === "activate" ? "Ya estás en la cabina nueva: completa la prueba de frenos" : "Ya cambiaste de cabina: cruza a la vía de salida", "info");
   if (sim.dockedStation() === player.route.first && sim.isStopped) {
     return hud.showMessage("Ya estás en la terminal de origen de tu servicio", "info");
   }
-  if (!sim.isStopped || Math.abs(sim.position - endZ) > 15 || sim.nextStation()) {
-    const d = Math.round(sim.position - endZ);
+  if (!atTurnbackBoard(player)) {
+    const d = Math.round(sim.position - player.route.track.retireZ);
     return hud.showMessage(sim.nextStation()
       ? "El cambio de cabina se hace en la cola de maniobras, tras la terminal"
       : `Detén el tren en el cartel FIN DE MANIOBRA (${d > 0 ? d + " m por delante" : -d + " m pasado"})`, "warn");
   }
-  if (!sim.doorsClosed) return hud.showMessage("Cierra las puertas antes de cambiar de cabina", "warn");
-
+  const missing = securedChecks(sim).filter(c => !c.ok);
+  if (missing.length) return hud.showMessage(`Antes de dejar la cabina asegura el tren: ${missing.map(c => c.text).join(" · ")}`, "warn", 5000);
   const other = oppositeRoute(player.route);
-  hud.fadeOut("Cambiando de cabina · cruzando a la vía contraria…");
-  setTimeout(async () => {
-    if (!game) return;
-    // En una sala, el servicio de vuelta lo asigna el Centro de Control
-    let trip = null;
-    if (game.net?.connected) trip = await game.net.requestTurn().catch(() => { game?.net?.lost("El Centro de Control no asignó el servicio de vuelta"); return null; });
-    if (!game || game.player !== player) return;
-    trip ??= game.traffic.nextTripFor(other, game.clock, 120, 1200) || makeTrip(other, Math.ceil((game.clock + 300) / 60) * 60);
-    game.traffic.turnback(player, trip);
-    game.net?.turned();
-    game.rig.setTrain(player.group);
-    player.group.add(game.trainLights);
-    game.lightsUnit = player;
-    game.stats = { arrivals: [], stops: [], log: [], redSignals: 0, overspeeds: 0, emergencies: 0 };
-    game.score = newScore(other);
-    game.shiftEnded = false;                 // empieza un servicio nuevo
-    game.lastStop = null;
-    game.dmiTimer = 0;
-    hud.fadeIn();
-    hud.showMessage(`Servicio ${trip.id} · ${other.label} · entra al andén de ${other.first.name} y sale a las ${formatClock(trip.departure)}`, "ok", 8000);
-  }, 2600);
+  if (!game.traffic.depotFree(other)) {
+    return hud.showMessage("La vía de salida está ocupada por un tren que sale de cocheras · espera unos segundos y vuelve a pulsar T", "warn", 5000);
+  }
+  if (game.turnPending) return;
+  game.turnPending = true;
+  audio_(a => a.reverserClunk());
+  // En una sala, el servicio de vuelta lo asigna el Centro de Control
+  let trip = null;
+  if (game.net?.connected) {
+    hud.showMessage("Llave retirada · pidiendo el servicio de vuelta al Centro de Control…", "info", 3000);
+    trip = await game.net.requestTurn().catch(() => { game?.net?.lost("El Centro de Control no asignó el servicio de vuelta"); return null; });
+  }
+  if (!game || game.player !== player) return;
+  game.turnPending = false;
+  trip ??= game.traffic.nextTripFor(other, game.clock, 240, 1500) || makeTrip(other, Math.ceil((game.clock + 420) / 60) * 60);
+  game.traffic.turnback(player, trip);          // el tren pasa a ser el servicio de vuelta (aún en la cola de llegada)
+  game.net?.turned();
+  sim.reverser = 0;                             // cabina nueva sin activar: llave fuera, inversor en N
+  sim.tractionLock = CAB_LOCK;
+  game.stats = { arrivals: [], stops: [], log: [], redSignals: 0, overspeeds: 0, emergencies: 0 };
+  game.score = newScore(other);
+  game.shiftEnded = false;                      // empieza un servicio nuevo
+  game.lastStop = null;
+  game.dmiTimer = 0;
+  game.turn = { phase: "walk", trip, walkZ: CONFIG.train.length - 5, walking: false, auto: false, run: false, stepDist: 0, test: { b1: false, b3: false } };
+  game.rig.walkZ = game.turn.walkZ;
+  game.rig.setView("walk");
+  hud.showMessage(`Servicio ${trip.id} · ${other.label} · sale de ${other.first.name} a las ${formatClock(trip.departure)}. Camina hasta la otra cabina (W) o pulsa T para el recorrido automático`, "ok", 8000);
+}
+
+/** Objeto del tren al que se enganchan cámara y luces: su coche delantero (el grupo entero si es rígido). */
+function trainHead(unit) { return unit.model?.head || unit.group; }
+
+/** Un tren de la línea activa estrenó modelo 3D (trainViews.js): reengancha lo que colgaba del anterior. */
+function onTrainModel(unit) {
+  if (!game) return;
+  if (game.lightsUnit === unit) trainHead(unit).add(game.trainLights);
+  if (unit !== game.player) return;
+  game.rig?.setTrain(trainHead(unit));
+  applyLivery(unit);
+  game.dmiTimer = 0;
+}
+
+/** Pequeño atajo: el audio de la partida si existe. */
+function audio_(fn) { if (game?.audio) fn(game.audio); }
+
+/** Teclas durante el recorrido por el tren (paso 2). Devuelve true si la tecla se usó. */
+function turnWalkKey(key, down) {
+  const turn = game.turn;
+  if (turn?.phase !== "walk") return false;
+  if (key === "shift") { turn.run = down; return true; }
+  if (!down) return true;
+  if (key === "w" || key === "arrowup") { turn.walking = true; return true; }
+  if (key === "s" || key === "arrowdown") { turn.walking = false; turn.auto = false; return true; }
+  if (key === "t") { turn.auto = true; return true; }
+  if (key === "c") { game.rig.recenter(); return true; }
+  return !["h", "m", "k", "f", "escape", "r"].includes(key);    // el resto del mando no hace nada mientras caminas
+}
+
+/** Avance de la maniobra en cada fotograma. */
+function updateTurn(dt, player) {
+  const turn = game.turn, sim = player.sim;
+  if (!turn) return;
+  if (turn.phase === "walk") {
+    const v = turn.auto ? AUTO_SPEED : turn.walking ? (turn.run ? RUN_SPEED : WALK_SPEED) : 0;
+    turn.walkZ = Math.max(WALK_END, turn.walkZ - v * dt);
+    game.rig.walkZ = turn.walkZ;
+    game.rig.walkSpeed = v;
+    if (v && !turn.auto) {
+      turn.stepDist += v * dt;
+      if (turn.stepDist > (turn.run ? 1.1 : 0.75)) { turn.stepDist = 0; game.audio.footstep("train", turn.run); }
+    }
+    if (turn.walkZ <= WALK_END) {
+      turn.phase = "activate";
+      game.rig.setView("cab");
+      audio_(a => a.reverserClunk());
+      hud.showMessage("En la cabina nueva · llave puesta · inversor ADELANTE (Q) y prueba de frenos: suelta a FRENO 1 y vuelve a FRENO 3", "info", 7000);
+    }
+  }
+  if (turn.phase === "activate") {
+    if (!sim.tractionLock) sim.tractionLock = CAB_LOCK;
+    if (sim.notch === NOTCH_INDEX.B1) turn.test.b1 = true;
+    if (turn.test.b1 && sim.notch <= NOTCH_INDEX.B3) turn.test.b3 = true;
+    if (sim.reverser === 1 && turn.test.b1 && turn.test.b3) {
+      if (sim.tractionLock === CAB_LOCK) sim.tractionLock = null;
+      turn.phase = "shunt";
+      audio_(a => a.chime?.());
+      const man = game.signals.get(player.route.id).signals.find(s => s.type === "maniobra");
+      hud.showMessage(`Cabina activa · espera la señal de maniobra S${man?.id ?? ""} en verde y cruza el cambio de vía (máx. 25 km/h) hasta la marca del andén de ${player.route.first.name}`, "ok", 8000);
+    }
+  }
+  if (turn.phase === "shunt" && sim.isStopped && sim.dockedStation() === player.route.first) {
+    game.turn = null;
+    hud.showMessage(`Maniobra completa · en el andén de ${player.route.first.name} · abre puertas (D) y sal a las ${formatClock(turn.trip.departure)}`, "ok", 7000);
+  }
+}
+
+/** Lista de pasos de la maniobra para el HUD (null si no hay maniobra en curso ni el tren está en FIN DE MANIOBRA). */
+function turnSteps(player) {
+  const turn = game.turn, sim = player.sim;
+  const step = (ok, text, now = false) => ({ ok, text, now });
+  if (!turn) {
+    if (!atTurnbackBoard(player)) return null;
+    const checks = securedChecks(sim);
+    const ready = checks.every(c => c.ok);
+    return { title: "MANIOBRA DE RETORNO · 1/4 · ASEGURAR EL TREN", steps: [
+      ...checks.map(c => step(c.ok, c.text, !c.ok)),
+      step(false, `T: retirar la llave e ir a la otra cabina`, ready),
+    ] };
+  }
+  if (turn.phase === "walk") {
+    const left = Math.max(0, Math.round(turn.walkZ - WALK_END));
+    return { title: "MANIOBRA DE RETORNO · 2/4 · A LA OTRA CABINA", steps: [
+      step(false, `Faltan ${left} m por el interior del tren`, true),
+      step(false, turn.auto ? "Recorrido automático…" : "W caminar · S detenerte · Shift correr"),
+      step(false, "T: recorrido automático"),
+    ] };
+  }
+  if (turn.phase === "activate") {
+    return { title: "MANIOBRA DE RETORNO · 3/4 · ACTIVAR LA CABINA", steps: [
+      step(true, "Llave puesta"),
+      step(sim.reverser === 1, "Inversor ADELANTE (Q)", sim.reverser !== 1),
+      step(turn.test.b1, "Prueba de frenos: suelta a FRENO 1 (W/▲)", sim.reverser === 1 && !turn.test.b1),
+      step(turn.test.b3, "…y vuelve a FRENO 3 (S/▼)", turn.test.b1 && !turn.test.b3),
+    ] };
+  }
+  const sys = game.signals.get(player.route.id);
+  const man = sys.signals.find(s => s.type === "maniobra");
+  const passed = !man || sim.position < man.z;
+  const aspect = man ? { red: "ROJO · espera", yellow: "AMARILLO · paso libre", green: "VERDE · paso libre" }[man.aspect] : "";
+  const crossed = !player.crossing;
+  return { title: "MANIOBRA DE RETORNO · 4/4 · AL ANDÉN DE SALIDA", steps: [
+    step(passed, passed ? `Señal de maniobra S${man?.id ?? ""} rebasada` : `Señal de maniobra S${man.id}: ${aspect}`, !passed),
+    step(crossed, `Cruza el cambio de vía (máx. 25 km/h)`, passed && !crossed),
+    step(false, `Detente en la marca del andén de ${player.route.first.name}`, crossed),
+  ] };
 }
 
 function onWalkerEvent(type, data) {
@@ -1888,7 +2044,7 @@ function touchContext() {
     const sim = game.player.sim;
     return {
       vigilance: !!game.safety.alarm,
-      cab: sim.isStopped && !sim.nextStation() && Math.abs(sim.position - game.player.route.track.retireZ) <= 15,
+      cab: game.turn?.phase === "walk" || (!game.turn && atTurnbackBoard(game.player)),
     };
   }
   const w = game.walker;
@@ -2265,7 +2421,7 @@ function loop(now) {
 
   // 4. Luces del tren en foco (la interior sigue al pasajero a lo largo del tren)
   const focus = inStreet ? null : focusUnit(cameraZ);
-  if (focus && focus !== game.lightsUnit) { focus.group.add(game.trainLights); game.lightsUnit = focus; }
+  if (focus && focus !== game.lightsUnit) { trainHead(focus).add(game.trainLights); game.lightsUnit = focus; }
   if (walker && walker.unit) game.innerLight.position.z = walker.pos.z;
   game.lineMap.update(player || walker.unit || focus || null, game.elapsed);
   game.carInfo.update(player || walker.unit || focus || null, game.clock, game.elapsed);
@@ -2317,9 +2473,12 @@ function loop(now) {
     const boardingBusy = engine.isBoarding(player);
     if (player.sim.doorState === "open") game.boardingDone = !boardingBusy;     // ¿terminó el embarque antes de cerrar?
     hud.updateDriver(player.sim, info, { clock: game.clock, onboard: people.onboardCount(player), boardingBusy });
+    updateTurn(dt, player);
+    hud.setTurnPanel(turnSteps(player));
     updateStopAssistSound(dt, player.sim, info);
     game.tutorial?.update(dt, { game, sim: player.sim, info });
   } else {
+    hud.setTurnPanel(null);
     hud.updatePassenger(walkerHudData());
     hud.updateGuide(missionGuide());
     game.tutorial?.update(dt, { game, walker, card, hud, fare: fareBandAt(game.clock).price });

@@ -154,6 +154,26 @@ export class Hud {
     for (const t of [0, last]) this.stripDots[t].classList.toggle("crowded", idx > 0 && idx < last && Math.abs(pos(idx) - pos(t)) < 16);
   }
 
+  /**
+   * Pasos de la maniobra de retorno (main.js → turnSteps): null la oculta.
+   * @param {null|{title:string, steps:Array<{ok:boolean, text:string, now:boolean}>}} t
+   */
+  setTurnPanel(t) {
+    const panel = this.turnPanel ??= $("turnPanel");
+    panel.classList.toggle("hidden", !t);
+    if (!t) { this.turnKey = ""; return; }
+    const key = t.title + t.steps.map(s => `${+s.ok}${+s.now}${s.text}`).join("|");
+    if (key === this.turnKey) return;
+    this.turnKey = key;
+    $("turnTitle").textContent = t.title;
+    $("turnSteps").replaceChildren(...t.steps.map(s => {
+      const li = document.createElement("li");
+      li.className = s.ok ? "done" : s.now ? "now" : "";
+      li.textContent = s.text;
+      return li;
+    }));
+  }
+
   /** Estación de destino de la misión, marcada en el esquema de línea (−1: ninguna). */
   setStripTarget(idx) {
     if (idx === this.stripTarget) return;

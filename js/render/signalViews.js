@@ -31,32 +31,37 @@ export class SignalViews {
       for (const s of system.signals) {
         const g = new THREE.Group();
         // A la derecha de la vía, sobre el borde del andén de evacuación, mirando al tren que llega
-        g.position.set(route.trackX + route.dir * 1.85, 0, route.toWorldZ(s.z));
+        // 1.7 · La de maniobra es una señal BAJA (enana) entre las dos vías, antes del cambio de vía
+        const dwarf = s.type === "maniobra", dy = dwarf ? -2.35 : 0;
+        g.position.set(dwarf ? 0 : route.trackX + route.dir * 1.85, 0, route.toWorldZ(s.z));
         g.rotation.y = route.dir === 1 ? 0 : Math.PI;
         scene.add(g);
 
-        const pole = new THREE.Mesh(poleGeo, post);
-        pole.position.y = 1.25;
         const box = new THREE.Mesh(boxGeo, head);
-        box.position.y = 2.95;
-        g.add(pole, box);
+        box.position.y = 2.95 + dy;
+        g.add(box);
+        if (!dwarf) {
+          const pole = new THREE.Mesh(poleGeo, post);
+          pole.position.y = 1.25;
+          g.add(pole);
+        }
 
         // Lámparas: rojo arriba, amarillo en medio, verde abajo
         const lamps = {};
         ["red", "yellow", "green"].forEach((aspect, k) => {
           const mat = new THREE.MeshBasicMaterial({ color: LAMP_OFF, fog: false, toneMapped: false });
           const lamp = new THREE.Mesh(lampGeo, mat);
-          lamp.position.set(0, 3.25 - k * 0.3, 0.115);
+          lamp.position.set(0, 3.25 - k * 0.3 + dy, 0.115);
           const visor = new THREE.Mesh(visorGeo, head);
           visor.rotation.x = Math.PI / 2;
           visor.rotation.y = Math.PI;
-          visor.position.set(0, 3.27 - k * 0.3, 0.17);
+          visor.position.set(0, 3.27 - k * 0.3 + dy, 0.17);
           g.add(lamp, visor);
           lamps[aspect] = mat;
         });
 
         const plate = new THREE.Mesh(plateGeo, glow(0xffffff, { map: toTexture(signalPlateCanvas(s.id)) }));
-        plate.position.set(0, 2.25, 0.06);
+        plate.position.set(0, dwarf ? 1.2 : 2.25, 0.06);
         g.add(plate);
 
         this.views.push({ signal: s, worldZ: route.toWorldZ(s.z), group: g, lamps, shown: null });

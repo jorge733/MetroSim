@@ -126,7 +126,7 @@ function driverSteps(k) {
     },
     {
       title: "¡Ya eres conductor!",
-      text: `Así se sirve cada estación: abrir, esperar el embarque, cerrar, acelerar, rodar y frenar a tiempo. Al final de la línea verás tu puntaje y harás la maniobra de retorno (${k("T", "⇄ Cambiar cabina, que aparece al detenerte en FIN DE MANIOBRA")}). ${k("H muestra los controles · V cambia la vista.", "En el menú ☰: Vista, Bocina, Tienda y Finalizar turno.")}`,
+      text: `Así se sirve cada estación: abrir, esperar el embarque, cerrar, acelerar, rodar y frenar a tiempo. Al final de la línea verás tu puntaje y harás la maniobra de retorno: detente en FIN DE MANIOBRA, asegura el tren (freno e inversor en N), cambia de cabina con ${k("T", "⇄ Cambiar cabina")} caminando por el tren, activa la cabina nueva y cruza el cambio de vía hasta el andén de salida (un panel te guía paso a paso). ${k("H muestra los controles · V cambia la vista.", "En el menú ☰: Vista, Bocina, Tienda y Finalizar turno.")}`,
       next: "Terminar",
     },
   ];

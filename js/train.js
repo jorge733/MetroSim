@@ -138,6 +138,31 @@ function trainTemplate(routeId, cabInterior) {
   return A.templates[key];
 }
 
+/**
+ * 1.7 · Plantillas POR COCHE (para el tren articulado que cruza un cambio de
+ * vía): cada coche fusionado por material en sus propias coordenadas (su
+ * extremo delantero en z = 0), con el fuelle que lo une al siguiente.
+ */
+function carTemplates(routeId, cabInterior) {
+  const A = assets();
+  const key = `${routeId}-${cabInterior ? "cab" : "ai"}-cars`;
+  if (A.templates[key]) return A.templates[key];
+  const dest = routeId === "A" ? A.mat.destination : A.mat.destinationB;
+  A.templates[key] = CONSIST.map((car, i) => {
+    const root = new THREE.Group(), g = new THREE.Group();
+    buildCarStatic(g, car, A.mat, {
+      dest, rubber: A.rubber, panto: A.panto,
+      cabFiller: car.type === "cab" && (car.flipped || !cabInterior),
+      openFront: i > 0, openRear: i < CONSIST.length - 1,
+    });
+    if (car.flipped) { g.rotation.y = Math.PI; g.position.z = CAR; }
+    root.add(g);
+    if (i < CONSIST.length - 1) buildGangway(root, A.mat, CAR);
+    return mergeByMaterial(root);
+  });
+  return A.templates[key];
+}
+
 /** Fusiona todas las mallas de un grupo en una por material. */
 function mergeByMaterial(root) {
   root.updateMatrixWorld(true);
@@ -374,33 +399,53 @@ function buildPantograph(g, mat, R) {
  * @param {"A"|"B"} opts.routeId   sentido (para el indicador de destino)
  * @param {boolean} opts.cab       cabina interior con pupitre y DMI (tren del jugador)
  */
-export function buildTrain({ routeId = "A", cab = false } = {}) {
+export function buildTrain({ routeId = "A", cab = false, articulated = false } = {}) {
   const A = assets();
   const group = new THREE.Group();
   group.name = "train";
-  for (const part of trainTemplate(routeId, cab)) group.add(new THREE.Mesh(part.geometry, part.material));
+  // Rígido (lo normal): todo el tren en una plantilla. Articulado (1.7, mientras
+  // cruza un cambio de vía): un grupo por coche, que bend() orienta sobre la vía.
+  const cars = [];
+  if (articulated) {
+    carTemplates(routeId, cab).forEach((parts, i) => {
+      const cg = new THREE.Group();
+      cg.position.z = CONSIST[i].offset;
+      for (const part of parts) cg.add(new THREE.Mesh(part.geometry, part.material));
+      group.add(cg);
+      cars.push(cg);
+    });
+  } else {
+    for (const part of trainTemplate(routeId, cab)) group.add(new THREE.Mesh(part.geometry, part.material));
+  }
 
   // Hojas de puerta del lado del andén (+X local): 2 por puerta, instanciadas
-  const n = TRAIN_LAYOUT.doors.length * 2;
-  const leafBody = new THREE.InstancedMesh(A.leafBody, A.mat.body, n);
-  const leafGlass = new THREE.InstancedMesh(A.leafGlass, A.mat.sideGlass, n);
-  leafBody.frustumCulled = leafGlass.frustumCulled = false;
-  group.add(leafBody, leafGlass);
-  const leaves = [];
-  TRAIN_LAYOUT.doors.forEach(zc => [-1, 1].forEach(leaf => {
-    const closedZ = zc + leaf * A.leafW / 2;
-    leaves.push({ closedZ, openZ: closedZ + leaf * (A.leafW - 0.04) });
-  }));
+  // (en el articulado, un juego por coche, en las coordenadas de su coche)
   const m = new THREE.Matrix4();
   const x = T.halfWidth + 0.035, y = T.floorY + T.doorHeight / 2;
-
   // Pilotos de puerta (exterior, sobre cada puerta del lado del andén): se encienden
   // en naranjo mientras las puertas no están cerradas, como en los trenes reales
   const lampMat = new THREE.MeshBasicMaterial({ color: 0x3a1c00, toneMapped: false });
-  const lamps = new THREE.InstancedMesh(new THREE.BoxGeometry(0.04, 0.07, 0.22), lampMat, TRAIN_LAYOUT.doors.length);
-  lamps.frustumCulled = false;
-  TRAIN_LAYOUT.doors.forEach((zc, i) => { m.makeTranslation(T.halfWidth + 0.05, T.floorY + T.doorHeight + 0.14, zc); lamps.setMatrixAt(i, m); });
-  group.add(lamps);
+  const doorSets = [];
+  const addDoors = (parent, doorZs, shift) => {
+    const n = doorZs.length * 2;
+    if (!n) return;
+    const leafBody = new THREE.InstancedMesh(A.leafBody, A.mat.body, n);
+    const leafGlass = new THREE.InstancedMesh(A.leafGlass, A.mat.sideGlass, n);
+    leafBody.frustumCulled = leafGlass.frustumCulled = false;
+    const leaves = [];
+    doorZs.forEach(zc => [-1, 1].forEach(leaf => {
+      const closedZ = zc + shift + leaf * A.leafW / 2;
+      leaves.push({ closedZ, openZ: closedZ + leaf * (A.leafW - 0.04) });
+    }));
+    const lamps = new THREE.InstancedMesh(new THREE.BoxGeometry(0.04, 0.07, 0.22), lampMat, doorZs.length);
+    lamps.frustumCulled = false;
+    doorZs.forEach((zc, i) => { m.makeTranslation(T.halfWidth + 0.05, T.floorY + T.doorHeight + 0.14, zc + shift); lamps.setMatrixAt(i, m); });
+    parent.add(leafBody, leafGlass, lamps);
+    doorSets.push({ leafBody, leafGlass, leaves });
+  };
+  if (articulated) {
+    CONSIST.forEach((car, i) => addDoors(cars[i], TRAIN_LAYOUT.doors.filter(z => z >= car.offset && z < car.offset + CAR), -car.offset));
+  } else addDoors(group, TRAIN_LAYOUT.doors, 0);
 
   let lastProgress = -1;
   const setDoors = (progress) => {
@@ -408,19 +453,39 @@ export function buildTrain({ routeId = "A", cab = false } = {}) {
     lastProgress = progress;
     lampMat.color.setHex(progress > 0.001 ? 0xff9a1a : 0x3a1c00);
     const e = progress * progress * (3 - 2 * progress);
-    leaves.forEach((l, i) => {
-      m.makeTranslation(x, y, l.closedZ + (l.openZ - l.closedZ) * e);
-      leafBody.setMatrixAt(i, m);
-      leafGlass.setMatrixAt(i, m);
-    });
-    leafBody.instanceMatrix.needsUpdate = leafGlass.instanceMatrix.needsUpdate = true;
+    for (const { leafBody, leafGlass, leaves } of doorSets) {
+      leaves.forEach((l, i) => {
+        m.makeTranslation(x, y, l.closedZ + (l.openZ - l.closedZ) * e);
+        leafBody.setMatrixAt(i, m);
+        leafGlass.setMatrixAt(i, m);
+      });
+      leafBody.instanceMatrix.needsUpdate = leafGlass.instanceMatrix.needsUpdate = true;
+    }
   };
   setDoors(0);
 
-  let cabParts = {};
-  if (cab) cabParts = buildCab(group, A.mat);
+  /**
+   * Articulado: coloca cada coche según la vía. lateral(z) da el desplazamiento
+   * lateral (m, en x local) del eje de la vía a la distancia z del testero; cada
+   * coche se apoya en sus dos bogies y gira lo justo para seguir la curva.
+   */
+  const PIVOT = 2.4;                       // m desde cada extremo del coche hasta el centro del bogie
+  const bend = (lateral) => {
+    if (!articulated) return;
+    CONSIST.forEach((car, i) => {
+      const zf = car.offset + PIVOT, zr = car.offset + CAR - PIVOT;
+      const xf = lateral(zf), xr = lateral(zr);
+      const k = (xr - xf) / (zr - zf);
+      cars[i].position.x = xf - k * PIVOT;
+      cars[i].rotation.y = Math.atan(k);
+    });
+  };
 
-  return { group, setDoors, ...cabParts };
+  let cabParts = {};
+  if (cab) cabParts = buildCab(articulated ? cars[0] : group, A.mat);
+
+  // head: objeto al que se enganchan la cámara de cabina y las luces del tren (el coche delantero)
+  return { group, setDoors, articulated, cars, bend, head: articulated ? cars[0] : group, ...cabParts };
 }
 
 /**

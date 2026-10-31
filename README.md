@@ -117,6 +117,29 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **Salir por los torniquetes es gratis**: solo se cobra el pasaje al pasar hacia la zona pagada (antes, al terminar
   de cruzar el torniquete de salida se cobraba un pasaje).
 
+## Versión 1.7 · Maniobra de retorno real
+
+Al final de la línea el tren ya no salta de vía: hace la maniobra como en el Metro de verdad.
+
+- **Por pasos, con un panel que guía** (`js/main.js`):
+  1. *Asegurar el tren* en el cartel FIN DE MANIOBRA: detenido, puertas cerradas, freno aplicado e inversor en N.
+     **T** retira la llave.
+  2. *Ir a la otra cabina* por dentro del tren vacío: caminando (**W** caminar · **S** detenerse · **Shift** correr,
+     con pasos y vaivén) o con el recorrido automático (**T** otra vez).
+  3. *Activar la cabina nueva*: inversor ADELANTE y prueba de frenos (soltar a FRENO 1 y volver a FRENO 3). Hasta
+     entonces no hay tracción.
+  4. *Maniobrar*: esperar la señal de maniobra en verde, cruzar el cambio de vía (máx. 25 km/h) y parar en la marca
+     del andén de salida.
+- **El tren cruza las agujas de verdad**: mientras cruza se dibuja articulado y cada coche sigue el cambio de vía de
+  una vía a la otra (`js/train.js`, `js/render/trainViews.js`, `trackXAt` en `js/engine/traffic.js`). Los trenes
+  automáticos hacen lo mismo.
+- **Señal de maniobra** (S…00, una señal baja entre las vías antes del cambio de vía) y **enclavamientos**: solo abre
+  si el andén de salida está libre; mientras un tren cruzando ocupe la cola de llegada, la señal de salida de esa
+  terminal queda en rojo y el tren siguiente espera en el andén (`js/engine/signals.js`, `js/engine/traffic.js`).
+- Los trenes automáticos salen de la cola apenas el andén de salida queda libre y esperan su hora en el andén.
+- En el multijugador, el estado de cruce se replica a los demás jugadores.
+- Tu librea se conserva tras el cambio de cabina.
+
 ## Versión 1.6 · Asistente de parada
 
 Ayudas para no pasarse de la estación (`js/engine/stopAssist.js`; se activan o desactivan con **N**):

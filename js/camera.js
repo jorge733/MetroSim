@@ -21,6 +21,8 @@ import { clamp } from "./utils.js";
 export const VIEWS = {
   cab:      { pos: new THREE.Vector3(0, 2.52, 1.95),   yaw: 0,    pitch: -0.12, yawLimit: 1.4,     pitchLimit: 0.7 },   // puesto central
   saloon:   { pos: new THREE.Vector3(0.45, 2.85, 10.6), yaw: 0.85, pitch: -0.08, yawLimit: Math.PI, pitchLimit: 0.8 },
+  // 1.7 · Recorrido a pie por el pasillo hasta la otra cabina (maniobra de retorno): z = rig.walkZ
+  walk:     { pos: new THREE.Vector3(0, 2.88, 0),      yaw: 0,    pitch: -0.04, yawLimit: Math.PI, pitchLimit: 0.8 },
   exterior: { orbit: true },
 };
 
@@ -110,6 +112,16 @@ export class CameraRig {
     if (this.view === "exterior") return this.updateOrbit(dt);
     const v = VIEWS[this.view];
     this.camera.position.copy(v.pos);
+    if (this.view === "walk") {
+      // Caminando: el pasillo, con el leve vaivén de los pasos
+      this.walkPhase = (this.walkPhase || 0) + dt * (this.walkSpeed || 0) * 4.2;
+      const bob = Math.min(1, (this.walkSpeed || 0) / 2.8);
+      this.camera.position.z = this.walkZ ?? CONFIG.train.length / 2;
+      this.camera.position.y += Math.abs(Math.sin(this.walkPhase)) * 0.035 * bob;
+      this.camera.position.x += Math.sin(this.walkPhase / 2) * 0.03 * bob;
+      this.camera.rotation.set(v.pitch + this.lookPitch, v.yaw + this.lookYaw, 0);
+      return;
+    }
     // Pequeño balanceo proporcional a la velocidad (sensación de rodadura)
     const sway = Math.min(sim.speed / CONFIG.train.maxSpeed, 1);
     this.camera.position.y += Math.sin(time * 7.3) * 0.004 * sway;

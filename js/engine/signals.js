@@ -13,6 +13,10 @@
 
    Tipos: "entrada" (antes de cada estación), "salida" (final de andén) e
    "intermedia" (en túnel, separación ≤ CONFIG.signals.maxBlock).
+   1.7 · "maniobra": señal baja antes del cambio de vía tras la terminal de
+   origen (S…00). Da paso al andén de salida solo si la ruta está libre: la
+   señal de entrada a la terminal no está en rojo. Los enclavamientos de la
+   maniobra de retorno (traffic.js) ponen s.interlock = true → rojo.
 
    Hay un SignalSystem por ruta (sentido), en coordenadas de la ruta.
    Este módulo es SOLO lógica: el dibujo de los postes y lámparas está en
@@ -36,10 +40,14 @@ function buildSignalList(route) {
     const n = Math.ceil(gap / CONFIG.signals.maxBlock) - 1;
     for (let k = 1; k <= n; k++) list.push({ type: "intermedia", station: null, z: from - (gap * k) / (n + 1) });
   });
+  // Maniobra: antes del cambio de vía de la cola de la terminal de origen
+  list.push({ type: "maniobra", station: route.first, z: route.first.z + CONFIG.turnback.crossoverTo + 15 });
   list.sort((a, b) => b.z - a.z);
+  let n = 0;
   list.forEach((s, i) => {
     s.index = i;
-    s.id = `${route.signalPrefix}${String(i + 1).padStart(2, "0")}`;   // L3: 1xx vía 1 · 2xx vía 2 · L6: 61xx / 62xx
+    // L3: 1xx vía 1 · 2xx vía 2 · L6: 61xx / 62xx · la de maniobra es la 00 (no corre la numeración)
+    s.id = `${route.signalPrefix}${s.type === "maniobra" ? "00" : String(++n).padStart(2, "0")}`;
     s.aspect = "green";
     s.endZ = list[i + 1]?.z ?? route.track.end;    // final de su cantón
   });
@@ -95,7 +103,8 @@ export class SignalSystem {
     // 3. Aspectos (de la última señal hacia atrás, porque el amarillo depende de la siguiente)
     for (let i = list.length - 1; i >= 0; i--) {
       const s = list[i], next = list[i + 1];
-      if (s.occupied || s.hold || s.fault) s.aspect = "red";     // fault: falla de señal (incidents.js)
+      if (s.occupied || s.hold || s.fault || s.interlock) s.aspect = "red";     // fault: falla de señal (incidents.js)
+      else if (s.type === "maniobra" && next && next.aspect === "red") s.aspect = "red";   // la ruta al andén no está libre
       else if (next && next.aspect === "red") s.aspect = "yellow";
       else s.aspect = "green";
     }
