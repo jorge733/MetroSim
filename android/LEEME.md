@@ -44,4 +44,4 @@ repositorio** (está en `.gitignore`): guárdala en un lugar seguro y ponla en `
 construir. Si no está, el script crea una nueva, y esa versión no podrá instalarse encima de la
 anterior (hay que desinstalar primero).
 
-Cada versión nueva sube `versionCode` solo (sale de la versión de `sw.js`: 1.5 → 105).
+Cada versión nueva sube `versionCode` solo (sale de la versión de `sw.js`: 1.6 → 10600, 1.6.1 → 10601).

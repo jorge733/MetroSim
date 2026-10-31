@@ -47,10 +47,11 @@ STORED = (".png", ".jpg", ".jpeg", ".mp3", ".ogg", ".woff2", ".arsc")
 
 
 def version():
-    """Versión del juego (la de sw.js: metrosim-vX.Y) → (versionName, versionCode)."""
-    m = re.search(r'metrosim-v(\d+)\.(\d+)', open(os.path.join(ROOT, "sw.js"), encoding="utf-8").read())
-    major, minor = int(m.group(1)), int(m.group(2))
-    return f"{major}.{minor}", major * 100 + minor
+    """Versión del juego (la de sw.js: metrosim-vX.Y o metrosim-vX.Y.Z) → (versionName, versionCode).
+    versionCode = X·10000 + Y·100 + Z (1.6 → 10600, 1.6.1 → 10601): siempre mayor que el de 1.5 (105)."""
+    m = re.search(r'metrosim-v(\d+)\.(\d+)(?:\.(\d+))?', open(os.path.join(ROOT, "sw.js"), encoding="utf-8").read())
+    major, minor, patch = int(m.group(1)), int(m.group(2)), int(m.group(3) or 0)
+    return (f"{major}.{minor}.{patch}" if patch else f"{major}.{minor}"), major * 10000 + minor * 100 + patch
 
 
 def get_three(tmp):

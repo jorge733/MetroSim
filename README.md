@@ -117,6 +117,22 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **Salir por los torniquetes es gratis**: solo se cobra el pasaje al pasar hacia la zona pagada (antes, al terminar
   de cruzar el torniquete de salida se cobraba un pasaje).
 
+## Versión 1.6 · Asistente de parada
+
+Ayudas para no pasarse de la estación (`js/engine/stopAssist.js`; se activan o desactivan con **N**):
+
+- **Parada prevista**: la barra de precisión (HUD y DMI) muestra con un **anillo** dónde se detendría el tren con
+  el freno actual, calculado con la misma física del simulador (jerk, carga, pendiente y riel mojado). Escala
+  amplia (±50 m) al acercarse y fina (±10 m) en los últimos 60 m.
+- **Avisos de frenado**: «Prepárate para frenar», «¡FRENA YA! · FRENO 2», «Te pasarías X m · sube el freno»,
+  «Te quedarías X m antes · afloja» (solo si el punto más suave también alcanza) y «¡TE PASAS!» si ni con FRENO 3
+  se alcanza. Con su sonido en cabina.
+- **Pitidos** cada vez más seguidos en los últimos 15 m (más agudos dentro de la tolerancia) y una campanilla al
+  quedar en la marca.
+- **Letreros de aproximación** amarillos a 300, 200, 100 y 50 m de cada marca de parada, en ambos sentidos.
+- Al detenerse fuera de posición, el mensaje dice si te pasaste o te quedaste antes, cuántos metros y cómo
+  corregirlo; la estación rebasada sigue siendo el objetivo hasta 60 m.
+
 ## Versión 1.5 · Realismo de la red
 
 - **El tren real de cada línea** (`js/engine/fleet.js`): las líneas 1, 2 y 5 usan trenes de **neumáticos** de Alstom
