@@ -98,8 +98,9 @@ trenes de los dos motores quedan a ~1 m (mediana).
     si te equivocas, se va por el camino equivocado.
   - **Objeto olvidado** (mochila, celular, billetera, paraguas…) en un asiento del coche: recógelo y entrégalo en
     cualquier boletería. El dueño te deja una recompensa. Lo llevas aunque cambies de línea o cierres el juego.
-  - **Vendedor ambulante:** chocolates «tres por mil», calugas, pañuelos… lo que compras queda en tu bolsa.
-  - **Músico** que toca en el coche (se oye): puedes darle una moneda.
+  - **Vendedor ambulante:** entra desde el coche vecino y recorre el pasillo con su caja: chocolates «tres por mil»,
+    calugas, pañuelos… lo que compras queda en tu bolsa.
+  - **Músico** que entra con su guitarra, acordeón o charango y toca en el coche (se oye): puedes darle una moneda.
   - **Pasajero que se siente mal:** avisa por el citófono de emergencia. El conductor responde por radio y el tren
     espera en la próxima estación a que suba personal de Metro.
 - **Civismo** (`js/civics.js`): ayudar suma puntos (equivocarte con el turista resta) y subes de nivel: Buen
@@ -116,6 +117,28 @@ trenes de los dos motores quedan a ~1 m (mediana).
   (Esc, «Seguir jugando» u otro «atrás» cancela; Enter confirma).
 - **Salir por los torniquetes es gratis**: solo se cobra el pasaje al pasar hacia la zona pagada (antes, al terminar
   de cruzar el torniquete de salida se cobraba un pasaje).
+
+## Versión 1.11 · Comerciantes ambulantes y músicos
+
+- **Músicos en los andenes** (`js/performers.js`): en muchas estaciones hay un músico junto al muro del andén, entre
+  una columna y un banco, con su **guitarra, acordeón o charango**, el estuche abierto con monedas, un parlante y el
+  cartel «¡Gracias por su aporte!». **Toca de verdad**: cueca, bolero, cumbia, vals peruano o música andina, con
+  melodía, bajo y rasgueo (el acordeón abre y cierra el fuelle, la guitarra se rasguea). Se oye más fuerte al acercarse,
+  bajito desde la mezanina, y también desde la cabina del conductor al detenerse cerca. Descansa entre canciones y
+  cambia de tema. Con **E** le das una moneda (suma civismo y la moneda aparece en el estuche) y después puedes
+  **pedirle otra canción**.
+- **Comerciantes ambulantes en la mezanina**: en la zona no pagada, junto al muro de los tótems, uno extiende su paño
+  de colores con la mercadería en filas y un cartel de cartón (maní confitado, chocolates tres por mil, audífonos,
+  cargadores, calcetines, paraguas). **Pregona** con su voz cuando pasas cerca y con **E** le compras (queda en tu
+  bolsa). De vez en cuando **llegan los guardias**: entra un guardia de chaleco reflectante, el comerciante enrolla el
+  paño y se va a la calle con el bulto a la espalda; unos minutos después vuelve a instalarse.
+- **El vendedor y el músico del coche ahora son personajes de verdad** (`js/encounters.js`): ya no es un pasajero
+  cualquiera con un ícono. El **vendedor** entra desde el coche vecino con su caja de mercadería colgada al frente,
+  recorre el pasillo parando cada pocos metros a pregonar y, al llegar al otro extremo, **pasa al coche siguiente** (o
+  se baja en la estación si ese extremo es la cabina). El **músico** entra con su instrumento, se planta en el pasillo y
+  toca el mismo repertorio que los de los andenes; en la próxima estación se baja por la puerta y se va a la calle.
+- La música se arma con Web Audio (sin archivos nuevos) y los pregones usan la voz del navegador, sin cortar los
+  anuncios del tren.
 
 ## Versión 1.10 · Tarifas de estudiante y adulto mayor
 
@@ -645,6 +668,7 @@ js/net/               multijugador (sala del Centro de Control con conductores)
   netHost.js          sala del PCC: reserva servicios, manda el estado, radio a los conductores
   netClient.js        conductor en una sala: motor réplica, radio del PCC, sin conexión sigue solo
 js/encounters.js      encuentros del Pasajero con otros viajeros (asiento, turista, objeto, vendedor, músico, citófono)
+js/performers.js      músicos de los andenes y comerciantes de la mezanina; instrumentos, música y guardias
 js/routeQuiz.js       preguntas de ruta del turista (con la red real)
 js/civics.js          civismo del Pasajero: puntos, niveles y objeto olvidado que llevas
 js/touch.js           controles táctiles (celular y tablet)

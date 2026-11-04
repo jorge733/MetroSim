@@ -547,6 +547,28 @@ export class PeopleSystem {
     return TRAIN_LAYOUT.doors.reduce((a, b) => (Math.abs(b - localZ) < Math.abs(a - localZ) ? b : a));
   }
 
+  /**
+   * Alguien que no es pasajero (músico, vendedor) se baja del tren por la
+   * puerta abierta más cercana y se va a la calle.
+   * @returns {boolean} false si las puertas no están abiertas
+   */
+  leaveTrain(p, unit, station) {
+    if (unit.sim.doorState !== "open") return false;
+    const doorLocal = this.nearestDoor(p.root.position.z);
+    p.state = "alighting";                                   // el tren no cierra mientras se baja
+    this.walk(p, [V(0.6, F, doorLocal), V(1.3, F, doorLocal)], () => {
+      if (unit.sim.doorState !== "open" || !this.traffic.units.includes(unit)) return this.remove(p);
+      const side = unit.route.side;
+      this.toWorld(p);
+      p.root.position.y = S.platformTop;
+      p.station = station;
+      p.side = side;
+      p.state = "leaving";
+      this.walk(p, pathToStreet(station, side, p.root.position), () => this.remove(p));
+    });
+    return true;
+  }
+
   /* ----- Subida ----- */
   startBoarding(p, unit) {
     const side = p.side;
@@ -893,5 +915,7 @@ export class PeopleSystem {
         m.body.position.y = 0;
       }
     }
+    // Músicos y vendedores (performers.js): brazos con el instrumento o la caja de mercadería
+    p.overlay?.(m, this.time, dt);
   }
 }

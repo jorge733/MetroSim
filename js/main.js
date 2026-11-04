@@ -101,6 +101,7 @@ import { DriverScore } from "./scoring.js";
 import { BankAccount, BANK_NAME, stationWage, shiftBonus } from "./economy.js";
 import { MissionSystem, MASTERY_REWARD, GRAND_REWARD, lineMastered } from "./missions.js";
 import { EncounterSystem } from "./encounters.js";
+import { PerformerSystem } from "./performers.js";
 import { Civics } from "./civics.js";
 import { celebrate } from "./celebration.js";
 import { Inventory, souvenirId, SOUVENIR_PRICE, ALBUM_REWARD, LICENSES, FREE_LINE } from "./shop.js";
@@ -660,6 +661,8 @@ async function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = 
   const people = new PeopleSystem(scene, traffic, engine.passengers);    // muestra visible de los pasajeros del motor
   people.elevators = world.elevators;                                  // algunos viajeros usan el ascensor
   game.people = people;
+  // Músicos en los andenes y comerciantes ambulantes en la mezanina (todos los modos)
+  game.performers = new PerformerSystem({ scene, people, audio, say: (text, level, ms) => mode !== "driver" && game && hud.showMessage(text, level, ms) });
   const warmed = await warmUp(engine, startClock, {
     from: 0.42, to: 0.8, text: "Poniendo trenes y pasajeros en servicio", alive: () => game === g,
     onStep: (step, t) => people.update(step, t, { cameraZ: 1e9, render: false }),
@@ -732,7 +735,7 @@ async function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = 
     game.walker = walker;
     // Encuentros con otros viajeros: ceder el asiento, turistas, objetos olvidados, vendedores, músicos…
     game.encounters = new EncounterSystem({
-      people: game.people, walker, engine, line: ROUTE_A.line, civics, audio,
+      people: game.people, performers: game.performers, walker, engine, line: ROUTE_A.line, civics, audio,
       say: (text, level, ms) => game && hud.showMessage(text, level, ms),
       reward: (amount, concept) => { if (!amount) return; bank.deposit(amount, concept); hud.setBank(bank); hud.moneyFloat(amount); },
       charge: (amount, concept, bagItem) => {
@@ -2596,6 +2599,7 @@ function loop(now) {
   }
   game.signalViews.update(cameraZ);
   people.update(dt, game.clock, { cameraZ, hideUnit: player && game.rig.view === "cab" ? player : null });
+  if (!game.transition) game.performers?.update(dt, cameraWorld);
   deckAgents.length = 0;
   people.deckAgents(deckAgents);
   if (walker && walker.space === "world") deckAgents.push(walker.pos);

@@ -9,24 +9,32 @@
                 estación (routeQuiz.js): elige la indicación correcta
      · lost     alguien olvidó una mochila, un celular… en un asiento del
                 coche: recógelo (E) y entrégalo en una boletería
-     · vendor   un vendedor ambulante recorre el coche: puedes comprarle
-     · music    un músico toca en el coche: puedes darle una moneda
+     · vendor   un vendedor ambulante entra desde el coche vecino con su
+                caja de mercadería y recorre el pasillo pregonando: puedes
+                comprarle; al final pasa al coche siguiente o se baja
+     · music    un músico entra con su guitarra, acordeón o charango, se
+                planta en el pasillo y toca (se oye): puedes darle una moneda
      · faint    un pasajero se siente mal: avísale al conductor por el
                 citófono de emergencia (E) y el tren espera en la próxima
                 estación a que lo atienda el personal ("control.hold")
 
    Quien protagoniza el encuentro es uno de los viajeros dibujados
-   (people.js), marcado con un ícono flotante. Ayudar suma civismo
-   (civics.js). Un encuentro a la vez, cada uno o dos minutos.
+   (people.js), marcado con un ícono flotante; el vendedor y el músico son
+   personajes propios (performers.js) que suben solo para eso. Ayudar suma
+   civismo (civics.js). Un encuentro a la vez, cada uno o dos minutos.
+
+   Además, los músicos de los andenes y los comerciantes de la mezanina
+   (performers.js) atienden con la misma tecla E cuando estás cerca.
 
    main.js llama a update(dt) en cada fotograma, interact() con la tecla E
    y deliverAtBooth() al abrir la boletería.
    ========================================================================== */
 
 import * as THREE from "three";
-import { formatCLP, spokenName } from "./config.js";
+import { CONFIG, formatCLP, spokenName } from "./config.js";
 import { carAt, carLoads } from "./engine/passengers.js";
 import { routeQuestion } from "./routeQuiz.js";
+import { MusicBox, INSTRUMENTS, STYLES, STALL_ITEMS, dressMusician, dressVendor, musicVolume } from "./performers.js";
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
@@ -56,7 +64,12 @@ const VENDOR_LINES = [
   "«Señores pasajeros, no les quito mucho tiempo: calugas de leche a quinientos…»",
   "«Para el resfrío, pañuelos desechables a quinientos, lleve, lleve…»",
 ];
-const MUSIC_STYLES = ["una cueca", "una cumbia", "un bolero", "un tema de Los Jaivas"];
+/** Coches del tren (coordenadas locales: el coche c va de c·PITCH a c·PITCH + CAR_LEN). */
+const T = CONFIG.train, CAR_LEN = T.carLength, PITCH = T.carLength + T.carGap, F = T.floorY;
+const carSpan = (car) => [car * PITCH, car * PITCH + CAR_LEN];
+/** Extremos del coche con pasillo de intercomunicación (los coches de punta tienen la cabina en un extremo). */
+const gangways = (car) => [...(car > 0 ? [carSpan(car)[0] + 0.3] : []), ...(car < T.cars - 1 ? [carSpan(car)[1] - 0.3] : [])];
+const TIPS = [{ name: "Darle una moneda", price: 200, pts: 1 }, { name: "Darle $500", price: 500, pts: 2 }, { name: "Darle $1.000", price: 1000, pts: 3 }];
 const TOURIST_FROM = ["Brasil", "Argentina", "Perú", "Alemania", "Estados Unidos", "Francia", "Japón", "Colombia"];
 const TOURIST_HELLO = ["«Hola, disculpa…", "«Hi! Sorry…", "«Olá! Desculpa…", "«Perdón, ¿me ayudas?"];
 
@@ -106,6 +119,7 @@ export class EncounterSystem {
     this.cooldown = rand(...FIRST);
     this.tmp = new THREE.Vector3();
     this.tmp2 = new THREE.Vector3();
+    this.v = new THREE.Vector3();
   }
 
   /* ----- Consultas ----- */
@@ -134,18 +148,36 @@ export class EncounterSystem {
 
   /** ¿Hay algo con lo que interactuar (E) cerca? (botón "Usar" en pantallas táctiles) */
   near() {
+    if (this.walker.frozen) return false;
+    return this.nearActive() || !!this.stationPerformer();
+  }
+
+  /** ¿Estás al alcance de quien protagoniza el encuentro en curso? */
+  nearActive() {
     const a = this.active;
     if (!a || a.done || this.walker.frozen) return false;
     if (a.kind === "lost") return this.propDist(a) < REACH.lost;
     return REACH[a.kind] ? this.alive(a.npc) && this.dist(a.npc) < REACH[a.kind] : false;
   }
 
+  /** Músico del andén o comerciante de la mezanina al alcance (performers.js). */
+  stationPerformer() {
+    const w = this.walker;
+    return w.space === "world" && !w.frozen ? this.performers?.nearest(w.pos) ?? null : null;
+  }
+
   /** Ayuda de controles mientras dura el encuentro. */
   hint() {
     const a = this.active;
+    const close = this.nearActive();
+    if ((!a || a.done || !close) && a?.kind !== "seat") {
+      const sp = this.stationPerformer();
+      if (sp) return sp.kind === "musician"
+        ? `E · darle una moneda al músico (toca ${STYLES[sp.who.style].name} en ${sp.who.inst.label})`
+        : "E · ver lo que vende el comerciante ambulante";
+    }
     if (!a || a.done) return null;
     if (a.kind === "seat") return "F · levantarte y cederle el asiento a la persona mayor";
-    const close = this.near();
     const what = { tourist: "orientar al turista", lost: `recoger ${a.item?.name}`, vendor: "comprarle al vendedor", music: "darle una moneda al músico", faint: "usar el citófono de emergencia" }[a.kind];
     return close ? `E · ${what}` : `Acércate al ícono ${a.symbol} para ${what}`;
   }
@@ -196,7 +228,7 @@ export class EncounterSystem {
     return out;
   }
 
-  tick(a) {
+  tick(a, dt) {
     const w = this.walker;
     // Quien protagoniza mira al jugador cuando está cerca
     if (a.npc && this.alive(a.npc) && !a.done && this.dist(a.npc) < 6) {
@@ -228,17 +260,8 @@ export class EncounterSystem {
       case "lost":
         if (w.unit !== a.unit || a.until <= 0) return this.end();
         return;
-      case "vendor":
-      case "music": {
-        if (!this.alive(a.npc) || w.unit !== a.unit) return this.end();
-        const sim = a.unit.sim;
-        // Se bajan en la próxima estación
-        if (a.until <= 0 || (sim.isStopped && sim.dockedStation() && sim.doorState === "open" && a.until < a.total - 20)) {
-          if (!a.talking) { this.say(a.kind === "vendor" ? "El vendedor se bajó del tren" : "El músico terminó y se bajó en la estación", "info", 3000); return this.end(); }
-        }
-        if (a.kind === "music" && !a.talking) this.playMusic(a);
-        return;
-      }
+      case "vendor": return this.tickVendor(a, dt);
+      case "music": return this.tickMusic(a, dt);
       case "faint": {
         if (!this.alive(a.npc) || w.unit !== a.unit) return this.end();
         if (a.until <= 0) {
@@ -312,21 +335,111 @@ export class EncounterSystem {
     return true;
   }
 
+  /**
+   * Personaje que entra al coche del jugador desde el coche vecino (pasillo de
+   * intercomunicación) para vender o tocar. Es un viajero más de people.js,
+   * pero con estado "performer": no ocupa plaza ni se baja con los demás.
+   */
+  boardPerformer() {
+    const w = this.walker, u = w.unit, car = carAt(w.pos.z);
+    const ends = gangways(car);
+    if (!ends.length) return null;
+    const from = pick(ends);
+    const st = (u.sim.nextStation() ?? u.route.last).world;
+    const p = this.people.newPerson(st, u.route.side);
+    p.state = "performer";
+    p.root.removeFromParent();
+    u.group.add(p.root);
+    p.space = "train"; p.unit = u;
+    p.root.position.set(0, F, from);
+    p.root.rotation.y = p.targetYaw = from > (carSpan(car)[0] + carSpan(car)[1]) / 2 ? Math.PI : 0;
+    return { p, car, from };
+  }
+
   startVendor() {
-    const npc = pick(this.inCar(9));
-    if (!npc) return false;
-    this.begin("vendor", npc, "$", "#34d17c", { unit: this.walker.unit, until: 90 });
-    this.say(`📢 Un vendedor ambulante recorre el coche: ${pick(VENDOR_LINES)} · E para comprarle`, "info", 6000);
+    const b = this.boardPerformer();
+    if (!b) return false;
+    const { p: npc, car, from } = b;
+    dressVendor(npc);
+    // Recorre el coche hasta el otro extremo, parando cada pocos metros a pregonar
+    const [z0, z1] = carSpan(car), dir = from < (z0 + z1) / 2 ? 1 : -1;
+    const stops = [];
+    for (let z = from + dir * 3.5; dir > 0 ? z < z1 - 1.5 : z > z0 + 1.5; z += dir * rand(3.5, 5)) stops.push(z);
+    const out = gangways(car).find(g => Math.abs(g - from) > 3) ?? null;     // ¿hay coche vecino al otro lado?
+    this.begin("vendor", npc, "$", "#34d17c", { unit: this.walker.unit, until: 100, stops, out, pauseT: 0.6, shoutT: 2, markerY: 2.15 });
+    const line = pick(VENDOR_LINES);
+    this.say(`📢 Un vendedor ambulante entra al coche con su caja: ${line} · E para comprarle`, "info", 6000);
+    this.audio?.shout?.(line.replace(/[«»…]/g, ""));
     return true;
   }
 
   startMusic() {
-    const npc = pick(this.inCar(9));
-    if (!npc) return false;
-    const style = pick(MUSIC_STYLES);
-    this.begin("music", npc, "♪", "#ff7ad9", { unit: this.walker.unit, until: 90, style, beat: 0, note: 0 });
-    this.say(`🎶 Un músico toca ${style} en el coche · si te gusta, acércate (E) y dale una moneda`, "info", 6000);
+    const b = this.boardPerformer();
+    if (!b) return false;
+    const { p: npc, car, from } = b;
+    const instrument = pick(Object.keys(INSTRUMENTS)), inst = INSTRUMENTS[instrument];
+    const style = pick(inst.styles);
+    dressMusician(npc, instrument);
+    npc.performer.playing = false;
+    // Se planta en el pasillo, cerca del centro del coche
+    const [z0, z1] = carSpan(car), mid = (z0 + z1) / 2;
+    const a = this.begin("music", npc, "♪", "#ff7ad9", { unit: this.walker.unit, until: 95, style, instrument, inst, box: new MusicBox(this.audio, instrument, style) });
+    this.people.walk(npc, [this.v.set(0, F, mid + (from < mid ? -1 : 1) * rand(1, 3)).clone()], () => {
+      npc.performer.playing = true;
+      a.playing = true;
+    });
+    this.say(`🎶 Un músico entra al coche con su ${inst.label} y toca ${STYLES[style].name} · si te gusta, acércate (E) y dale una moneda`, "info", 6000);
     return true;
+  }
+
+  /** Vendedor del coche: avanza de parada en parada; al terminar pasa al coche siguiente o se baja en la estación. */
+  tickVendor(a, dt) {
+    const w = this.walker, p = a.npc;
+    if (!this.alive(p) || w.unit !== a.unit) return this.end();
+    if (p.state !== "performer") return this.end();
+    if (a.talking) {
+      if (p.path.length) { p.path.length = 0; p.pose = "stand"; if (a.target != null) a.stops.unshift(a.target); }
+      return;
+    }
+    const sim = a.unit.sim, docked = sim.isStopped && sim.dockedStation() && sim.doorState === "open";
+    if (!p.path.length) {
+      a.pauseT -= dt;
+      a.shoutT -= dt;
+      if (a.shoutT <= 0 && this.dist(p) < 9) { a.shoutT = rand(12, 18); this.audio?.shout?.(pick(VENDOR_LINES).replace(/[«»…]/g, "")); }
+      if (a.pauseT <= 0 && a.stops.length) {
+        a.target = a.stops.shift();
+        this.people.walk(p, [this.v.set(0, F, a.target).clone()], () => { a.target = null; a.pauseT = rand(5, 8); });
+      } else if (a.pauseT <= 0) a.traversed = true;
+    }
+    if (a.traversed && a.out !== null) { this.say("El vendedor pasó al coche siguiente", "info", 3000); return this.end(); }
+    if (docked && (a.traversed || a.until <= 0) && a.until < a.total - 15) { this.say("El vendedor se bajó en la estación", "info", 3000); return this.end(); }
+    if (a.until <= -90) return this.end();
+  }
+
+  /** Músico del coche: toca mientras viaja y se baja en la próxima estación (si ya tocó un rato). */
+  tickMusic(a) {
+    const w = this.walker, p = a.npc;
+    if (!this.alive(p) || w.unit !== a.unit || p.state !== "performer") return this.end();
+    const sim = a.unit.sim, docked = sim.isStopped && sim.dockedStation() && sim.doorState === "open";
+    if (!a.talking && docked && (a.until < a.total - 25 || a.until <= 0)) {
+      this.say("El músico terminó su tema, agradeció y se bajó en la estación", "info", 3000);
+      return this.end();
+    }
+    if (!a.talking && a.until <= -60) return this.end();
+    if (a.playing) a.box.play(musicVolume(this.dist(p)));
+  }
+
+  /** El vendedor o el músico se va: por la puerta si el tren está abierto, si no al coche vecino. */
+  dismiss(a) {
+    const p = a.npc, u = a.unit;
+    if (!this.alive(p) || p.state !== "performer" || p.space !== "train") return;
+    if (p.performer) p.performer.playing = false;
+    const docked = u.sim.isStopped && u.sim.dockedStation();
+    if (docked && this.people.leaveTrain(p, u, docked.world)) return;
+    const car = carAt(p.root.position.z), z = p.root.position.z;
+    const out = gangways(car).sort((x, y) => Math.abs(x - z) - Math.abs(y - z))[0];
+    if (out === undefined) return this.people.remove(p);
+    this.people.walk(p, [this.v.set(0, F, out).clone()], () => this.people.remove(p));
   }
 
   startFaint() {
@@ -341,8 +454,13 @@ export class EncounterSystem {
   /** @returns {boolean} si la tecla la usó un encuentro */
   interact() {
     const a = this.active;
-    if (!a || a.done || !this.near()) return false;
-    const w = this.walker;
+    if (!a || a.done || !this.nearActive()) {
+      const sp = this.stationPerformer();
+      if (!sp) return false;
+      if (sp.kind === "musician") this.tipStationMusician(sp.site);
+      else this.buyFromStall(sp.site);
+      return true;
+    }
     switch (a.kind) {
       case "tourist": return this.askTourist(a), true;
       case "lost": {
@@ -361,14 +479,14 @@ export class EncounterSystem {
             if (err) throw new Error(err);
             return `Compraste ${item.name.toLowerCase()} · «¡Gracias, que le vaya bien!»`;
           },
-          onClose: () => { a.talking = false; this.end(); },
+          onClose: () => { a.talking = false; a.pauseT = Math.max(a.pauseT, 2); },
         });
         return true;
       case "music":
         a.talking = true;
         this.dialog({
-          icon: "🎸", kicker: "Músico del Metro", title: `Toca ${a.style}`, status: "Una moneda ayuda a que siga la música",
-          items: () => a.paid ? [] : [{ name: "Darle una moneda", price: 200, pts: 1 }, { name: "Darle $500", price: 500, pts: 2 }, { name: "Darle $1.000", price: 1000, pts: 3 }],
+          icon: a.inst.icon, kicker: "Músico del Metro", title: `Toca ${STYLES[a.style].name} en ${a.inst.label}`, status: "Una moneda ayuda a que siga la música",
+          items: () => a.paid ? [] : TIPS,
           onBuy: async (item) => {
             const err = this.charge(item.price, "Moneda a un músico del Metro");
             if (err) throw new Error(err);
@@ -376,7 +494,7 @@ export class EncounterSystem {
             this.help(item.pts, "music", null);
             return `«¡Gracias, amigo! Un aplauso para el público» · +${item.pts} civismo`;
           },
-          onClose: () => { a.talking = false; this.end(); },
+          onClose: () => { a.talking = false; },
         });
         return true;
       case "faint":
@@ -385,6 +503,42 @@ export class EncounterSystem {
         return true;
     }
     return false;
+  }
+
+  /** Músico de un andén: moneda (una vez por músico) y, después, pedirle otra canción. */
+  tipStationMusician(site) {
+    const m = site.musician;
+    this.dialog({
+      icon: m.inst.icon, kicker: "Músico en el andén",
+      title: `Toca ${STYLES[m.style].name} en ${m.inst.label}`,
+      status: m.paid ? "Ya le diste una moneda: puedes pedirle otro tema" : "Una moneda en el estuche ayuda a que siga la música",
+      items: () => m.paid ? [{ name: "Pedirle otra canción", action: true, tag: "pedir", request: true }] : TIPS,
+      onBuy: async (item) => {
+        if (item.request) return `«¡Va, ahora una de ${this.performers.request(site).replace(/^(una?|un) /, "")}!»`;
+        const err = this.charge(item.price, "Moneda a un músico del Metro");
+        if (err) throw new Error(err);
+        this.performers.tip(site);
+        this.help(item.pts, "music", null);
+        return `La moneda suena en el estuche · «¡Gracias! ¿Le toco otra?» · +${item.pts} civismo`;
+      },
+    });
+  }
+
+  /** Paño de un comerciante en la mezanina. */
+  buyFromStall(site) {
+    const v = site.vendor;
+    v.talking = true;
+    this.dialog({
+      icon: "🧺", kicker: "Comerciante ambulante", title: "«¡Pase, vea, sin compromiso!»",
+      status: "Está prohibido vender en el Metro: si llegan los guardias, se va con todo",
+      items: () => STALL_ITEMS,
+      onBuy: async (item) => {
+        const err = this.charge(item.price, `Comerciante ambulante · ${item.name}`, item.bag);
+        if (err) throw new Error(err);
+        return `Compraste ${item.name.toLowerCase()} · «¡Gracias, casero, que le vaya bonito!»`;
+      },
+      onClose: () => { v.talking = false; },
+    });
   }
 
   askTourist(a) {
@@ -445,20 +599,6 @@ export class EncounterSystem {
     }
   }
 
-  /** Unas notas de vez en cuando mientras toca el músico (solo si estás en su coche). */
-  playMusic(a) {
-    const ctx = this.audio?.ctx;
-    if (!ctx || this.audio.muted || this.dist(a.npc) > 12) return;
-    const now = performance.now() / 1000;
-    if (now < a.beat) return;
-    a.beat = now + 0.32;
-    const scale = [392, 440, 494, 523, 587, 659];          // sol mayor
-    const phrase = [0, 2, 4, 2, 3, 1, 0, -1, 0, 4, 5, 4, 2, 1, 0, -1];
-    const n = phrase[a.note++ % phrase.length];
-    if (n < 0) return;
-    this.audio.tone(scale[n], { duration: 0.28, gain: 0.035, wave: "triangle" });
-  }
-
   end() {
     const a = this.active;
     if (!a) return;
@@ -468,6 +608,7 @@ export class EncounterSystem {
       a.npc.encounter = null;
       if (a.npc.state === "chatting") a.npc.state = "waiting";
     }
+    if (a.kind === "vendor" || a.kind === "music") this.dismiss(a);
     if (a.kind === "lost") {
       a.prop.removeFromParent();
       a.prop.geometry.dispose();

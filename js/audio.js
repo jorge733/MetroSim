@@ -431,6 +431,20 @@ export class AudioSystem {
     }, 350);
   }
 
+  /**
+   * Pregón de un vendedor ambulante (o un músico que saluda): voz sintetizada
+   * más aguda y rápida, sin radio. No interrumpe los avisos del tren: si ya
+   * hay una voz hablando, se calla.
+   */
+  shout(text) {
+    if (!this.ctx || this.muted || !("speechSynthesis" in window) || speechSynthesis.speaking || speechSynthesis.pending) return;
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = this.voice?.lang || "es-CL";
+    if (this.voice) u.voice = this.voice;
+    u.rate = 1.2; u.pitch = 1.15; u.volume = 0.7;
+    speechSynthesis.speak(u);
+  }
+
   /** Traspié a bordo: arrastre de zapatos y, si chocas con alguien, un golpe sordo. */
   stumble(bump = false) {
     if (!this.ctx) return;
