@@ -26,7 +26,7 @@
    y curva de demanda horaria de un día real de Santiago.
    ========================================================================== */
 
-export const VERSION = "1.9.1";
+export const VERSION = "1.10";
 
 /* ---------- Colores oficiales de las líneas ---------- */
 export const LINE_COLORS = {
@@ -178,9 +178,15 @@ export const FARES = {
   loadAmounts: [1000, 2000, 3000, 5000, 10000],
   bands: [
     { id: "punta", label: "Hora punta", price: 895, ranges: [[7, 9], [18, 20]], weekdaysOnly: true },
-    { id: "valle", label: "Hora valle", price: 815, ranges: [[6.5, 7], [9, 18], [20, 20.75]] },
-    { id: "baja",  label: "Hora baja",  price: 735, ranges: [[6, 6.5], [20.75, 23]], weekdaysOnly: true },
+    { id: "valle", label: "Hora valle", price: 815, ranges: [[9, 18], [20, 20.75]] },
+    { id: "baja",  label: "Hora baja",  price: 735, ranges: [[6, 7], [20.75, 23]], weekdaysOnly: true },
   ],
+  // 1.10 · Tarifas rebajadas: el mismo precio todo el día y todos los días (rider.js decide cuál le toca al jugador)
+  special: {
+    estudiante: { id: "tne", label: "Tarifa estudiante", card: "TNE", price: 260 },
+    mayor:      { id: "mayor", label: "Tarifa adulto mayor", card: "TAM", price: 260 },
+  },
+  seniorBipPrice: 390,                 // bip! Adulto Mayor: permite viajes integrados con buses (en el juego, solo Metro: conviene la TAM)
 };
 
 /**

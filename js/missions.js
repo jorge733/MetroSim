@@ -25,6 +25,7 @@
 import { streetPlan, SHOPS } from "./city/plan.js";
 import { landmarkFor } from "./city/catalog.js";
 import { fareBandAt, formatCLP, spokenName } from "./config.js";
+import { riderFare, riderSpecial } from "./rider.js";
 import { formatClock } from "./engine/format.js";
 
 const OFFERS = 3;
@@ -203,7 +204,7 @@ export class MissionSystem {
     const step = this.step;
     if (!step) return out;
     if (step.kind === "bipCard" && ctx.card.hasCard) this.advance(out, ctx);
-    else if (step.kind === "bipLoad" && ctx.card.hasCard && ctx.card.balance >= fareBandAt(ctx.clock).price) this.advance(out, ctx);
+    else if (step.kind === "bipLoad" && ctx.card.hasCard && ctx.card.balance >= riderFare(ctx.clock).price) this.advance(out, ctx);
     else if (step.deadline && ctx.clock > step.deadline + 1) return this.fail(`Se acabó el tiempo (${formatClock(step.deadline).slice(0, 5)})`, ctx);
     return out;
   }
@@ -351,7 +352,7 @@ export class MissionSystem {
   }
 
   makeSaver(ctx) {
-    if (fareBandAt(ctx.clock).id === "punta") return null;
+    if (fareBandAt(ctx.clock).id === "punta" || riderSpecial()) return null;   // con TNE o TAM ya se paga lo mínimo
     const options = this.destinations(ctx, 2);
     if (!options.length) return null;
     const st = pickOf(options);

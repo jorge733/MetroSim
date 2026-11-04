@@ -98,7 +98,7 @@
         <header class="start-brand">
           <img class="metro-mark" src="logo.svg" alt="">
           <h1>MetroSim</h1>
-          <span class="start-ver">v1.9.1</span>
+          <span class="start-ver">v1.10</span>
         </header>
         <div class="start-hero">
           <p class="eyebrow">Simulador del Metro de Santiago</p>
@@ -552,6 +552,7 @@
         <span id="fareInfoBand" class="clock-band"><i></i><span id="fareInfoBandLabel">—</span><b id="fareInfoBandPrice"></b></span>
       </div>
       <small id="fareInfoNext" class="clock-note fare-info-next"></small>
+      <div class="fare-mine"><span id="fareInfoMine"></span><button id="fareInfoMineEdit" class="ghost-button" type="button">Cambiar</button></div>
       <div id="fareInfoPrices" class="fare-prices"></div>
       <div id="fareInfoDays" class="seg fare-days" role="tablist" aria-label="Tipo de día"></div>
       <div class="fare-bar-wrap">
@@ -559,6 +560,8 @@
         <div class="fare-bar-ends"><span id="fareInfoBarFrom"></span><span id="fareInfoBarTo"></span></div>
       </div>
       <div id="fareInfoList" class="ticket-fares"></div>
+      <span class="small-label">Tarifas rebajadas · todo el día</span>
+      <div id="fareInfoSpecial" class="ticket-fares"></div>
       <ul id="fareInfoNotes" class="fare-notes"></ul>
       <footer class="ticket-actions">
         <span></span>
@@ -567,6 +570,30 @@
     </div>
   </div>
 
+
+  <!-- 1.10 · Tu tarifa: fecha de nacimiento para las tarifas de estudiante y adulto mayor -->
+  <div id="riderPanel" class="ticket-panel hidden">
+    <div class="ticket-card rider-card" role="dialog" aria-labelledby="riderTitle" aria-describedby="riderIntro">
+      <header class="ticket-head">
+        <div class="ticket-head-text">
+          <span id="riderKicker" class="small-label">TU TARIFA</span>
+          <strong id="riderTitle">¿Cuándo naciste?</strong>
+        </div>
+      </header>
+      <p id="riderIntro" class="station-sub rider-intro">Metro cobra menos a los estudiantes con TNE y a los adultos mayores. Con tu fecha de nacimiento el juego te cobra la tarifa que te corresponde. Solo se guarda en este dispositivo.</p>
+      <label class="rider-field">
+        <span class="small-label">Fecha de nacimiento</span>
+        <input id="riderBirth" type="date" min="1900-01-01" autocomplete="bday">
+      </label>
+      <label id="riderStudentRow" class="rider-check"><input id="riderStudent" type="checkbox"> <span>Soy estudiante y tengo <b>TNE</b> (pase escolar)</span></label>
+      <label id="riderWoman60Row" class="rider-check hidden"><input id="riderWoman60" type="checkbox"> <span>Soy mujer: tengo <b>TAM</b> de adulto mayor desde los 60</span></label>
+      <div id="riderPreview" class="ticket-status"></div>
+      <footer class="ticket-actions">
+        <button id="riderSkip" class="ghost-button" type="button">Ahora no</button>
+        <button id="riderSave" class="go-button" type="button">Guardar</button>
+      </footer>
+    </div>
+  </div>
 
 </body>
 </html>

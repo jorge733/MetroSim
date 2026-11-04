@@ -10,6 +10,7 @@
    ========================================================================== */
 
 import { CONFIG, STATIONS, LINE, NOTCHES, NOTCH_INDEX, WORLD, FARES, formatCLP, fareBandAt } from "./config.js";
+import { riderFare, riderSpecial } from "./rider.js";
 import { $, clamp, formatClock, formatStopError } from "./utils.js";
 import { formatDelay } from "./engine/schedule.js";
 import { BANK_NAME } from "./economy.js";
@@ -387,7 +388,7 @@ export class Hud {
      --------------------------------------------------------------------- */
   setCard(card) {
     this.setText(this.el.cardPillText, card.hasCard ? formatCLP(card.balance) : "sin tarjeta");
-    this.el.cardPill.classList.toggle("low", card.hasCard && card.balance < fareBandAt(0 + (this.lastClock || 0)).price);
+    this.el.cardPill.classList.toggle("low", card.hasCard && card.balance < riderFare(this.lastClock || 0).price);
   }
 
   /**
@@ -418,10 +419,18 @@ export class Hud {
     refresh();
 
     // Tarifas vigentes, con el tramo actual resaltado
+    // (1.10: si el jugador tiene TNE o TAM, su tarifa rebajada va resaltada arriba)
+    const special = riderSpecial();
     const band = fareBandAt(o.clock);
-    e.ticketFares.replaceChildren(...FARES.bands.map(b => {
+    const specialRow = special && Object.assign(document.createElement("div"), { className: "fare-row current" });
+    if (specialRow) {
+      specialRow.innerHTML = "<span></span><b></b>";
+      specialRow.firstChild.textContent = `Tu tarifa · ${special.label} (${special.card}) · todo el día`;
+      specialRow.lastChild.textContent = formatCLP(special.price);
+    }
+    e.ticketFares.replaceChildren(...[specialRow].filter(Boolean), ...FARES.bands.map(b => {
       const row = document.createElement("div");
-      row.className = "fare-row" + (b === band ? " current" : "");
+      row.className = "fare-row" + (b === band && !special ? " current" : "");
       row.innerHTML = "<span></span><b></b>";
       row.firstChild.textContent = b.label + (b === band ? " · ahora" : "");
       row.lastChild.textContent = formatCLP(b.price);

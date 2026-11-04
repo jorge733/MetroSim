@@ -119,6 +119,8 @@ import { joinDriverRoom } from "./net/netClient.js";
 import { cleanRoomCode, localNetwork, NET_LEVEL } from "./net/transport.js";
 import { startPoint } from "./net/replica.js";
 import { setupFareInfo, openFareInfo, closeFareInfo, fareInfoOpen, tickFareInfo } from "./fareInfo.js";
+import { riderFare, riderSpecial, riderAsked, riderCategory } from "./rider.js";
+import { setupRiderPanel, openRiderPanel, closeRiderPanel, riderPanelOpen } from "./riderPanel.js";
 
 // La vía en 3D sigue las pendientes reales: se engancha antes de compilar ningún material
 installTrackLift();
@@ -398,7 +400,8 @@ function renderClock() {
   if (clockBandShown && clockBandShown !== state) { void chip.offsetWidth; chip.classList.add("changed"); }
   clockBandShown = state;
   $("clockBandLabel").textContent = open ? band.label : "Metro cerrado";
-  $("clockBandPrice").textContent = open ? formatCLP(band.price) : "";
+  const special = riderSpecial();
+  $("clockBandPrice").textContent = open ? (special ? `${formatCLP(special.price)} ${special.card}` : formatCLP(band.price)) : "";
 
   let note;
   if (open) {
@@ -413,7 +416,8 @@ function renderClock() {
   } else {
     const h = t / 3600, today = SERVICE_HOURS[day];
     const opensAt = h < today[0] ? today[0] : SERVICE_HOURS[dayTypeOf(new Date(+now + 86400000))][0];
-    note = `Abre a las ${hhmm(opensAt)} · puedes jugar igual: se cobra ${band.label.toLowerCase()} (${formatCLP(band.price)})`;
+    const pay = special || band;
+    note = `Abre a las ${hhmm(opensAt)} · puedes jugar igual: se cobra ${pay.label.toLowerCase()} (${formatCLP(pay.price)})`;
   }
   $("clockNote").textContent = note;
 }
@@ -429,9 +433,15 @@ function useLine(line) {
   $("loadingTitle").textContent = `Preparando la ${line.name.charAt(0) + line.name.slice(1).toLowerCase()}…`;
 }
 
-document.querySelectorAll("[data-mode]").forEach(btn => btn.addEventListener("click", () => startGame(btn.dataset.mode)));
+// 1.10 · La primera vez que se juega, antes de empezar se pregunta la fecha de nacimiento (tarifas TNE y adulto mayor)
+setupRiderPanel();
+function firstAskThen(go) {
+  if (riderAsked()) return go();
+  openRiderPanel({ first: true, done: () => { renderClock(); go(); } });
+}
+document.querySelectorAll("[data-mode]").forEach(btn => btn.addEventListener("click", () => firstAskThen(() => startGame(btn.dataset.mode))));
 // "¿Primera vez? Con tutorial" de cada modo: juega ese modo con el tutorial interactivo desde el principio
-document.querySelectorAll("[data-tutorial]").forEach(btn => btn.addEventListener("click", () => startGame(btn.dataset.tutorial, { tutorial: true })));
+document.querySelectorAll("[data-tutorial]").forEach(btn => btn.addEventListener("click", () => firstAskThen(() => startGame(btn.dataset.tutorial, { tutorial: true }))));
 $("backButton").addEventListener("click", requestMenu);
 // 1.9 · Tocar la hora (portada o HUD) abre las tarifas según el horario
 setupFareInfo();
@@ -440,16 +450,16 @@ function showFares() {
     const w = game.walker, wasFrozen = w?.frozen;
     if (w) { w.frozen = true; w.keys.clear(); }
     if (document.pointerLockElement) document.exitPointerLock?.();
-    openFareInfo({ clock: game.clock, dayType: CONFIG.dayType, onClose: () => { if (w && game?.walker === w && !wasFrozen && !confirmOpen) { w.frozen = false; w.keys.clear(); } } });
+    openFareInfo({ clock: game.clock, dayType: CONFIG.dayType, onChange: () => hud.setCard(card), onClose: () => { if (w && game?.walker === w && !wasFrozen && !confirmOpen) { w.frozen = false; w.keys.clear(); } } });
   } else {
     const now = new Date();
-    openFareInfo({ clock: now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds(), dayType: dayTypeOf(now) });
+    openFareInfo({ clock: now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds(), dayType: dayTypeOf(now), onChange: renderClock });
   }
 }
 $("clockNow").addEventListener("click", showFares);
 $("clockNow").addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); showFares(); } });
 $("hudClock").addEventListener("click", (ev) => { ev.currentTarget.blur(); showFares(); });
-window.addEventListener("keydown", (ev) => { if (!game && fareInfoOpen() && ev.key === "Escape") closeFareInfo(); });
+window.addEventListener("keydown", (ev) => { if (!game && !riderPanelOpen() && fareInfoOpen() && ev.key === "Escape") closeFareInfo(); });
 $("confirmOk").addEventListener("click", () => closeConfirm(true));
 $("confirmCancel").addEventListener("click", () => closeConfirm(false));
 $("confirmPanel").addEventListener("click", (ev) => { if (ev.target === ev.currentTarget) closeConfirm(false); });
@@ -815,6 +825,7 @@ window.addEventListener("popstate", () => {
   const shopClose = document.querySelector(".shop-overlay .shop-close");
   if (shopClose) shopClose.click();
   else if (confirmOpen) closeConfirm(false);
+  else if (riderPanelOpen()) closeRiderPanel();
   else if (fareInfoOpen()) closeFareInfo();
   else if (game && hud.ticketOpen) hud.closeTicket();
   else if (game && hud.storeOpen) hud.closeStore();
@@ -971,6 +982,7 @@ function onKeyDown(event) {
   if (["arrowup", "arrowdown", "arrowleft", "arrowright", " ", "pageup", "pagedown"].includes(key)) event.preventDefault();
   if (hud.summaryOpen) return;
   if (confirmOpen) { if (key === "escape") closeConfirm(false); else if (key === "enter") closeConfirm(true); return; }
+  if (riderPanelOpen()) return;
   if (fareInfoOpen()) { if (key === "escape" || key === "enter") closeFareInfo(); return; }
   if (hud.ticketOpen) { if (key === "escape" || key === "e") hud.closeTicket(); return; }
   if (hud.storeOpen) { if (key === "escape" || key === "e") hud.closeStore(); return; }
@@ -1590,7 +1602,7 @@ function onWalkerEvent(type, data) {
 
 /** Cobro del pasaje al entrar por un torniquete. */
 function validateFare() {
-  const band = fareBandAt(game.clock);
+  const band = riderFare(game.clock);              // 1.10: la tarifa TNE o de adulto mayor, si le corresponde
   const gate = game.world.nearestGate(game.walker.pos);
   const r = card.pay(band.price);
   hud.setCard(card);
@@ -1598,7 +1610,7 @@ function validateFare() {
     game.audio.bip();
     if (gate) game.world.flashValidator(gate, true);
     game.ride.fare = band;
-    hud.showMessage(`bip! · ${band.label} ${formatCLP(band.price)} · saldo ${formatCLP(card.balance)}`, "ok", 2500);
+    hud.showMessage(`bip! · ${band.label}${band.card ? ` ${band.card}` : ""} ${formatCLP(band.price)} · saldo ${formatCLP(card.balance)}`, "ok", 2500);
     return { ok: true };
   }
   game.audio.deny();
@@ -2099,7 +2111,7 @@ function missionGuide() {
 
 /** ¿No alcanza ni para pagar el pasaje ni para cargar la bip!? */
 function passengerBroke() {
-  const fare = fareBandAt(game.clock).price;
+  const fare = riderFare(game.clock).price;
   if (card.hasCard && card.balance >= fare) return false;
   return bank.balance < (card.hasCard ? FARES.loadAmounts[0] : FARES.cardPrice + FARES.loadAmounts[0]);
 }
@@ -2611,7 +2623,7 @@ function loop(now) {
     hud.setTurnPanel(null);
     hud.updatePassenger(walkerHudData());
     hud.updateGuide(missionGuide());
-    game.tutorial?.update(dt, { game, walker, card, hud, fare: fareBandAt(game.clock).price });
+    game.tutorial?.update(dt, { game, walker, card, hud, fare: riderFare(game.clock).price });
   }
 
   updateHudClockBand();
@@ -2706,12 +2718,12 @@ function walkerHudData() {
   const closed = inService(clock) ? "" : `Fuera del horario comercial (${String(h0 | 0).padStart(2, "0")}:${h0 % 1 ? "30" : "00"}–${h1 | 0}:${h1 % 1 ? "30" : "00"}): servicio especial del juego cada 15 min · `;
   const base = { clock, worldZ: w.worldZ, hint: closed + (game.encounters?.hint() ?? w.hint()) };
   if (w.space === "street") {
-    const lm = game.city.landmark, band = fareBandAt(clock);
+    const lm = game.city.landmark, band = riderFare(clock);
     return {
       ...base,
       title: `CALLE${lm ? " · " + lm.name.toUpperCase() : ""}`,
       station: w.station.name,
-      sub: `Cuenta ${bank.label} · bip! ${card.label} · pasaje ahora ${formatCLP(band.price)} (${band.label.toLowerCase()})`,
+      sub: `Cuenta ${bank.label} · bip! ${card.label} · pasaje ahora ${formatCLP(band.price)} (${band.label.toLowerCase()}${band.card ? ` ${band.card}` : ""})`,
       highlight: w.station,
     };
   }

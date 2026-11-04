@@ -8,6 +8,8 @@
    ========================================================================== */
 
 import { FARES, SERVICE_HOURS, DAY_TYPE_LABEL, fareBandAt, inService, formatCLP } from "./config.js";
+import { riderSpecial, riderCategory, riderProfile, ageOf } from "./rider.js";
+import { openRiderPanel } from "./riderPanel.js";
 
 const DAYS = ["laboral", "sabado", "domingo"];
 const DAY_TAB = { laboral: "Lun a vie", sabado: "Sábado", domingo: "Dom y festivos" };
@@ -50,11 +52,12 @@ export const fareInfoOpen = () => !!state;
  * @param {number} o.clock     hora vigente en segundos desde medianoche
  * @param {string} o.dayType   "laboral" | "sabado" | "domingo"
  * @param {Function} [o.onClose]
+ * @param {Function} [o.onChange]  el jugador cambió su tarifa (fecha de nacimiento, TNE)
  */
-export function openFareInfo({ clock, dayType, onClose }) {
+export function openFareInfo({ clock, dayType, onClose, onChange }) {
   const panel = $("fareInfoPanel");
   if (!panel) return;
-  state = { clock, today: dayType, shown: dayType, onClose };
+  state = { clock, today: dayType, shown: dayType, onClose, onChange };
   render();
   panel.classList.remove("hidden");
   $("fareInfoClose").focus();
@@ -106,6 +109,13 @@ function render() {
     next = `Fuera de horario. Si juegas igual, se cobra ${band.label.toLowerCase()}.`;
   }
   $("fareInfoNext").textContent = `${DAY_TYPE_LABEL[today]} · ${next}`;
+
+  // Tu tarifa (1.10): la rebajada si tiene TNE o TAM; si no, la general por tramo
+  const special = riderSpecial(), p = riderProfile(), age = ageOf(p?.birth);
+  $("fareInfoMine").innerHTML = special
+    ? `Tu tarifa: <b>${special.label} (${special.card}) · ${formatCLP(special.price)}</b> a cualquier hora`
+    : `Tu tarifa: <b>general</b>${age != null ? ` · ${age} años` : ""} · ahora ${formatCLP(band.price)}`;
+  $("fareInfoMine").parentElement.classList.toggle("special", !!special);
 
   // Pestañas de tipo de día
   $("fareInfoDays").replaceChildren(...DAYS.map(d => {
@@ -163,6 +173,20 @@ function render() {
     return el;
   }));
 
+  const mine = riderCategory();
+  $("fareInfoSpecial").replaceChildren(...[
+    [`Estudiante · TNE`, FARES.special.estudiante.price, mine === "estudiante"],
+    [`Adulto mayor · TAM (desde 65 años; mujeres, 60)`, FARES.special.mayor.price, mine === "mayor"],
+    [`Adulto mayor · bip! Adulto Mayor (con buses)`, FARES.seniorBipPrice, false],
+  ].map(([label, price, cur]) => {
+    const row = document.createElement("div");
+    row.className = "fare-row" + (cur ? " current" : "");
+    row.innerHTML = "<span></span><b></b>";
+    row.firstChild.textContent = label + (cur ? " · tu tarifa" : "");
+    row.lastChild.textContent = formatCLP(price);
+    return row;
+  }));
+
   const [so, sc] = SERVICE_HOURS[shown];
   $("fareInfoNotes").replaceChildren(...[
     `Horario de ${DAY_TYPE_LABEL[shown].toLowerCase()}: de ${hhmm(so)} a ${hhmm(sc)}.`,
@@ -177,4 +201,5 @@ export function setupFareInfo() {
   $("fareInfoClose")?.addEventListener("click", closeFareInfo);
   $("fareInfoOk")?.addEventListener("click", closeFareInfo);
   $("fareInfoPanel")?.addEventListener("click", (ev) => { if (ev.target === ev.currentTarget) closeFareInfo(); });
+  $("fareInfoMineEdit")?.addEventListener("click", () => openRiderPanel({ done: () => { if (state) { render(); state.onChange?.(); } } }));
 }
