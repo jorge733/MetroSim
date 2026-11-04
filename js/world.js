@@ -204,12 +204,12 @@ function fareBoardCanvas() {
     g.fillStyle = "#1b2430"; g.font = "800 28px Arial"; g.textAlign = "left";
     g.fillText(b.label.toUpperCase(), 22, y);
     g.font = "500 18px Arial"; g.fillStyle = "#4b5560";
-    g.fillText(b.ranges.map(([a, z]) => `${hh(a)}–${hh(z)}`).join(" · "), 22, y + 30);
+    g.fillText(b.ranges.map(([a, z]) => `${hh(a)}–${hh(z)}`).join(" · ") + (b.weekdaysOnly ? " · lun a vie" : ""), 22, y + 30);
     g.font = "900 34px Arial"; g.fillStyle = "#1b2430"; g.textAlign = "right";
     g.fillText(formatCLP(b.price), 490, y + 10);
   });
   g.font = "600 17px Arial"; g.fillStyle = "#4b5560"; g.textAlign = "left";
-  g.fillText(`Tarjeta nueva ${formatCLP(FARES.cardPrice)} · combinaciones sin costo`, 22, 362);
+  g.fillText(`Tarjeta nueva ${formatCLP(FARES.cardPrice)} · sáb., dom. y festivos sin punta`, 22, 362);
   return c;
 }
 

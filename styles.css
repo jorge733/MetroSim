@@ -143,6 +143,20 @@ kbd {
 .line-card-text { font-size: 13px; line-height: 1.45; color: #a8b3bf; }
 .line-card-text:empty { display: none; }
 /* Clima (1.5) */
+/* Hora en Santiago y tramo tarifario (1.8) */
+.clock-now { display: grid; gap: 6px; }
+.clock-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.clock-time { font-family: var(--f-data); font-size: 30px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.clock-band { --c: var(--muted); display: inline-flex; align-items: center; gap: 7px; padding: 5px 11px 5px 9px; border: 1px solid color-mix(in srgb, var(--c) 55%, transparent); border-radius: 999px; background: color-mix(in srgb, var(--c) 14%, transparent); font-size: 13px; font-weight: 700; white-space: nowrap; }
+.clock-band i { width: 8px; height: 8px; border-radius: 50%; background: var(--c); box-shadow: 0 0 8px var(--c); }
+.clock-band b { font-family: var(--f-data); font-size: 12px; color: var(--muted); }
+.clock-band.punta { --c: #ff5a4f; }
+.clock-band.valle { --c: var(--warn); }
+.clock-band.baja  { --c: var(--ok); }
+.clock-band.closed { --c: var(--dim); }
+.clock-band.changed { animation: clockPulse .9s ease-out; }
+@keyframes clockPulse { 0% { transform: scale(1.12); } 100% { transform: none; } }
+.clock-note { font-size: 12px; color: var(--muted); line-height: 1.35; }
 .weather-picker { display: grid; gap: 6px; }
 .weather-seg button { padding: 4px 6px; text-align: center; }
 .weather-seg button b { font-size: 15px; white-space: nowrap; }
@@ -272,7 +286,8 @@ body.touch-mode .start-keys { display: none; }
   .start-screen { padding-top: max(12px, env(safe-area-inset-top)); }
   .start-layout { grid-template-columns: minmax(0, 320px) minmax(0, 1fr); gap: 14px 24px; max-width: none; }
   .start-side { gap: 10px; }
-  .start-hero .eyebrow, .tagline, .line-card-text, .start-note, .weather-now { display: none; }
+  .start-hero .eyebrow, .tagline, .line-card-text, .start-note, .weather-now, .clock-note { display: none; }
+  .clock-time { font-size: 22px; }
   .start-hero h2 { font-size: 22px; }
   .metro-mark { width: 40px; }
   .start-brand h1 { font-size: 26px; }

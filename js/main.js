@@ -68,7 +68,7 @@
 
 import * as THREE from "three";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
-import { CONFIG, STATIONS, LINE, NOTCH_INDEX, FARES, spokenName, fareBandAt, formatCLP, demandAt, dayTypeOf, inService, SERVICE_HOURS } from "./config.js";
+import { CONFIG, STATIONS, LINE, NOTCH_INDEX, FARES, spokenName, fareBandAt, formatCLP, demandAt, dayTypeOf, inService, SERVICE_HOURS, DAY_TYPE_LABEL } from "./config.js";
 import { ROUTES, ROUTE_A, ROUTE_B, routeForSide, oppositeRoute, setActiveLine } from "./engine/route.js";
 import { LINES, lineById } from "./engine/network.js";
 import { BipCard } from "./card.js";
@@ -363,6 +363,51 @@ async function fetchRealWeather() {
 }
 applyWeatherChoice();
 fetchRealWeather();
+let clockBandShown = null;              // tramo mostrado en la portada (para animar el cambio)
+renderClock();
+setInterval(() => { if (!game) renderClock(); }, 10000);
+
+/* ---------- Hora y tramo tarifario en la portada (1.8) ---------- */
+
+/** "HH:MM" de una hora en horas decimales o de un Date. */
+function hhmm(x) {
+  const m = x instanceof Date ? x.getHours() * 60 + x.getMinutes() : Math.round(x * 60) % 1440;
+  return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+}
+
+/** Reloj de la portada: la hora del dispositivo (la misma con la que arranca el juego) y el tramo que se cobra. */
+function renderClock() {
+  const el = $("clockNow");
+  if (!el) return;
+  const now = new Date(), day = dayTypeOf(now);
+  const t = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+  const open = inService(t, day), band = fareBandAt(t, day);
+  $("clockTime").textContent = hhmm(now);
+
+  const chip = $("clockBand"), state = open ? band.id : "closed";
+  chip.className = `clock-band ${state}`;
+  if (clockBandShown && clockBandShown !== state) { void chip.offsetWidth; chip.classList.add("changed"); }
+  clockBandShown = state;
+  $("clockBandLabel").textContent = open ? band.label : "Metro cerrado";
+  $("clockBandPrice").textContent = open ? formatCLP(band.price) : "";
+
+  let note;
+  if (open) {
+    // Próximo cambio: de tramo o el cierre, buscando minuto a minuto
+    let next = null;
+    for (let m = 1; m <= 24 * 60 && !next; m++) {
+      const u = t - now.getSeconds() + m * 60;
+      if (!inService(u, day)) next = `cierra a las ${hhmm(u / 3600)}`;
+      else if (fareBandAt(u, day) !== band) next = `pasa a ${fareBandAt(u, day).label.toLowerCase()} a las ${hhmm(u / 3600)}`;
+    }
+    note = `${DAY_TYPE_LABEL[day]}${day !== "laboral" ? " · sin hora punta" : ""}${next ? ` · ${next}` : ""}`;
+  } else {
+    const h = t / 3600, today = SERVICE_HOURS[day];
+    const opensAt = h < today[0] ? today[0] : SERVICE_HOURS[dayTypeOf(new Date(+now + 86400000))][0];
+    note = `Abre a las ${hhmm(opensAt)} · puedes jugar igual: se cobra ${FARES.bands.at(-1).label.toLowerCase()} (${formatCLP(FARES.bands.at(-1).price)})`;
+  }
+  $("clockNote").textContent = note;
+}
 
 function loadSetting(key) { try { return localStorage.getItem(key); } catch { return null; } }
 function saveSetting(key, value) { try { localStorage.setItem(key, value); } catch { /* sin almacenamiento */ } }

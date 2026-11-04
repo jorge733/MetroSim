@@ -117,6 +117,17 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **Salir por los torniquetes es gratis**: solo se cobra el pasaje al pasar hacia la zona pagada (antes, al terminar
   de cruzar el torniquete de salida se cobraba un pasaje).
 
+## Versión 1.8 · Hora y tarifa en la portada
+
+- **Reloj en la portada** (`index.html`, `js/main.js`): junto al clima se ve la hora (la del dispositivo, la misma
+  con la que arranca el juego) y el tramo tarifario vigente con su color y precio: 🔴 hora punta, 🟡 hora valle o
+  🟢 hora baja. Debajo, el tipo de día y cuándo cambia el tramo («pasa a hora valle a las 20:00» o «cierra a las
+  23:00»). Fuera de horario dice «Metro cerrado», a qué hora abre y que, si juegas igual, se cobra tarifa baja.
+  Se actualiza solo y el chip late cuando cambia de tramo.
+- **Sin hora punta los fines de semana** (`js/config.js` → `fareBandAt`): como en el Metro real, los sábados,
+  domingos y festivos las horas de punta se cobran como valle. Vale para los torniquetes, la boletería y el
+  tablero de tarifas de la estación, que ahora dice «lun a vie» junto a la punta.
+
 ## Versión 1.7 · Maniobra de retorno real
 
 Al final de la línea el tren ya no salta de vía: hace la maniobra como en el Metro de verdad.

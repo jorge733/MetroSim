@@ -98,7 +98,7 @@
         <header class="start-brand">
           <img class="metro-mark" src="logo.svg" alt="">
           <h1>MetroSim</h1>
-          <span class="start-ver">v1.7.1</span>
+          <span class="start-ver">v1.8</span>
         </header>
         <div class="start-hero">
           <p class="eyebrow">Simulador del Metro de Santiago</p>
@@ -124,6 +124,15 @@
             <div><dt class="small-label">Combinaciones</dt><dd id="lineCardCombos">—</dd></div>
           </dl>
           <p id="lineCardText" class="line-card-text"></p>
+        </div>
+
+        <div class="clock-now" id="clockNow" aria-live="polite">
+          <span class="small-label">Hora y tarifa</span>
+          <div class="clock-row">
+            <b id="clockTime" class="clock-time">--:--</b>
+            <span id="clockBand" class="clock-band"><i></i><span id="clockBandLabel">—</span><b id="clockBandPrice"></b></span>
+          </div>
+          <small id="clockNote" class="clock-note"></small>
         </div>
 
         <div class="weather-picker">
