@@ -167,6 +167,16 @@ Al final de la línea el tren ya no salta de vía: hace la maniobra como en el M
 - Grabación propia opcional: si `audio/voz/manifest.json` incluye `bienvenida`, suena `audio/voz/bienvenida.mp3`
   con un filtro de altavoz en vez de la voz sintetizada.
 
+**1.7.2 · Pantallas de cabina legibles** (`js/dmi.js`, `js/main.js`, `js/train.js`)
+
+- Las dos pantallas del pupitre (DMI y estado del tren) ya no quedan en negro: muestran una pantalla de arranque
+  antes del primer dibujo y, si el navegador descarta el canvas (Chrome en Android, al volver de segundo plano o con
+  poca memoria), conservan el último cuadro en vez de subir uno vacío.
+- Más contraste: fondo un poco más claro, rótulos grises más luminosos y la letra más chica sube de 12 a 13 px;
+  textura con filtrado anisótropo al máximo de la GPU (más nítida vista en ángulo).
+- **Toca una pantalla** (o **P**) para verlas en grande: se dibujan directo a la resolución del dispositivo, con el
+  texto nítido, y se siguen actualizando en vivo. Toca de nuevo (o **P** / **Esc**) para cerrar.
+
 ## Versión 1.6 · Asistente de parada
 
 Ayudas para no pasarse de la estación (`js/engine/stopAssist.js`; se activan o desactivan con **N**):

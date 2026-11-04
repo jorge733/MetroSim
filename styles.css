@@ -1668,3 +1668,20 @@ body.touch-mode .back-button.driver-job-button { top: auto; bottom: calc(120px +
 .confirm-card { width: min(92vw, 380px); border-top-color: var(--warn); }
 .confirm-card strong { font: 700 22px/1.15 var(--f-display); }
 .confirm-card p { margin: 2px 0 6px; font-size: 13.5px; line-height: 1.4; }
+
+/* 1.7.2 · Pantallas de cabina ampliadas (tocar la DMI o la pantalla de estado, o P) */
+.cab-screens {
+  position: absolute; inset: 0; z-index: 30; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; padding: calc(12px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));
+  background: rgba(4, 7, 10, .82); cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.cab-screens-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; max-width: 100%; }
+.cab-screens canvas {
+  width: min(calc((100vw - 56px) / 2), 640px, calc((100vh - 70px) * 16 / 9)); aspect-ratio: 16 / 9; height: auto;
+  border-radius: 10px; border: 3px solid #1b232c; box-shadow: 0 10px 40px #000a; background: #0c141d;
+}
+@media (orientation: portrait) {
+  .cab-screens canvas { width: min(calc(100vw - 32px), 640px, calc((100vh - 110px) / 2 * 16 / 9)); }
+}
+.cab-screens-hint { margin: 0; color: #a7b6c6; font-size: 13px; }
+.cab-screens-hint kbd { font-size: 11px; }
