@@ -128,6 +128,9 @@ trenes de los dos motores quedan a ~1 m (mediana).
   domingos y festivos las horas de punta se cobran como valle. Vale para los torniquetes, la boletería y el
   tablero de tarifas de la estación, que ahora dice «lun a vie» junto a la punta.
 
+**1.8.1 · Domingos y festivos hasta las 23:00** (`js/config.js`): el Metro cierra a las 23:00 también los domingos
+y festivos (antes, 22:30), como en el horario real. La demanda de la última media hora baja de a poco hasta el cierre.
+
 ## Versión 1.7 · Maniobra de retorno real
 
 Al final de la línea el tren ya no salta de vía: hace la maniobra como en el Metro de verdad.
@@ -343,7 +346,7 @@ esta vaya en viaducto.
 - **Horario calculado con la misma física**: los tiempos entre estaciones salen de simular cada interestación con
   el tren, la pendiente y el ATO (+4 % de margen). La L3 completa tarda ~37 min (≈ 40 km/h comerciales).
 - **Calendario real**: día laboral, sábado o domingo/festivo (incluye festivos de Chile y Semana Santa) según la
-  fecha de tu computador. Horario comercial: L–V 06:00–23:00, sábado 06:30–23:00, domingo y festivos 07:30–22:30
+  fecha de tu computador. Horario comercial: L–V 06:00–23:00, sábado 06:30–23:00, domingo y festivos 07:30–23:00
   (fuera de él queda un servicio simbólico cada 15 min para poder jugar siempre).
 - **Demanda horaria de un día real**: punta mañana 07:00–09:00, valle con repunte al almuerzo, punta tarde
   17:30–20:00; el fin de semana, menor y repartida.

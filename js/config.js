@@ -26,7 +26,7 @@
    y curva de demanda horaria de un día real de Santiago.
    ========================================================================== */
 
-export const VERSION = "1.8";
+export const VERSION = "1.8.1";
 
 /* ---------- Colores oficiales de las líneas ---------- */
 export const LINE_COLORS = {
@@ -256,7 +256,7 @@ export const DAY_TYPE_LABEL = { laboral: "Día laboral", sabado: "Sábado", domi
 export const SERVICE_HOURS = {
   laboral: [6.0, 23.0],
   sabado:  [6.5, 23.0],
-  domingo: [7.5, 22.5],
+  domingo: [7.5, 23.0],
 };
 
 /** ¿Está abierto el Metro a esta hora (s)? */
@@ -278,7 +278,7 @@ const DEMAND_PROFILE = {
             [18.5, 0.95], [19, 0.86], [19.5, 0.68], [20, 0.5], [21, 0.32], [22, 0.2], [22.9, 0.1], [23.0, 0]],
   sabado:  [[6.4, 0], [6.5, 0.12], [8, 0.2], [10, 0.32], [12, 0.42], [13.5, 0.45], [16, 0.4], [18, 0.38], [20, 0.28],
             [22, 0.15], [22.9, 0.06], [23.0, 0]],
-  domingo: [[7.4, 0], [7.5, 0.08], [9, 0.14], [11, 0.24], [13, 0.3], [17, 0.3], [19, 0.26], [21, 0.14], [22.4, 0.04], [22.5, 0]],
+  domingo: [[7.4, 0], [7.5, 0.08], [9, 0.14], [11, 0.24], [13, 0.3], [17, 0.3], [19, 0.26], [21, 0.14], [22, 0.08], [22.9, 0.03], [23.0, 0]],
 };
 /** Demanda mínima fuera del horario comercial (servicio nocturno simbólico del juego). */
 const NIGHT_DEMAND = 0.03;
