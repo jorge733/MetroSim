@@ -118,6 +118,7 @@ import { SECTION_LABEL } from "./engine/sections.js";
 import { joinDriverRoom } from "./net/netClient.js";
 import { cleanRoomCode, localNetwork, NET_LEVEL } from "./net/transport.js";
 import { startPoint } from "./net/replica.js";
+import { setupFareInfo, openFareInfo, closeFareInfo, fareInfoOpen, tickFareInfo } from "./fareInfo.js";
 
 // La vía en 3D sigue las pendientes reales: se engancha antes de compilar ningún material
 installTrackLift();
@@ -367,6 +368,16 @@ setInterval(() => { if (!game) renderClock(); }, 10000);
 
 /* ---------- Hora y tramo tarifario en la portada (1.8) ---------- */
 
+let hudBandShown = null;
+/** Punto de color del tramo vigente junto a la HORA del HUD (y la hora del panel de tarifas, si está abierto). */
+function updateHudClockBand() {
+  tickFareInfo(game.clock);
+  const state = inService(game.clock) ? fareBandAt(game.clock).id : "closed";
+  if (state === hudBandShown) return;
+  hudBandShown = state;
+  $("hudClockBand").className = `hud-clock-band ${state}`;
+}
+
 /** "HH:MM" de una hora en horas decimales o de un Date. */
 function hhmm(x) {
   const m = x instanceof Date ? x.getHours() * 60 + x.getMinutes() : Math.round(x * 60) % 1440;
@@ -422,6 +433,23 @@ document.querySelectorAll("[data-mode]").forEach(btn => btn.addEventListener("cl
 // "¿Primera vez? Con tutorial" de cada modo: juega ese modo con el tutorial interactivo desde el principio
 document.querySelectorAll("[data-tutorial]").forEach(btn => btn.addEventListener("click", () => startGame(btn.dataset.tutorial, { tutorial: true })));
 $("backButton").addEventListener("click", requestMenu);
+// 1.9 · Tocar la hora (portada o HUD) abre las tarifas según el horario
+setupFareInfo();
+function showFares() {
+  if (game) {
+    const w = game.walker, wasFrozen = w?.frozen;
+    if (w) { w.frozen = true; w.keys.clear(); }
+    if (document.pointerLockElement) document.exitPointerLock?.();
+    openFareInfo({ clock: game.clock, dayType: CONFIG.dayType, onClose: () => { if (w && game?.walker === w && !wasFrozen && !confirmOpen) { w.frozen = false; w.keys.clear(); } } });
+  } else {
+    const now = new Date();
+    openFareInfo({ clock: now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds(), dayType: dayTypeOf(now) });
+  }
+}
+$("clockNow").addEventListener("click", showFares);
+$("clockNow").addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); showFares(); } });
+$("hudClock").addEventListener("click", (ev) => { ev.currentTarget.blur(); showFares(); });
+window.addEventListener("keydown", (ev) => { if (!game && fareInfoOpen() && ev.key === "Escape") closeFareInfo(); });
 $("confirmOk").addEventListener("click", () => closeConfirm(true));
 $("confirmCancel").addEventListener("click", () => closeConfirm(false));
 $("confirmPanel").addEventListener("click", (ev) => { if (ev.target === ev.currentTarget) closeConfirm(false); });
@@ -716,6 +744,7 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = {}) {
 
 function stopGame({ keepFullscreen = false } = {}) {
   if (!game) return;
+  closeFareInfo();
   if (game.net) { game.net.leave(); applyWeatherChoice(); }     // sale de la sala y vuelve al tiempo elegido
   game.touch?.destroy();
   hud.setTurnPanel(null);
@@ -786,6 +815,7 @@ window.addEventListener("popstate", () => {
   const shopClose = document.querySelector(".shop-overlay .shop-close");
   if (shopClose) shopClose.click();
   else if (confirmOpen) closeConfirm(false);
+  else if (fareInfoOpen()) closeFareInfo();
   else if (game && hud.ticketOpen) hud.closeTicket();
   else if (game && hud.storeOpen) hud.closeStore();
   else if (game && hud.missionsOpen) hud.closeMissions();
@@ -941,6 +971,7 @@ function onKeyDown(event) {
   if (["arrowup", "arrowdown", "arrowleft", "arrowright", " ", "pageup", "pagedown"].includes(key)) event.preventDefault();
   if (hud.summaryOpen) return;
   if (confirmOpen) { if (key === "escape") closeConfirm(false); else if (key === "enter") closeConfirm(true); return; }
+  if (fareInfoOpen()) { if (key === "escape" || key === "enter") closeFareInfo(); return; }
   if (hud.ticketOpen) { if (key === "escape" || key === "e") hud.closeTicket(); return; }
   if (hud.storeOpen) { if (key === "escape" || key === "e") hud.closeStore(); return; }
   if (hud.missionsOpen) { if (key === "escape" || key === "j") hud.closeMissions(); return; }
@@ -2583,6 +2614,7 @@ function loop(now) {
     game.tutorial?.update(dt, { game, walker, card, hud, fare: fareBandAt(game.clock).price });
   }
 
+  updateHudClockBand();
   renderFrame();
   game.raf = requestAnimationFrame(loop);
 }

@@ -1685,3 +1685,41 @@ body.touch-mode .back-button.driver-job-button { top: auto; bottom: calc(120px +
 }
 .cab-screens-hint { margin: 0; color: #a7b6c6; font-size: 13px; }
 .cab-screens-hint kbd { font-size: 11px; }
+
+/* ---------- 1.9 · Tarifas según el horario (tocando la hora) ---------- */
+.clock-now { cursor: pointer; border-radius: var(--radius); margin: -6px; padding: 6px; transition: background .15s; }
+.clock-now:hover, .clock-now:focus-visible { background: #ffffff0a; outline: none; }
+.clock-more { margin-left: 6px; color: var(--warn); letter-spacing: .3px; text-transform: none; }
+.hud-clock { pointer-events: auto; cursor: pointer; color: var(--text); font: inherit; }
+.hud-clock:hover { background: var(--raise); }
+.hud-clock-band { --c: var(--dim); display: inline-block; width: 7px; height: 7px; margin-left: 4px; border-radius: 50%; background: var(--c); box-shadow: 0 0 6px var(--c); vertical-align: 1px; }
+.hud-clock-band.punta { --c: #ff5a4f; }
+.hud-clock-band.valle { --c: var(--warn); }
+.hud-clock-band.baja  { --c: var(--ok); }
+#fareInfoPanel { position: fixed; z-index: 30; }
+.fare-info-card { border-top-color: var(--warn); }
+.fare-info-now { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.fare-info-next { display: block !important; }
+.fare-prices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.fare-price { --c: var(--muted); display: grid; gap: 2px; padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, var(--c) 12%, transparent); box-shadow: inset 0 3px 0 var(--c); }
+.fare-price small { font-size: 11.5px; color: var(--muted); }
+.fare-price b { font: 700 18px/1.1 var(--f-data); font-variant-numeric: tabular-nums; }
+.fare-price span { font-size: 11px; color: var(--muted); }
+.fare-price.punta, .fare-slot.punta, .fare-bar-seg.punta { --c: #ff5a4f; }
+.fare-price.valle, .fare-slot.valle, .fare-bar-seg.valle { --c: var(--warn); }
+.fare-price.baja,  .fare-slot.baja,  .fare-bar-seg.baja  { --c: var(--ok); }
+.fare-days button { text-align: center; place-items: center; font-size: 12.5px; font-weight: 600; min-height: 36px; padding: 4px 8px; }
+.fare-days button.selected { background: var(--raise); color: var(--text); box-shadow: inset 0 -2px 0 var(--warn); }
+.fare-bar-wrap { display: grid; gap: 3px; }
+.fare-bar { position: relative; display: flex; height: 14px; border-radius: 7px; overflow: hidden; background: var(--raise); }
+.fare-bar-seg { background: var(--c); opacity: .85; }
+.fare-bar-seg + .fare-bar-seg { border-left: 1px solid var(--surface); }
+.fare-bar-now { position: absolute; top: -2px; bottom: -2px; width: 3px; margin-left: -1.5px; background: #fff; border-radius: 2px; box-shadow: 0 0 0 1px #0008, 0 0 8px #fff; }
+.fare-bar-ends { display: flex; justify-content: space-between; font: 600 11px/1 var(--f-data); color: var(--muted); }
+.fare-slot > span { display: inline-flex; align-items: center; gap: 8px; }
+.fare-slot i { width: 8px; height: 8px; border-radius: 50%; background: var(--c); flex: none; }
+.fare-slot-time { font-family: var(--f-data); font-variant-numeric: tabular-nums; font-size: 12px; color: var(--muted); }
+.fare-slot.current .fare-slot-time { color: inherit; }
+.fare-slot em { font-style: normal; font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 999px; background: var(--warn); color: #14305c; }
+.fare-notes { margin: 0; padding-left: 18px; display: grid; gap: 3px; font-size: 12px; line-height: 1.4; color: var(--muted); }
+@media (max-width: 420px) { .fare-price b { font-size: 15px; } }

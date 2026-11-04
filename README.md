@@ -117,6 +117,18 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **Salir por los torniquetes es gratis**: solo se cobra el pasaje al pasar hacia la zona pagada (antes, al terminar
   de cruzar el torniquete de salida se cobraba un pasaje).
 
+## Versión 1.9 · Tarifas según el horario
+
+- **Toca la hora para ver las tarifas** (`js/fareInfo.js`, `index.html`, `js/main.js`): en la portada (el bloque
+  «Hora y tarifa») y en la partida (la **HORA** del HUD, que ahora lleva un punto con el color del tramo vigente) se
+  abre un panel con:
+  - la hora y el tramo que se cobra ahora, cuándo cambia y cuánto más o menos costará el pasaje;
+  - el precio de cada tramo (🔴 punta, 🟡 valle, 🟢 baja) y cuánto se ahorra frente a la punta;
+  - una franja del día pintada por tramo, con la marca de «ahora», y la lista de horarios con su precio, para
+    lunes a viernes, sábado y domingo o festivo (pestañas; parte en el tipo de día de hoy);
+  - el horario de servicio de ese día y que las combinaciones no se vuelven a cobrar.
+  Durante la partida la hora del panel sigue corriendo. Se cierra con ✕, **Entendido**, **Esc** o tocando fuera.
+
 ## Versión 1.8 · Hora y tarifa en la portada
 
 - **Reloj en la portada** (`index.html`, `js/main.js`): junto al clima se ve la hora (la del dispositivo, la misma

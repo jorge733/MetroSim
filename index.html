@@ -98,7 +98,7 @@
         <header class="start-brand">
           <img class="metro-mark" src="logo.svg" alt="">
           <h1>MetroSim</h1>
-          <span class="start-ver">v1.8.3</span>
+          <span class="start-ver">v1.9</span>
         </header>
         <div class="start-hero">
           <p class="eyebrow">Simulador del Metro de Santiago</p>
@@ -126,8 +126,8 @@
           <p id="lineCardText" class="line-card-text"></p>
         </div>
 
-        <div class="clock-now" id="clockNow" aria-live="polite">
-          <span class="small-label">Hora y tarifa</span>
+        <div class="clock-now" id="clockNow" aria-live="polite" role="button" tabindex="0" title="Ver las tarifas según el horario">
+          <span class="small-label">Hora y tarifa <span class="clock-more">Ver horarios ›</span></span>
           <div class="clock-row">
             <b id="clockTime" class="clock-time">--:--</b>
             <span id="clockBand" class="clock-band"><i></i><span id="clockBandLabel">—</span><b id="clockBandPrice"></b></span>
@@ -285,10 +285,10 @@
             <span id="scoreFloat" class="score-float"></span>
           </div>
           <button id="soundButton" class="sound-button" aria-label="Sonido activado"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4zM16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/></svg></button>
-          <div class="hud-clock">
-            <span class="hud-label">HORA</span>
+          <button id="hudClock" class="hud-clock" type="button" title="Ver las tarifas según el horario" aria-label="Hora: ver las tarifas según el horario">
+            <span class="hud-label">HORA <span id="hudClockBand" class="hud-clock-band"></span></span>
             <span id="clock">08:00:00</span>
-          </div>
+          </button>
         </div>
       </header>
 
@@ -537,5 +537,36 @@
       <p>Para jugar necesitas activar JavaScript en tu navegador.</p>
     </div>
   </noscript>
+  <!-- 1.9 · Tarifas según el horario (se abre tocando la hora) -->
+  <div id="fareInfoPanel" class="ticket-panel hidden">
+    <div class="ticket-card fare-info-card" role="dialog" aria-labelledby="fareInfoTitle">
+      <header class="ticket-head">
+        <div class="ticket-head-text">
+          <span class="small-label">TARIFAS METRO</span>
+          <strong id="fareInfoTitle">Tarifas según el horario</strong>
+        </div>
+        <button id="fareInfoClose" class="ticket-close" type="button" aria-label="Cerrar">✕</button>
+      </header>
+      <div class="fare-info-now">
+        <b id="fareInfoTime" class="clock-time">--:--</b>
+        <span id="fareInfoBand" class="clock-band"><i></i><span id="fareInfoBandLabel">—</span><b id="fareInfoBandPrice"></b></span>
+      </div>
+      <small id="fareInfoNext" class="clock-note fare-info-next"></small>
+      <div id="fareInfoPrices" class="fare-prices"></div>
+      <div id="fareInfoDays" class="seg fare-days" role="tablist" aria-label="Tipo de día"></div>
+      <div class="fare-bar-wrap">
+        <div id="fareInfoBar" class="fare-bar"></div>
+        <div class="fare-bar-ends"><span id="fareInfoBarFrom"></span><span id="fareInfoBarTo"></span></div>
+      </div>
+      <div id="fareInfoList" class="ticket-fares"></div>
+      <ul id="fareInfoNotes" class="fare-notes"></ul>
+      <footer class="ticket-actions">
+        <span></span>
+        <button id="fareInfoOk" class="go-button" type="button">Entendido</button>
+      </footer>
+    </div>
+  </div>
+
+
 </body>
 </html>
