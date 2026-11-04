@@ -1735,6 +1735,7 @@ body.touch-mode .back-button.driver-job-button { top: auto; bottom: calc(120px +
 }
 .rider-field input:focus { outline: 2px solid var(--warn); outline-offset: 1px; }
 .rider-check { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 8px; background: #ffffff08; font-size: 13.5px; cursor: pointer; }
+.rider-check small { display: block; margin-top: 2px; font-size: 11.5px; color: var(--muted); }
 .rider-check input { width: 18px; height: 18px; accent-color: var(--warn); flex: none; }
 #riderSave:disabled { opacity: .45; pointer-events: none; }
 .fare-mine { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px 8px 12px; border-radius: 8px; background: #ffffff08; font-size: 13px; }

@@ -6,7 +6,9 @@
      (y si es estudiante con TNE). Se guarda solo en este dispositivo
      (localStorage). Se puede cambiar cuando quiera desde el panel de tarifas.
    · Tarifas (config.js → FARES.special), iguales a cualquier hora y día:
-       - Adulto mayor (TAM): desde los 65 años; las mujeres, desde los 60.
+       - Adulto mayor (TAM): personas pensionadas, mujeres desde los 60 años y
+         hombres desde los 65. Desde los 60 el jugador marca si tiene TAM (a los
+         65 viene marcada).
        - Estudiante (TNE): estudiantes de básica, media o superior.
      Si no tiene ninguna, paga la tarifa general por tramo horario.
    ========================================================================== */
@@ -14,7 +16,7 @@
 import { FARES, fareBandAt, CONFIG } from "./config.js";
 
 const KEY = "metrosim.rider";
-export const SENIOR_AGE = 65, SENIOR_AGE_TAM_WOMEN = 60;
+export const TAM_MIN_AGE = 60, TAM_DEFAULT_AGE = 65;
 
 let profile = read();
 
@@ -28,10 +30,10 @@ export const riderProfile = () => profile;
 
 /**
  * Guarda el perfil.
- * @param {{birth?: string, student?: boolean, woman60?: boolean, skipped?: boolean}} p  birth = "AAAA-MM-DD"
+ * @param {{birth?: string, student?: boolean, tam?: boolean, skipped?: boolean}} p  birth = "AAAA-MM-DD"
  */
 export function setRider(p) {
-  profile = { birth: p.birth || "", student: !!p.student, woman60: !!p.woman60, skipped: !!p.skipped };
+  profile = { birth: p.birth || "", student: !!p.student, tam: !!p.tam, skipped: !!p.skipped };
   try { localStorage.setItem(KEY, JSON.stringify(profile)); } catch { /* sin almacenamiento: vale para esta sesión */ }
 }
 
@@ -51,7 +53,9 @@ export function ageOf(birth, on = new Date()) {
 export function categoryOf(p = profile) {
   if (!p || p.skipped) return "general";
   const age = ageOf(p.birth);
-  if (age != null && (age >= SENIOR_AGE || (age >= SENIOR_AGE_TAM_WOMEN && p.woman60))) return "mayor";
+  // (los perfiles de la 1.10 guardaban woman60 y daban la TAM sola a los 65)
+  const tam = p.tam ?? p.woman60 ?? (age != null && age >= TAM_DEFAULT_AGE);
+  if (age != null && age >= TAM_MIN_AGE && tam) return "mayor";
   if (p.student) return "estudiante";
   return "general";
 }

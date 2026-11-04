@@ -124,14 +124,19 @@ trenes de los dos motores quedan a ~1 m (mediana).
   se ve al momento cuánto pagarás. Con «Ahora no» se juega con la tarifa general y no se vuelve a preguntar. Se guarda
   solo en el dispositivo y se cambia cuando quieras con **Cambiar** en el panel de tarifas (tocando la hora).
 - **Tarifas rebajadas** (`js/config.js` → `FARES.special`), como en el tarifario de Metro, iguales a cualquier hora y día:
-  - **Adulto mayor (TAM): $260**, desde los 65 años (las mujeres, desde los 60: hay una casilla para eso entre los 60 y
-    los 64). La bip! Adulto Mayor ($390, con buses) aparece como referencia; en el juego conviene la TAM.
+  - **Adulto mayor (TAM): $260**, para personas pensionadas: mujeres desde los 60 años y hombres desde los 65. Desde
+    los 60 aparece la casilla «Tengo tarjeta Adulto Mayor (TAM)» (a los 65 viene marcada). La bip! Adulto Mayor ($390,
+    con buses) aparece como referencia; en el juego conviene la TAM.
   - **Estudiante (TNE): $260**, todo el año.
 - **Se cobra en todo el juego**: torniquetes, el aviso de saldo bajo, la boletería (tu tarifa arriba, resaltada), la
   calle, las misiones y el tutorial. La portada muestra tu precio junto al tramo («$260 TNE»). Con tarifa rebajada no
   sale la misión «Viaje económico» (ya pagas lo mínimo).
 - **Arreglo del tarifario** (`js/config.js`): la hora baja de la mañana es de 06:00 a 06:59, como en la tabla oficial
   (antes, de 06:30 a 07:00 se cobraba valle).
+
+**1.10.1 · La TAM es para todos** (`js/rider.js`, `js/riderPanel.js`): la casilla «Soy mujer: tengo TAM desde los 60»
+daba a entender que la tarjeta era solo para mujeres. Ahora es «Tengo tarjeta Adulto Mayor (TAM)», aparece desde los 60
+años para cualquiera, explica el requisito (mujeres desde 60, hombres desde 65, pensionados) y viene marcada a los 65.
 
 ## Versión 1.9 · Tarifas según el horario
 

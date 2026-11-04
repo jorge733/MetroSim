@@ -6,10 +6,11 @@
    ========================================================================== */
 
 import { FARES, formatCLP } from "./config.js";
-import { riderProfile, setRider, ageOf, categoryOf, riderSpecial, SENIOR_AGE, SENIOR_AGE_TAM_WOMEN } from "./rider.js";
+import { riderProfile, setRider, ageOf, categoryOf, riderSpecial, TAM_MIN_AGE, TAM_DEFAULT_AGE } from "./rider.js";
 
 const $ = (id) => document.getElementById(id);
 let onDone = null;
+let tamTouched = false;                   // si el jugador tocó la casilla TAM, ya no se marca sola al cambiar la fecha
 
 export const riderPanelOpen = () => !!onDone;
 
@@ -22,7 +23,7 @@ function preview(p) {
   if (p.birth && age == null) return { cls: "error", text: "Esa fecha no es válida." };
   if (special) {
     const why = categoryOf(p) === "mayor"
-      ? `Con ${age} años tienes tarjeta TAM de adulto mayor`
+      ? "Con tu tarjeta TAM de adulto mayor"
       : "Con tu TNE de estudiante";
     return { cls: "ok", text: `${why}: pagas ${formatCLP(special.price)} por viaje, a cualquier hora y todos los días (la tarifa general es de ${range}).` };
   }
@@ -33,16 +34,17 @@ function preview(p) {
 function read() {
   // Las casillas ocultas no cuentan (p. ej. «estudiante» marcada antes de poner una edad de adulto mayor)
   const on = (id) => $(id).checked && !$(`${id}Row`).classList.contains("hidden");
-  return { birth: $("riderBirth").value, student: on("riderStudent"), woman60: on("riderWoman60") };
+  return { birth: $("riderBirth").value, student: on("riderStudent"), tam: on("riderTam") };
 }
 
 function refresh() {
-  const p = read(), age = ageOf(p.birth);
-  const senior = age != null && age >= SENIOR_AGE;
-  // TAM desde los 60 para las mujeres: la casilla solo tiene sentido entre los 60 y los 64
-  $("riderWoman60Row").classList.toggle("hidden", !(age != null && age >= SENIOR_AGE_TAM_WOMEN && !senior));
-  $("riderStudentRow").classList.toggle("hidden", senior);
-  const pv = preview(p), el = $("riderPreview");
+  const age = ageOf($("riderBirth").value);
+  // TAM: desde los 60 se puede tener (mujeres desde 60, hombres desde 65); a los 65 viene marcada
+  const canTam = age != null && age >= TAM_MIN_AGE;
+  if (canTam && !tamTouched) $("riderTam").checked = age >= TAM_DEFAULT_AGE;
+  $("riderTamRow").classList.toggle("hidden", !canTam);
+  $("riderStudentRow").classList.toggle("hidden", canTam && $("riderTam").checked);
+  const pv = preview(read()), el = $("riderPreview");     // se vuelve a leer: las casillas acaban de cambiar
   el.className = `ticket-status ${pv.cls}`;
   el.textContent = pv.text;
   $("riderSave").disabled = pv.cls === "error";
@@ -61,7 +63,9 @@ export function openRiderPanel({ first = false, done } = {}) {
   $("riderBirth").max = new Date().toISOString().slice(0, 10);
   $("riderBirth").value = p.skipped ? "" : (p.birth || "");
   $("riderStudent").checked = !!p.student;
-  $("riderWoman60").checked = !!p.woman60;
+  const age = ageOf(p.birth);
+  $("riderTam").checked = !!(p.tam ?? p.woman60 ?? (age != null && age >= TAM_DEFAULT_AGE));
+  tamTouched = p.tam != null || p.woman60 != null;
   onDone = { done, first };
   refresh();
   $("riderPanel").classList.remove("hidden");
@@ -81,9 +85,9 @@ function close(save) {
 export const closeRiderPanel = () => close(false);
 
 export function setupRiderPanel() {
-  ["riderBirth", "riderStudent", "riderWoman60"].forEach(id => $(id).addEventListener("input", refresh));
+  $("riderBirth").addEventListener("input", refresh);
   $("riderStudent").addEventListener("change", refresh);
-  $("riderWoman60").addEventListener("change", refresh);
+  $("riderTam").addEventListener("change", () => { tamTouched = true; refresh(); });
   $("riderSave").addEventListener("click", () => close(true));
   $("riderSkip").addEventListener("click", () => close(false));
   $("riderPanel").addEventListener("keydown", (ev) => {

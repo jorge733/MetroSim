@@ -176,7 +176,7 @@ function render() {
   const mine = riderCategory();
   $("fareInfoSpecial").replaceChildren(...[
     [`Estudiante · TNE`, FARES.special.estudiante.price, mine === "estudiante"],
-    [`Adulto mayor · TAM (desde 65 años; mujeres, 60)`, FARES.special.mayor.price, mine === "mayor"],
+    [`Adulto mayor · TAM (mujeres desde 60, hombres desde 65)`, FARES.special.mayor.price, mine === "mayor"],
     [`Adulto mayor · bip! Adulto Mayor (con buses)`, FARES.seniorBipPrice, false],
   ].map(([label, price, cur]) => {
     const row = document.createElement("div");
