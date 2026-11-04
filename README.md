@@ -134,6 +134,11 @@ y festivos (antes, 22:30), como en el horario real. La demanda de la última med
 **1.8.2 · Arreglo: el juego no arrancaba** (`index.html`): al unir la 1.7.2 con la 1.8 se perdió el panel de las
 pantallas de cabina ampliadas (y su tecla **P** en la portada); sin él, la partida quedaba en negro al empezar.
 
+**1.8.3 · La intro sale al instante** (`js/boot.js`, `js/intro.js`): antes se veía la portada un momento y después
+empezaba la intro, porque la arrancaba `main.js` cuando ya había bajado Three.js y armado el juego. Ahora la página
+abre con la portada oculta y un arranque liviano (`boot.js`) lanza la intro de inmediato mientras el juego carga
+detrás; la portada aparece al terminar la intro (si la conexión es lenta, la intro espera a que el juego esté listo).
+
 ## Versión 1.7 · Maniobra de retorno real
 
 Al final de la línea el tren ya no salta de vía: hace la maniobra como en el Metro de verdad.

@@ -14,14 +14,14 @@
    sin conexión.
    ========================================================================== */
 
-const CACHE = "metrosim-v1.8.2";
+const CACHE = "metrosim-v1.8.3";
 const CDN = ["cdn.jsdelivr.net", "unpkg.com"];
 
 /** Lo mínimo para que la portada abra sin conexión aunque no se haya jugado. */
 const SHELL = [
   "./", "index.html", "styles.css", "logo.svg", "favicon.svg",
   "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/bip.png",
-  "js/main.js",
+  "js/boot.js", "js/main.js",
   // Fuentes de la interfaz (si faltan, la portada usa letras del sistema)
   "fonts/barlow-latin-400-normal.woff2", "fonts/barlow-latin-500-normal.woff2",
   "fonts/barlow-latin-600-normal.woff2", "fonts/barlow-latin-700-normal.woff2",

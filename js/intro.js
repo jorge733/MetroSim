@@ -527,8 +527,9 @@ function welcomeSound(muted) {
  * Muestra la introducción y oculta el menú hasta que termina.
  * @param {object} opts
  * @param {() => boolean} opts.isMuted
+ * @param {Promise} [opts.menuReady]  la portada sale cuando esto se cumple (el juego terminó de cargar)
  */
-export function playIntro({ isMuted = () => false } = {}) {
+export function playIntro({ isMuted = () => false, menuReady = null } = {}) {
   const menu = document.getElementById("startScreen");
   const style = document.createElement("style");
   style.textContent = CSS;
@@ -608,9 +609,12 @@ export function playIntro({ isMuted = () => false } = {}) {
     window.removeEventListener("keydown", onKey);
     clearInterval(typer); clearInterval(counters); watch.disconnect();
     if (withSound) welcomeSound(isMuted());
-    root.classList.add("leaving");
-    menu?.classList.remove("hidden");
-    setTimeout(() => { scene.stop(); map.stop(); root.remove(); style.remove(); }, 950);
+    // Si el juego aún carga (conexión lenta), la intro espera en pantalla para no mostrar una portada vacía
+    Promise.resolve(menuReady).catch(() => {}).then(() => {
+      root.classList.add("leaving");
+      menu?.classList.remove("hidden");
+      setTimeout(() => { scene.stop(); map.stop(); root.remove(); style.remove(); }, 950);
+    });
   };
   // Durante el túnel, cualquier tecla adelanta a la ciudad; después, entra al menú
   const onKey = (e) => {

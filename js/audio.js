@@ -21,7 +21,8 @@
    llama desde el clic que inicia la partida.
    ========================================================================== */
 
-import { clamp } from "./utils.js";
+/** Acota v a [a, b]. Local para que audio.js (y la intro, que lo usa) no dependan de utils.js, que carga Three.js. */
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
 /**
  * Elige la voz en español más realista del navegador: primero español de

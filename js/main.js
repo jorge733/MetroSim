@@ -73,7 +73,6 @@ import { ROUTES, ROUTE_A, ROUTE_B, routeForSide, oppositeRoute, setActiveLine } 
 import { LINES, lineById } from "./engine/network.js";
 import { BipCard } from "./card.js";
 import { PHRASES } from "./announcements.js";
-import { playIntro } from "./intro.js";
 import { setupPWA } from "./pwa.js";
 import { setupCreator } from "./creator.js";
 import { icon, textOn } from "./icons.js";
@@ -141,8 +140,7 @@ const civics = new Civics();              // civismo del pasajero (ayudar a otro
 hud.setBank(bank);
 const directionSelect = $("startDirection");
 
-// Introducción de bienvenida (solo al abrir la página)
-playIntro({ isMuted: () => muted });
+// La introducción de bienvenida la arranca boot.js apenas abre la página (1.8.3)
 // App instalable: service worker (sin conexión) y botón "Instalar MetroSim"
 setupPWA($("installButton"));
 // Modo Creador (?creador): todo desbloqueado y gratis para el creador del juego
