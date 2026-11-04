@@ -17,6 +17,7 @@ Three.js se carga desde CDN, así que la primera vez hace falta conexión a inte
 
 `dist/MetroSim.apk` instala el juego como app de Android (funciona sin internet). Se reconstruye con
 `python3 android/build/build.py`; detalles en [android/LEEME.md](android/LEEME.md).
+Para Google Play, `python3 android/build/build.py --aab` deja `dist/MetroSim.aab` (App Bundle).
 
 ## Instalar como app (PWA)
 
@@ -155,6 +156,13 @@ Al final de la línea el tren ya no salta de vía: hace la maniobra como en el M
 - El gong de entrada tiene armónicos suaves (suena a campana) y la voz entra cuando se apaga.
 - Grabación propia opcional: si `audio/voz/manifest.json` incluye `bienvenida`, suena `audio/voz/bienvenida.mp3`
   con un filtro de altavoz en vez de la voz sintetizada.
+
+**1.7.2 · App Bundle para Google Play** (`android/build/aab.py`, `android/build/build.py`)
+
+- `python3 android/build/build.py --aab` arma `dist/MetroSim.aab`, el formato que pide Google Play: manifiesto y
+  tabla de recursos en protobuf (como aapt2) y firma JAR con la clave de subida. Sigue sin necesitar el SDK de Android.
+- La app apunta a Android 16 (API 36), lo que exige Play desde agosto de 2026. El botón «atrás» sigue yendo al
+  historial del juego (`enableOnBackInvokedCallback="false"`).
 
 ## Versión 1.6 · Asistente de parada
 

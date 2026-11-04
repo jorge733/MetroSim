@@ -28,13 +28,32 @@ el SDK de Android ni Gradle. El script:
 - alinea los archivos sin comprimir y firma con `metrosim.keystore` usando el esquema de firma v2
   (`build/firma.py`, con openssl), que exige Android para apps hechas para versiones recientes.
 
-La app declara `targetSdkVersion` 35 (Android 15): con una versión antigua, Google Play Protect la
-bloquea como «app no segura».
+La app declara `targetSdkVersion` 36 (Android 16), lo que Google Play exige desde agosto de 2026 (con una versión
+antigua, además, Play Protect la bloquea como «app no segura»). Declara `enableOnBackInvokedCallback="false"` para
+que Android 16 siga llamando a `onBackPressed`.
 
 La app sirve los archivos desde `https://appassets.androidplatform.net/` (interceptando las
 peticiones del WebView), así que módulos, `fetch` y `localStorage` funcionan como en el navegador.
 El botón «atrás» del teléfono va al historial del juego (cierra ventanas o pide confirmación) y en
 la portada sale de la app.
+
+## App Bundle para Google Play (AAB)
+
+```
+python3 android/build/build.py --aab      # deja dist/MetroSim.aab
+```
+
+Google Play no acepta APK: pide un App Bundle. Es el mismo juego, pero `build/aab.py` escribe el manifiesto
+y la tabla de recursos en protobuf (el formato de aapt2) en un módulo `base/`, agrega `BundleConfig.pb` y lo firma
+con `jarsigner`. Tampoco necesita el SDK.
+
+Al subirlo, Play Console usa **Firma de apps de Google Play**: la firma del AAB (`metrosim.keystore`) queda como
+**clave de subida** y Google firma los APK que entrega con su propia clave. Por eso la app de Play no se instala
+encima del APK instalado a mano: hay que desinstalarlo primero, y con eso se pierde el avance guardado. Si se pierde la
+clave de subida, Play permite cambiarla desde la consola.
+
+Para revisarlo antes de subirlo, con [bundletool](https://github.com/google/bundletool):
+`java -jar bundletool.jar build-apks --bundle=dist/MetroSim.aab --output=MetroSim.apks --mode=universal`.
 
 ## Clave de firma
 

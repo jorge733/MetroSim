@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """
-Construye MetroSim.apk sin el SDK de Android.
+Construye MetroSim.apk (o MetroSim.aab para Google Play) sin el SDK de Android.
 
     python3 android/build/build.py [--three DIR] [--out MetroSim.apk]
+    python3 android/build/build.py --aab [--out MetroSim.aab]
 
 1. Copia el juego a assets/www (con Three.js local en vendor/three, sin CDN).
 2. Genera classes.dex (dex.py + app.py), AndroidManifest.xml y resources.arsc (axml.py).
 3. Empaqueta, alinea los archivos sin comprimir y firma con el esquema v2 (firma.py, con openssl).
+   Con --aab arma en cambio el App Bundle (manifiesto y recursos en protobuf, aab.py) y lo firma con jarsigner.
 
 Three.js: --three apunta al paquete npm "three" descomprimido (carpeta con
 build/ y examples/); si no se indica, se descarga con `npm pack three@VERSIÓN`.
@@ -32,12 +34,13 @@ sys.path.insert(0, HERE)
 
 from dex import build as build_dex          # noqa: E402
 from app import CLASSES                      # noqa: E402
+import aab                                   # noqa: E402
 import axml                                  # noqa: E402
 import firma                                 # noqa: E402
 
 PACKAGE = "cl.metrosim.app"
 THREE_VERSION = "0.180.0"
-TARGET_SDK = 35                              # Android 15: Play Protect bloquea las apps hechas para versiones antiguas
+TARGET_SDK = 36                              # Android 16: lo exige Google Play desde agosto de 2026 (y Play Protect bloquea las antiguas)
 KEYSTORE = os.path.join(ANDROID, "metrosim.keystore")
 KEY_ALIAS, KEY_PASS = "metrosim", "metrosim"
 GAME = ["index.html", "styles.css", "favicon.svg", "logo.svg", "manifest.webmanifest", "js", "audio", "fonts", "icons"]
@@ -93,7 +96,7 @@ def copy_game(www, three):
     open(p, "w", encoding="utf-8").write(js2)
 
 
-def manifest_xml(version_name, version_code):
+def manifest_tree(version_name, version_code):
     S, I, H, B, R = axml.TYPE_STRING, axml.TYPE_INT_DEC, axml.TYPE_INT_HEX, axml.TYPE_INT_BOOLEAN, axml.TYPE_REFERENCE
     a = lambda name, value, typ: (True, name, value, typ)          # atributo android:*
     activity = ("activity", [
@@ -112,8 +115,10 @@ def manifest_xml(version_name, version_code):
         a("icon", 0x7F010000, R),
         a("theme", 0x01030007, R),                 # @android:style/Theme.NoTitleBar.Fullscreen
         a("hardwareAccelerated", True, B),
+        # Android 16 (API 36) ya no llama a onBackPressed salvo que la app lo pida: el «atrás» va al historial del juego
+        a("enableOnBackInvokedCallback", False, B),
     ], [activity])
-    return axml.manifest(("manifest", [
+    return ("manifest", [
         (False, "package", PACKAGE, S),
         a("versionCode", version_code, I),
         a("versionName", version_name, S),
@@ -121,7 +126,7 @@ def manifest_xml(version_name, version_code):
         ("uses-sdk", [a("minSdkVersion", 24, I), a("targetSdkVersion", TARGET_SDK, I)], []),
         ("uses-permission", [a("name", "android.permission.INTERNET", S)], []),
         app,
-    ]))
+    ])
 
 
 def keystore():
@@ -155,36 +160,50 @@ def align(src, dst):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--three", help="paquete npm three descomprimido")
-    ap.add_argument("--out", default=os.path.join(ROOT, "dist", "MetroSim.apk"))
+    ap.add_argument("--aab", action="store_true", help="App Bundle para Google Play en vez de APK")
+    ap.add_argument("--out", help="archivo de salida (por defecto dist/MetroSim.apk o dist/MetroSim.aab)")
     args = ap.parse_args()
+    out = args.out or os.path.join(ROOT, "dist", "MetroSim.aab" if args.aab else "MetroSim.apk")
     version_name, version_code = version()
+    tree = manifest_tree(version_name, version_code)
 
     with tempfile.TemporaryDirectory() as tmp:
         three = args.three or get_three(tmp)
         www = os.path.join(tmp, "www")
         os.makedirs(www)
         copy_game(www, three)
+        keystore()
+        os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
 
-        unsigned = os.path.join(tmp, "unsigned.apk")
+        unsigned = os.path.join(tmp, "unsigned.zip")
+        base = "base/" if args.aab else ""
         with zipfile.ZipFile(unsigned, "w", zipfile.ZIP_DEFLATED) as z:
             def put(name, data):
-                z.writestr(name, data, zipfile.ZIP_STORED if name.lower().endswith(STORED) else zipfile.ZIP_DEFLATED)
-            put("AndroidManifest.xml", manifest_xml(version_name, version_code))
-            put("classes.dex", build_dex(CLASSES))
-            put("resources.arsc", axml.resources(PACKAGE, "res/drawable/icon.png"))
+                z.writestr(base + name, data, zipfile.ZIP_STORED if name.lower().endswith(STORED) else zipfile.ZIP_DEFLATED)
+            if args.aab:
+                z.writestr("BundleConfig.pb", aab.bundle_config())
+                put("manifest/AndroidManifest.xml", aab.manifest(tree))
+                put("dex/classes.dex", build_dex(CLASSES))
+                put("resources.pb", aab.resources(PACKAGE, "res/drawable/icon.png"))
+            else:
+                put("AndroidManifest.xml", axml.manifest(tree))
+                put("classes.dex", build_dex(CLASSES))
+                put("resources.arsc", axml.resources(PACKAGE, "res/drawable/icon.png"))
             put("res/drawable/icon.png", open(os.path.join(ROOT, "icons/icon-192.png"), "rb").read())
-            for base, dirs, files in os.walk(www):
+            for root, dirs, files in os.walk(www):
                 dirs.sort()
                 for f in sorted(files):
-                    full = os.path.join(base, f)
+                    full = os.path.join(root, f)
                     put("assets/www/" + os.path.relpath(full, www).replace(os.sep, "/"), open(full, "rb").read())
 
-        keystore()
-        os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
-        align(unsigned, args.out)
-        firma.sign(args.out, KEYSTORE, KEY_PASS)
-        firma.verify(args.out)
-    print(f"{args.out} · MetroSim {version_name} (versionCode {version_code}) · {os.path.getsize(args.out) / 1e6:.1f} MB")
+        if args.aab:
+            shutil.copy2(unsigned, out)
+            aab.sign(out, KEYSTORE, KEY_ALIAS, KEY_PASS)
+        else:
+            align(unsigned, out)
+            firma.sign(out, KEYSTORE, KEY_PASS)
+            firma.verify(out)
+    print(f"{out} · MetroSim {version_name} (versionCode {version_code}) · {os.path.getsize(out) / 1e6:.1f} MB")
 
 
 if __name__ == "__main__":

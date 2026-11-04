@@ -15,6 +15,7 @@ ATTR_IDS = {
     "exported": 0x01010010, "screenOrientation": 0x0101001E, "configChanges": 0x0101001F,
     "minSdkVersion": 0x0101020C, "versionCode": 0x0101021B, "versionName": 0x0101021C,
     "targetSdkVersion": 0x01010270, "hardwareAccelerated": 0x010102D3,
+    "enableOnBackInvokedCallback": 0x0101066C,
 }
 
 TYPE_REFERENCE, TYPE_STRING, TYPE_INT_DEC, TYPE_INT_HEX, TYPE_INT_BOOLEAN = 0x01, 0x03, 0x10, 0x11, 0x12
