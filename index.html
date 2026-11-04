@@ -98,7 +98,7 @@
         <header class="start-brand">
           <img class="metro-mark" src="logo.svg" alt="">
           <h1>MetroSim</h1>
-          <span class="start-ver">v1.7.1</span>
+          <span class="start-ver">v1.7.2</span>
         </header>
         <div class="start-hero">
           <p class="eyebrow">Simulador del Metro de Santiago</p>
@@ -223,6 +223,7 @@
           <span><kbd>F</kbd> sentarse</span>
           <span><kbd>G</kbd> agarrarse</span>
           <span><kbd>T</kbd> cambio de cabina</span>
+          <span><kbd>P</kbd> pantallas de cabina</span>
           <span><kbd>J</kbd> misiones</span>
           <span><kbd>K</kbd> tienda</span>
           <span><kbd>M</kbd> sonido</span>
@@ -245,6 +246,13 @@
   <!-- =============================== PANTALLA DE JUEGO =============================== -->
   <section id="gameScreen" class="screen game-screen hidden">
     <div id="gameContainer"></div>
+    <div id="cabScreens" class="cab-screens hidden" role="dialog" aria-label="Pantallas de cabina ampliadas">
+      <div class="cab-screens-row">
+        <canvas id="cabScreenDmi" aria-label="DMI: velocidad, señal y parada"></canvas>
+        <canvas id="cabScreenStatus" aria-label="Estado del tren: recorrido y próximas estaciones"></canvas>
+      </div>
+      <p class="cab-screens-hint">Toca para cerrar · <kbd>P</kbd></p>
+    </div>
 
     <div id="hud">
       <!-- Barra superior -->

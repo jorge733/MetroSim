@@ -622,6 +622,7 @@ function buildCab(group, mat) {
     const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.52, 0.2925), glow(0xffffff, { map: display.texture }));
     screen.position.z = 0.011;
     bezel.add(screen);
+    display.mesh = screen;                          // para tocarla y verla ampliada (main.js)
     screens[key] = display;
   });
 

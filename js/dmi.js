@@ -1,6 +1,7 @@
 /* ==========================================================================
    MetroSim — Alpha 0.6 · dmi.js
    Pantalla de cabina (DMI) dibujada en un canvas y usada como textura.
+   1.7.2 · Más contraste, nunca en negro y vista ampliada (tocar la pantalla).
    1.5 · Avisos de PATINAJE / DESLIZAMIENTO (riel mojado), freno reostático
    en los trenes sin regeneración, modelo del tren y Ruta Expresa (estaciones
    que se pasan sin detenerse).
@@ -10,27 +11,70 @@ import * as THREE from "three";
 import { CONFIG } from "./config.js";
 import { clamp, makeCanvas, formatStopError } from "./utils.js";
 
+/** Tamaño lógico de las pantallas (todo el dibujo usa estas coordenadas). */
+export const SCREEN_W = 640, SCREEN_H = 360;
+const SCREEN_BG = "#0c141d";
+
+/**
+ * Canvas + textura de una pantalla de cabina. 1.7.2 · Nunca queda en negro:
+ * se dibuja una pantalla de arranque antes de crear la textura y, si el
+ * navegador descarta el canvas (Chrome en Android lo hace al ir a segundo
+ * plano o con poca memoria: «contextlost»), no se sube a la GPU un canvas
+ * vacío; se sigue mostrando el último cuadro hasta que vuelve.
+ */
+function setupScreen(owner, title) {
+  owner.canvas = makeCanvas(SCREEN_W, SCREEN_H);
+  owner.ctx = owner.canvas.getContext("2d");
+  owner.lost = false;
+  owner.mirror = null;                                   // vista ampliada (canvas HTML), si está abierta
+  owner.canvas.addEventListener?.("contextlost", () => { owner.lost = true; });
+  owner.canvas.addEventListener?.("contextrestored", () => { owner.lost = false; });
+  const g = owner.ctx;
+  g.fillStyle = SCREEN_BG; g.fillRect(0, 0, SCREEN_W, SCREEN_H);
+  g.fillStyle = "#a7b6c6"; g.font = "800 26px Arial"; g.textAlign = "center"; g.textBaseline = "middle";
+  g.fillText(title, SCREEN_W / 2, SCREEN_H / 2);
+  g.textBaseline = "alphabetic";
+  owner.texture = new THREE.CanvasTexture(owner.canvas);
+  owner.texture.colorSpace = THREE.SRGBColorSpace;
+  owner.texture.anisotropy = 16;                         // three la limita al máximo de la GPU: más nítida en ángulo
+}
+
+/** Dibuja en la textura (si el canvas sigue vivo) y en la vista ampliada (si está abierta). */
+function present(owner, paint) {
+  if (!owner.lost) {
+    paint(owner.ctx);
+    owner.texture.needsUpdate = true;
+  }
+  const m = owner.mirror;
+  if (m) {
+    const s = m.canvas.width / SCREEN_W;
+    m.setTransform(s, 0, 0, s, 0, 0);
+    paint(m);
+    m.setTransform(1, 0, 0, 1, 0, 0);
+  }
+}
+
 export class CabDisplay {
   constructor() {
-    this.canvas = makeCanvas(640, 360);
-    this.ctx = this.canvas.getContext("2d");
-    this.texture = new THREE.CanvasTexture(this.canvas);
-    this.texture.colorSpace = THREE.SRGBColorSpace;
-    this.texture.anisotropy = 4;
+    setupScreen(this, "DMI · INICIANDO…");
   }
 
   draw(sim, info) {
-    const g = this.ctx, Wd = 640, Hd = 360;
-    g.fillStyle = "#070b10"; g.fillRect(0, 0, Wd, Hd);
-    g.strokeStyle = "#1f2a35"; g.lineWidth = 4; g.strokeRect(2, 2, Wd - 4, Hd - 4);
+    present(this, (g) => this.paint(g, sim, info));
+  }
+
+  paint(g, sim, info) {
+    const Wd = SCREEN_W, Hd = SCREEN_H;
+    g.fillStyle = SCREEN_BG; g.fillRect(0, 0, Wd, Hd);
+    g.strokeStyle = "#2c3a48"; g.lineWidth = 4; g.strokeRect(2, 2, Wd - 4, Hd - 4);
 
     /* --- Inversor (sentido de marcha) --- */
     const rev = sim.reverserData;
-    const revColor = { F: "#6fe39a", N: "#8b9bab", R: "#ffb547" }[rev.id];
+    const revColor = { F: "#6fe39a", N: "#a7b6c6", R: "#ffb547" }[rev.id];
     g.fillStyle = revColor; g.fillRect(14, 14, 44, 34);
     g.fillStyle = "#0a121b"; g.font = "900 24px Arial"; g.textAlign = "center"; g.textBaseline = "middle";
     g.fillText(rev.id, 36, 32);
-    g.fillStyle = revColor; g.font = "700 12px Arial"; g.textAlign = "left";
+    g.fillStyle = revColor; g.font = "700 13px Arial"; g.textAlign = "left";
     g.fillText(rev.label, 64, 32);
 
     /* --- Avisos de seguridad (vigilancia, ATP, marcha a la vista) --- */
@@ -91,7 +135,7 @@ export class CabDisplay {
     g.fillStyle = "#1a242e"; g.beginPath(); g.arc(cx, cy, 50, 0, Math.PI * 2); g.fill();
     g.fillStyle = over ? "#ff6b6b" : "#ffffff"; g.font = "800 46px Arial";
     g.fillText(String(Math.round(kmh)), cx, cy - 4);
-    g.fillStyle = "#8b9bab"; g.font = "600 14px Arial"; g.fillText("km/h", cx, cy + 28);
+    g.fillStyle = "#a7b6c6"; g.font = "600 14px Arial"; g.fillText("km/h", cx, cy + 28);
     g.fillStyle = "#ff8a8a"; g.font = "700 16px Arial"; g.fillText(`LÍMITE ${info.limit}`, cx, cy + 112);
 
     /* --- Columna derecha --- */
@@ -119,22 +163,22 @@ export class CabDisplay {
       g.fillStyle = "#ffb547"; g.fillRect(mid - len, barY, len - elec, barH);
     }
     g.fillStyle = "#ffffff"; g.fillRect(mid - 1, barY - 3, 2, barH + 6);
-    g.fillStyle = "#8b9bab"; g.font = "600 12px Arial";
+    g.fillStyle = "#a7b6c6"; g.font = "700 13px Arial";
     g.textAlign = "left"; g.fillText("FRENO", x0, barY + 30);
     const regen = (sim.stock?.regenReceptivity ?? 1) > 0;
     g.fillStyle = "#3ee08a"; g.textAlign = "center"; g.fillText(regen ? "REGEN." : "REOSTÁT.", x0 + w * 0.34, barY + 30);
-    g.fillStyle = "#8b9bab"; g.textAlign = "right"; g.fillText("TRACCIÓN", x0 + w, barY + 30);
+    g.fillStyle = "#a7b6c6"; g.textAlign = "right"; g.fillText("TRACCIÓN", x0 + w, barY + 30);
 
     // Pendiente, tensión de catenaria y corriente (abajo a la izquierda)
     if (sim.voltage !== undefined) {
       const permil = Math.round((sim.grade || 0) * 1000);
       const arrow = permil > 1 ? "↗" : permil < -1 ? "↘" : "→";
-      g.fillStyle = Math.abs(permil) >= 20 ? "#ffd166" : "#9fb0c2";
+      g.fillStyle = Math.abs(permil) >= 20 ? "#ffd166" : "#bccbda";
       g.font = "700 15px Arial"; g.textAlign = "left";
       g.fillText(`${arrow} ${permil > 0 ? "+" : ""}${permil} ‰`, 16, 340);
-      g.fillStyle = "#9fb0c2";
+      g.fillStyle = "#bccbda";
       g.fillText(`${Math.round(sim.voltage)} V`, 106, 340);
-      g.fillStyle = sim.current < -5 ? "#3ee08a" : "#9fb0c2";
+      g.fillStyle = sim.current < -5 ? "#3ee08a" : "#bccbda";
       g.fillText(`${sim.current >= 0 ? "" : "−"}${Math.abs(Math.round(sim.current)).toLocaleString("es-CL")} A`, 180, 340);
     }
 
@@ -150,7 +194,7 @@ export class CabDisplay {
 
     // Estación
     g.textAlign = "left";
-    g.fillStyle = "#8b9bab"; g.font = "600 13px Arial";
+    g.fillStyle = "#a7b6c6"; g.font = "600 13px Arial";
     g.fillText(info.docked ? "EN ESTACIÓN" : info.express ? "PRÓXIMA PARADA" : "PRÓXIMA", x0, 168);
     g.fillStyle = "#ffffff"; g.font = "800 28px Arial";
     const stName = info.docked ? info.docked.short : (info.next ? info.next.short : "FIN DE LÍNEA");
@@ -201,7 +245,7 @@ export class CabDisplay {
     if (!info.approach && !info.assist && info.ahead) {
       const a = info.ahead, sy = 215;
       const color = a.gap < 300 ? "#ff4b4b" : a.gap < 800 ? "#ffb000" : "#6fe39a";
-      g.textAlign = "left"; g.fillStyle = "#8b9bab"; g.font = "600 13px Arial";
+      g.textAlign = "left"; g.fillStyle = "#a7b6c6"; g.font = "600 13px Arial";
       g.fillText(`TREN ADELANTE · ${a.id}`, x0, sy + 6);
       g.textAlign = "right"; g.fillStyle = color; g.font = "800 18px Arial";
       g.fillText(`${a.gap < 1000 ? Math.round(a.gap) + " m" : (a.gap / 1000).toFixed(1).replace(".", ",") + " km"}`, x0 + w, sy + 6);
@@ -215,7 +259,7 @@ export class CabDisplay {
 
     // Horario
     if (info.schedule) {
-      g.fillStyle = "#8b9bab"; g.font = "600 13px Arial"; g.textAlign = "left";
+      g.fillStyle = "#a7b6c6"; g.font = "600 13px Arial"; g.textAlign = "left";
       g.fillText(info.schedule.label, x0, 286);
       g.fillStyle = info.schedule.color; g.font = "800 16px Arial"; g.textAlign = "right";
       g.fillText(info.schedule.delayText, x0 + w, 286);
@@ -228,7 +272,6 @@ export class CabDisplay {
     g.fillStyle = "#e8eef5"; g.font = "700 17px Arial"; g.textAlign = "left";
     g.fillText(doorText, x0 + 28, 319);
 
-    this.texture.needsUpdate = true;
   }
 }
 
@@ -240,19 +283,19 @@ export class CabDisplay {
  */
 export class CabStatusDisplay {
   constructor() {
-    this.canvas = makeCanvas(640, 360);
-    this.ctx = this.canvas.getContext("2d");
-    this.texture = new THREE.CanvasTexture(this.canvas);
-    this.texture.colorSpace = THREE.SRGBColorSpace;
-    this.texture.anisotropy = 4;
+    setupScreen(this, "ESTADO DEL TREN · INICIANDO…");
   }
 
   /** @param {{clock:number, onboard:number, trip:object, lineColor:string}} extra */
   draw(sim, info, extra) {
-    const g = this.ctx, Wd = 640, Hd = 360, route = sim.route, sts = route.stations;
+    present(this, (g) => this.paint(g, sim, info, extra));
+  }
+
+  paint(g, sim, info, extra) {
+    const Wd = SCREEN_W, Hd = SCREEN_H, route = sim.route, sts = route.stations;
     const color = extra.lineColor || "#8b5a2b";
-    g.fillStyle = "#070b10"; g.fillRect(0, 0, Wd, Hd);
-    g.strokeStyle = "#1f2a35"; g.lineWidth = 4; g.strokeRect(2, 2, Wd - 4, Hd - 4);
+    g.fillStyle = SCREEN_BG; g.fillRect(0, 0, Wd, Hd);
+    g.strokeStyle = "#2c3a48"; g.lineWidth = 4; g.strokeRect(2, 2, Wd - 4, Hd - 4);
 
     // Cabecera: destino y hora
     g.fillStyle = color; g.fillRect(14, 14, Wd - 28, 40);
@@ -278,7 +321,7 @@ export class CabStatusDisplay {
     for (const st of sts) {
       const passed = next && route.stationOf ? st.index < next.index : false;
       const skip = trip?.skip?.has(st.index);
-      g.fillStyle = passed ? "#4a5560" : st === next ? "#ffd166" : "#e8eef5";
+      g.fillStyle = passed ? "#5d6975" : st === next ? "#ffd166" : "#e8eef5";
       g.strokeStyle = g.fillStyle; g.lineWidth = 2;
       g.beginPath(); g.arc(px(st.stopZ), y, st === next ? 6 : 4, 0, Math.PI * 2);
       if (skip) g.stroke(); else g.fill();                                     // Ruta Expresa: hueca = pasa sin detenerse
@@ -288,10 +331,10 @@ export class CabStatusDisplay {
 
     // Próximas estaciones con hora prevista
     g.textBaseline = "alphabetic";
-    g.fillStyle = "#8b9bab"; g.font = "700 13px Arial"; g.textAlign = "left";
+    g.fillStyle = "#a7b6c6"; g.font = "700 13px Arial"; g.textAlign = "left";
     g.fillText("PRÓXIMAS ESTACIONES", 26, 122);
     if (sim.stock) {
-      g.textAlign = "right"; g.fillStyle = "#6f8193"; g.font = "700 12px Arial";
+      g.textAlign = "right"; g.fillStyle = "#94a5b6"; g.font = "700 13px Arial";
       g.fillText(`${sim.stock.model} · ${sim.stock.tyre === "rubber" ? "NEUMÁTICOS" : "RUEDA DE ACERO"} · ${sim.stock.lineVoltage} V`, Wd - 26, 122);
       g.textAlign = "left";
     }
@@ -301,7 +344,7 @@ export class CabStatusDisplay {
       const yy = 152 + i * 34;
       if (i === 0) { g.fillStyle = "#1a2633"; g.fillRect(18, yy - 24, Wd - 36, 32); }
       const skip = trip?.skip?.has(st.index);
-      g.fillStyle = skip ? "#6f7d8b" : i === 0 ? "#ffd166" : "#e8eef5";
+      g.fillStyle = skip ? "#8d9aa8" : i === 0 ? "#ffd166" : "#e8eef5";
       g.font = `${i === 0 && !skip ? 800 : 600} 19px Arial`; g.textAlign = "left";
       g.fillText(st.name.length > 26 ? st.short : st.name, 30, yy);
       if (st.combos?.length) {
@@ -310,11 +353,11 @@ export class CabStatusDisplay {
       }
       const arr = extra.trip?.arr?.[st.index];
       if (skip) {
-        g.fillStyle = "#8b9bab"; g.font = "700 15px Arial"; g.textAlign = "right";
+        g.fillStyle = "#a7b6c6"; g.font = "700 15px Arial"; g.textAlign = "right";
         g.fillText("PASA SIN DETENERSE", Wd - 30, yy);
       } else if (arr != null) {
         const hh = Math.floor(arr / 3600) % 24, mm = Math.floor(arr / 60) % 60;
-        g.fillStyle = "#9fb0c2"; g.font = "700 17px Arial"; g.textAlign = "right";
+        g.fillStyle = "#bccbda"; g.font = "700 17px Arial"; g.textAlign = "right";
         g.fillText(`${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`, Wd - 30, yy);
       }
     });
@@ -322,16 +365,15 @@ export class CabStatusDisplay {
 
     // Pie: viajeros a bordo (y ocupación), masa del tren y energía neta del turno
     const occ = Math.round((sim.occupancy ?? 0) * 100);
-    g.fillStyle = occ >= 85 ? "#ff8a8a" : occ >= 65 ? "#ffd166" : "#8b9bab";
+    g.fillStyle = occ >= 85 ? "#ff8a8a" : occ >= 65 ? "#ffd166" : "#a7b6c6";
     g.font = "600 14px Arial"; g.textAlign = "left";
     g.fillText(`A BORDO: ${extra.onboard ?? 0} VIAJEROS · ${occ} %`, 26, Hd - 16);
     if (sim.energy) {
       const net = sim.energy.traction + sim.energy.aux - sim.energy.regen;
-      g.fillStyle = "#8b9bab"; g.textAlign = "right";
+      g.fillStyle = "#a7b6c6"; g.textAlign = "right";
       g.fillText(`${Math.round(sim.mass / 1000)} t · ${net.toFixed(1)} kWh (regen. ${sim.energy.regen.toFixed(1)})`, Wd - 26, Hd - 16);
     } else {
       g.textAlign = "right"; g.fillText(`LÍMITE ${info.limit} KM/H`, Wd - 26, Hd - 16);
     }
-    this.texture.needsUpdate = true;
   }
 }

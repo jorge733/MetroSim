@@ -566,6 +566,7 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = {}) {
     rig.setView("cab");
     rig.attach(renderer.domElement);
     game.rig = rig;
+    attachScreenTap(renderer.domElement, camera);
     trainHead(player).add(game.trainLights);
     game.lightsUnit = player;
     setTimeout(() => game?.player === player && hud.showMessage(driverBriefing(player), "info", 9000), 1500);
@@ -686,6 +687,7 @@ function stopGame({ keepFullscreen = false } = {}) {
   });
   game.renderer.dispose();
   gameContainer.replaceChildren();
+  setCabScreens(false);
   game = null;
   confirmOpen = false;
   $("confirmPanel").classList.add("hidden");
@@ -904,6 +906,8 @@ function onKeyDown(event) {
   if (key === "m") return toggleSound();
   if (key === "k" && !game.transition) return openStore({ tab: game.walker ? "album" : "driver" });
   if (key === "h") return hud.toggleHelp();
+  if (cabScreens.open && (key === "escape" || key === "p")) return setCabScreens(false);
+  if (key === "p" && game.player && !game.walker) return setCabScreens(true);
 
   if (game.walker) {
     if (game.transition) return;
@@ -2314,6 +2318,49 @@ function delayStyle(d) {
   return d > 0 ? { cls: "late", color: "#ff6b6b" } : { cls: "early", color: "#ffd166" };
 }
 
+/* ----- Pantallas de cabina ampliadas (1.7.2) -----
+   Las pantallas del pupitre se ven pequeñas (sobre todo en el teléfono):
+   tocarlas (o P) las abre en grande, dibujadas directo en canvas HTML a la
+   resolución de la pantalla del dispositivo, así el texto queda nítido. */
+const cabScreens = { open: false, dmi: null, status: null, openedAt: 0 };
+// En el teléfono el «click» que sigue al toque cae sobre la vista recién abierta: se ignora el primer instante
+$("cabScreens").addEventListener("click", () => { if (performance.now() - cabScreens.openedAt > 400) setCabScreens(false); });
+
+function setCabScreens(open) {
+  const el = $("cabScreens");
+  if (open && !game?.player) open = false;
+  cabScreens.open = open;
+  el.classList.toggle("hidden", !open);
+  if (!open) { cabScreens.dmi = cabScreens.status = null; return; }
+  cabScreens.openedAt = performance.now();
+  const fit = (id) => {
+    const c = $(id), r = c.getBoundingClientRect(), dpr = Math.min(window.devicePixelRatio || 1, 3);
+    c.width = Math.max(320, Math.round(r.width * dpr));
+    c.height = Math.round(c.width * 9 / 16);
+    return c.getContext("2d");
+  };
+  cabScreens.dmi = fit("cabScreenDmi");
+  cabScreens.status = fit("cabScreenStatus");
+  game.dmiTimer = 0;                                   // se dibujan en el próximo cuadro
+}
+
+/** Un toque (sin arrastrar) sobre una pantalla del pupitre la abre ampliada. */
+function attachScreenTap(dom, camera) {
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+  let down = null;
+  dom.addEventListener("pointerdown", (ev) => { down = { x: ev.clientX, y: ev.clientY, t: performance.now() }; });
+  dom.addEventListener("pointerup", (ev) => {
+    const d = down; down = null;
+    if (!d || !game?.player || game.walker || game.rig?.view !== "cab" || cabScreens.open) return;
+    if (Math.hypot(ev.clientX - d.x, ev.clientY - d.y) > 10 || performance.now() - d.t > 450) return;   // fue un arrastre para mirar
+    const m = game.player.model, meshes = [m.dmi?.mesh, m.status?.mesh].filter(Boolean);
+    const r = dom.getBoundingClientRect();
+    ndc.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
+    ray.setFromCamera(ndc, camera);
+    if (ray.intersectObjects(meshes, false).length) setCabScreens(true);
+  });
+}
+
 function updateCabVisuals(dt, unit, info) {
   const { sim, model } = unit;
   const target = (sim.notch - NOTCH_INDEX.N) * -0.11;
@@ -2331,6 +2378,8 @@ function updateCabVisuals(dt, unit, info) {
   setLamp(model.lamps.brake, sim.accel < -0.05);
   setLamp(model.lamps.emergency, sim.emergency && blink);
 
+  model.dmi.mirror = cabScreens.open ? cabScreens.dmi : null;          // vista ampliada (sigue al tren tras el cambio de cabina)
+  if (model.status) model.status.mirror = cabScreens.open ? cabScreens.status : null;
   game.dmiTimer -= dt;
   if (game.dmiTimer <= 0) {
     model.dmi.draw(sim, info);
