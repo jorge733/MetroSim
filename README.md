@@ -131,6 +131,9 @@ trenes de los dos motores quedan a ~1 m (mediana).
 **1.8.1 · Domingos y festivos hasta las 23:00** (`js/config.js`): el Metro cierra a las 23:00 también los domingos
 y festivos (antes, 22:30), como en el horario real. La demanda de la última media hora baja de a poco hasta el cierre.
 
+**1.8.2 · Arreglo: el juego no arrancaba** (`index.html`): al unir la 1.7.2 con la 1.8 se perdió el panel de las
+pantallas de cabina ampliadas (y su tecla **P** en la portada); sin él, la partida quedaba en negro al empezar.
+
 ## Versión 1.7 · Maniobra de retorno real
 
 Al final de la línea el tren ya no salta de vía: hace la maniobra como en el Metro de verdad.
