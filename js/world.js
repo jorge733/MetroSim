@@ -209,7 +209,7 @@ function fareBoardCanvas() {
     g.fillText(formatCLP(b.price), 490, y + 10);
   });
   g.font = "600 17px Arial"; g.fillStyle = "#4b5560"; g.textAlign = "left";
-  g.fillText(`Tarjeta nueva ${formatCLP(FARES.cardPrice)} · sáb., dom. y festivos sin punta`, 22, 362);
+  g.fillText(`Tarjeta nueva ${formatCLP(FARES.cardPrice)} · sáb., dom. y fest.: valle todo el día`, 22, 362);
   return c;
 }
 

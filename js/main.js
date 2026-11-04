@@ -409,11 +409,11 @@ function renderClock() {
       if (!inService(u, day)) next = `cierra a las ${hhmm(u / 3600)}`;
       else if (fareBandAt(u, day) !== band) next = `pasa a ${fareBandAt(u, day).label.toLowerCase()} a las ${hhmm(u / 3600)}`;
     }
-    note = `${DAY_TYPE_LABEL[day]}${day !== "laboral" ? " · sin hora punta" : ""}${next ? ` · ${next}` : ""}`;
+    note = `${DAY_TYPE_LABEL[day]}${day !== "laboral" ? " · tarifa valle todo el día" : ""}${next ? ` · ${next}` : ""}`;
   } else {
     const h = t / 3600, today = SERVICE_HOURS[day];
     const opensAt = h < today[0] ? today[0] : SERVICE_HOURS[dayTypeOf(new Date(+now + 86400000))][0];
-    note = `Abre a las ${hhmm(opensAt)} · puedes jugar igual: se cobra ${FARES.bands.at(-1).label.toLowerCase()} (${formatCLP(FARES.bands.at(-1).price)})`;
+    note = `Abre a las ${hhmm(opensAt)} · puedes jugar igual: se cobra ${band.label.toLowerCase()} (${formatCLP(band.price)})`;
   }
   $("clockNote").textContent = note;
 }

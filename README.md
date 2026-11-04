@@ -129,6 +129,11 @@ trenes de los dos motores quedan a ~1 m (mediana).
   - el horario de servicio de ese día y que las combinaciones no se vuelven a cobrar.
   Durante la partida la hora del panel sigue corriendo. Se cierra con ✕, **Entendido**, **Esc** o tocando fuera.
 
+**1.9.1 · Tarifas reales 2026** (`js/config.js`): los pasajes quedan como los de Metro desde el 22 de febrero de 2026
+(tarjeta bip! adulto): punta **$895**, valle **$815** y baja **$735**. Además, como en el Metro real, los sábados,
+domingos y festivos se cobra **hora valle todo el día** (antes la hora baja también regía esos días). Lo siguen los
+torniquetes, la boletería, el tablero de la estación, la portada y el panel de tarifas.
+
 ## Versión 1.8 · Hora y tarifa en la portada
 
 - **Reloj en la portada** (`index.html`, `js/main.js`): junto al clima se ve la hora (la del dispositivo, la misma

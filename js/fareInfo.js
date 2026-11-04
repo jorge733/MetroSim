@@ -103,7 +103,7 @@ function render() {
       }
     }
   } else {
-    next = `Fuera de horario. Si juegas igual, se cobra ${FARES.bands.at(-1).label.toLowerCase()}.`;
+    next = `Fuera de horario. Si juegas igual, se cobra ${band.label.toLowerCase()}.`;
   }
   $("fareInfoNext").textContent = `${DAY_TYPE_LABEL[today]} · ${next}`;
 
@@ -158,7 +158,7 @@ function render() {
   $("fareInfoPrices").replaceChildren(...FARES.bands.map(b => {
     const el = document.createElement("div");
     el.className = `fare-price ${b.id}`;
-    const save = punta && b !== punta ? `ahorras ${formatCLP(punta.price - b.price)}` : "lun a vie";
+    const save = [punta && b !== punta ? `ahorras ${formatCLP(punta.price - b.price)}` : "", b.weekdaysOnly ? "lun a vie" : "todos los días"].filter(Boolean).join(" · ");
     el.innerHTML = `<small>${b.label}</small><b>${formatCLP(b.price)}</b><span>${save}</span>`;
     return el;
   }));
@@ -166,7 +166,8 @@ function render() {
   const [so, sc] = SERVICE_HOURS[shown];
   $("fareInfoNotes").replaceChildren(...[
     `Horario de ${DAY_TYPE_LABEL[shown].toLowerCase()}: de ${hhmm(so)} a ${hhmm(sc)}.`,
-    shown === "laboral" ? "La hora punta solo rige de lunes a viernes no festivos." : `${shown === "sabado" ? "Los sábados" : "Los domingos y festivos"} no hay hora punta: esas horas se cobran como hora valle.`,
+    shown === "laboral" ? "Las horas punta y baja solo rigen de lunes a viernes no festivos." : `${shown === "sabado" ? "Los sábados" : "Los domingos y festivos"} se cobra hora valle todo el día: no hay punta ni baja.`,
+    "Tarifas adulto con tarjeta bip! vigentes desde el 22 de febrero de 2026 (metro.cl).",
     "El pasaje se cobra al pasar el torniquete, según la hora de entrada. Las combinaciones entre líneas no se vuelven a cobrar.",
   ].map(t => { const li = document.createElement("li"); li.textContent = t; return li; }));
 }

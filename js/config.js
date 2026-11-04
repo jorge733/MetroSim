@@ -26,7 +26,7 @@
    y curva de demanda horaria de un día real de Santiago.
    ========================================================================== */
 
-export const VERSION = "1.9";
+export const VERSION = "1.9.1";
 
 /* ---------- Colores oficiales de las líneas ---------- */
 export const LINE_COLORS = {
@@ -167,29 +167,30 @@ export const CONFIG = {
 };
 
 /* ---------- Tarjeta bip! y tarifas ----------
-   Valores de REFERENCIA para el juego (pesos chilenos). Las tarifas reales de
-   Metro cambian con el tiempo: ajústalas aquí si quieres que coincidan con
-   las vigentes. Los tramos horarios siguen el esquema punta / valle / baja. */
+   Tarifas de Metro vigentes desde el 22 de febrero de 2026 (pesos chilenos,
+   tarjeta bip! adulto; ver metro.cl/el-viaje/horarios-y-tarifas). Si cambian,
+   basta con ajustarlas aquí. De lunes a viernes hay tres tramos (punta / valle /
+   baja); los sábados, domingos y festivos se cobra hora valle todo el día. */
 export const FARES = {
   cardPrice: 1550,                     // precio de una tarjeta bip! nueva
   startBalance: 0,                     // (Alpha 0.9) el jugador empieza sin tarjeta: la compra y la carga con su débito
   maxBalance: 25000,
   loadAmounts: [1000, 2000, 3000, 5000, 10000],
   bands: [
-    { id: "punta", label: "Hora punta", price: 870, ranges: [[7, 9], [18, 20]], weekdaysOnly: true },
-    { id: "valle", label: "Hora valle", price: 790, ranges: [[6.5, 7], [9, 18], [20, 20.75]] },
-    { id: "baja",  label: "Hora baja",  price: 710, ranges: [[6, 6.5], [20.75, 23]] },
+    { id: "punta", label: "Hora punta", price: 895, ranges: [[7, 9], [18, 20]], weekdaysOnly: true },
+    { id: "valle", label: "Hora valle", price: 815, ranges: [[6.5, 7], [9, 18], [20, 20.75]] },
+    { id: "baja",  label: "Hora baja",  price: 735, ranges: [[6, 6.5], [20.75, 23]], weekdaysOnly: true },
   ],
 };
 
 /**
  * Tramo tarifario vigente a una hora (s). Fuera de servicio se usa el de hora baja.
- * La punta solo rige en días laborales: sábados, domingos y festivos esas horas se cobran como valle.
+ * Punta y baja solo rigen en días laborales: sábados, domingos y festivos se cobra valle todo el día.
  */
 export function fareBandAt(clockSeconds, dayType = CONFIG.dayType) {
   const h = (((clockSeconds / 3600) % 24) + 24) % 24;
   const band = FARES.bands.find(b => b.ranges.some(([a, c]) => h >= a && h < c)) || FARES.bands.at(-1);
-  return band.weekdaysOnly && dayType !== "laboral" ? FARES.bands.find(b => b.id === "valle") : band;
+  return dayType !== "laboral" ? FARES.bands.find(b => b.id === "valle") : band;
 }
 
 /** Formato de pesos chilenos: 2350 → "$2.350". */
