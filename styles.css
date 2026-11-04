@@ -816,10 +816,11 @@ body.touch-mode .help-chip { display: none !important; }
 .loading-card { display: grid; justify-items: center; gap: 10px; width: min(320px, 86vw); text-align: center; }
 .loading-card strong { font: 700 28px/1.1 var(--f-display); letter-spacing: .3px; }
 .loading-card small { color: var(--muted); font-size: 14px; }
-/* Barra de progreso indeterminada con el color de la línea */
-.loading-card::after { content: ""; width: 100%; height: 4px; margin-top: 6px; border-radius: 2px; background: linear-gradient(90deg, transparent, var(--line), transparent) 0 0 / 40% 100% no-repeat, #ffffff12; animation: loadingBar 1.2s ease-in-out infinite; }
-@keyframes loadingBar { from { background-position: -40% 0, 0 0; } to { background-position: 140% 0, 0 0; } }
-@media (prefers-reduced-motion: reduce) { .loading-card::after { animation: none; background: var(--line); opacity: .5; } }
+/* 1.10.2 · La barra avanza con lo que lleva cargado (main.js · setLoading) */
+.loading-bar { width: 100%; height: 6px; margin-top: 6px; border-radius: 3px; background: #ffffff14; overflow: hidden; }
+.loading-bar i { display: block; width: 0; height: 100%; border-radius: inherit; background: var(--line); transition: width .25s ease-out; }
+.loading-card .loading-pct { font-variant-numeric: tabular-nums; font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { .loading-bar i { transition: none; } }
 
 /* Esquema de línea con 21 estaciones: solo se rotulan terminales y la estación actual */
 .line-strip { width: min(46vw, 620px); }

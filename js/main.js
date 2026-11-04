@@ -535,7 +535,7 @@ function startGame(mode, opts = {}) {
   // En una sala, el sentido es el del servicio que asignó el Centro de Control
   const direction = opts.net ? [ROUTE_A, ROUTE_B].find(r => r.id === opts.net.welcome.trip.r) : directionSelect.value === "B" ? ROUTE_B : ROUTE_A;
   startScreen.classList.add("hidden");
-  loadingScreen.classList.remove("hidden");
+  showLoading();
   let audio = opts.audio;
   if (!audio) {
     if (wantsTouch()) enterMobileFullscreen();     // dentro del gesto del usuario
@@ -546,7 +546,45 @@ function startGame(mode, opts = {}) {
   setTimeout(() => buildGame(mode, stationIndex, audio, direction, opts), 40);
 }
 
-function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = {}) {
+/* 1.10.2 · Barra de la pantalla de carga: avanza con lo que de verdad lleva armado la partida */
+const loadingFill = $("loadingFill"), loadingPct = $("loadingPct"), loadingText = $("loadingText");
+function setLoading(frac, text) {
+  const pct = Math.round(Math.max(0, Math.min(1, frac)) * 100);
+  loadingFill.style.width = `${pct}%`;
+  loadingPct.textContent = `${pct} %`;
+  loadingFill.parentElement.setAttribute("aria-valuenow", pct);
+  if (text) loadingText.textContent = text;
+}
+/** Suelta el hilo para que el navegador dibuje la barra (con la pestaña oculta no hay fotogramas: sigue igual). */
+const paintPause = () => new Promise(resolve => {
+  const t = setTimeout(resolve, 60);
+  requestAnimationFrame(() => { clearTimeout(t); setTimeout(resolve, 0); });
+});
+/**
+ * Simula el motor hasta `time` en tramos, soltando el hilo cada ~40 ms para mover la barra
+ * entre `from` y `to`. Mismos pasos que un solo runUntil. Devuelve false si se canceló.
+ */
+async function warmUp(engine, time, { from, to, text, onStep, alive = () => true }) {
+  const t0 = engine.time, span = Math.max(1, time - t0), CHUNK = 30;
+  let k = 0, mark = performance.now();
+  while (engine.time < time) {
+    engine.runUntil(Math.min(time, t0 + ++k * CHUNK), { onStep });
+    if (performance.now() - mark > 40) {
+      setLoading(from + (to - from) * (engine.time - t0) / span, text);
+      await paintPause();
+      if (!alive()) return false;
+      mark = performance.now();
+    }
+  }
+  setLoading(to, text);
+  return true;
+}
+const showLoading = () => { setLoading(0, "Empezando…"); loadingScreen.classList.remove("hidden"); };
+
+async function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = {}) {
+  setLoading(0.02, "Preparando el dibujo 3D");
+  await paintPause();
+  if (game) return;                                  // otra partida ganó la carrera
   resetTrainAssets();
 
   /* --- Render --- */
@@ -586,9 +624,15 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = {}) {
   }
 
   /* --- Motor MetroSim (el "cerebro") y su dibujo --- */
+  setLoading(0.08, "Construyendo túneles y estaciones");
+  await paintPause();
   setTrackLiftLine();                                         // cotas de la línea activa (pendientes en 3D)
   const world = new World(scene);
+  setLoading(0.3, "Levantando viaductos y el cielo");
+  await paintPause();
   const outdoor = new OutdoorView(scene);                     // viaductos, trincheras, cielo y lluvia (1.5)
+  setLoading(0.38, "Poniendo en marcha la red");
+  await paintPause();
   const warmStart = startClock - 45 * 60;
   const engine = new MetroEngine({ startTime: warmStart });
   if (net) engine.replica = true;                             // los demás trenes y los incidentes los manda el anfitrión
@@ -603,7 +647,7 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = {}) {
   const signalViews = new SignalViews(scene, signals.values());
   const playerTrip = net ? net.trip(engine) : timetables.get(direction.id).anchorTrip;
 
-  game = {
+  const g = game = {
     mode, renderer, scene, camera, world, outdoor, engine, signals, timetables, traffic, trainViews, signalViews, audio, playerTrip,
     clock: warmStart, elapsed: 0, last: performance.now(), dmiTimer: 0, pidTimer: 0, raf: 0,
     warming: true,
@@ -616,7 +660,14 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = {}) {
   const people = new PeopleSystem(scene, traffic, engine.passengers);    // muestra visible de los pasajeros del motor
   people.elevators = world.elevators;                                  // algunos viajeros usan el ascensor
   game.people = people;
-  engine.runUntil(startClock, { onStep: (step, t) => people.update(step, t, { cameraZ: 1e9, render: false }) });
+  const warmed = await warmUp(engine, startClock, {
+    from: 0.42, to: 0.8, text: "Poniendo trenes y pasajeros en servicio", alive: () => game === g,
+    onStep: (step, t) => people.update(step, t, { cameraZ: 1e9, render: false }),
+  });
+  if (!warmed) return;
+  setLoading(0.82, mode === "driver" ? "Preparando tu cabina" : "Armando la calle y la estación");
+  await paintPause();
+  if (game !== g) return;
   game.clock = engine.time;
   game.realClock = { epoch: startEpoch, clock: startClock };           // ancla para seguir la hora local (recupera el tiempo de carga)
   game.warming = false;
@@ -708,7 +759,11 @@ function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = {}) {
   }
 
   // Precompila los shaders para evitar tirones la primera vez que se ve cada cosa
+  setLoading(0.92, "Preparando luces y materiales");
+  await paintPause();
+  if (game !== g) return;
   renderer.compile(scene, camera);
+  setLoading(1, "¡Listo!");
 
   hud.setMode(mode);
   $("endShiftButton").classList.toggle("hidden", mode !== "driver");
@@ -876,14 +931,18 @@ const CONTROL_STEP = 0.1;
 
 function startControl(opts = {}) {
   startScreen.classList.add("hidden");
-  loadingScreen.classList.remove("hidden");
-  setTimeout(() => {
+  showLoading();
+  setTimeout(async () => {
+    setLoading(0.05, "Encendiendo el Centro de Control");
+    await paintPause();
     // Hora local, igual que en los otros modos
     const startClock = localClock();
     CONFIG.startTime = startClock;
     CONFIG.schedule.playerDeparture = Math.ceil((startClock + 90) / 30) * 30;
     const engine = new MetroEngine({ startTime: startClock - 45 * 60 });
-    engine.runUntil(startClock);                     // la red ya tiene trenes al empezar el turno
+    // La red ya tiene trenes al empezar el turno
+    await warmUp(engine, startClock, { from: 0.1, to: 0.95, text: "Poniendo trenes en servicio en toda la red" });
+    if (control || game) return;
     const ui = new ControlCenter({
       engine, onExit: stopControl, tutorial: !!opts.tutorial, touch: wantsTouch(),
       onPay: (amount, concept) => bank.deposit(amount, concept, { wage: true }),
@@ -1813,7 +1872,7 @@ function transferLine(lineId, st) {
     saveSetting("metrosim.line", line.id);
     useLine(line);
     startScreen.classList.add("hidden");
-    loadingScreen.classList.remove("hidden");
+    showLoading();
     const audio = new AudioSystem();
     audio.muted = muted;
     audio.start();

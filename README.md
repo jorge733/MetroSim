@@ -138,6 +138,11 @@ trenes de los dos motores quedan a ~1 m (mediana).
 daba a entender que la tarjeta era solo para mujeres. Ahora es «Tengo tarjeta Adulto Mayor (TAM)», aparece desde los 60
 años para cualquiera, explica el requisito (mujeres desde 60, hombres desde 65, pensionados) y viene marcada a los 65.
 
+**1.10.2 · La pantalla de carga avanza de verdad** (`js/main.js`, `index.html`, `styles.css`): la barra ya no es una
+animación que va y viene: se llena con lo que lleva armado la partida (dibujo 3D, túneles y estaciones, viaductos, los
+45 minutos de servicio que el motor simula para que la línea ya tenga trenes, la calle o la cabina y los materiales), con
+el porcentaje y el paso actual. Lo mismo al entrar al Centro de Control y en las combinaciones entre líneas.
+
 ## Versión 1.9 · Tarifas según el horario
 
 - **Toca la hora para ver las tarifas** (`js/fareInfo.js`, `index.html`, `js/main.js`): en la portada (el bloque
