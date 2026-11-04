@@ -23,7 +23,7 @@
 
 import { LINES } from "./engine/network.js";
 import { LANDMARKS } from "./city/catalog.js";
-import { bestSpanishVoice } from "./audio.js";
+import { waitForSpanishVoice } from "./audio.js";
 import { VERSION, LINE_COLORS } from "./config.js";
 import { LICENSES, LIVERIES, CONTRACTS, FURNITURE } from "./shop.js";
 
@@ -436,28 +436,87 @@ function startMap(canvas, legend) {
    Sonido de bienvenida
    ========================================================================== */
 
-/** Gong de dos tonos y bienvenida por voz (necesita el gesto del usuario). */
+/** Saludo según la hora, como lo diría un locutor. */
+function greeting() {
+  const h = new Date().getHours();
+  return h >= 6 && h < 12 ? "Buenos días." : h >= 12 && h < 20 ? "Buenas tardes." : "Buenas noches.";
+}
+
+/** Lee audio/voz/bienvenida.mp3 si está en el manifiesto (grabación propia opcional). */
+async function welcomeClip(ctx) {
+  try {
+    const res = await fetch("audio/voz/manifest.json", { cache: "no-store" });
+    if (!res.ok) return null;
+    const manifest = await res.json();
+    if (!(manifest.clips || []).includes("bienvenida")) return null;
+    const buf = await (await fetch(`audio/voz/bienvenida.${manifest.extension || "mp3"}`)).arrayBuffer();
+    return await ctx.decodeAudioData(buf);
+  } catch { return null; }
+}
+
+/**
+ * Gong de estación y bienvenida por voz (necesita el gesto del usuario).
+ * Si hay una grabación propia (audio/voz/bienvenida.mp3) suena por un filtro
+ * de altavoz; si no, la dice la mejor voz sintetizada en frases cortas, con
+ * pausas naturales y el ritmo tranquilo de la locución del Metro.
+ */
 function welcomeSound(muted) {
   if (muted) return;
+  let ctx = null;
   try {
     const AC = window.AudioContext || window.webkitAudioContext;
-    const ctx = new AC();
+    ctx = new AC();
+    const out = ctx.createGain(); out.gain.value = 0.9; out.connect(ctx.destination);
+    // Gong de dos tonos con armónicos suaves (suena a campana, no a pitido)
     [[659, 0], [523, 0.55]].forEach(([fq, s]) => {
-      const o = ctx.createOscillator(), gn = ctx.createGain(), t0 = ctx.currentTime + s;
-      o.frequency.value = fq; o.connect(gn).connect(ctx.destination);
-      gn.gain.setValueAtTime(0.0001, t0); gn.gain.exponentialRampToValueAtTime(0.15, t0 + 0.01); gn.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.2);
-      o.start(t0); o.stop(t0 + 1.3);
+      const t0 = ctx.currentTime + s;
+      [[1, 0.15], [2, 0.035], [3, 0.012]].forEach(([mult, peak]) => {
+        const o = ctx.createOscillator(), gn = ctx.createGain();
+        o.frequency.value = fq * mult; o.connect(gn).connect(out);
+        const tail = 1.4 / mult;
+        gn.gain.setValueAtTime(0.0001, t0); gn.gain.exponentialRampToValueAtTime(peak, t0 + 0.008); gn.gain.exponentialRampToValueAtTime(0.0001, t0 + tail);
+        o.start(t0); o.stop(t0 + tail + 0.05);
+      });
     });
-    setTimeout(() => ctx.close(), 2500);
-  } catch { /* sin audio */ }
-  if (!("speechSynthesis" in window)) return;
-  setTimeout(() => {
-    const u = new SpeechSynthesisUtterance("Bienvenido a MetroSim. Metro de Santiago.");
-    const v = bestSpanishVoice();
-    if (v) { u.voice = v; u.lang = v.lang; } else u.lang = "es-CL";
-    u.rate = 0.92;
-    speechSynthesis.speak(u);
-  }, 1300);
+  } catch { ctx = null; }
+
+  const lead = 1500;   // la voz entra cuando el gong ya se apaga
+  const clip = ctx ? welcomeClip(ctx) : Promise.resolve(null);
+  const voice = waitForSpanishVoice(lead);
+  const t0 = performance.now();
+
+  Promise.all([clip, voice]).then(([buffer, v]) => {
+    setTimeout(() => {
+      // 1. Grabación propia por un altavoz suave (banda de megafonía y un leve eco)
+      if (buffer && ctx) {
+        const hp = ctx.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 180;
+        const lp = ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 6500;
+        const gain = ctx.createGain(); gain.gain.value = 0.95;
+        const delay = ctx.createDelay(); delay.delayTime.value = 0.05;
+        const fb = ctx.createGain(); fb.gain.value = 0.12;
+        hp.connect(lp).connect(gain).connect(ctx.destination);
+        gain.connect(delay).connect(fb).connect(ctx.destination);
+        const src = ctx.createBufferSource(); src.buffer = buffer; src.connect(hp); src.start();
+        src.onended = () => setTimeout(() => ctx.close(), 400);
+        return;
+      }
+      setTimeout(() => ctx?.close(), 1500);
+      // 2. Voz sintetizada, en frases cortas para que respire entre ellas
+      if (!("speechSynthesis" in window)) return;
+      speechSynthesis.cancel();
+      speechSynthesis.resume();   // Chrome a veces deja la cola en pausa
+      const natural = v && /natural|online|neural|premium|enhanced|google/i.test(v.name);
+      const phrases = [greeting(), "Te damos la bienvenida a MetroSim,", "el simulador del Metro de Santiago."];
+      phrases.forEach((text, i) => {
+        const u = new SpeechSynthesisUtterance(text);
+        if (v) { u.voice = v; u.lang = v.lang; } else u.lang = "es-CL";
+        u.rate = natural ? 0.96 : 0.9;             // pausado, sin arrastrar las palabras
+        u.pitch = i === 0 ? 1.06 : 1.0;             // el saludo, algo más alegre
+        u.volume = 1;
+        speechSynthesis.speak(u);
+      });
+    }, Math.max(0, lead - (performance.now() - t0)));
+  });
 }
 
 /* ==========================================================================

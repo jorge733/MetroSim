@@ -22,6 +22,7 @@ permiso de uso. No incluyas grabaciones de Metro sin autorización.
 | `estacion-terminal.mp3` | Estación terminal, todos deben descender del tren |
 | `no-olvides.mp3` | Que no se te olviden tus cosas, por tu preferencia muchas gracias |
 | `viaje-seguro.mp3` | Para un viaje más seguro, por favor no te sientes en el suelo del tren |
+| `bienvenida.mp3` | (portada) Bienvenida a MetroSim, el simulador del Metro de Santiago |
 | `estacion-3-plaza-quilicura.mp3` | Plaza Quilicura |
 | `estacion-3-lo-cruzat.mp3` | Lo Cruzat |
 | `estacion-3-ferrocarril.mp3` | Ferrocarril |

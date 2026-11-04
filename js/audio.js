@@ -39,12 +39,36 @@ export function bestSpanishVoice() {
     else if (/es-(419|us|mx|ar|co|pe)/.test(lang)) s += 60;          // latinoamericano
     else if (lang === "es-es") s += 35;
     if (/natural|online|neural/i.test(v.name)) s += 70;              // voces neuronales
+    if (/premium|enhanced|mejorad/i.test(v.name)) s += 50;           // voces de alta calidad de Apple
     if (/google/i.test(v.name)) s += 20;
+    if (/espeak|compact|robot/i.test(v.name)) s -= 40;               // voces de baja calidad
     if (female.test(v.name)) s += 15;
     return s;
   };
   const ranked = speechSynthesis.getVoices().map(v => ({ v, s: score(v) })).filter(x => x.s >= 0).sort((a, b) => b.s - a.s);
   return ranked[0]?.v || null;
+}
+
+/**
+ * Espera a que el navegador cargue sus voces (en Chrome la lista llega vacía
+ * la primera vez y se rellena después con "voiceschanged").
+ * @param {number} timeout  ms máximos de espera
+ * @returns {Promise<SpeechSynthesisVoice|null>}
+ */
+export function waitForSpanishVoice(timeout = 1500) {
+  if (!("speechSynthesis" in window)) return Promise.resolve(null);
+  if (speechSynthesis.getVoices().length) return Promise.resolve(bestSpanishVoice());
+  return new Promise(resolve => {
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      speechSynthesis.removeEventListener?.("voiceschanged", finish);
+      resolve(bestSpanishVoice());
+    };
+    speechSynthesis.addEventListener?.("voiceschanged", finish);
+    setTimeout(finish, timeout);
+  });
 }
 
 export class AudioSystem {

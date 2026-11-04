@@ -146,6 +146,16 @@ Al final de la línea el tren ya no salta de vía: hace la maniobra como en el M
 - En el multijugador, el estado de cruce se replica a los demás jugadores.
 - Tu librea se conserva tras el cambio de cabina.
 
+**1.7.1 · Voz de bienvenida mejorada** (`js/intro.js`, `js/audio.js`)
+
+- La bienvenida espera a que el navegador cargue sus voces (antes, en Chrome, la primera vez salía la voz por defecto,
+  más robótica) y elige mejor: suma las voces *Premium/Mejoradas* de Apple y descarta las de baja calidad (eSpeak).
+- Habla en frases cortas con pausas y ritmo de locutora: saludo según la hora («Buenos días / Buenas tardes / Buenas
+  noches»), «Te damos la bienvenida a MetroSim, el simulador del Metro de Santiago».
+- El gong de entrada tiene armónicos suaves (suena a campana) y la voz entra cuando se apaga.
+- Grabación propia opcional: si `audio/voz/manifest.json` incluye `bienvenida`, suena `audio/voz/bienvenida.mp3`
+  con un filtro de altavoz en vez de la voz sintetizada.
+
 ## Versión 1.6 · Asistente de parada
 
 Ayudas para no pasarse de la estación (`js/engine/stopAssist.js`; se activan o desactivan con **N**):
