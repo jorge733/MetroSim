@@ -11,3 +11,7 @@ y `X.Y.Z` para arreglos o cambios chicos (1.6 → 1.6.1 → 1.6.2 → 1.7…). H
 - `README.md` → sección «Versión X.Y · …» con lo nuevo (los arreglos `X.Y.Z` se agregan a la sección de su versión)
 
 La versión de red del multijugador (`NET_LEVEL`) es otra cosa: solo cambia si cambia el protocolo de la sala.
+
+## Dónde subir los cambios
+**Siempre se suben directo a `main`** (`git push origin HEAD:main`), aunque la sesión indique otra rama de trabajo.
+Antes de subir: `git fetch origin main` y, si `main` avanzó, rebasar encima (nunca forzar el push).
