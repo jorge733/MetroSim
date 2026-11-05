@@ -118,6 +118,23 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **Salir por los torniquetes es gratis**: solo se cobra el pasaje al pasar hacia la zona pagada (antes, al terminar
   de cruzar el torniquete de salida se cobraba un pasaje).
 
+## Versión 1.12 · Consola realista en el celular
+
+Solo en pantallas de celular (en la tablet y el computador todo sigue igual):
+
+- **Pupitre de conducción realista** (`js/touch.js`): los botones ▲ / ▼ se reemplazan por el **manipulador**, una
+  palanca combinada de tracción y freno con su empuñadura en T que **se desliza por la ranura** y encaja en cada muesca
+  (P4 arriba, N, B1–B3 y, tras un tope, EMERGENCIA abajo). También se puede tocar directamente una muesca de la escala.
+  La palanca sigue el estado real del tren (si el sistema aplica la emergencia, baja sola a EM).
+- En una placa metálica a la derecha: la **llave del inversor** (conmutador rotativo R · N · F: tocar el lado R o F la
+  gira un paso), el **hongo de emergencia** rojo sobre aro amarillo (queda hundido e iluminado mientras la emergencia
+  está enclavada), la **bocina** y el **pulsador iluminado de puertas** (verde «Abrir puertas»; ámbar «Cerrar puertas»
+  con las puertas abiertas). La **vigilancia (hombre muerto)** y el **cambio de cabina** aparecen como pulsadores
+  iluminados encima de la placa solo cuando hacen falta.
+- La pantalla de conducción lleva un marco de pupitre, como el DMI de una cabina.
+- **Pasajero**: botones redondos con pictograma y rótulo (Usar, Misiones, Sentarse, Agarrarse) y una palanca analógica
+  con base hundida y capuchón de goma.
+
 ## Versión 1.11 · Comerciantes ambulantes y músicos
 
 - **Músicos en los andenes** (`js/performers.js`): en muchas estaciones hay un músico junto al muro del andén, entre

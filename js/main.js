@@ -2204,6 +2204,11 @@ function touchContext() {
     return {
       vigilance: !!game.safety.alarm,
       cab: game.turn?.phase === "walk" || (!game.turn && atTurnbackBoard(game.player)),
+      // Estado real del tren para la consola del celular (palanca, llave del inversor, pulsadores)
+      notch: sim.notch,
+      reverser: sim.reverser,
+      emergency: !!sim.emergency,
+      doorsOpen: !sim.doorsClosed,
     };
   }
   const w = game.walker;
