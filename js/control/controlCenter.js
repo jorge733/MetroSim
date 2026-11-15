@@ -298,6 +298,108 @@ const CSS = `
   .pcc .tutorial.tutorial-control { top: calc(var(--pcc-top, 100px) + 6px); bottom: auto; left: 50%; transform: translateX(-50%); }
   .pcc-toast { bottom: 12px; }
 }
+
+/* ======================================================================
+   2.0 · Interfaz nueva del Centro de Control (sistema de diseño de css/ui.css)
+   Mismas clases que usa la lógica; solo cambia el aspecto. Acento: azul del
+   modo Centro de Control (--c-control).
+   ====================================================================== */
+.pcc { --acc: var(--c-control); --acc-soft: color-mix(in srgb, var(--c-control) 16%, transparent);
+  background: radial-gradient(70% 60% at 100% 0%, #6c9bff12 0, transparent 70%), var(--bg); }
+.pcc button { min-height: 38px; padding: 0 14px; border-radius: 10px; border-color: var(--panel-border); background: var(--surface); font-size: 14px; font-weight: 600; transition: background .15s, border-color .15s; }
+.pcc button:hover:not(:disabled) { background: var(--raise); border-color: #ffffff33; }
+.pcc button.primary { background: var(--acc); border-color: transparent; color: #fff; box-shadow: 0 6px 18px #6c9bff38; }
+.pcc button.primary:hover:not(:disabled) { background: #82abff; }
+.pcc button.danger { background: #ff4d4d14; border-color: #ff4d4d55; color: #ffc4c4; }
+.pcc button.danger:hover:not(:disabled) { background: #ff4d4d26; }
+.pcc button.ghost { background: transparent; border-color: transparent; }
+.pcc button.ghost:hover:not(:disabled) { background: #ffffff0d; }
+.pcc button.on { background: #3ad37f1a; border-color: #3ad37f66; color: #c4f3d8; }
+.pcc .ico { width: 18px; height: 18px; vertical-align: -4px; }
+
+/* Barra superior */
+.pcc-top { gap: 10px; padding: 10px 16px; background: #0d1117e6; border-bottom: 1px solid var(--panel-border); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+.pcc-title { display: grid; gap: 3px; padding-left: 44px; position: relative; }
+.pcc-title::before { content: ""; position: absolute; left: 0; top: 50%; width: 34px; height: 34px; margin-top: -17px; border-radius: 10px; background: var(--acc-soft);
+  -webkit-mask: none; box-shadow: inset 0 0 0 1px #6c9bff44; }
+.pcc-title::after { content: ""; position: absolute; left: 8px; top: 50%; width: 18px; height: 18px; margin-top: -9px; background: var(--acc);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='12' rx='2'/%3E%3Cpath d='M8 20h8M12 16v4M6 10h3l2-3 2 5 2-2h3'/%3E%3C/svg%3E") center / contain no-repeat;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='12' rx='2'/%3E%3Cpath d='M8 20h8M12 16v4M6 10h3l2-3 2 5 2-2h3'/%3E%3C/svg%3E") center / contain no-repeat; }
+.pcc-title h1 { font: 700 22px/1 var(--f-display); letter-spacing: .2px; text-transform: none; }
+.pcc-title small { font-size: 12.5px; }
+.pcc-views { gap: 6px; padding: 4px; border-radius: 12px; background: var(--surface); border: 1px solid var(--panel-border); }
+.pcc-views button { min-height: 34px; padding: 0 10px; border-color: transparent; background: transparent; }
+.pcc-views button.active { background: var(--raise-2); border-color: #ffffff1f; }
+.pcc-views .count { top: -6px; right: -6px; background: var(--emergency); }
+.pcc-time { padding: 4px; gap: 2px; border-radius: 12px; border-color: var(--panel-border); background: var(--surface); }
+.pcc-time button { min-height: 32px; padding: 0 10px; border-radius: 8px; }
+.pcc-time button + button { border-left: 0; }
+.pcc-time button.active { background: var(--acc-soft); color: #dbe6ff; box-shadow: inset 0 0 0 1px #6c9bff55; }
+.pcc-time .pcc-pause.active { background: #ffc24722; color: #ffe2a6; box-shadow: inset 0 0 0 1px #ffc24755; }
+.pcc-clock { font-size: 24px; }
+.pcc-score b { color: var(--acc); }
+.pcc-end { background: transparent !important; border-color: #ff4d4d55 !important; color: #ffb0b0 !important; }
+.pcc-end:hover { background: #ff4d4d1a !important; }
+.pcc-room.live { background: #3ad37f1a; border-color: #3ad37f66; color: #c4f3d8; }
+
+/* Cuerpo */
+.pcc-body { gap: 16px; padding: 16px; }
+@media (min-width: 1001px) { .pcc-body { grid-template-columns: minmax(0, 1fr) 380px; } }
+.pcc-main { gap: 12px; }
+.pcc-summary { gap: 10px; }
+.pcc-kpi { border-radius: 14px; padding: 12px 14px; background: linear-gradient(160deg, #161b23, var(--surface)); }
+.pcc-kpi b { font-size: 24px; }
+.pcc-kpi.bad { border-color: #ff4d4d44; } .pcc-kpi.good { border-color: #3ad37f33; }
+.pcc-line { border-radius: 16px; padding: 12px 14px 10px; }
+.pcc-line header strong { font-size: 20px; }
+.pcc-badge { border-radius: 8px; }
+.pcc-switch { min-height: 32px !important; border-radius: 999px !important; }
+.pcc-switch.on i { background: var(--ok); }
+.pcc-legend { gap: 8px 16px; }
+
+/* Columna lateral */
+.pcc-card { border-radius: 16px; padding: 16px; }
+.pcc-card h2 { margin-bottom: 10px; }
+.pcc-train.has-train { border-color: #6c9bff55; box-shadow: 0 0 0 1px #6c9bff22, 0 12px 34px #0007; }
+.pcc-train-close { min-height: 32px !important; width: 32px; padding: 0 !important; border-radius: 50% !important; top: 12px; right: 12px; }
+.pcc-train-head b { font-size: 22px; }
+.pcc-actions { gap: 8px; }
+.pcc-actions button { min-height: 44px; padding: 6px 8px; }
+.pcc-tabs { gap: 2px; margin: 0 0 12px; padding: 4px; border-radius: 12px; background: var(--bg); border: 1px solid var(--panel-border); }
+.pcc-tabs button { min-height: 34px; border-radius: 8px; }
+.pcc-tabs button.active { background: var(--raise-2); border-color: #ffffff1f; }
+.pcc-alarm { border-radius: 12px; padding: 10px 12px; }
+.pcc-alarm footer, .pcc-alarm .pcc-acts-row { gap: 6px; }
+.pcc-sort button { min-height: 30px; padding: 0 10px; border-radius: 999px; }
+.pcc-sort button.active { background: var(--raise-2); border-color: #ffffff33; }
+.pcc-table tr.sel td { background: var(--acc-soft); }
+.pcc-log li { border-radius: 8px; padding: 6px 9px; }
+
+/* Avisos y ventanas */
+.pcc-toast { border-radius: 12px; padding: 11px 16px; background: #0d1117f2; border-left-color: var(--acc); backdrop-filter: blur(12px); }
+.pcc-modal { background: #05070acc; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.pcc-dialog { gap: 14px; padding: 24px; border-radius: 18px; border-color: var(--panel-border); background: linear-gradient(180deg, #161b23, var(--surface)); animation: panelIn .22s var(--ease); }
+.pcc-dialog h2 { font-size: 30px; }
+.pcc-scopes button { min-height: 0; padding: 12px 16px; border-radius: 12px; }
+.pcc-scopes button.active { border-color: var(--acc); background: var(--acc-soft); box-shadow: inset 0 0 0 1px var(--acc); }
+.pcc-check input { accent-color: var(--acc); }
+.pcc-dialog footer button { min-height: 46px; padding: 0 20px; }
+.pcc-code { color: #ffd166; }
+.pcc .tutorial .go-button { background: var(--acc); color: #fff; }
+@media (max-width: 760px), (max-height: 520px) {
+  .pcc button { min-height: 36px; padding: 0 10px; }
+  .pcc-top { padding: 6px 10px; }
+  .pcc-title { padding-left: 0; } .pcc-title::before, .pcc-title::after { display: none; }
+  .pcc-clock { font-size: 18px; }
+  .pcc-views { padding: 3px; }
+  .pcc-time { padding: 3px; }
+  .pcc-body { padding: 8px 10px 16px; gap: 10px; }
+  .pcc-kpi { padding: 6px 10px; border-radius: 12px; } .pcc-kpi b { font-size: 16px; }
+  .pcc-dialog { padding: 16px 18px; }
+  .pcc-dialog h2 { font-size: 22px; }
+}
+@media (max-height: 520px) and (min-width: 761px) { .pcc-title { display: none; } }
+@media (max-width: 760px) { .pcc-title small { display: none; } .pcc-title h1 { font-size: 15px; } }
 `;
 
 export class ControlCenter {
@@ -346,7 +448,7 @@ export class ControlCenter {
     root.className = "pcc";
     root.innerHTML = `
       <div class="pcc-top">
-        <button class="pcc-icon-btn" data-act="exit" title="Volver al menú">${icon("back")}<span>Menú</span></button>
+        <button class="pcc-icon-btn" data-act="exit" title="Salir a la portada">${icon("back")}<span>Salir</span></button>
         <div class="pcc-title"><h1>Centro de Control</h1><small class="pcc-scope">RedMoviSim · red en tiempo real</small></div>
         <nav class="pcc-views" aria-label="Qué ver"></nav>
         <div class="pcc-time" role="group" aria-label="Velocidad del tiempo">

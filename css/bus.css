@@ -1,0 +1,72 @@
+/* ==========================================================================
+   RedMoviSim 2.0 · bus.css — HUD del bus (conducir y viajar)
+   Mismo lenguaje que la partida de Metro (css/game.css): paneles de vidrio,
+   radio 14, botón Menú con texto y menú de pausa igual al del Metro.
+   ========================================================================== */
+
+/* Paneles sobre la calle */
+.bus-brand, .bus-pill, .bus-icon-btn, .bus-panel, .bus-guide, .bus-lead, .bus-keys, .bus-toast {
+  border-radius: 14px; background: #0d1117d9; border: 1px solid #ffffff1a;
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); box-shadow: 0 8px 28px #0006;
+}
+.bus-brand { padding: 8px 16px 8px 8px; }
+.bus-badge { min-width: 50px; height: 38px; border-radius: 10px; background: var(--brand); font-size: 18px; }
+.bus-route strong { font-size: 16px; }
+.bus-pill { padding: 8px 14px; }
+.bus-pill strong { font-size: 18px; }
+.bus-icon-btn { width: 52px; height: 52px; transition: background .15s, border-color .15s; }
+.bus-icon-btn:hover { background: #1a2029ee; border-color: #ffffff33; }
+.bus-menu-btn { display: inline-flex; width: auto; gap: 8px; padding: 0 16px; font: 600 15px/1 var(--f-body); }
+.bus-menu-btn svg { width: 20px; height: 20px; }
+@media (max-width: 900px), (max-height: 520px) {
+  .bus-icon-btn { width: 42px; height: 42px; }
+  .bus-menu-btn { width: 42px; padding: 0; justify-content: center; }
+  .bus-menu-btn span { display: none; }
+}
+
+/* Esquema del recorrido */
+.bus-strip-track { background: var(--brand); }
+.bus-strip-stop i { border-color: var(--brand); }
+.bus-strip-bus { border-radius: 5px; box-shadow: 0 0 0 2px var(--brand), 0 2px 6px #0008; }
+
+/* Avisos */
+.bus-toast { padding: 11px 18px; font-size: 14.5px; }
+.bus-bell { border-radius: 999px; background: var(--brand); padding: 8px 18px; }
+
+/* Consola de abajo */
+.bus-bottom { gap: 12px; }
+.bus-panel { padding: 14px 16px; }
+.bus-speed-num strong { font-size: 48px; }
+.bus-next { width: min(460px, 52vw); }
+.bus-next strong { font-size: 26px; }
+.bus-guide { padding: 10px 14px; }
+.bus-guide-bar i { background: var(--brand); }
+
+/* Lista de teclas: se ve al empezar y después desde Menú › Controles */
+.bus-keys { padding: 10px 14px; gap: 6px; }
+.bus-screen:not(.bus-keys-on) .bus-keys { display: none; }
+
+/* Botones táctiles */
+.bus-touch button { border-radius: 16px; background: #0d1117c7; border-color: #ffffff26; }
+.bus-ride-btn { border-radius: 16px; background: #0d1117d9; border-color: #ffffff26; }
+.bus-ride-btn.bell.on { background: #e8343fcc; border-color: var(--brand-hi); }
+
+/* Menú de pausa (mismas piezas que el menú de la partida de Metro) */
+.bus-overlay { background: #05070acc; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.bus-card { border-radius: 18px; background: linear-gradient(180deg, #161b23, var(--surface)); border: 1px solid var(--panel-border); box-shadow: 0 30px 80px #000c; padding: 24px; }
+.bus-menu-card { width: min(94vw, 420px); text-align: left; gap: 12px; }
+.bus-menu-route { font-size: 14px; color: var(--muted); line-height: 1.4; }
+.bus-menu-route b { display: inline-block; margin-right: 6px; padding: 2px 8px; border-radius: 6px; background: var(--brand); color: #fff; font: 700 13px/1.3 var(--f-data); }
+.bus-touch-mode .game-menu-item kbd { display: none; }
+
+/* Informe al terminar el recorrido */
+.bus-btn { min-height: 46px; padding: 0 20px; border-radius: 10px; border-color: var(--panel-border); font-weight: 600; }
+.bus-btn.primary { background: var(--brand); box-shadow: 0 6px 18px #e8343f40; }
+.bus-btn:hover { filter: none; background: var(--raise); }
+.bus-btn.primary:hover { background: var(--brand-hi); }
+
+/* Paradero en la calle (modo pasajero) */
+.bus-stop-panel { background: #05070acc; backdrop-filter: blur(6px); }
+.bus-stop-dir { border-radius: 12px; background: var(--surface); }
+.bus-stop-dir:hover { border-color: var(--brand); background: var(--raise); }
+.bus-stop-dir b i { background: var(--brand); }

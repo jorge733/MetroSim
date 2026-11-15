@@ -124,6 +124,19 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **Salir por los torniquetes es gratis**: solo se cobra el pasaje al pasar hacia la zona pagada (antes, al terminar
   de cruzar el torniquete de salida se cobraba un pasaje).
 
+## Versión 2.1 · Centro de Control y bus con la interfaz nueva
+
+- **Centro de Control** (`js/control/controlCenter.js`): rehecho con el sistema de diseño 2.0 y su color propio
+  (azul). Barra superior de vidrio con ícono, selector de vista y control del tiempo como selectores segmentados,
+  indicadores más grandes, esquemas de línea en tarjetas, ficha del tren destacada al seleccionarlo, pestañas
+  Alarmas/Trenes/Registro segmentadas, órdenes con botones más grandes (retener en rojo suave, la principal en azul) y
+  diálogos (nuevo turno, sala, ayuda, informe) con la misma forma que los paneles del juego. «Terminar turno» se
+  distingue en rojo y el botón para salir dice **Salir**. En el celular horizontal la barra cabe en una fila.
+- **Bus** (`js/bus/busGame.js`, `css/bus.css`): el HUD usa los mismos paneles que la partida de Metro; arriba dice
+  **Bus Red · Conduciendo** o **Viajando**, y el botón **Menú** tiene texto. La pausa (Esc) es ahora el **menú** de la
+  partida: Seguir manejando, **Controles** (muestra u oculta la lista de teclas, que se ve al empezar y se oculta sola a
+  los 12 s), Sonido y Volver a la portada. Paraderos, timbre e informe del recorrido con el rojo de la marca.
+
 ## Versión 2.0 · Interfaz nueva
 
 RedMoviSim estrena una interfaz hecha desde cero: identidad propia (ya no la del Metro) y más fácil de usar.

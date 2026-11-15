@@ -137,14 +137,14 @@ class BusGame {
       <header class="bus-top">
         <div class="bus-brand">
           <span class="bus-badge">${R.id}</span>
-          <div class="bus-route"><span class="bus-label">${this.ride ? "BUS RED · VIAJAS COMO PASAJERO" : "BUSES · CONDUCTOR DE BUS · BETA"}</span><strong>${esc(R.name.toUpperCase())} · ${esc(R.from.toUpperCase())} → ${esc(R.to.toUpperCase())}</strong></div>
+          <div class="bus-route"><span class="bus-label">${this.ride ? "BUS RED · VIAJANDO" : "BUS RED · CONDUCIENDO · BETA"}</span><strong>${esc(R.name.toUpperCase())} · ${esc(R.from.toUpperCase())} → ${esc(R.to.toUpperCase())}</strong></div>
         </div>
         <div class="bus-right">
           <div class="bus-pill"><span class="bus-label">CUENTA</span><strong data-k="bank">$0</strong><span class="bus-float" data-k="float"></span></div>
           <div class="bus-pill"><span class="bus-label">HORA</span><strong data-k="clock">--:--</strong></div>
           <div class="bus-pill bus-weather"><span class="bus-label">CLIMA</span><strong>${esc(weatherLabel())}</strong></div>
           <button class="bus-icon-btn" data-k="sound" aria-label="Sonido">${ICON.sound}</button>
-          <button class="bus-icon-btn" data-k="menu" aria-label="Pausa y menú">${ICON.menu}</button>
+          <button class="bus-icon-btn bus-menu-btn" data-k="menu" aria-label="Pausa y menú" title="Menú (Esc)">${ICON.menu}<span>Menú</span></button>
         </div>
       </header>
       <div class="bus-strip" data-k="strip"></div>
@@ -206,14 +206,23 @@ class BusGame {
         </div>
       </div>
       <div class="bus-overlay bus-pause hidden" data-k="pause">
-        <div class="bus-card">
-          <span class="bus-label">${this.ride ? "VIAJE EN BUS · PAUSA" : "CONDUCTOR DE BUS · PAUSA"}</span>
-          <h2>Recorrido ${R.id} · ${esc(R.name)}</h2>
-          <p>${this.ride ? "Para bajarte, toca el timbre antes de tu parada y, con las puertas abiertas, elige «Bajarse aquí». Desde la portada puedes volver a empezar donde quieras." : "El sueldo de cada paradero ya está en tu cuenta. Si terminas ahora no recibes el bono del servicio."}</p>
-          <div class="bus-card-actions">
-            <button class="bus-btn primary" data-k="resume">${this.ride ? "Seguir el viaje" : "Seguir manejando"}</button>
-            <button class="bus-btn" data-k="quit">Volver a la portada</button>
+        <div class="bus-card bus-menu-card ticket-card game-menu-card" role="dialog" aria-modal="true" aria-label="Menú">
+          <header class="ticket-head">
+            <div class="ticket-head-text">
+              <span class="small-label">${this.ride ? "VIAJANDO EN BUS · PAUSA" : "CONDUCIENDO · PAUSA"}</span>
+              <strong>Menú</strong>
+            </div>
+          </header>
+          <p class="bus-menu-route"><b>${R.id}</b> ${esc(R.name)} · ${esc(R.from)} → ${esc(R.to)}</p>
+          <div class="game-menu-list">
+            <button class="go-button game-menu-resume" data-k="resume"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16l13-8z"/></svg> ${this.ride ? "Seguir el viaje" : "Seguir manejando"}</button>
+            ${this.ride ? "" : `<button class="game-menu-item" data-k="pmKeys"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg><span>Controles · <b data-k="pmKeysState">ocultos</b></span></button>`}
+            <button class="game-menu-item" data-k="pmSound"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4zM16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/></svg><span>Sonido · <b data-k="pmSoundState">activado</b></span><kbd>M</kbd></button>
           </div>
+          <footer class="game-menu-exit">
+            <button class="ghost-button" data-k="quit"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11 12 4l9 7M5 10v10h14V10M10 20v-6h4v6"/></svg> Volver a la portada</button>
+            <p class="game-menu-note">${this.ride ? "Para bajarte, toca el timbre antes de tu parada y, con las puertas abiertas, elige «Bajarse aquí»." : "El sueldo de cada paradero ya está en tu cuenta. Si terminas ahora no recibes el bono del servicio."}</p>
+          </footer>
         </div>
       </div>
       <div class="bus-overlay bus-summary hidden" data-k="summary"><div class="bus-card" data-k="summaryCard"></div></div>
@@ -227,6 +236,17 @@ class BusGame {
     this.el.menu.addEventListener("click", (e) => { e.currentTarget.blur(); this.setPaused(true); });
     this.el.resume.addEventListener("click", () => this.setPaused(false));
     this.el.quit.addEventListener("click", () => this.exit());
+    // 2.0 · Menú: sonido y lista de teclas (que se oculta sola a los 12 s)
+    const syncMenu = () => {
+      this.el.pmSoundState.textContent = this.audio.muted ? "desactivado" : "activado";
+      if (this.el.pmKeysState) this.el.pmKeysState.textContent = this.root.classList.contains("bus-keys-on") ? "a la vista" : "ocultos";
+    };
+    this.syncMenu = syncMenu;
+    this.el.pmSound.addEventListener("click", () => this.toggleMute());
+    this.el.pmKeys?.addEventListener("click", () => { this.root.classList.toggle("bus-keys-on"); syncMenu(); });
+    this.root.classList.add("bus-keys-on");
+    this.keysTimer = setTimeout(() => { this.root.classList.remove("bus-keys-on"); syncMenu(); }, 12000);
+    syncMenu();
     this.bindTouch();
     this.root.querySelectorAll("[data-r]").forEach(btn => btn.addEventListener("click", (e) => {
       e.currentTarget.blur();
@@ -336,6 +356,7 @@ class BusGame {
     this.audio.setMuted(m);
     this.el.sound.innerHTML = m ? ICON.mute : ICON.sound;
     this.onMuteChange?.(m);
+    this.syncMenu?.();
     this.toast(m ? "Sonido desactivado" : "Sonido activado", "info", 1200);
   }
 
@@ -350,6 +371,8 @@ class BusGame {
     if (this.sim.finished) return;
     this.paused = p;
     this.el.pause.classList.toggle("hidden", !p);
+    this.syncMenu?.();
+    if (p) this.el.resume.focus();
     this.releaseControls();
     this.syncInput();
     this.audio.horn(false);
