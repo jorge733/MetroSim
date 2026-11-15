@@ -142,6 +142,8 @@ RedMoviSim estrena una interfaz hecha desde cero: identidad propia (ya no la del
   «Tren Nos · EFE») y si estás conduciendo o viajando.
 - **Paneles unificados**: boletería, locales, misiones, tarifas y confirmaciones con la misma forma.
 - Fin de la mantención (`js/mantencion.js`, `ACTIVA = false`). Lo hecho mientras tanto quedó en las 1.20.5 a 1.20.8.
+- **2.0.1 · Imágenes del post «¡Ya volvimos! · RedMoviSim 2.0»** (`post-volvimos/`): post cuadrado, historia y
+  portada horizontal con capturas reales de la portada nueva en PC y celular. Se generan con `node generar.js plantilla.html`.
 
 ## Versión 1.20 · La calle del bus usa todo lo del Metro
 
