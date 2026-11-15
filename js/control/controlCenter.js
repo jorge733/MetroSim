@@ -61,7 +61,7 @@ const L = CONFIG.train.length;
 const SCOPES = [
   { id: "apprentice", name: "Aprendiz", lines: ["3"], title: "Línea 3", text: "Una sola línea y pocas alarmas. Ideal para empezar." },
   { id: "operator", name: "Operador", lines: ["1", "2", "3"], title: "Líneas 1, 2 y 3", text: "Tres líneas con combinaciones entre ellas." },
-  { id: "chief", name: "Jefe de turno", lines: null, title: "Toda la red", text: "Las 7 líneas a la vez: muchas alarmas." },
+  { id: "chief", name: "Jefe de turno", lines: null, title: "Toda la red", text: "Las 7 líneas del Metro y los trenes de EFE a la vez: muchas alarmas." },
 ];
 const SPEEDS = [1, 2, 5, 10];
 /** Sueldo por alarma atendida y duración mínima (s simulados) del turno para el bono. */
@@ -214,9 +214,9 @@ const CSS = `
 .pcc-log .warn { box-shadow: inset 3px 0 #ffb020; } .pcc-log .alert { box-shadow: inset 3px 0 #ff4b4b; } .pcc-log .ok { box-shadow: inset 3px 0 #3fd07a; }
 
 /* Ventanas (inicio de turno, informe, ayuda) */
-.pcc-modal { position: fixed; inset: 0; z-index: 8; display: grid; place-items: center; background: #000a; padding: 16px; overflow: auto; }
+.pcc-modal { position: fixed; inset: 0; z-index: 8; display: grid; place-items: start center; background: #000a; padding: 16px; overflow: auto; }
 .pcc-modal[hidden] { display: none; }
-.pcc-dialog { width: min(560px, 100%); background: var(--surface); border: 1px solid #ffffff2e; border-radius: 14px; padding: 20px 22px; box-shadow: 0 30px 80px #000c; display: grid; gap: 12px; }
+.pcc-dialog { margin-block: auto; width: min(560px, 100%); background: var(--surface); border: 1px solid #ffffff2e; border-radius: 14px; padding: 20px 22px; box-shadow: 0 30px 80px #000c; display: grid; gap: 12px; }
 .pcc-dialog h2 { margin: 0; font: 700 26px/1.05 var(--f-display); letter-spacing: .4px; }
 .pcc-dialog h3 { margin: 4px 0 0; font: 600 15px/1.2 var(--f-body); color: #c9d4df; }
 .pcc-dialog p { margin: 0; color: #c9d4df; font-size: 14px; line-height: 1.45; }
@@ -229,6 +229,16 @@ const CSS = `
 .pcc-check input { width: 18px; height: 18px; accent-color: #4aa3ff; }
 .pcc-dialog footer { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; margin-top: 4px; }
 .pcc-dialog footer button { padding: 9px 16px; }
+/* Celular en horizontal: el diálogo cabe sin cortarse arriba */
+@media (max-height: 520px) {
+  .pcc-modal { padding: 8px; }
+  .pcc-dialog { padding: 14px 18px; gap: 8px; }
+  .pcc-dialog h2 { font-size: 21px; }
+  .pcc-dialog p { font-size: 13px; line-height: 1.35; }
+  .pcc-scopes { gap: 6px; }
+  .pcc-scopes button { padding: 6px 12px; }
+  .pcc-scopes button b { font-size: 14px; } .pcc-scopes button span { font-size: 12px; }
+}
 .pcc-grade { display: flex; align-items: center; gap: 16px; }
 .pcc-grade strong { font: 800 64px/1 var(--f-display); width: 80px; height: 80px; border-radius: 16px; display: grid; place-items: center; background: #ffffff10; border: 2px solid var(--c); color: var(--c); }
 .pcc-grade div b { font: 700 28px/1 var(--f-data); display: block; }
@@ -250,6 +260,21 @@ const CSS = `
 @media (max-width: 1000px) {
   .pcc-body { grid-template-columns: 1fr; }
   .pcc-alarms, .pcc-log, .pcc-table-wrap { max-height: 50vh; }
+}
+/* Celular en horizontal (pantalla baja): barra en una sola fila con botones de solo ícono e indicadores más bajos,
+   para que el esquema de la línea se vea sin bajar */
+@media (max-height: 520px) and (min-width: 761px) {
+  .pcc-top { gap: 6px 8px; padding: 5px 10px; flex-wrap: nowrap; }
+  .pcc-title, .pcc-icon-btn span { display: none; }
+  .pcc-score, .pcc-clock { white-space: nowrap; }
+  .pcc-time { margin-left: auto; }
+  .pcc-time button { padding: 6px 8px; }
+  .pcc-clock { font-size: 18px; }
+  .pcc-end { padding: 6px 9px !important; font-size: 13px !important; white-space: nowrap; }
+  .pcc-body { padding: 8px 10px 16px; gap: 8px; }
+  .pcc-summary { gap: 6px; }
+  .pcc-kpi { min-width: 80px; padding: 4px 9px; } .pcc-kpi span { font-size: 9px; } .pcc-kpi b { font-size: 15px; }
+  .pcc-line { padding: 6px 10px 4px; }
 }
 /* Celular: barra compacta, esquema grande desplazable de lado y ficha del tren como hoja inferior */
 @media (max-width: 760px) {
@@ -612,7 +637,7 @@ export class ControlCenter {
         <button class="ghost" data-act="exit">Volver</button>
         <button class="primary" data-act="start">Empezar turno ›</button>
       </footer>`);
-    this.dialogEl.querySelector("[data-act=start]").focus();
+    this.dialogEl.querySelector("[data-act=start]").focus({ preventScroll: true });
   }
 
   startShift() {
@@ -1017,7 +1042,10 @@ export class ControlCenter {
         ctx.save();
         const top = i % 2 === 0;                      // alternando arriba y abajo para que quepan
         ctx.translate(x, top ? g.yA - 20 : g.yB + 24);
-        ctx.rotate(top ? -Math.PI / 5 : Math.PI / 5);
+        // Cerca del borde derecho el nombre se empina (hasta vertical) para no cortarse
+        const room = Math.max(0, w - 6 - x) / Math.max(1, ctx.measureText(st.short).width);
+        const ang = Math.max(Math.PI / 5, Math.acos(Math.min(1, room)));
+        ctx.rotate(top ? -ang : ang);
         ctx.textAlign = "left";
         ctx.fillText(st.short, 0, 0);
         ctx.restore();

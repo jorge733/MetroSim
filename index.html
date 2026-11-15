@@ -98,7 +98,7 @@
         <header class="start-brand">
           <img class="metro-mark" src="logo.svg" alt="">
           <h1>Red<span>Movi</span>Sim</h1>
-          <span class="start-ver">v1.16.1</span>
+          <span class="start-ver">v1.17</span>
         </header>
         <div class="start-hero">
           <p class="eyebrow">Simulador del transporte público de Santiago</p>
@@ -251,7 +251,7 @@
         <p class="start-note disclaimer">RedMoviSim es un proyecto independiente y gratuito, sin relación con Red Metropolitana de Movilidad, Metro de Santiago ni el Ministerio de Transportes. Los nombres de líneas, estaciones y lugares se usan solo como referencia.</p>
       </div>
     </main>
-    <p class="version">RedMoviSim 1.16 · simulador no oficial del transporte público de Santiago · Metro (7 líneas), Tren Nos y Tren Rancagua · buses por la Alameda · conductor, pasajero con combinaciones bus ⇄ Metro y Centro de Control · multijugador · app instalable</p>
+    <p class="version">RedMoviSim 1.17 · simulador no oficial del transporte público de Santiago · Metro (7 líneas), Tren Nos y Tren Rancagua · buses por la Alameda · conductor, pasajero con combinaciones bus ⇄ Metro y Centro de Control · multijugador · app instalable</p>
   </section>
 
   <!-- =============================== PANTALLA DE CARGA =============================== -->
@@ -411,19 +411,30 @@
 
       <!-- Ayuda de controles -->
       <div id="controlsHelp" class="controls-help">
-        <span class="hud-label">CONTROLES · H ocultar</span>
-        <span class="help-driver"><kbd>W</kbd>/<kbd>↑</kbd> subir mando · <kbd>S</kbd>/<kbd>↓</kbd> bajar mando</span>
-        <span class="help-driver"><kbd>Q</kbd> inversor adelante · <kbd>E</kbd> inversor atrás</span>
-        <span class="help-driver"><kbd>Espacio</kbd> emergencia · <kbd>D</kbd> puertas · <kbd>R</kbd> reiniciar · <kbd>F</kbd> finalizar turno</span>
-        <span class="help-driver"><kbd>B</kbd> bocina · <kbd>X</kbd> confirmar vigilancia (hombre muerto; mover el mando también cuenta)</span>
-        <span class="help-driver"><kbd>N</kbd> asistente de parada: anillo = dónde paras con el freno actual · aviso «¡FRENA YA!» · pitidos en los últimos metros</span>
-        <span class="help-driver">Arrastrar ratón: mirar · <kbd>C</kbd> centrar · <kbd>V</kbd> vista (cabina · interior · exterior)</span>
-        <span class="help-driver">Vista exterior: arrastrar gira · <kbd>Shift</kbd>+arrastrar desplaza · rueda zoom</span>
-        <span class="help-driver"><kbd>T</kbd> maniobra de retorno: en FIN DE MANIOBRA, con freno aplicado e inversor en N, deja la cabina · camina por el tren (<kbd>W</kbd> caminar · <kbd>S</kbd> detenerte · <kbd>Shift</kbd> correr) o pulsa <kbd>T</kbd> otra vez para el recorrido automático</span>
-        <span class="help-walker"><kbd>W</kbd>/<kbd>S</kbd> caminar · <kbd>A</kbd>/<kbd>D</kbd> girar · <kbd>Shift</kbd> correr</span>
-        <span class="help-walker"><kbd>Re Pág</kbd>/<kbd>Av Pág</kbd> mirar arriba / abajo</span>
-        <span class="help-walker"><kbd>F</kbd> sentarse · <kbd>G</kbd> agarrarse de una barra (a bordo) · <kbd>E</kbd> boletería, tótem, locales, acceso o foto</span>
-        <span class="help-walker"><kbd>J</kbd> misiones · <kbd>E</kbd> junto a un ícono flotante: ayudar a otro viajero (civismo)</span>
+        <span class="hud-label help-title">Controles <span>· <kbd>H</kbd> ocultar</span></span>
+        <span class="help-group help-driver">Conducir</span>
+        <span class="help-driver"><kbd>W</kbd><kbd>↑</kbd> subir mando (tracción)</span>
+        <span class="help-driver"><kbd>S</kbd><kbd>↓</kbd> bajar mando (freno)</span>
+        <span class="help-driver"><kbd>Q</kbd><kbd>E</kbd> inversor adelante / atrás</span>
+        <span class="help-driver"><kbd>Espacio</kbd> freno de emergencia</span>
+        <span class="help-driver"><kbd>D</kbd> abrir / cerrar puertas</span>
+        <span class="help-driver"><kbd>B</kbd> bocina</span>
+        <span class="help-driver"><kbd>X</kbd> vigilancia (hombre muerto)<small>mover el mando también cuenta</small></span>
+        <span class="help-driver"><kbd>N</kbd> asistente de parada<small>anillo donde paras · «¡FRENA YA!» · pitidos</small></span>
+        <span class="help-group help-driver">Cámara y turno</span>
+        <span class="help-driver">Arrastrar: mirar · <kbd>C</kbd> centrar</span>
+        <span class="help-driver"><kbd>V</kbd> vista: cabina · interior · exterior</span>
+        <span class="help-driver">Exterior: <kbd>Shift</kbd>+arrastrar desplaza · rueda zoom</span>
+        <span class="help-driver"><kbd>T</kbd> maniobra de retorno<small>en FIN DE MANIOBRA, con freno e inversor en N</small></span>
+        <span class="help-driver"><kbd>R</kbd> reiniciar · <kbd>F</kbd> finalizar turno</span>
+        <span class="help-group help-walker">A pie</span>
+        <span class="help-walker"><kbd>W</kbd><kbd>S</kbd> caminar · <kbd>A</kbd><kbd>D</kbd> girar</span>
+        <span class="help-walker"><kbd>Shift</kbd> correr</span>
+        <span class="help-walker"><kbd>Re Pág</kbd><kbd>Av Pág</kbd> mirar arriba / abajo</span>
+        <span class="help-walker"><kbd>E</kbd> usar: boletería, tótem, local, acceso, foto</span>
+        <span class="help-walker"><kbd>F</kbd> sentarse · <kbd>G</kbd> agarrarse (a bordo)</span>
+        <span class="help-walker"><kbd>E</kbd> junto a un ícono flotante: ayudar</span>
+        <span class="help-walker"><kbd>J</kbd> misiones</span>
         <span><kbd>M</kbd> sonido</span>
       </div>
       <button id="helpChip" class="help-chip"><kbd>H</kbd> Controles</button>

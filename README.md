@@ -124,6 +124,19 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **Salir por los torniquetes es gratis**: solo se cobra el pasaje al pasar hacia la zona pagada (antes, al terminar
   de cruzar el torniquete de salida se cobraba un pasaje).
 
+## Versión 1.17 · Interfaz más clara en todas las pantallas
+
+- **Tienda:** si no te alcanza, el precio se ve apagado (borde punteado) y dice cuánto te falta («faltan $37.000»);
+  antes parecía un botón para comprar. En el celular horizontal la cabecera es más baja y caben más artículos.
+- **Controles de la cabina (H):** la ayuda pasa de una lista larga de una columna a dos columnas por grupos
+  (Conducir · Cámara y turno · A pie), cada acción en su línea con su tecla y una nota corta cuando hace falta.
+- **Centro de Control en el celular horizontal:** la barra de arriba cabe en una fila (botones de solo ícono) y los
+  indicadores son más bajos, así el esquema de la línea se ve sin bajar. El diálogo *Nuevo turno* ya no se corta
+  arriba. «Toda la red» aclara que incluye los trenes de EFE.
+- **Esquema del PCC:** los nombres de las últimas estaciones se empinan en vez de cortarse en el borde derecho
+  («F. CASTILLO V.»).
+- **Bus:** la lista de teclas de abajo a la derecha va sobre un panel y se lee bien sobre la calle.
+
 ## Versión 1.16 · Tren Rancagua (EFE) y Tienda RedMovi
 
 - **Tren Rancagua** (`js/engine/network.js`, botón **RCG**): el tren regional de EFE de Estación Central (estación

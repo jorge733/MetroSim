@@ -83,8 +83,17 @@ export function openShopUI(o) {
       btn.className = "ghost-button";
       btn.disabled = true;
     } else {
-      btn.textContent = item.price ? formatCLP(item.price) : "Gratis";
-      btn.className = "go-button" + (bank.canPay(item.price) ? "" : " poor");
+      const poor = !bank.canPay(item.price);
+      btn.className = "go-button" + (poor ? " poor" : "");
+      btn.innerHTML = "<span></span>";
+      btn.firstChild.textContent = item.price ? formatCLP(item.price) : "Gratis";
+      // Sin dinero suficiente: el botón se ve apagado y dice cuánto falta (antes parecía comprable)
+      if (poor) {
+        const short = document.createElement("small");
+        short.textContent = `faltan ${formatCLP(item.price - bank.balance)}`;
+        btn.append(short);
+        btn.title = "Gana dinero conduciendo para comprarlo";
+      }
       btn.disabled = disabled;
       btn.onclick = () => buy(item);
     }
