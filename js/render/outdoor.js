@@ -27,6 +27,7 @@ import { ROUTE_A } from "../engine/route.js";
 import { lineStock } from "../engine/fleet.js";
 import { WEATHER } from "../engine/weather.js";
 import { std, glow, addBox, addBoxSpan, makeCanvas, toTexture, concreteTexture } from "../utils.js";
+import { SkyDome, sunDirection, crownGeometry, trunkGeometry, leafMaterial } from "./realism.js";
 
 const S = CONFIG.station;
 /** Color del túnel (fondo y niebla bajo tierra). */
@@ -167,6 +168,11 @@ export class OutdoorView {
     this.sun.position.set(-60, 120, 40);
     this.hemi = new THREE.HemisphereLight(0xcfe4ff, 0x4a4238, 0);
     scene.add(this.sun, this.sun.target, this.hemi);
+    // 2.4 · Cielo con degradado, sol y nubes (solo se ve al aire libre)
+    this.dome = new SkyDome();
+    this.dome.setOpacity(0);
+    scene.add(this.dome);
+    this.sunDir = new THREE.Vector3(0, 1, 0);
 
     this.buildRain();
   }
@@ -202,7 +208,7 @@ export class OutdoorView {
       railing: std(0x4f585e, { metal: 0.6, rough: 0.5 }),
       building: std(0xffffff, { map: toTexture(fac.day), rough: 0.8, emissive: 0xffffff, emissiveIntensity: 0 }),
       trunk: std(0x5a4632, { rough: 0.9 }),
-      leaves: std(0x3f6b34, { rough: 0.9 }),
+      leaves: leafMaterial(0x5d8a46),
       lampHead: glow(0xfff1c9),
       carBody: std(0xffffff, { metal: 0.5, rough: 0.35 }),
       carGlass: std(0x1b232b, { metal: 0.3, rough: 0.2 }),
@@ -299,15 +305,15 @@ export class OutdoorView {
     const n = zs.length * 2;
     const poles = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.09, 0.12, 8, 6), M.steel, n);
     const heads = new THREE.InstancedMesh(new THREE.BoxGeometry(0.9, 0.18, 0.4), M.lampHead, n);
-    const trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.16, 0.22, 3, 6), M.trunk, n);
-    const crowns = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(2.2, 0), M.leaves, n);
+    const trunks = new THREE.InstancedMesh(trunkGeometry().clone().scale(1.3, 3.2, 1.3), M.trunk, n);
+    const crowns = new THREE.InstancedMesh(crownGeometry(2).clone().scale(2, 1.7, 2), M.leaves, n);
     let k = 0;
     for (const z of zs) for (const s of [-1, 1]) {
       const y = rel(z) + 0.12;
       poles.setMatrixAt(k, m.compose(v.set(s * (WALK[0] + 0.6), y + 4, z), q, one));
       heads.setMatrixAt(k, m.compose(v.set(s * (WALK[0] - 0.1), y + 8, z), q, one));
       const tz = z + 15, ty = rel(tz) + 0.12;
-      trunks.setMatrixAt(k, m.compose(v.set(s * (WALK[1] - 1.2), ty + 1.5, tz), q, one));
+      trunks.setMatrixAt(k, m.compose(v.set(s * (WALK[1] - 1.2), ty, tz), q, one));
       crowns.setMatrixAt(k, m.compose(v.set(s * (WALK[1] - 1.2), ty + 4.2, tz), q, one));
       k++;
     }
@@ -456,17 +462,20 @@ export class OutdoorView {
     this.sky = sky;
 
     // Cielo y niebla (si la calle no los está manejando)
+    sunDirection(clock, this.sunDir);
     if (!street && cityOutdoor <= 0) {
-      this.scene.background.copy(TUNNEL_BG).lerp(sky.color, f);
-      this.scene.fog.color.copy(TUNNEL_BG).lerp(sky.color, f);
+      const horizon = this.dome.set(sky, this.sunDir);
+      this.dome.setOpacity(f);
+      this.scene.background.copy(TUNNEL_BG).lerp(horizon, f);
+      this.scene.fog.color.copy(TUNNEL_BG).lerp(horizon, f);
       const far = 330 - 120 * WEATHER.rain;
       this.scene.fog.near = 30 + (60 - 30) * f;
       this.scene.fog.far = 240 + (far - 240) * f;
-    }
+    } else this.dome.setOpacity(0);
     const light = street ? 0 : f;
     this.sun.intensity = 2.4 * sky.light * light;
     this.sun.color.setHex(sky.dusk > 0.4 ? 0xffb37a : 0xfff1dc);
-    this.sun.position.set(cam.x - 60, cam.y + 120, cam.z + 40);
+    this.sun.position.set(cam.x + this.sunDir.x * 150, cam.y + Math.max(0.2, this.sunDir.y) * 150, cam.z + this.sunDir.z * 150);
     this.sun.target.position.set(cam.x, cam.y, cam.z);
     this.hemi.intensity = (0.2 + 0.9 * sky.day * (1 - 0.3 * WEATHER.cloud)) * light;
     if (this.M) this.M.building.emissiveIntensity = sky.day < 0.35 ? 0.9 * (1 - sky.day / 0.35) : 0;

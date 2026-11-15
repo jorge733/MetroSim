@@ -825,7 +825,7 @@ async function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = 
       }
     }
   } else {
-    const city = new City(scene);
+    const city = new City(scene, renderer);
     city.sound = (type, data) => game?.audio.cityEvent(type, data);     // autos, bocinas, pájaros...
     game.city = city;
     game.missions = new MissionSystem(ROUTE_A.line, STATIONS);

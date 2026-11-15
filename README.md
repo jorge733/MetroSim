@@ -124,6 +124,25 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **Salir por los torniquetes es gratis**: solo se cobra el pasaje al pasar hacia la zona pagada (antes, al terminar
   de cruzar el torniquete de salida se cobraba un pasaje).
 
+## Versión 2.4 · La calle se ve más real
+
+Nuevo `js/render/realism.js`, que usan la calle del bus y del taxi, la calle de la estación (modo Viajar) y el Metro
+al aire libre:
+
+- **Cielo de verdad:** degradado del cenit azul profundo a la bruma clara del horizonte, el disco y el halo del sol y
+  nubes que se mueven (más con el tiempo nublado). La niebla toma el color del horizonte, así lo lejano se funde con él.
+- **El sol se mueve con la hora:** sale por la cordillera, al mediodía está hacia el norte y se pone por el poniente.
+  En la calle del bus/taxi y en la calle de la estación **proyecta sombras** suaves (edificios, árboles, faroles,
+  paraderos, autos, el bus y la gente) en un área que acompaña a la cámara. En celulares el mapa de sombras es más chico.
+- **Texturas del tamaño real:** asfalto con grano, bacheos, manchas de aceite y grietas; veredas de baldosas con
+  juntas; pasto en el bandejón. Se pegan según la posición en el mundo, así no se estiran en las piezas largas.
+- **Fachadas:** las ventanas se reparten por pisos según el alto real de cada edificio (ya no se estiran), con marco,
+  vidrio que refleja el cielo, cortinas, alféizar con mancha de lluvia y aire acondicionado; el color de cada edificio
+  tiñe solo el muro y la azotea es de hormigón. También hay edificios de muro cortina.
+- **Árboles** con copa de varios bultos, más oscura abajo (sombra propia), y tronco con ramas.
+- **Reflejos:** los autos, los vidrios y la calzada mojada reflejan el cielo de la hora.
+- **De noche,** los faroles dejan un círculo de luz cálida en el piso.
+
 ## Versión 2.3 · La calle dobla como el recorrido real · taxi en los dos sentidos
 
 - **Recorridos con sus giros** (`js/bus/busPath.js`): la calle del bus y del taxi sigue el **trazado real** de cada

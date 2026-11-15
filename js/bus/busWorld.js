@@ -30,6 +30,7 @@ import { skyAt } from "../render/outdoor.js";
 import { WEATHER } from "../engine/weather.js";
 import { metroStreetAccess } from "../city/city.js";
 import { linesAtStation } from "../engine/network.js";
+import { SkyDome, SunShadow, sunDirection, skyEnvironment, shadows, asphaltTexture, asphaltRoughness, paverTexture, grassTexture, worldUV, facadeUV, facadeSet, crownGeometry, trunkGeometry, leafMaterial, ASPHALT_TILE, PAVER_TILE, GRASS_TILE } from "../render/realism.js";
 
 const ROAD_FAR = -17.6;          // borde de la calzada de vuelta
 const MEDIAN_FAR = -7.4;         // fin del bandejón
@@ -94,8 +95,10 @@ export class BusWorld {
    * @param {{scene:THREE.Scene, route:object, clock?:number, hour?:number, ride?:boolean}} o
    *   clock: hora del día en segundos (o hour, 0..24) para el cielo y las luces · ride: el jugador va sentado adentro
    */
-  constructor({ scene, route, clock, hour = 12, ride = false, vehicle = "bus" }) {
+  constructor({ scene, route, clock, hour = 12, ride = false, vehicle = "bus", renderer = null }) {
     this.scene = scene;
+    this.renderer = renderer;
+    this.clock = clock ?? hour * 3600;
     this.taxi = vehicle === "taxi";
     this.route = route;
     this.ride = ride;
@@ -129,9 +132,16 @@ export class BusWorld {
     this.buildMetroAccesses();
     statics.push(...scene.children.filter(o => !before2.has(o)));
     this.bendStatic(statics);
+    // 2.4 · Sombras: todo lo fijo proyecta sombra; el piso, los edificios y los paraderos la reciben
+    for (const o of statics) shadows(o, { cast: true, receive: true });
+    shadows(this.bus, { cast: true, receive: true });
+    for (const o of this.oncoming) shadows(o.mesh);
+    this.ground.receiveShadow = true;
     this.buildRain();
     // 1.19 · pasajeros 3D; 1.20: también bajan al Metro por el acceso y pasa gente por las veredas
     this.people = new BusPeople(scene, route, this.body, { ride, accesses: this.accesses, taxi: this.taxi ? TAXI_SEATS : null, bend: this });
+    const pr = this.people.renderer;
+    if (pr) for (const m of [pr.box, pr.head, pr.hair]) m.castShadow = true;
     if (this.taxi) this.buildFareMarker();
   }
 
@@ -216,16 +226,28 @@ export class BusWorld {
   buildSky() {
     const s = this.scene;
     const K = this.sky, rain = this.rainAmount;
-    const sky = K.color.clone();
+    // 2.4 · Cielo con degradado, sol y nubes; la niebla toma el color del horizonte
+    this.sunDir = sunDirection(this.clock);
+    this.dome = new SkyDome();
+    const sky = this.dome.set(K, this.sunDir).clone();
+    s.add(this.dome);
     s.background = sky;
     // Neblina: más corta con lluvia y de noche (la misma idea que la vía al aire libre del Metro)
-    s.fog = new THREE.Fog(sky, 70 - 30 * rain, (this.night ? 380 : 560) * (1 - 0.45 * rain) - 60 * K.cloud);
+    s.fog = new THREE.Fog(sky, 90 - 40 * rain, (this.night ? 420 : 700) * (1 - 0.45 * rain) - 80 * K.cloud);
     const hemi = new THREE.HemisphereLight(this.night ? "#3a4c78" : "#dfeaff", this.night ? "#2a2620" : "#5d5446", 0.75 + 0.45 * K.light);
     s.add(hemi);
     const sunColor = new THREE.Color(this.night ? "#8fa6d8" : "#fff4e0").lerp(new THREE.Color("#ffc58f"), Math.min(1, K.dusk));
-    const sun = new THREE.DirectionalLight(sunColor, this.night ? 0.45 : 0.35 + 1.5 * K.light);
+    const sun = new THREE.DirectionalLight(sunColor, this.night ? 0.45 : 0.35 + 2.4 * K.light);
     sun.position.set(-60, 120, 40);
-    s.add(sun);
+    s.add(sun, sun.target);
+    this.sun = sun;
+    if (this.renderer) {
+      this.shadow = new SunShadow(this.renderer, sun);
+      // Autos, vidrios y la calzada mojada reflejan este mismo cielo
+      s.environment = skyEnvironment(this.renderer, this.dome);
+      s.environmentIntensity = this.night ? 0.25 : 0.55;
+      hemi.intensity *= this.night ? 0.9 : 0.62;
+    }
     // La cordillera al fondo (hacia el oriente, adonde va el bus)
     const mtn = canvasTexture(1024, 256, (g, w, h) => {
       g.clearRect(0, 0, w, h);
@@ -249,14 +271,11 @@ export class BusWorld {
   /* ----------------------------- Suelo, calzada y veredas ----------------------------- */
   buildGround() {
     const s = this.scene, rng = this.rng;
-    const asphalt = canvasTexture(256, 256, (g, w, h) => {
-      g.fillStyle = "#3b3e42"; g.fillRect(0, 0, w, h);
-      noise(g, w, h, 26, rng);
-    }, { repeat: [6, this.len / 12] });
+    const asphalt = asphaltTexture();
     const roadW = CURB_X - ROAD_FAR;
     // 1.20 · Con lluvia la calzada se ve mojada: más oscura y con brillo (reflejos de faroles y focos)
     const wetK = Math.min(1, this.wet);
-    const road = new THREE.Mesh(new THREE.PlaneGeometry(roadW, this.len, 1, Math.ceil(this.len / 3)), std(new THREE.Color("#ffffff").lerp(new THREE.Color("#8d9196"), wetK), { map: asphalt, roughness: 0.95 - 0.6 * wetK, metalness: 0.25 * wetK }));
+    const road = new THREE.Mesh(new THREE.PlaneGeometry(roadW, this.len, 1, Math.ceil(this.len / 3)), worldUV(std(new THREE.Color("#ffffff").lerp(new THREE.Color("#8d9196"), wetK), { map: asphalt, roughnessMap: asphaltRoughness(), roughness: 0.95 - 0.65 * wetK, metalness: 0.2 * wetK }), ASPHALT_TILE));
     road.rotation.x = -Math.PI / 2;
     road.position.set((CURB_X + ROAD_FAR) / 2, 0, this.zMid);
     s.add(road);
@@ -267,12 +286,7 @@ export class BusWorld {
     busLane.position.set(LANES[0], 0.004, this.zMid);
     s.add(busLane);
 
-    const concrete = canvasTexture(128, 128, (g, w, h) => {
-      g.fillStyle = "#a7a39b"; g.fillRect(0, 0, w, h);
-      noise(g, w, h, 18, rng);
-      g.strokeStyle = "rgba(60,60,60,.35)"; g.lineWidth = 2; g.strokeRect(0, 0, w, h);
-    }, { repeat: [3, this.len / 3] });
-    const walkMat = std(new THREE.Color("#ffffff").lerp(new THREE.Color("#9a9a9a"), 0.6 * Math.min(1, this.wet)), { map: concrete });
+    const walkMat = worldUV(std(new THREE.Color("#ffffff").lerp(new THREE.Color("#9a9a9a"), 0.6 * Math.min(1, this.wet)), { map: paverTexture(), roughness: 0.9 - 0.4 * Math.min(1, this.wet) }), PAVER_TILE);
     // Vereda del lado del bus en tres franjas: la del medio deja el hueco de la escalera del Metro
     const ax0 = ACCESS.dx - ACCESS.w / 2 - 0.05, ax1 = ACCESS.dx + ACCESS.w / 2 + 0.05;
     box(s, ax0, 0.16, this.len, walkMat, CURB_X + ax0 / 2, 0.08, this.zMid);
@@ -290,7 +304,7 @@ export class BusWorld {
     box(s, 0.25, 0.18, this.len, curbMat, ROAD_FAR - 0.12, 0.09, this.zMid);
 
     // Terreno: un plano grande que acompaña al vehículo (la calle dobla encima)
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(3200, 3200), std(this.night ? "#1a1c1a" : "#5f6650"));
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(3200, 3200), worldUV(std(this.night ? "#3a3c3a" : "#b9b7a4", { map: grassTexture() }), GRASS_TILE));
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -0.05;
     s.add(ground);
@@ -343,7 +357,7 @@ export class BusWorld {
   buildMedian() {
     const s = this.scene, rng = this.rng;
     const w = MEDIAN_X - MEDIAN_FAR;
-    box(s, w, 0.2, this.len, std(this.night ? "#1f2a1c" : "#55703f"), (MEDIAN_X + MEDIAN_FAR) / 2, 0.1, this.zMid);
+    box(s, w, 0.2, this.len, worldUV(std(this.night ? "#4a5a48" : "#ffffff", { map: grassTexture(), roughness: 1 }), GRASS_TILE), (MEDIAN_X + MEDIAN_FAR) / 2, 0.1, this.zMid);
     const curb = std("#c9c6bf");
     box(s, 0.2, 0.22, this.len, curb, MEDIAN_X - 0.1, 0.11, this.zMid);
     box(s, 0.2, 0.22, this.len, curb, MEDIAN_FAR + 0.1, 0.11, this.zMid);
@@ -356,37 +370,28 @@ export class BusWorld {
       if (!this.route.stops.some(st => ts > st.s - 10 && ts < st.s + (st.metro ? 15 : 6))) spots.push([CURB_X + 4.4, ts]);
       spots.push([ROAD_FAR - 4.4, z + 3 + rng() * 3]);
     }
-    const trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.16, 0.22, 4.8, 6), std("#5a4632"), spots.length);
-    const crowns = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(2.1, 0), std(this.night ? "#1d2f1d" : "#3f6b34", { flatShading: true }), spots.length);
+    // 2.4 · Copas de varios bultos (con sombra propia) y troncos con ramas, en tres formas distintas
+    const trunks = new THREE.InstancedMesh(trunkGeometry(), std("#5b4a3a", { roughness: 1 }), spots.length);
+    const leaf = leafMaterial(this.night ? "#55705a" : "#ffffff");
+    const crownSets = [1, 2, 3].map(k => new THREE.InstancedMesh(crownGeometry(k), leaf, spots.length));
+    const crownN = [0, 0, 0];
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), v = new THREE.Vector3(), sc = new THREE.Vector3();
     const col = new THREE.Color();
     spots.forEach(([x, sPos], i) => {
-      trunks.setMatrixAt(i, m4.compose(v.set(x, 2.4, -sPos), q, sc.set(1, 1, 1)));
       const k = 0.75 + rng() * 0.4;
-      crowns.setMatrixAt(i, m4.compose(v.set(x, 5.4 + k * 0.6, -sPos), q.setFromEuler(new THREE.Euler(0, rng() * 6, 0)), sc.set(k, k * (0.8 + rng() * 0.3), k)));
-      crowns.setColorAt(i, col.setHSL(0.27 + rng() * 0.06, 0.4, (this.night ? 0.12 : 0.3) + rng() * 0.08));
+      trunks.setMatrixAt(i, m4.compose(v.set(x, 0, -sPos), q, sc.set(1.3 * k, 4.6 + k * 0.6, 1.3 * k)));
+      const set = Math.floor(rng() * 3), crowns = crownSets[set], j = crownN[set]++;
+      crowns.setMatrixAt(j, m4.compose(v.set(x, 5.2 + k * 0.8, -sPos), q.setFromEuler(new THREE.Euler(0, rng() * 6, 0)), sc.set(2.2 * k, 1.9 * k * (0.85 + rng() * 0.3), 2.2 * k)));
+      crowns.setColorAt(j, col.setHSL(0.24 + rng() * 0.07, 0.42 + rng() * 0.1, (this.night ? 0.16 : 0.3) + rng() * 0.08));
       q.identity();
     });
-    s.add(trunks, crowns);
+    crownSets.forEach((c, i) => { c.count = crownN[i]; });
+    s.add(trunks, ...crownSets);
   }
 
   /* ----------------------------- Edificios ----------------------------- */
   buildBuildings() {
     const s = this.scene, rng = this.rng;
-    const winTex = canvasTexture(128, 256, (g, w, h) => {
-      g.fillStyle = "#ffffff"; g.fillRect(0, 0, w, h);
-      for (let y = 10; y < h - 8; y += 24) for (let x = 8; x < w - 8; x += 20) {
-        const lit = rng() < 0.45;
-        g.fillStyle = lit ? "#ffe2a6" : "#2b3440";
-        g.fillRect(x, y, 12, 14);
-      }
-    }, { repeat: [1, 1] });
-    const emisTex = canvasTexture(128, 256, (g, w, h) => {
-      g.fillStyle = "#000"; g.fillRect(0, 0, w, h);
-      for (let y = 10; y < h - 8; y += 24) for (let x = 8; x < w - 8; x += 20) {
-        if (rng() < 0.4) { g.fillStyle = "#ffd28a"; g.fillRect(x, y, 12, 14); }
-      }
-    });
     const crossings = this.route.lights.map(l => l.s + 8);
     const lots = [];
     for (const side of [1, -1]) {
@@ -403,16 +408,27 @@ export class BusWorld {
         sPos += w;
       }
     }
+    // 2.4 · Fachadas con ventanas por piso (según el alto real de cada edificio), vidrio que refleja el cielo,
+    // cortinas y manchas; edificios de oficinas o de muro cortina
     const geo = new THREE.BoxGeometry(1, 1, 1);
-    const mat = std("#ffffff", { map: winTex, roughness: 0.8, ...(this.night || this.dusk ? { emissiveMap: emisTex, emissive: new THREE.Color("#ffffff"), emissiveIntensity: this.night ? 0.9 : 0.25 } : {}) });
-    const mesh = new THREE.InstancedMesh(geo, mat, lots.length);
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), v = new THREE.Vector3(), sc = new THREE.Vector3(), col = new THREE.Color();
-    const tones = ["#d8cfc0", "#b9b2a6", "#c7c9c8", "#e2d6bf", "#9fa7ad", "#cdb89a", "#a8988a", "#e6e1d8"];
-    lots.forEach((b, i) => {
-      mesh.setMatrixAt(i, m4.compose(v.set(b.x, b.h / 2, b.z), q, sc.set(b.d, b.h, b.w)));
-      mesh.setColorAt(i, col.set(tones[Math.floor(rng() * tones.length)]));
-    });
-    s.add(mesh);
+    const tones = ["#d8cfc0", "#b9b2a6", "#c7c9c8", "#e2d6bf", "#9fa7ad", "#cdb89a", "#a8988a", "#e6e1d8", "#c98f72", "#8f9a8c"];
+    const glassTones = ["#9fb4c6", "#8ea3a6", "#a9b3bd", "#7f95ab"];
+    for (const kind of ["office", "glass"]) {
+      const mine = lots.filter(b => (b.kind ??= b.h > 30 && rng() < 0.55 ? "glass" : "office") === kind);
+      if (!mine.length) continue;
+      const fs = facadeSet(kind);
+      const lit = this.night || this.dusk;
+      const mat = facadeUV(std("#ffffff", { map: fs.map, roughnessMap: fs.roughnessMap, roughness: 0.9, metalness: kind === "glass" ? 0.35 : 0.08,
+        ...(lit ? { emissiveMap: fs.emissiveMap, emissive: new THREE.Color("#ffffff"), emissiveIntensity: this.night ? 0.75 : 0.25 } : {}) }));
+      const mesh = new THREE.InstancedMesh(geo, mat, mine.length);
+      mine.forEach((b, i) => {
+        mesh.setMatrixAt(i, m4.compose(v.set(b.x, b.h / 2, b.z), q, sc.set(b.d, b.h, b.w)));
+        const pal = kind === "glass" ? glassTones : tones;
+        mesh.setColorAt(i, col.set(pal[Math.floor(rng() * pal.length)]));
+      });
+      s.add(mesh);
+    }
     // Primer piso con locales (franja oscura con toldos de colores)
     const shop = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), std("#ffffff", { roughness: 0.6 }), lots.length);
     lots.forEach((b, i) => {
@@ -441,6 +457,25 @@ export class BusWorld {
     });
     heads.count = k;
     s.add(poles, heads);
+    // 2.4 · De noche, cada farol deja un círculo de luz cálida en el piso (sin luces reales: es un dibujo sumado)
+    if (this.night || this.dusk) {
+      const pool = canvasTexture(128, 128, (g, w, h) => {
+        const grd = g.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
+        grd.addColorStop(0, "rgba(255,214,150,1)"); grd.addColorStop(0.45, "rgba(255,190,120,.45)"); grd.addColorStop(1, "rgba(255,170,100,0)");
+        g.fillStyle = grd; g.fillRect(0, 0, w, h);
+      });
+      const poolMat = new THREE.MeshBasicMaterial({ map: pool, transparent: true, opacity: this.night ? 0.55 : 0.2, blending: THREE.AdditiveBlending, depthWrite: false, fog: true });
+      const pools = new THREE.InstancedMesh(new THREE.PlaneGeometry(11, 11), poolMat, k);
+      const qf = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0));
+      let n = 0;
+      spots.forEach(([x, sPos, dir]) => {
+        const arms = dir === 0 ? [-1.4, 1.4] : [dir * 1.6];
+        for (const a of arms) pools.setMatrixAt(n++, m4.compose(v.set(x + a * 1.6, 0.2, -sPos), qf, one));
+      });
+      pools.count = n;
+      pools.renderOrder = 2;
+      s.add(pools);
+    }
   }
 
   /* ----------------------------- Calles que cruzan ----------------------------- */
@@ -825,6 +860,7 @@ export class BusWorld {
     for (const x of [-0.65, 0.65]) box(g, 0.35, 0.14, 0.04, tails, x, van ? 1.0 : 0.78, car.len + 0.02);
     if (this.night) for (const x of [-0.6, 0.6]) box(g, 0.3, 0.12, 0.04, this.headMat, x, 0.7, -0.02);
     g.userData.tails = tails;
+    shadows(g);
     this.scene.add(g);
     return g;
   }
@@ -953,9 +989,17 @@ export class BusWorld {
     // Cordillera fija respecto del bus (está «en el infinito»)
     this.mountains.position.set(g.position.x + 1500, 120, g.position.z);
     this.ground.position.x = g.position.x; this.ground.position.z = g.position.z;
+    // 2.4 · El área con sombras acompaña a la cámara (un poco hacia adelante, donde se mira)
+    if (this.shadow) {
+      const f = this._sf ??= new THREE.Vector3();
+      f.copy(cam || g.position);
+      if (cam) { const h = this.heading(sim.idaS) + (sim.dir < 0 ? Math.PI : 0); f.x -= Math.sin(h) * 25; f.z -= Math.cos(h) * 25; }
+      this.shadow.follow(f, this.sunDir);
+    }
   }
 
   dispose() {
+    this.scene.environment?.dispose();
     this.scene.traverse(obj => {
       obj.geometry?.dispose();
       const mats = Array.isArray(obj.material) ? obj.material : obj.material ? [obj.material] : [];

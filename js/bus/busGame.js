@@ -115,7 +115,7 @@ class BusGame {
     // 1.20 · La misma curva de demanda y el mismo clima que el Metro (con lluvia viaja más gente y el piso está mojado)
     const simOpts = { route: this.route, clock, demand: demandAt(clock, dayTypeOf(now)) * weatherDemandFactor(), startStop: this.ride?.from ?? 0, wet: WEATHER.wet };
     this.sim = this.taxi ? new TaxiSim(simOpts) : new BusSim(simOpts);
-    this.world = new BusWorld({ scene: this.scene, route: this.route, clock, ride: !!this.ride, vehicle: this.taxi ? "taxi" : "bus" });
+    this.world = new BusWorld({ scene: this.scene, route: this.route, clock, ride: !!this.ride, vehicle: this.taxi ? "taxi" : "bus", renderer: this.renderer });
     this.scene.add(this.camera);
     this.camPos = null;
     this.earned = 0;

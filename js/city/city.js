@@ -31,6 +31,7 @@ import { skyAt } from "../render/outdoor.js";            // cielo según la hora
 import { buildLandmark } from "./landmarks.js";
 import { cityMaterials, genericBuilding, signMaterial, facingPlane, streetLamp, tree, bench, addMesh } from "./kit.js";
 import { markCity } from "../render/trackLift.js";
+import { SkyDome, SunShadow, sunDirection, lampPool } from "../render/realism.js";
 import { BUS_METRO_STOPS, busRoutesAt } from "../bus/busRoute.js";
 
 /** 1.15 · Paradero de la calle (local): aquí se toma el bus del recorrido si pasa por esta estación. */
@@ -143,8 +144,10 @@ export function metroTotem(parent, name, lines, x = 0, z = 0) {
 const LANES = [{ x: -5.2, dir: 1 }, { x: -1.9, dir: 1 }, { x: 1.9, dir: -1 }, { x: 5.2, dir: -1 }];
 
 export class City {
-  constructor(scene) {
+  /** @param {THREE.WebGLRenderer} [renderer] 2.4 · para las sombras del sol */
+  constructor(scene, renderer = null) {
     this.scene = scene;
+    this.renderer = renderer;
     this.group = null;
     this.active = false;
     this.station = null;
@@ -191,6 +194,24 @@ export class City {
     this.sun.position.set(-60, 120, 40);
     this.sun.target.position.set(0, 0, 0);
     g.add(this.hemi, this.sun, this.sun.target);
+    // 2.4 · Cielo con degradado, sol y nubes; sombras del sol que siguen al pasajero
+    this.dome = new SkyDome();
+    g.add(this.dome);
+    this.sunDir = sunDirection(clock);
+    if (this.renderer) {
+      this.shadow = new SunShadow(this.renderer, this.sun, { range: 55 });
+      // La sombra se calcula sin doblar con la vía, igual que la calle (render/trackLift.js)
+      const depth = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
+      depth.userData.trackLift = "city";
+      g.traverse(o => {
+        if (!o.isMesh || o === this.dome) return;
+        const m = Array.isArray(o.material) ? o.material[0] : o.material;
+        const solid = m && !m.transparent && !m.isMeshBasicMaterial;
+        o.castShadow = solid;
+        o.receiveShadow = !!m && !m.isMeshBasicMaterial;
+        if (solid) o.customDepthMaterial = depth;
+      });
+    }
     this.setTime(clock);
     markCity(g);                            // la calle es horizontal: no se dobla con la vía (render/trackLift.js)
   }
@@ -230,14 +251,16 @@ export class City {
   applySky() {
     const f = this.outdoor || 0, sky = this.sky;
     if (!this.base || !sky) return;
-    this.scene.background.copy(this.base.bg).lerp(sky.color, f);
-    this.scene.fog.color.copy(this.base.fog).lerp(sky.color, f);
+    const horizon = this.dome ? this.dome.set(sky, this.sunDir) : sky.color;
+    this.dome?.setOpacity(f);
+    this.scene.background.copy(this.base.bg).lerp(horizon, f);
+    this.scene.fog.color.copy(this.base.fog).lerp(horizon, f);
     this.scene.fog.near = this.base.near + (70 - this.base.near) * f;
     this.scene.fog.far = this.base.far + (330 - this.base.far) * f;
     if (this.hemi) {
       const k = f > 0 ? 0.5 + 0.5 * f : 0;               // la luz del día entra por la boca del acceso
-      this.hemi.intensity = (0.25 + 1.0 * sky.day * (1 - 0.3 * sky.cloud)) * k;
-      this.sun.intensity = 2.4 * sky.light * k;
+      this.hemi.intensity = (0.25 + 0.75 * sky.day * (1 - 0.3 * sky.cloud)) * k;
+      this.sun.intensity = 2.8 * sky.light * k;
       this.sun.color.setHex(sky.dusk > 0.4 ? 0xffb37a : 0xfff1dc);
     }
   }
@@ -245,6 +268,7 @@ export class City {
   /** Ajusta el cielo y el sol a la hora del juego. */
   setTime(clock) {
     this.sky = skyAt(clock);
+    this.sunDir = sunDirection(clock, this.sunDir);
     this.applySky();
   }
 
@@ -420,9 +444,11 @@ export class City {
 
   /** Faroles, árboles, bancos y paradero. */
   buildFurniture(g, M, rnd) {
+    const night = (this.sky?.night ?? 0) > 0.5;
     for (let z = -84; z <= 84; z += 24) {
       streetLamp(g, M, S.roadHalf + 0.6, z + 6, -1);
       streetLamp(g, M, -S.roadHalf - 0.6, z - 6, 1);
+      if (night) { lampPool(g, S.roadHalf - 1.4, z + 6); lampPool(g, -S.roadHalf + 1.4, z - 6); }
       this.blocks.push({ x0: S.roadHalf + 0.45, x1: S.roadHalf + 0.75, z0: z + 5.85, z1: z + 6.15 });
       this.blocks.push({ x0: -S.roadHalf - 0.75, x1: -S.roadHalf - 0.45, z0: z - 6.15, z1: z - 5.85 });
     }
@@ -673,6 +699,12 @@ export class City {
     this.timeT -= dt;
     if (this.timeT <= 0) { this.timeT = 20; this.setTime(clock); }
     const lx = playerPos ? playerPos.x - this.origin.x : 1e9, lz = playerPos ? playerPos.z - this.origin.z : 1e9;
+    // 2.4 · El área con sombras acompaña al pasajero (o queda sobre la salida del Metro mientras sube)
+    if (this.shadow) {
+      const f = this._sf ??= new THREE.Vector3();
+      f.set(playerPos ? playerPos.x : this.origin.x + S.access.x, this.origin.y, playerPos ? playerPos.z : this.origin.z + S.access.z);
+      this.shadow.follow(f, this.sunDir);
+    }
 
     // Vehículos: frenan ante el jugador y ante el de adelante
     for (const c of this.vehicles) {

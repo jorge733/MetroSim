@@ -9,6 +9,7 @@
 
 import * as THREE from "three";
 import { std, glow, addBox, makeCanvas, toTexture } from "../utils.js";
+import { worldUV, asphaltTexture, paverTexture, grassTexture, crownGeometry, trunkGeometry, leafMaterial, ASPHALT_TILE, PAVER_TILE, GRASS_TILE } from "../render/realism.js";
 
 /**
  * Textura de fachada con ventanas.
@@ -24,14 +25,28 @@ export function facadeTexture({ base = "#9a9590", glass = "#3d4f63", lit = 0, co
   for (let r = 0; r < rows; r++) {
     for (let k = 0; k < cols; k++) {
       const on = seed() < lit;
-      g.fillStyle = on ? (seed() < 0.5 ? "#ffe2a6" : "#fff3d6") : glass;
-      if (style === "glass") {
-        g.fillRect(k * cw + 1, r * rh + 1, cw - 2, rh - 2);
-      } else if (style === "classic") {
-        g.fillRect(k * cw + cw * 0.3, r * rh + rh * 0.18, cw * 0.4, rh * 0.62);
+      // 2.4 · Ventana con marco, vidrio que refleja el cielo (más claro arriba), cortinas y alféizar con mancha
+      const [x, y, w, h] = style === "glass" ? [k * cw + 1, r * rh + 1, cw - 2, rh - 2]
+        : style === "classic" ? [k * cw + cw * 0.3, r * rh + rh * 0.18, cw * 0.4, rh * 0.62]
+        : [k * cw + cw * 0.14, r * rh + rh * 0.2, cw * 0.72, rh * 0.56];
+      if (style !== "glass") { g.fillStyle = "rgba(0,0,0,.28)"; g.fillRect(x - 2, y - 2, w + 4, h + 4); }
+      if (on) g.fillStyle = seed() < 0.5 ? "#ffe2a6" : "#fff3d6";
+      else {
+        const grd = g.createLinearGradient(0, y, 0, y + h);
+        grd.addColorStop(0, "#9fb3c6"); grd.addColorStop(0.5, glass); grd.addColorStop(1, "#1f2730");
+        g.fillStyle = grd;
+      }
+      g.fillRect(x, y, w, h);
+      if (!on && seed() < 0.3) { g.fillStyle = seed() < 0.5 ? "#d8d0c0" : "#b8ad9a"; g.fillRect(x, y, w, h * (0.2 + seed() * 0.5)); }
+      g.fillStyle = "rgba(255,255,255,.08)"; g.fillRect(x + w * 0.1, y, w * 0.18, h);
+      if (style === "classic") {
         g.fillStyle = "#00000030"; g.fillRect(k * cw + cw * 0.26, r * rh + rh * 0.12, cw * 0.48, rh * 0.06);
-      } else {
-        g.fillRect(k * cw + cw * 0.14, r * rh + rh * 0.2, cw * 0.72, rh * 0.56);
+      }
+      if (style !== "glass") {
+        g.fillStyle = "rgba(255,255,255,.35)"; g.fillRect(x - 3, y + h, w + 6, 3);
+        const st = g.createLinearGradient(0, y + h + 3, 0, y + h + rh * 0.35);
+        st.addColorStop(0, "rgba(40,34,28,.16)"); st.addColorStop(1, "rgba(40,34,28,0)");
+        g.fillStyle = st; g.fillRect(x + w * 0.15, y + h + 3, w * 0.7, rh * 0.35);
       }
     }
   }
@@ -39,6 +54,10 @@ export function facadeTexture({ base = "#9a9590", glass = "#3d4f63", lit = 0, co
     g.fillStyle = "#00000022";
     for (let r = 0; r < rows; r++) g.fillRect(0, r * rh, W, 3);
   }
+  // Suciedad abajo
+  const dirt = g.createLinearGradient(0, H * 0.8, 0, H);
+  dirt.addColorStop(0, "rgba(45,40,34,0)"); dirt.addColorStop(1, "rgba(45,40,34,.18)");
+  g.fillStyle = dirt; g.fillRect(0, H * 0.8, W, H * 0.2);
   return toTexture(c);
 }
 
@@ -87,15 +106,16 @@ export function addMesh(parent, geo, mat, x = 0, y = 0, z = 0) {
  */
 export function cityMaterials(night) {
   return {
-    asphalt: std(0x2b2d30, { rough: 0.95 }),
-    sidewalk: std(0x9d978c, { rough: 0.9 }),
+    // 2.4 · Asfalto, baldosas y pasto con textura del tamaño real (coordenadas del mundo)
+    asphalt: worldUV(std(0xffffff, { map: asphaltTexture(), rough: 0.95 }), ASPHALT_TILE),
+    sidewalk: worldUV(std(0xffffff, { map: paverTexture(), rough: 0.9 }), PAVER_TILE),
     curb: std(0xbab4aa, { rough: 0.8 }),
     paint: glow(night > 0.5 ? 0xb8b8b0 : 0xf2f2ea),
     yellow: glow(0xe6b800),
-    grass: std(0x4f8a3a, { rough: 1 }),
-    darkGrass: std(0x3f6f30, { rough: 1 }),
+    grass: worldUV(std(0xdde8cf, { map: grassTexture(), rough: 1 }), GRASS_TILE),
+    darkGrass: worldUV(std(0xb4c4a6, { map: grassTexture(), rough: 1 }), GRASS_TILE),
     trunk: std(0x5a4130, { rough: 1 }),
-    leaves: std(0x3d7a35, { rough: 1 }),
+    leaves: leafMaterial(night > 0.5 ? 0x3a5236 : 0x5d8a46),
     palm: std(0x4c8a3a, { rough: 1, side: THREE.DoubleSide }),
     metal: std(0x3a4046, { metal: 0.6, rough: 0.4 }),
     steel: std(0x8e979f, { metal: 0.7, rough: 0.35 }),
@@ -138,9 +158,13 @@ export function tree(parent, M, x, z, s = 1, kind = "round") {
     }
     return;
   }
-  addMesh(parent, new THREE.CylinderGeometry(0.18 * s, 0.26 * s, 3.2 * s, 6), M.trunk, x, 1.6 * s, z);
-  const crown = addMesh(parent, new THREE.IcosahedronGeometry(2.3 * s, 1), M.leaves, x, 4.6 * s, z);
-  crown.scale.set(1, 0.85, 1);
+  // 2.4 · Tronco con ramas y copa de varios bultos (con sombra propia); cada árbol, una de tres formas
+  const trunk = addMesh(parent, trunkGeometry(), M.trunk, x, 0, z);
+  trunk.scale.set(1.3 * s, 3.6 * s, 1.3 * s);
+  const form = 1 + (Math.abs(Math.round(x * 7 + z * 3)) % 3);
+  const crown = addMesh(parent, crownGeometry(form), M.leaves, x, 4.7 * s, z);
+  crown.scale.set(2.1 * s, 1.8 * s, 2.1 * s);
+  crown.rotation.y = x + z;
 }
 
 /** Farol de calle (la luz es emisiva: no gasta luces reales). */
