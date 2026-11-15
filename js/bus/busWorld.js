@@ -13,6 +13,7 @@
 import * as THREE from "three";
 import { LANES, CURB_X, MEDIAN_X, lightState } from "./busRoute.js";
 import { BUS_LENGTH, BUS_WIDTH, makeRng } from "./busSim.js";
+import { BusPeople } from "./busPeople.js";
 
 const ROAD_FAR = -17.6;          // borde de la calzada de vuelta
 const MEDIAN_FAR = -7.4;         // fin del bandejón
@@ -68,7 +69,7 @@ export class BusWorld {
   /**
    * @param {{scene:THREE.Scene, route:object, hour:number}} o  hour: hora del día (0..24) para el cielo y las luces
    */
-  constructor({ scene, route, hour }) {
+  constructor({ scene, route, hour, ride = false }) {
     this.scene = scene;
     this.route = route;
     this.rng = makeRng(20261115);
@@ -90,6 +91,7 @@ export class BusWorld {
     this.buildLights();
     this.bus = this.buildBus();
     this.buildOncoming();
+    this.people = new BusPeople(scene, route, this.body, { ride });   // 1.19 · pasajeros 3D
   }
 
   /* ----------------------------- Cielo y luz ----------------------------- */
@@ -348,10 +350,6 @@ export class BusWorld {
     const glass = new THREE.MeshStandardMaterial({ color: "#9cc3d9", transparent: true, opacity: 0.35, roughness: 0.1 });
     const post = std("#5d656c", { metalness: 0.5, roughness: 0.4 });
     const yellow = std("#f2c230", { roughness: 0.7 });
-    const personGeo = new THREE.CapsuleGeometry(0.24, 1.05, 3, 8);
-    const personMat = std("#ffffff", { roughness: 0.9 });
-    this.stopPeople = [];
-    const q = new THREE.Quaternion(), v = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1), m4 = new THREE.Matrix4(), col = new THREE.Color();
     this.route.stops.forEach((st, i) => {
       const z = -st.s;
       const g = new THREE.Group();
@@ -384,18 +382,6 @@ export class BusWorld {
         m.position.set(LANES[0] + dx, 0.018, dz);
         g.add(m);
       }
-      // Gente esperando
-      const people = new THREE.InstancedMesh(personGeo, personMat, 28);
-      people.count = 0;
-      people.frustumCulled = false;
-      for (let k = 0; k < 28; k++) {
-        const row = k % 7, line = Math.floor(k / 7);
-        const px = CURB_X + 0.9 + line * 0.8 + rng() * 0.3, pz = 1 + row * 1.25 + rng() * 0.4;
-        people.setMatrixAt(k, m4.compose(v.set(px, 0.16 + 0.76, pz), q, one));
-        people.setColorAt(k, col.setHSL(rng(), 0.35 + rng() * 0.3, 0.25 + rng() * 0.35));
-      }
-      g.add(people);
-      this.stopPeople.push(people);
     });
   }
 
@@ -434,22 +420,41 @@ export class BusWorld {
     const L = BUS_LENGTH, W = BUS_WIDTH;
     const white = std("#eef0f2", { roughness: 0.45, metalness: 0.1 });
     const red = std(this.route.color, { roughness: 0.5 });
-    const glass = new THREE.MeshStandardMaterial({ color: "#1b2733", roughness: 0.15, metalness: 0.4 });
     const dark = std("#1d2024", { roughness: 0.7 });
     const body = new THREE.Group();
     g.add(body);
-    // Carrocería (origen = centro del frente, al nivel del suelo; el bus se extiende hacia +z)
-    box(body, W, 2.55, L, white, 0, 1.75, L / 2);
-    for (const side of [-1, 1]) {                                        // franjas rojas (paneles a cada lado, no cajas macizas: desde dentro no tapan)
+    // Carrocería (origen = centro del frente, al nivel del suelo; el bus se extiende hacia +z).
+    // 1.19: con paneles y ventanas translúcidas (ya no una caja maciza) para que se vea a la gente adentro.
+    const BOT = 0.475, WIN0 = 1.655, WIN1 = 2.705, TOP = 3.025;
+    const glassT = new THREE.MeshStandardMaterial({ color: "#22323f", roughness: 0.08, metalness: 0.5, transparent: true, opacity: 0.38, depthWrite: false });
+    const DOOR_GAPS = [[0.65, 1.85], [5.0, 6.2], [9.35, 10.55]];          // vanos de las puertas (lado derecho)
+    const spans = (a, b, gaps) => {                                      // tramos de [a, b] fuera de los vanos
+      const out = []; let x = a;
+      for (const [g0, g1] of gaps) { if (g0 > x) out.push([x, Math.min(g0, b)]); x = Math.max(x, g1); }
+      if (x < b) out.push([x, b]);
+      return out.filter(([p, q]) => q - p > 0.02);
+    };
+    for (const side of [-1, 1]) {
+      const x = side * (W / 2 - 0.02), gaps = side > 0 ? DOOR_GAPS : [];
+      for (const [a, b] of spans(0, L, gaps)) box(body, 0.04, WIN0 - BOT, b - a, white, x, (BOT + WIN0) / 2, (a + b) / 2);   // bajo las ventanas
+      box(body, 0.04, TOP - WIN1, L, white, x, (WIN1 + TOP) / 2, L / 2);                                                  // sobre las ventanas
+      for (const [a, b] of spans(0, L, [[side > 0 ? 0.65 : 1.3, 11.3]])) box(body, 0.04, WIN1 - WIN0, b - a, white, x, (WIN0 + WIN1) / 2, (a + b) / 2);   // pilares de los extremos
+      for (const z of [3.3, 4.45, 7.0, 8.2, 11.25]) if (!gaps.some(([g0, g1]) => z > g0 - 0.1 && z < g1 + 0.1)) box(body, 0.05, WIN1 - WIN0, 0.09, white, side * (W / 2 - 0.01), (WIN0 + WIN1) / 2, z);
+      for (const [a, b] of spans(1.3, 11.3, gaps)) box(body, 0.02, WIN1 - WIN0, b - a, glassT, side * (W / 2 + 0.005), (WIN0 + WIN1) / 2, (a + b) / 2);   // ventanas
+    }
+    box(body, W, 1.225 - BOT, 0.04, white, 0, (BOT + 1.225) / 2, 0.0);   // frente bajo el parabrisas
+    box(body, W, 1.75 - BOT, 0.04, white, 0, (BOT + 1.75) / 2, L);       // atrás: bajo la luneta
+    box(body, W, TOP - 2.65, 0.04, white, 0, (2.65 + TOP) / 2, L);       // sobre la luneta
+    for (const x of [-1, 1]) box(body, 0.16, 0.9, 0.04, white, x * (W / 2 - 0.08), 2.2, L);
+    for (const side of [-1, 1]) {                                        // franjas rojas
       box(body, 0.02, 0.5, L - 0.2, red, side * (W / 2 + 0.01), 0.72, L / 2);
       box(body, 0.02, 0.12, L - 0.4, red, side * (W / 2 + 0.015), 1.42, L / 2);
     }
     box(body, W - 0.2, 0.5, 0.02, red, 0, 0.72, -0.01);                  // franja del frente
     box(body, W - 0.2, 0.5, 0.02, red, 0, 0.72, L + 0.01);               // y de atrás
-    box(body, W + 0.02, 1.05, L - 1.4, glass, 0, 2.18, L / 2 + 0.6);   // ventanas laterales
     const windshield = new THREE.MeshStandardMaterial({ color: "#1b2733", roughness: 0.1, metalness: 0.5, transparent: true, opacity: 0.55, depthWrite: false });
     this.windshield = box(body, W - 0.2, 1.45, 0.02, windshield, 0, 1.95, -0.01);   // parabrisas (se ve a través desde la cabina)
-    box(body, W - 0.3, 0.9, 0.06, glass, 0, 2.2, L + 0.01);               // luneta
+    box(body, W - 0.3, 0.9, 0.02, glassT, 0, 2.2, L + 0.01);              // luneta
     box(body, W - 0.1, 0.12, 0.08, dark, 0, 0.45, -0.02);                 // parachoques
     box(body, W, 0.1, L, std("#d4d7da"), 0, 3.06, L / 2);                // techo
     box(body, 1.6, 0.35, 3.2, std("#c8ccd0"), 0, 3.25, L * 0.62);        // equipo de aire acondicionado
@@ -488,7 +493,7 @@ export class BusWorld {
     }
     // Puertas del lado derecho (delantera, central y trasera): dos hojas que se abren hacia los lados
     this.doorLeaves = [];
-    const doorMat = new THREE.MeshStandardMaterial({ color: "#2a3640", roughness: 0.2, metalness: 0.3 });
+    const doorMat = new THREE.MeshStandardMaterial({ color: "#2a3640", roughness: 0.2, metalness: 0.3, transparent: true, opacity: 0.6 });
     for (const zc of [1.25, 5.6, 9.95]) {
       for (const side of [-1, 1]) {
         const leaf = box(body, 0.06, 2.35, 0.6, doorMat, W / 2 + 0.02, 1.48, zc + side * 0.3);
@@ -613,8 +618,9 @@ export class BusWorld {
       sg.state = st;
       for (const k of ["red", "amber", "green"]) sg.mats[k].emissiveIntensity = k === st ? 2.6 : 0.05;
     }
-    // Gente en los paraderos
-    sim.waiting.forEach((n, i) => { this.stopPeople[i].count = Math.min(28, n); });
+    // Pasajeros: en los paraderos, subiendo, a bordo y bajando (busPeople.js)
+    g.updateMatrixWorld();
+    this.people.update(sim, dt);
     // Cordillera fija respecto del bus (está «en el infinito»)
     this.mountains.position.z = zBus - 900;
   }

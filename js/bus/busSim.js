@@ -21,8 +21,18 @@ const CAR_WIDTH = 1.8;
 const STOP_WINDOW = 9;            // m alrededor de la marca del paradero en que se puede atender
 const SKIP_AFTER = 14;            // m pasada la marca: el paradero queda saltado
 const DOOR_TIME = 1.1;            // s para abrir o cerrar
-const ALIGHT_EVERY = 0.55;        // s por pasajero que baja
-const BOARD_EVERY = 0.85;         // s por pasajero que sube (valida la bip!)
+/**
+ * 1.19 · Tipos de pasajero: cuánto tardan en subir (validar la bip!) y en bajar, en segundos [mín, máx].
+ * Suben por la puerta delantera y, AL MISMO TIEMPO, bajan por la central y la trasera (como en los buses Red).
+ */
+export const PASSENGER_KINDS = {
+  adulto:     { share: 0.55, board: [0.8, 1.3], alight: [0.5, 0.9] },
+  estudiante: { share: 0.2,  board: [0.7, 1.1], alight: [0.45, 0.8] },
+  mayor:      { share: 0.12, board: [1.8, 2.6], alight: [1.2, 1.8] },   // adulto mayor: sube despacio, de la baranda
+  carga:      { share: 0.07, board: [2.0, 3.0], alight: [1.3, 2.0] },   // con bolsas, maleta o coche de guagua
+  nino:       { share: 0.06, board: [0.7, 1.0], alight: [0.5, 0.8] },   // niño (no valida: va con un adulto)
+};
+const NO_BALANCE = 0.025;         // tarjeta sin saldo: el validador la rechaza y la persona se baja
 const COMMERCIAL = 21 / 3.6;      // velocidad comercial del horario (m/s)
 
 const round10 = (n) => Math.max(0, Math.round(n / 10) * 10);
@@ -103,6 +113,26 @@ export class BusSim {
   initialWaiting(i) {
     const base = 2 + this.demand * 11 * (0.6 + this.rng() * 0.8);
     return Math.round(base + (i === 0 ? 4 : 0));
+  }
+
+  /** Un tipo de pasajero al azar (según su proporción). */
+  personKind() {
+    let r = this.rng();
+    for (const [k, v] of Object.entries(PASSENGER_KINDS)) { r -= v.share; if (r <= 0) return k; }
+    return "adulto";
+  }
+  personTime(kind, what) {
+    const [a, b] = PASSENGER_KINDS[kind][what];
+    return a + this.rng() * (b - a);
+  }
+  /** Paradero donde se bajará quien sube en `from`: más gente va a las estaciones de Metro (combinación) y a la terminal. */
+  pickDestination(from) {
+    const st = this.route.stops, n = st.length;
+    const w = [];
+    for (let j = from + 1; j < n; j++) w.push((st[j].metro ? 2.2 : 1) * (j === n - 1 ? 1.6 : 1) * (j === from + 1 ? 0.6 : 1));
+    let r = this.rng() * w.reduce((a, x) => a + x, 0);
+    for (let k = 0; k < w.length; k++) { r -= w[k]; if (r <= 0) return from + 1 + k; }
+    return n - 1;
   }
 
   emit(type, data = {}) { this.events.push({ type, ...data }); }
@@ -282,45 +312,77 @@ export class BusSim {
       return;
     }
     if (!this.serving) {
-      this.serving = { index: here.index, timer: 0, boarded: 0, alighted: 0, error: here.error, arrival: this.time, done: false };
+      this.serving = { index: here.index, boarded: 0, alighted: 0, error: here.error, arrival: this.time, done: false };
       this.emit("arrive", { index: here.index });
     }
   }
 
+  /**
+   * 1.19 · Subida y bajada: por la puerta delantera suben de a uno (cada uno valida su bip!, unos más lentos
+   * que otros) y a la vez bajan por las puertas central y trasera. Al terminar, a veces alguien viene corriendo.
+   */
   updateBoarding(dt) {
     const sv = this.serving;
-    if (sv.done) return;
-    sv.timer += dt;
-    const wantsOff = this.onboard.findIndex(d => d === sv.index);
-    if (wantsOff >= 0) {
-      if (sv.timer >= ALIGHT_EVERY) {
-        sv.timer = 0;
-        this.onboard.splice(wantsOff, 1);
+    const i = sv.index;
+    const last = i === this.route.stops.length - 1;
+    if (sv.done) {
+      // Alguien corre al paradero: si las puertas siguen abiertas cuando llega, sube
+      if (sv.runner && (sv.runner.eta -= dt) <= 0) {
+        sv.runner = null;
+        this.waiting[i]++;
+        sv.done = false;
+        this.emit("runnerArrive", { index: i });
+        this.msg("Llegó corriendo y alcanzó a subir: espera que valide", "ok");
+      }
+      return;
+    }
+    let busy = false;
+    // Bajan (puertas central y trasera)
+    if (this.onboard.some(d => d === i)) {
+      busy = true;
+      sv.alight ??= { kind: this.personKind(), t: 0 };
+      sv.alight.need ??= this.personTime(sv.alight.kind, "alight");
+      if ((sv.alight.t += dt) >= sv.alight.need) {
+        this.onboard.splice(this.onboard.indexOf(i), 1);
         sv.alighted++;
-        this.emit("alight", { index: sv.index });
+        this.emit("alight", { index: i, kind: sv.alight.kind, door: this.rng() < 0.45 ? "mid" : "rear" });
+        sv.alight = null;
       }
-      return;
     }
-    const last = sv.index === this.route.stops.length - 1;
-    if (!last && this.waiting[sv.index] > 0 && this.onboard.length < BUS_CAPACITY) {
-      if (sv.timer >= BOARD_EVERY) {
-        sv.timer = 0;
-        this.waiting[sv.index]--;
-        const n = this.route.stops.length;
-        this.onboard.push(sv.index + 1 + Math.floor(this.rng() * (n - sv.index - 1)));
-        sv.boarded++;
-        const evaded = this.rng() < 0.04;
-        if (evaded) this.totals.evasions++;
-        this.emit("board", { index: sv.index, evaded });
+    // Suben (puerta delantera)
+    if (!last && this.waiting[i] > 0 && this.onboard.length < BUS_CAPACITY) {
+      busy = true;
+      sv.board ??= { kind: this.personKind(), t: 0 };
+      sv.board.need ??= this.personTime(sv.board.kind, "board");
+      if ((sv.board.t += dt) >= sv.board.need) {
+        const kind = sv.board.kind;
+        sv.board = null;
+        this.waiting[i]--;
+        if (kind !== "nino" && this.rng() < NO_BALANCE) {
+          this.emit("boardFail", { index: i, kind });
+        } else {
+          this.onboard.push(this.pickDestination(i));
+          sv.boarded++;
+          const evaded = kind !== "nino" && this.rng() < 0.04;
+          if (evaded) this.totals.evasions++;
+          this.emit("board", { index: i, kind, evaded });
+        }
       }
-      return;
     }
+    if (busy) return;
     sv.done = true;
-    const full = this.onboard.length >= BUS_CAPACITY && this.waiting[sv.index] > 0;
-    this.emit("boardingDone", { index: sv.index, full });
-    const early = this.timetable[sv.index].time - this.time;
+    const full = this.onboard.length >= BUS_CAPACITY && this.waiting[i] > 0;
+    // A veces alguien viene corriendo justo cuando terminan de subir (más en hora punta)
+    if (!last && !full && !sv.hadRunner && this.rng() < 0.12 + this.demand * 0.15) {
+      sv.hadRunner = true;
+      sv.runner = { eta: 3.5 + this.rng() * 3 };
+      this.emit("runner", { index: i, eta: sv.runner.eta });
+    }
+    this.emit("boardingDone", { index: i, full });
+    const early = this.timetable[i].time - this.time;
     this.msg(last ? "Fin del recorrido: todos abajo. Cierra las puertas para terminar el servicio"
       : full ? "Bus lleno: el resto espera el próximo. Cierra las puertas"
+      : sv.runner ? "Todos arriba… ¡pero alguien viene corriendo! Si lo esperas, alcanza a subir"
       : early > 60 ? `Todos arriba. Vas ${Math.round(early)} s adelantado: espera con las puertas abiertas antes de seguir`
       : "Todos arriba: cierra las puertas y sigue", "ok");
   }
@@ -330,6 +392,7 @@ export class BusSim {
     if (!sv) return;
     this.serving = null;
     const i = sv.index;
+    if (sv.runner) { this.emit("runnerMissed", { index: i }); this.msg("Un pasajero corría al bus y no alcanzó", "info"); }
     const left = this.onboard.length < BUS_CAPACITY ? this.waiting[i] : 0;
     const stuck = this.onboard.filter(d => d === i).length;
     if (stuck) {

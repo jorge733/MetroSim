@@ -124,6 +124,26 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **Salir por los torniquetes es gratis**: solo se cobra el pasaje al pasar hacia la zona pagada (antes, al terminar
   de cruzar el torniquete de salida se cobraba un pasaje).
 
+## Versión 1.19 · Pasajeros realistas en el bus
+
+- **Personas en 3D en vez de cápsulas** (`js/bus/busPeople.js`): las mismas figuras articuladas del Metro, con ropa,
+  piel y pelo distintos. Hay adultos, **estudiantes con mochila**, **adultos mayores** (pelo cano, algo encorvados,
+  caminan y suben despacio), **niños** y gente **con bolsas**.
+- **En el paradero** unos esperan sentados en la banca y otros de pie, mirando la calle, si viene el bus o el celular.
+  Cuando el bus se acerca a detenerse se arriman a la solera y **hacen fila junto a la puerta delantera**.
+- **Suben de a uno por adelante** y validan la bip! (a veces el validador rechaza una tarjeta sin saldo y la persona
+  se baja). **Al mismo tiempo bajan por las puertas central y trasera** y se van caminando por la vereda.
+- **Dentro del bus** buscan asiento (los adultos mayores y quien va con bolsas primero) o van de pie tomados del
+  pasamanos, y **se van para adelante y para atrás cuando frenas o aceleras**. La carrocería ahora tiene ventanas
+  translúcidas, así que se ve a la gente desde afuera. **El bus tiene conductor** (con camisa del uniforme y las
+  manos en el volante; en la vista de cabina no se dibuja porque la cámara está en su cabeza).
+- **Alguien llega corriendo** a veces justo cuando terminaron de subir (más en hora punta): si esperas con las
+  puertas abiertas alcanza a subir; si cierras, se queda mirando cómo se va el bus. El bus automático del modo
+  pasajero lo espera.
+- **Cada persona tarda lo suyo**: subir toma de 0,7 a 3 s según quién sea (antes todos 0,85 s) y la bajada va en
+  paralelo. **Más gente se baja en las estaciones de Metro** (para combinar) y en la terminal.
+- En el modo pasajero tu asiento y el pasillo de adelante quedan libres, para que se vea la calle.
+
 ## Versión 1.18 · Recorridos reales de Red y mejor manejo del bus
 
 - **8 recorridos reales de buses Red** además del A01 de práctica: **210, 385, 401 y 403** por la Alameda,

@@ -104,7 +104,7 @@ class BusGame {
     const now = new Date();
     const clock = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
     this.sim = new BusSim({ route: this.route, clock, demand: demandAt(clock, dayTypeOf(now)), startStop: this.ride?.from ?? 0 });
-    this.world = new BusWorld({ scene: this.scene, route: this.route, hour: clock / 3600 });
+    this.world = new BusWorld({ scene: this.scene, route: this.route, hour: clock / 3600, ride: !!this.ride });
     this.scene.add(this.camera);
     this.camPos = null;
     this.earned = 0;
@@ -409,6 +409,7 @@ class BusGame {
 
   updateCamera(dt) {
     const g = this.world.bus, cam = this.camera;
+    this.world.people.showDriver(this.camMode !== "cab");
     if (this.camMode === "seat") {
       g.updateMatrixWorld();
       cam.position.copy(new THREE.Vector3(0.7, 2.25, 4.45).applyMatrix4(g.matrixWorld));
@@ -435,12 +436,14 @@ class BusGame {
 
   handleEvents() {
     for (const e of this.sim.drain()) {
+      this.world.people.onEvent(e, this.sim);                  // 1.19 · los pasajeros 3D suben, bajan y corren
       if (this.ride) { this.rideEvent(e); continue; }
       switch (e.type) {
         case "msg": this.toast(e.text, e.level); break;
         case "penalty": this.toast(`${e.text} · −${e.points} pts`, "warn", 3600); this.audio.fault(); break;
         case "door": this.audio.door(e.open); break;
         case "board": this.audio.validate(!e.evaded); break;
+        case "boardFail": this.audio.validate(false); this.toast("El validador rechazó la tarjeta: sin saldo. El pasajero se baja", "info", 2600); break;
         case "bell": this.audio.bell(); break;
         case "blinker": this.audio.blinker(); break;
         case "crash": this.audio.crash(); break;
@@ -464,6 +467,7 @@ class BusGame {
       return;
     }
     if (e.type === "board") this.audio.validate(!e.evaded);
+    else if (e.type === "boardFail") this.audio.validate(false);
     else if (e.type === "bell") this.audio.bell();
     else if (e.type === "stopDone" && this.wantOff === e.index) {
       this.wantOff = null;
@@ -623,6 +627,7 @@ class BusGame {
       : { doors: "Espacio", gas: "W", brake: "S", right: "D" };
     if (sim.finished) return "";
     if (sim.serving && !sim.serving.done) return "Subiendo y bajando pasajeros…";
+    if (sim.serving?.done && sim.serving.runner) return `Alguien viene corriendo: si esperas con las puertas abiertas alcanza a subir (${K.doors} para cerrar)`;
     if (sim.serving?.done) {
       const due = sim.timetable[sim.serving.index].time;
       if (due - sim.time > 60) return `Vas adelantado: espera con las puertas abiertas; puedes salir desde las ${clockText(due - 60)}`;

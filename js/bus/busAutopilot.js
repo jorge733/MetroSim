@@ -26,7 +26,7 @@ export function autopilot(sim, dt, { hold = false } = {}) {
   if (b.doors !== "closed") {
     inp.brake = true;
     if (b.doors !== "open") return;
-    if (sim.serving && !sim.serving.done) { ap.doorWait = 0; return; }
+    if (sim.serving && (!sim.serving.done || sim.serving.runner)) { ap.doorWait = 0; return; }   // 1.19: espera al que viene corriendo
     ap.doorWait += dt;
     const atTerminal = (sim.serving?.index ?? sim.stopIndex) === last;
     if (atTerminal) return;                                   // en la terminal se espera a que todos bajen

@@ -59,7 +59,7 @@ const V = (x, y, z) => new THREE.Vector3(x, y, z);
 /** Parte de la gente real (motor) que se dibuja. */
 const VISIBLE_SHARE = 0.3;
 
-const PALETTE = {
+export const PALETTE = {
   shirt: [0x2f4f7f, 0x8a2b2b, 0x3f6e46, 0xd9d4c7, 0x1d1f24, 0x6b4f8a, 0xc7862f, 0x5f6f7a, 0xa33f6b, 0x2d6c78, 0xe5e5e5, 0x7a6450],
   pants: [0x1f2a3a, 0x24262b, 0x3b3f46, 0x4a3b2c, 0x2c3e5c, 0x6d6a60],
   skin: [0xf1c7a5, 0xe0ac86, 0xc68d65, 0x9c6644, 0x6b4430, 0xf5d5bd],
@@ -73,7 +73,7 @@ const PALETTE = {
    ========================================================================== */
 
 /** Crea el esqueleto articulado (Object3D sin mallas). Origen = pies; frente = +Z. */
-function createSkeleton() {
+export function createSkeleton() {
   const h = rand(0.9, 1.1);
   const legLen = 0.84 * h, thigh = legLen / 2, shin = legLen / 2;
   const torsoH = 0.58 * h, armLen = 0.62 * h;
@@ -126,7 +126,7 @@ function createSkeleton() {
   };
 }
 
-class PeopleRenderer {
+export class PeopleRenderer {
   constructor(scene, capacity) {
     const mk = (geo, rough, n) => {
       const m = new THREE.InstancedMesh(geo, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: rough, metalness: 0 }), n);
