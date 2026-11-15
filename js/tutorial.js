@@ -194,7 +194,7 @@ function passengerSteps(k) {
     },
     {
       title: "¡Ya conoces el Metro!",
-      text: `En la calle hay locales (${k("E", "✋ Usar")} para comprar), un hito para fotografiar y un cajero con tu saldo. ${k("J misiones · K Tienda Metro · H controles.", "🎯 Misiones para el tablero · ☰ Tienda.")} Si te falta dinero, haz un turno como Conductor.`,
+      text: `En la calle hay locales (${k("E", "✋ Usar")} para comprar), un hito para fotografiar y un cajero con tu saldo. ${k("J misiones · K Tienda RedMovi · H controles.", "🎯 Misiones para el tablero · ☰ Tienda.")} Si te falta dinero, haz un turno como Conductor.`,
       next: "Terminar",
     },
   ];

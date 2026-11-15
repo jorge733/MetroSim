@@ -1,6 +1,6 @@
 /* ==========================================================================
    MetroSim — shop.js
-   TIENDA METRO: en qué gastar lo que ganas (sin Three.js).
+   TIENDA REDMOVI: en qué gastar lo que ganas (sin Three.js).
 
    Pensada para que convenga jugar el modo Conductor (ahí se gana el sueldo)
    y para tener metas caras a las que juntar dinero:
@@ -17,7 +17,7 @@
    ========================================================================== */
 
 import { LINES } from "./engine/network.js";
-import { formatCLP } from "./config.js";
+import { formatCLP, lineLabel, lineArticle } from "./config.js";
 import { isCreator } from "./creator.js";
 
 const KEY = "metrosim.owned";
@@ -26,11 +26,11 @@ const KEY = "metrosim.owned";
 export const FREE_LINE = "3";
 
 /** Licencias de conductor: una por línea (salvo la gratuita). */
-const LICENSE_PRICE = { "1": 30000, "2": 20000, "4": 25000, "4A": 12000, "5": 25000, "6": 15000, "NOS": 18000 };
+const LICENSE_PRICE = { "1": 30000, "2": 20000, "4": 25000, "4A": 12000, "5": 25000, "6": 15000, "NOS": 18000, "RAN": 25000 };
 export const LICENSES = LINES.filter(l => l.id !== FREE_LINE).map(l => ({
   id: `license-${l.id}`, lineId: l.id, kind: "license", icon: "🪪",
-  name: `Licencia ${l.name.charAt(0) + l.name.slice(1).toLowerCase()}`,
-  desc: `Habilita el modo Conductor en la ${l.name.charAt(0) + l.name.slice(1).toLowerCase()} (${l.stations[0].short} ⇄ ${l.stations.at(-1).short}, ${l.stations.length} estaciones).`,
+  name: `Licencia ${lineLabel(l.id)}`,
+  desc: `Habilita el modo Conductor en ${lineArticle(l.id)} ${lineLabel(l.id)} (${l.stations[0].short} ⇄ ${l.stations.at(-1).short}, ${l.stations.length} estaciones).`,
   price: LICENSE_PRICE[l.id] ?? 20000, color: l.color,
 }));
 
@@ -100,7 +100,7 @@ export class Inventory {
     if (this.has(item.id)) return { ok: false, text: "Ya lo tienes." };
     if (item.requires && !this.has(item.requires)) return { ok: false, text: "Primero necesitas el contrato anterior." };
     if (item.kind === "furniture" && !this.has(HOME.id)) return { ok: false, text: "Primero compra el departamento." };
-    const r = bank.charge(item.price, `Tienda Metro: ${item.name}`);
+    const r = bank.charge(item.price, `Tienda RedMovi: ${item.name}`);
     if (!r.ok) return { ok: false, text: `Te faltan ${formatCLP(item.price - bank.balance)}. Gana más en el modo Conductor: cada estación bien servida paga.` };
     this.owned.add(item.id);
     if (item.kind === "livery") this.livery = item.id;          // se estrena al tiro

@@ -15,7 +15,7 @@
    un plano esquemático de la red que se dibuja línea por línea con trenes
    recorriéndola, y tarjetas con lo que se puede hacer en la 1.0 (cabina,
    viaje a pie con combinaciones y ascensores, ciudad, libreta de misiones,
-   Tienda Metro y Centro de Control). "Comenzar" (o cualquier tecla / clic)
+   Tienda RedMovi y Centro de Control). "Comenzar" (o cualquier tecla / clic)
    toca el gong, da la bienvenida por voz y pasa al menú; Esc salta sin sonido.
 
    El módulo crea su propio HTML y CSS para no tocar el resto de la interfaz.
@@ -24,7 +24,7 @@
 import { LINES } from "./engine/network.js";
 import { LANDMARKS } from "./city/catalog.js";
 import { waitForSpanishVoice } from "./audio.js";
-import { VERSION, LINE_COLORS } from "./config.js";
+import { VERSION, LINE_COLORS, isRail, RAIL_LINES } from "./config.js";
 import { LICENSES, LIVERIES, CONTRACTS, FURNITURE } from "./shop.js";
 
 const TUNNEL_TIME = 4.6;           // segundos de viaje por el túnel antes de salir a la ciudad
@@ -369,6 +369,7 @@ const MAP_PATHS = {
   "5": [[0.07, 0.6], [0.28, 0.54], [0.47, 0.49], [0.6, 0.6], [0.66, 0.78], [0.72, 0.9]],
   "6": [[0.2, 0.72], [0.4, 0.66], [0.56, 0.62], [0.72, 0.56]],
   "NOS": [[0.3, 0.5], [0.3, 0.7], [0.34, 0.85], [0.37, 0.97]],
+  "RAN": [[0.3, 0.5], [0.29, 0.7], [0.3, 0.86], [0.27, 1.02]],
 };
 
 function startMap(canvas, legend) {
@@ -539,7 +540,7 @@ export function playIntro({ isMuted = () => false, menuReady = null } = {}) {
 
   const stations = new Set(LINES.flatMap(l => l.stations.map(s => s.name))).size;
   const landmarks = Object.keys(LANDMARKS).length;
-  // Artículos de la Tienda Metro: licencias, libreas de pago, contratos, el depto, sus muebles y un recuerdo por estación de cada línea
+  // Artículos de la Tienda RedMovi: licencias, libreas de pago, contratos, el depto, sus muebles y un recuerdo por estación de cada línea
   const shopItems = LICENSES.length + LIVERIES.filter(l => l.price > 0).length + CONTRACTS.length + 1 + FURNITURE.length
     + LINES.reduce((n, l) => n + l.stations.length, 0);
   const title = "RedMoviSim".split("").map((ch, i) => `<span${ch === "M" || ch === "o" || ch === "v" || (ch === "i" && i === 6) ? ' class="mv"' : ""} style="animation-delay:${0.25 + i * 0.06}s">${ch}</span>`).join("");
@@ -575,7 +576,7 @@ export function playIntro({ isMuted = () => false, menuReady = null } = {}) {
       <div class="intro-mapbox">
         <canvas></canvas>
         <span class="intro-maplabel">RED DE METRO · EN VIVO</span>
-        <div class="intro-legend">${LINES.map(l => `<span style="--c:${l.color}" data-id="${l.id}">${l.id === "NOS" ? "Nos" : `L${l.id}`}</span>`).join("")}</div>
+        <div class="intro-legend">${LINES.map(l => `<span style="--c:${l.color}" data-id="${l.id}">${isRail(l.id) ? RAIL_LINES[l.id].short : `L${l.id}`}</span>`).join("")}</div>
       </div>
     </div>`;
   document.body.append(root);
@@ -587,7 +588,7 @@ export function playIntro({ isMuted = () => false, menuReady = null } = {}) {
 
   // Cuando aparece la ciudad: texto que se escribe solo, contadores y plano
   const typed = root.querySelector(".typed");
-  const text = "Conduce desde la cabina, viaja a pie y recorre Santiago. Un Metro vivo que funciona aunque no lo mires: gana tu sueldo, cumple misiones y gástalo en la Tienda Metro.";
+  const text = "Conduce desde la cabina, viaja a pie y recorre Santiago. Un Metro vivo que funciona aunque no lo mires: gana tu sueldo, cumple misiones y gástalo en la Tienda RedMovi.";
   let typer = 0, counters = 0;
   const onCity = () => {
     map.start();

@@ -1,17 +1,17 @@
 /* ==========================================================================
    MetroSim — shopUI.js
-   Panel de la TIENDA METRO (DOM): pestañas Conductor · Mi depto · Colección.
+   Panel de la TIENDA REDMOVI (DOM): pestañas Conductor · Mi depto · Colección.
    El catálogo y lo comprado están en shop.js; aquí solo se muestra y se
    compra. Se abre desde la pantalla de inicio o con la tecla K en el juego.
    ========================================================================== */
 
-import { formatCLP } from "./config.js";
+import { formatCLP, lineLabel } from "./config.js";
 import { icon } from "./icons.js";
 import { LINES } from "./engine/network.js";
 import { LICENSES, LIVERIES, CONTRACTS, HOME, FURNITURE, SOUVENIR_PRICE, ALBUM_REWARD, souvenirId } from "./shop.js";
 
 const hex = (n) => "#" + n.toString(16).padStart(6, "0");
-const lineTitle = (l) => l.name.charAt(0) + l.name.slice(1).toLowerCase();
+const lineTitle = (l) => lineLabel(l.id);
 
 /**
  * Abre la tienda.
@@ -30,9 +30,9 @@ export function openShopUI(o) {
   const root = document.createElement("div");
   root.className = "shop-overlay";
   root.innerHTML = `
-    <div class="shop-card" role="dialog" aria-label="Tienda Metro">
+    <div class="shop-card" role="dialog" aria-label="Tienda RedMovi">
       <header class="shop-head">
-        <div><p class="shop-kicker">Gasta lo que ganas como conductor</p><h2>${icon("bag")} Tienda Metro</h2></div>
+        <div><p class="shop-kicker">Gasta lo que ganas como conductor</p><h2>${icon("bag")} Tienda RedMovi</h2></div>
         <div class="shop-balance"><span>Tu cuenta</span><b></b></div>
         <button class="shop-close" aria-label="Cerrar">${icon("close")}</button>
       </header>

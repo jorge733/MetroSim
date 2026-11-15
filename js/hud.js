@@ -9,7 +9,7 @@
    misiones y destello de la cámara de fotos.
    ========================================================================== */
 
-import { CONFIG, STATIONS, LINE, NOTCHES, NOTCH_INDEX, WORLD, FARES, formatCLP, fareBandAt } from "./config.js";
+import { CONFIG, STATIONS, LINE, NOTCHES, NOTCH_INDEX, WORLD, FARES, formatCLP, fareBandAt, isRail, RAIL_LINES } from "./config.js";
 import { riderFare, riderSpecial } from "./rider.js";
 import { $, clamp, formatClock, formatStopError } from "./utils.js";
 import { formatDelay } from "./engine/schedule.js";
@@ -79,8 +79,8 @@ export class Hud {
   setLine() {
     document.documentElement.style.setProperty("--line", LINE.color);
     document.documentElement.style.setProperty("--on-line", textOn(LINE.color));
-    this.setText($("hudLineBadge"), LINE.id);
-    this.setText($("hudLineLabel"), LINE.id === "NOS" ? "TREN NOS · ESTACIÓN CENTRAL ⇄ NOS" : `METRO DE SANTIAGO · ${LINE.name}`);
+    this.setText($("hudLineBadge"), RAIL_LINES[LINE.id]?.sign ?? LINE.id);
+    this.setText($("hudLineLabel"), isRail(LINE.id) ? `${RAIL_LINES[LINE.id].name.toUpperCase()} · EFE · ${RAIL_LINES[LINE.id].route}` : `METRO DE SANTIAGO · ${LINE.name}`);
     this.setText($("hudLineRoute"), `${STATIONS[0].name} ⇄ ${STATIONS.at(-1).name}`);
     this.stripDots?.forEach(d => d.remove());
     this.stripIdx = undefined;

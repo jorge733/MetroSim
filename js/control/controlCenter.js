@@ -31,7 +31,7 @@
    engine.command(...) y escucha el bus del motor.
    ========================================================================== */
 
-import { CONFIG, formatCLP } from "../config.js";
+import { CONFIG, formatCLP, lineTag } from "../config.js";
 import { icon, textOn } from "../icons.js";
 import { describeTrain } from "../engine/engine.js";
 import { TRAIN_STATES } from "../engine/state.js";
@@ -704,7 +704,7 @@ export class ControlCenter {
       : `<p>Aún no entra nadie. Cuando un conductor se una, su tren aparece en el esquema con su nombre.</p>`;
     this.openModal("room", true, net ? `
       <h2>Sala abierta</h2>
-      <p>Comparte este código. Cada conductor abre RedMoviSim, elige una de tus líneas (${[...this.lines].map(id => id === "NOS" ? "Nos" : `L${id}`).join(", ")}) y su servicio, y pulsa <b>«Unirse a una sala»</b> en la tarjeta Conductor.</p>
+      <p>Comparte este código. Cada conductor abre RedMoviSim, elige una de tus líneas (${[...this.lines].map(lineTag).join(", ")}) y su servicio, y pulsa <b>«Unirse a una sala»</b> en la tarjeta Conductor.</p>
       <div class="pcc-code" aria-label="Código de la sala">${net.code}</div>
       ${localNetwork() ? `<p class="pcc-error">Modo local (?red=local en la dirección): solo se pueden unir pestañas de este mismo navegador. Para jugar con otro computador o celular, abre MetroSim sin ?red=local.</p>` : ""}
       <p class="${net.online ? "pcc-ok" : "pcc-error"}">${net.online ? "✓ Sala visible: ya pueden unirse." : "⚠ Sin conexión con los servidores para encontrarse, reconectando… Nadie nuevo puede unirse hasta que vuelva."}</p>

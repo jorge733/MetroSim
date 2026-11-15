@@ -16,7 +16,7 @@
    ========================================================================== */
 
 import { LINES, TRANSFERS } from "./engine/network.js";
-import { spokenName } from "./config.js";
+import { spokenName, lineLabel, lineArticle } from "./config.js";
 
 const nice = spokenName;
 const pickOf = (arr, rnd) => arr[Math.floor(rnd() * arr.length)];
@@ -28,7 +28,7 @@ function towards(line, from, to) {
 function away(line, from, to) {
   return to.index > from.index ? line.stations[0] : line.stations.at(-1);
 }
-const lname = (line) => line.id === "NOS" ? "Tren Nos" : `Línea ${line.id}`;
+const lname = (line) => lineLabel(line.id);
 const dir = (line, terminal) => `${lname(line)} dirección ${nice(terminal.name)}`;
 /** "Línea 1 dirección X hasta Y" (o "Línea 1 hasta Y, la terminal" si Y es la terminal). */
 const leg = (line, from, to) => {
@@ -90,7 +90,7 @@ export function routeQuestion(line, station, rnd = Math.random) {
         wrongs.push(`${leg(line, station, s)}, y ahí cambia a la ${dir(destLine, leg2)}`);
       }
       return finish({ dest, destLine, correct, wrongs, stops: null, rnd,
-        explain: here ? `Aquí se combina con ${destLine.id === "NOS" ? "el" : "la"} ${lname(destLine)}.` : `Se combina con ${destLine.id === "NOS" ? "el" : "la"} ${lname(destLine)} en ${nice(t.here.name)}.` });
+        explain: here ? `Aquí se combina con ${lineArticle(destLine.id)} ${lname(destLine)}.` : `Se combina con ${lineArticle(destLine.id)} ${lname(destLine)} en ${nice(t.here.name)}.` });
     }
   }
 
@@ -112,7 +112,7 @@ export function routeQuestion(line, station, rnd = Math.random) {
   }
   if (wrongs.length < 2) wrongs.push(`Sal a la calle: ${nice(dest.name)} no tiene Metro`);
   return finish({ dest, destLine: line, correct, wrongs, stops, rnd,
-    explain: `Son ${stops} estacion${stops === 1 ? "" : "es"} en ${line.id === "NOS" ? "el" : "la"} ${lname(line)}.` });
+    explain: `Son ${stops} estacion${stops === 1 ? "" : "es"} en ${lineArticle(line.id)} ${lname(line)}.` });
 }
 
 function finish({ dest, destLine, correct, wrongs, stops, rnd, explain }) {

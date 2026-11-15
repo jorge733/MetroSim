@@ -74,7 +74,7 @@ function makeLine({ id, name, data, speedLimits = () => [], scheduleOffset = 0, 
     stations,
     speedLimits: speedLimits(stations),
     routeIds: id === "3" ? ["A", "B"] : [`${id}A`, `${id}B`],
-    tripPrefix: id === "NOS" ? ["NOS", "NOSV"] : [`L${id}`, `L${id}V`],
+    tripPrefix: id === "NOS" || id === "RAN" ? [id, `${id}V`] : [`L${id}`, `L${id}V`],
     signalPrefix: id === "3" ? ["1", "2"] : [`${id}1`, `${id}2`],
     scheduleOffset,                    // desfase de su malla respecto a la de referencia
     peakHeadway, demand, centers, terrain, deep, sections, express,
@@ -94,7 +94,7 @@ export const L1 = makeLine({
     { name: "ECUADOR",                   short: "ECUADOR",          gap: 800 },
     { name: "SAN ALBERTO HURTADO",       short: "S. A. HURTADO",    gap: 750 },
     { name: "UNIVERSIDAD DE SANTIAGO",   short: "U. DE SANTIAGO",   gap: 700 },
-    { name: "ESTACIÓN CENTRAL",          short: "EST. CENTRAL",     gap: 650,  combos: ["NOS"] },
+    { name: "ESTACIÓN CENTRAL",          short: "EST. CENTRAL",     gap: 650,  combos: ["NOS", "RAN"] },
     { name: "UNIÓN LATINOAMERICANA",     short: "U. LATINOAMER.",   gap: 700 },
     { name: "REPÚBLICA",                 short: "REPÚBLICA",        gap: 650 },
     { name: "LOS HÉROES",                short: "LOS HÉROES",       gap: 700,  combos: ["2"] },
@@ -334,21 +334,46 @@ export const NOS = makeLine({
   description: "Tren de cercanías de superficie, de Estación Central a San Bernardo y Nos.",
   sections: [{ from: "ESTACIÓN CENTRAL", to: "NOS", type: "trinchera" }],
   data: [
-    { name: "ESTACIÓN CENTRAL",               short: "ALAMEDA",       gap: 0,    combos: ["1"] },
+    { name: "ESTACIÓN CENTRAL",               short: "ALAMEDA",       gap: 0,    combos: ["1", "RAN"] },
     { name: "LO VALLEDOR",                    short: "LO VALLEDOR",   gap: 3400, combos: ["6"] },
     { name: "PRESIDENTE PEDRO AGUIRRE CERDA", short: "P. A. CERDA",   gap: 2100, combos: ["6"] },
     { name: "LO ESPEJO",                      short: "LO ESPEJO",     gap: 2500 },
     { name: "LO BLANCO",                      short: "LO BLANCO",     gap: 2500 },
     { name: "FREIRE",                         short: "FREIRE",        gap: 1900 },
-    { name: "SAN BERNARDO",                   short: "SAN BERNARDO",  gap: 1900 },
+    { name: "SAN BERNARDO",                   short: "SAN BERNARDO",  gap: 1900, combos: ["RAN"] },
     { name: "MAESTRANZA",                     short: "MAESTRANZA",    gap: 1500 },
     { name: "CINCO PINOS",                    short: "CINCO PINOS",   gap: 1600 },
-    { name: "NOS",                            short: "NOS",           gap: 2600 },
+    { name: "NOS",                            short: "NOS",           gap: 2600, combos: ["RAN"] },
+  ],
+});
+
+/* ---------- 1.16 · Tren Rancagua (EFE): Estación Central → Rancagua ----------
+   Servicio regional de EFE hacia el sur por la misma vía del Tren Nos hasta Nos, y después
+   por Buin, Paine y Graneros hasta Rancagua (~82 km). Combina con la L1 y el Tren Nos en
+   Estación Central y con el Tren Nos en San Bernardo y Nos. Mismas simplificaciones que el
+   Tren Nos (5 coches, 80 km/h, trinchera). Estaciones del servicio actual; distancias aproximadas. */
+export const RAN = makeLine({
+  id: "RAN", name: "TREN RANCAGUA", scheduleOffset: 300, peakHeadway: 1200, demand: 0.3, terrain: [520, 500],
+  centers: ["ESTACIÓN CENTRAL", "RANCAGUA"],
+  description: "Tren regional de EFE: de Estación Central a Rancagua por San Bernardo, Buin y Paine.",
+  sections: [{ from: "ESTACIÓN CENTRAL", to: "RANCAGUA", type: "trinchera" }],
+  data: [
+    { name: "ESTACIÓN CENTRAL",   short: "ALAMEDA",       gap: 0,     combos: ["1", "NOS"] },
+    { name: "SAN BERNARDO",       short: "SAN BERNARDO",  gap: 14300, combos: ["NOS"] },
+    { name: "NOS",                short: "NOS",           gap: 5700,  combos: ["NOS"] },
+    { name: "BUIN ZOO",           short: "BUIN ZOO",      gap: 8000 },
+    { name: "BUIN",               short: "BUIN",          gap: 3500 },
+    { name: "LINDEROS",           short: "LINDEROS",      gap: 3000 },
+    { name: "PAINE",              short: "PAINE",         gap: 6500 },
+    { name: "HOSPITAL",           short: "HOSPITAL",      gap: 6000 },
+    { name: "SAN FRANCISCO",      short: "SAN FRANCISCO", gap: 10000 },
+    { name: "GRANEROS",           short: "GRANEROS",      gap: 11000 },
+    { name: "RANCAGUA",           short: "RANCAGUA",      gap: 14000 },
   ],
 });
 
 /** Todas las líneas de la red, en el orden de la pantalla principal. */
-export const LINES = [L1, L2, L3, L4, L4A, L5, L6, NOS];
+export const LINES = [L1, L2, L3, L4, L4A, L5, L6, NOS, RAN];
 
 /** Línea por id ("1", "4A"...). */
 export const lineById = (id) => LINES.find(l => l.id === String(id)) || null;

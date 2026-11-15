@@ -98,12 +98,12 @@
         <header class="start-brand">
           <img class="metro-mark" src="logo.svg" alt="">
           <h1>Red<span>Movi</span>Sim</h1>
-          <span class="start-ver">v1.15</span>
+          <span class="start-ver">v1.16</span>
         </header>
         <div class="start-hero">
           <p class="eyebrow">Simulador del transporte público de Santiago</p>
           <h2>Conduce el Metro, maneja buses y viaja por Santiago en 3D</h2>
-          <p class="tagline" id="startTagline">Las siete líneas del Metro, el Tren Nos y los buses de la Alameda, con sus estaciones, horarios y combinaciones.</p>
+          <p class="tagline" id="startTagline">Las siete líneas del Metro, los trenes de EFE a Nos y Rancagua y los buses de la Alameda, con sus estaciones, horarios y combinaciones.</p>
         </div>
 
         <div class="line-picker">
@@ -155,7 +155,7 @@
               <span class="mode-icon"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="14" rx="3"/><path d="M5 11h14M9 17l-2 4M15 17l2 4"/><path d="M9 14h.01M15 14h.01"/></svg></span>
               <div class="mode-text">
                 <strong>Conductor</strong>
-                <small id="driverText">Elige qué conducir: un tren del Metro, el Tren Nos a San Bernardo o un bus de la Red por la Alameda. Cada estación o paradero bien servido te paga al instante.</small>
+                <small id="driverText">Elige qué conducir: un tren del Metro, un tren de EFE (Tren Nos o Tren Rancagua) o un bus de la Red por la Alameda. Cada estación o paradero bien servido te paga al instante.</small>
               </div>
               <button class="go-button" data-mode="driver" id="driverGo">Conducir <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
             </div>
@@ -165,6 +165,7 @@
                 <div id="vehicleSeg" class="seg vehicle-seg" role="radiogroup" aria-labelledby="vehicleLabel">
                   <button type="button" role="radio" data-vehicle="metro"><b>🚇 Tren del Metro</b><span>Líneas 1 a 6</span></button>
                   <button type="button" role="radio" data-vehicle="nos"><b>🚆 Tren Nos</b><span>Est. Central → Nos</span></button>
+                  <button type="button" role="radio" data-vehicle="efe"><b>🚄 Tren Rancagua</b><span>EFE · → Rancagua</span></button>
                   <button type="button" role="radio" data-vehicle="bus"><b>🚌 Bus Red</b><span>Alameda · beta</span></button>
                 </div>
               </div>
@@ -225,7 +226,7 @@
 
         <button id="shopButton" class="shop-launch">
           <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16l-1.5 13h-13zM9 7V5a3 3 0 0 1 6 0v2"/></svg>
-          <b>Tienda Metro</b>
+          <b>Tienda RedMovi</b>
           <span>licencias · libreas · contratos · mi depto · colección</span>
           <strong id="startBank" class="shop-balance-mini"></strong>
         </button>
@@ -250,7 +251,7 @@
         <p class="start-note disclaimer">RedMoviSim es un proyecto independiente y gratuito, sin relación con Red Metropolitana de Movilidad, Metro de Santiago ni el Ministerio de Transportes. Los nombres de líneas, estaciones y lugares se usan solo como referencia.</p>
       </div>
     </main>
-    <p class="version">RedMoviSim 1.15 · simulador no oficial del transporte público de Santiago · Metro (7 líneas) y Tren Nos · buses por la Alameda · conductor, pasajero con combinaciones bus ⇄ Metro y Centro de Control · multijugador · app instalable</p>
+    <p class="version">RedMoviSim 1.16 · simulador no oficial del transporte público de Santiago · Metro (7 líneas), Tren Nos y Tren Rancagua · buses por la Alameda · conductor, pasajero con combinaciones bus ⇄ Metro y Centro de Control · multijugador · app instalable</p>
   </section>
 
   <!-- =============================== PANTALLA DE CARGA =============================== -->

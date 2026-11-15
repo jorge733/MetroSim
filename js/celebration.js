@@ -9,7 +9,7 @@
    Solo DOM y un canvas 2D (sin Three.js); se dibuja encima del juego.
    ========================================================================== */
 
-import { LINE_COLORS, formatCLP } from "./config.js";
+import { LINE_COLORS, formatCLP, isRail, lineLabel } from "./config.js";
 import { MISSION_TYPES } from "./missions.js";
 
 /**
@@ -53,7 +53,7 @@ export function celebrate(o) {
 
   const $ = (s) => root.querySelector(s);
   $(".medal-disc b").textContent = o.line.id;
-  $(".celebration-title").textContent = `¡${o.line.id === "NOS" ? "TREN NOS COMPLETADO" : `LÍNEA ${o.line.id} COMPLETADA`}!`;
+  $(".celebration-title").textContent = `¡${isRail(o.line.id) ? `${lineLabel(o.line.id).toUpperCase()} COMPLETADO` : `LÍNEA ${o.line.id} COMPLETADA`}!`;
   $(".celebration-sub").textContent = `Ahora eres Pasajero Ilustre de la ${titleCase(o.line.name)}`;
   $(".c-done").textContent = String(o.completed);
   $(".celebration-types").replaceChildren(...MISSION_TYPES.map((t, i) => {

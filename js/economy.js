@@ -40,7 +40,7 @@ const round10 = (n) => Math.max(0, Math.round(n / 10) * 10);
  * Pago de una estación servida.
  * @param {{gained:number, perfect:boolean, deductions:number, mult?:number}} s
  *   gained: puntos de la estación · deductions: puntos de falta desde la anterior
- *   mult: multiplicador del contrato comprado en la Tienda Metro (shop.js)
+ *   mult: multiplicador del contrato comprado en la Tienda RedMovi (shop.js)
  * @returns {{pay:number, gross:number, discount:number}}
  */
 export function stationWage({ gained, perfect, deductions = 0, mult = 1 }) {

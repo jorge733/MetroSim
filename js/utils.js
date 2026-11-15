@@ -4,7 +4,7 @@
    ========================================================================== */
 
 import * as THREE from "three";
-import { CONFIG, STATIONS, LINE, LINE_COLORS, WORLD } from "./config.js";
+import { CONFIG, STATIONS, LINE, LINE_COLORS, WORLD, isRail, lineLabel, lineSign } from "./config.js";
 
 // Matemáticas y formato puros: viven en el motor y se reexportan aquí
 export { clamp, formatClock, formatStopError, gradeStop } from "./engine/format.js";
@@ -153,7 +153,7 @@ export function drawLineBadge(g, id, x, y, r) {
   g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
   g.fillStyle = id === "2" ? "#1b1b1b" : "#fff";
   g.font = `900 ${Math.round(r * (id.length > 2 ? 0.62 : 1.15))}px Arial`; g.textAlign = "center"; g.textBaseline = "middle";
-  g.fillText(id, x, y + r * 0.06);
+  g.fillText(lineSign(id), x, y + r * 0.06);
 }
 
 /** Ajusta el tamaño de letra para que el texto quepa en un ancho. */
@@ -266,7 +266,7 @@ export function transferSignCanvas(lineId) {
   g.fillStyle = LINE_COLORS[lineId] || "#777"; g.fillRect(0, H - 20, W, 20);
   drawLineBadge(g, lineId, 100, 86, 62);
   g.fillStyle = "#fff"; g.font = "800 66px Arial"; g.textAlign = "left"; g.textBaseline = "middle";
-  g.fillText(lineId === "NOS" ? "COMBINACIÓN TREN NOS" : `COMBINACIÓN LÍNEA ${lineId}`, 190, 74);
+  g.fillText(isRail(lineId) ? `COMBINACIÓN ${lineLabel(lineId).toUpperCase()}` : `COMBINACIÓN LÍNEA ${lineId}`, 190, 74);
   g.fillStyle = "#aab4bf"; g.font = "600 30px Arial";
   g.fillText("Pasillo de conexión · sin volver a pagar", 192, 136);
   g.fillStyle = "#ffd23f"; g.font = "900 96px Arial"; g.textAlign = "right";

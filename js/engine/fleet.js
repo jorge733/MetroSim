@@ -110,6 +110,7 @@ export const LINE_FLEETS = {
   "5":  [["NS-74", 0.49], ["NS-2016", 0.31], ["NS-93", 0.2]],
   "6":  [["AS-2014", 1]],
   "NOS": [["XTRAPOLIS", 1]],
+  "RAN": [["XTRAPOLIS", 1]],
 };
 
 /** Número 0..1 estable a partir de un texto (mismo servicio → mismo tren). */

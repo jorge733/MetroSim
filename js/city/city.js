@@ -25,7 +25,7 @@
 
 import * as THREE from "three";
 import { std, glow, addBox, makeCanvas, toTexture } from "../utils.js";
-import { CONFIG, LINE, LINE_COLORS } from "../config.js";
+import { CONFIG, LINE, LINE_COLORS, lineSign } from "../config.js";
 import { STREET, streetPlan, seededRandom } from "./plan.js";
 import { skyAt } from "../render/outdoor.js";            // cielo según la hora y el tiempo (1.5: nublado, lluvia)
 import { buildLandmark } from "./landmarks.js";
@@ -66,7 +66,7 @@ function lineBadgesTexture(ids) {
     const cx = 16 + s * i + s / 2, cy = c.height / 2;
     g.fillStyle = LINE_COLORS[id] || "#888"; g.beginPath(); g.arc(cx, cy, s * 0.42, 0, Math.PI * 2); g.fill();
     g.fillStyle = "#ffffff"; g.font = `900 ${id.length > 2 ? 34 : id.length > 1 ? 50 : 66}px Arial`; g.textAlign = "center"; g.textBaseline = "middle";
-    g.fillText(id, cx, cy + 3);
+    g.fillText(lineSign(id), cx, cy + 3);
   });
   const t = toTexture(c);
   t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;

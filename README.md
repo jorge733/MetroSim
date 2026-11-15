@@ -1,6 +1,6 @@
 # RedMoviSim
 
-Simulador 3D del **transporte público de Santiago**: el **Metro** (líneas 1, 2, 3, 4, 4A, 5 y 6), el **Tren Nos** y los **buses**,
+Simulador 3D del **transporte público de Santiago**: el **Metro** (líneas 1, 2, 3, 4, 4A, 5 y 6), los trenes de EFE (**Tren Nos** y **Tren Rancagua**) y los **buses**,
 para navegador, hecho con HTML, CSS, JavaScript y [Three.js](https://threejs.org/). Se juega en
 **https://redmovisim.benedettowebs.cl/**. Antes se llamaba **MetroSim**.
 
@@ -123,6 +123,23 @@ trenes de los dos motores quedan a ~1 m (mediana).
   (Esc, «Seguir jugando» u otro «atrás» cancela; Enter confirma).
 - **Salir por los torniquetes es gratis**: solo se cobra el pasaje al pasar hacia la zona pagada (antes, al terminar
   de cruzar el torniquete de salida se cobraba un pasaje).
+
+## Versión 1.16 · Tren Rancagua (EFE) y Tienda RedMovi
+
+- **Tren Rancagua** (`js/engine/network.js`, botón **RCG**): el tren regional de EFE de Estación Central (estación
+  Alameda) a Rancagua, ~82 km y 11 estaciones: Alameda, San Bernardo, Nos, Buin Zoo, Buin, Linderos, Paine, Hospital,
+  San Francisco, Graneros y Rancagua (distancias aproximadas). Corre por la misma vía que el Tren Nos hasta Nos, con
+  trenes X'Trapolis, más o menos cada 20 minutos en hora punta. **Combina con la L1 y el Tren Nos en Estación Central
+  y con el Tren Nos en San Bernardo y Nos**; como pasajero se puede tomar y combinar a pie, y el Centro de Control lo
+  supervisa. Licencia en la tienda: $18.000 el Tren Nos y $25.000 el Tren Rancagua.
+- **Conductor**: *¿Qué quieres conducir?* ahora tiene cuatro opciones: Tren del Metro, Tren Nos, **Tren Rancagua** y
+  Bus Red.
+- **La tienda se llama Tienda RedMovi** (portada, panel, movimientos de la cuenta y textos).
+- Los textos de los trenes de EFE usan su nombre («Tren Nos», «Tren Rancagua», «el Tren Rancagua») y los botones y
+  letreros su sigla (NOS, RCG) en vez de «L…» (`lineTag`, `lineLabel` y `lineSign` en `js/config.js`).
+- Mismas simplificaciones que el Tren Nos: 5 coches, 80 km/h y vía dibujada en trinchera. Como el recorrido es largo,
+  la escena 3D del Tren Rancagua pesa unas 3 veces la del Tren Nos (~650 mil triángulos por cuadro): bien en un
+  computador, puede andar más lento en celulares modestos.
 
 ## Versión 1.15 · Todo conectado: Tren Nos y bus para el pasajero
 

@@ -3,7 +3,7 @@
    MODO CREADOR: acceso completo y gratis para el creador del juego.
 
    Con el modo activo:
-     · La Tienda Metro aparece entera como comprada: licencias de todas las
+     · La Tienda RedMovi aparece entera como comprada: licencias de todas las
        líneas, libreas, contratos, el depto con sus muebles y los recuerdos.
      · Compras en locales, pasajes del torniquete, tarjeta bip! y cargas no
        descuentan nada (quedan en los movimientos como "gratis · creador").

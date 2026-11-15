@@ -68,7 +68,7 @@
 
 import * as THREE from "three";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
-import { CONFIG, STATIONS, LINE, NOTCH_INDEX, FARES, lineTag, lineLabel, spokenName, fareBandAt, formatCLP, demandAt, dayTypeOf, inService, SERVICE_HOURS, DAY_TYPE_LABEL } from "./config.js";
+import { CONFIG, STATIONS, LINE, NOTCH_INDEX, FARES, lineTag, lineLabel, lineArticle, isRail, lineSign, spokenName, fareBandAt, formatCLP, demandAt, dayTypeOf, inService, SERVICE_HOURS, DAY_TYPE_LABEL } from "./config.js";
 import { ROUTES, ROUTE_A, ROUTE_B, routeForSide, oppositeRoute, setActiveLine } from "./engine/route.js";
 import { LINES, lineById } from "./engine/network.js";
 import { BipCard } from "./card.js";
@@ -152,7 +152,7 @@ setupPWA($("installButton"));
 // Modo Creador (?creador): todo desbloqueado y gratis para el creador del juego
 setupCreator($("creatorBadge"));
 const wait = (ms) => new Promise(r => setTimeout(r, ms));
-/** Lo comprado en la Tienda Metro (licencias, libreas, contratos, depto, recuerdos). */
+/** Lo comprado en la Tienda RedMovi (licencias, libreas, contratos, depto, recuerdos). */
 const inventory = new Inventory();
 
 /* --- Pantalla principal: primero la línea (botones de color), después el modo --- */
@@ -163,21 +163,24 @@ for (const sel of [driverLineSelect, paxLineSelect]) {
   LINES.forEach(l => sel.append(new Option(`${l.name} · ${l.stations[0].short} ⇄ ${l.stations.at(-1).short}`, l.id)));
   sel.value = lineById(savedLine) ? savedLine : "3";
 }
-/* 1.15 · Modo Conductor: primero se elige QUÉ conducir (tren del Metro, Tren Nos o bus de la Red).
-   El Tren Nos es una línea más de la red (botón NOS); el bus tiene su propio modo (js/bus/). */
+/* 1.15 · Modo Conductor: primero se elige QUÉ conducir (tren del Metro, Tren Nos, Tren Rancagua de EFE o bus de la Red).
+   Los trenes de EFE son líneas más de la red (botones NOS y RCG); el bus tiene su propio modo (js/bus/). */
+const VEHICLE_LINE = { nos: "NOS", efe: "RAN" };                       // vehículo → línea que conduce
+const vehicleOfLine = (id) => Object.keys(VEHICLE_LINE).find(v => VEHICLE_LINE[v] === id) || "metro";
 const driverCard = document.querySelector('.mode-card[data-card="driver"]');
 const vehicleButtons = [...document.querySelectorAll("#vehicleSeg [data-vehicle]")];
-let driverVehicle = loadSetting("metrosim.mode") === "bus" ? "bus" : (loadSetting("metrosim.vehicle") || (savedLine === "NOS" ? "nos" : "metro"));
+let driverVehicle = loadSetting("metrosim.mode") === "bus" ? "bus" : (loadSetting("metrosim.vehicle") || vehicleOfLine(savedLine));
 function selectVehicle(v, { fromLine = false } = {}) {
-  driverVehicle = ["metro", "nos", "bus"].includes(v) ? v : "metro";
+  driverVehicle = ["metro", "nos", "efe", "bus"].includes(v) ? v : "metro";
   saveSetting("metrosim.vehicle", driverVehicle);
   vehicleButtons.forEach(b => b.setAttribute("aria-checked", String(b.dataset.vehicle === driverVehicle)));
   driverCard.classList.toggle("bus-vehicle", driverVehicle === "bus");
   $("busDriverNote").hidden = driverVehicle !== "bus";
   $("driverGo").firstChild.textContent = driverVehicle === "bus" ? "Manejar " : "Conducir ";
   if (fromLine) return;
-  if (driverVehicle === "nos" && driverLineSelect.value !== "NOS") selectLine("NOS");
-  if (driverVehicle === "metro" && driverLineSelect.value === "NOS") selectLine(lineById(loadSetting("metrosim.metroLine")) ? loadSetting("metrosim.metroLine") : "3");
+  const wanted = VEHICLE_LINE[driverVehicle];
+  if (wanted && driverLineSelect.value !== wanted) selectLine(wanted);
+  if (driverVehicle === "metro" && isRail(driverLineSelect.value)) selectLine(lineById(loadSetting("metrosim.metroLine")) ? loadSetting("metrosim.metroLine") : "3");
 }
 vehicleButtons.forEach(b => b.addEventListener("click", () => { selectVehicle(b.dataset.vehicle); selectMode("driver"); }));
 
@@ -201,10 +204,9 @@ function selectLine(id) {
   const line = lineById(id);
   driverLineSelect.value = paxLineSelect.value = line.id;
   saveSetting("metrosim.line", line.id);
-  if (line.id !== "NOS") saveSetting("metrosim.metroLine", line.id);
-  // El botón NOS elige el Tren Nos para conducir; una línea del Metro vuelve al tren del Metro (el bus no cambia)
-  if (line.id === "NOS" && driverVehicle === "metro") selectVehicle("nos", { fromLine: true });
-  if (line.id !== "NOS" && driverVehicle === "nos") selectVehicle("metro", { fromLine: true });
+  if (!isRail(line.id)) saveSetting("metrosim.metroLine", line.id);
+  // Los botones NOS y RCG eligen ese tren de EFE; una línea del Metro vuelve al tren del Metro (el bus no cambia)
+  if (driverVehicle !== "bus" && vehicleOfLine(line.id) !== driverVehicle) selectVehicle(vehicleOfLine(line.id), { fromLine: true });
   startScreen.style.setProperty("--line", line.color);
   startScreen.style.setProperty("--on-line", textOn(line.color));
   lineChips.forEach(c => c.setAttribute("aria-checked", String(c.dataset.line === line.id)));
@@ -244,7 +246,7 @@ function refreshDriverLines() {
   }
   for (const chip of lineChips) {
     const l = lineById(chip.dataset.line), locked = !inventory.canDrive(l.id);
-    chip.innerHTML = l.id + (locked ? icon("lock", "chip-lock") : "");
+    chip.innerHTML = lineSign(l.id) + (locked ? icon("lock", "chip-lock") : "");
     chip.title = `${l.name} · ${l.stations[0].name} ⇄ ${l.stations.at(-1).name}` + (locked ? " · conducir requiere licencia" : "");
     chip.setAttribute("aria-label", chip.title);
   }
@@ -265,7 +267,7 @@ modeCards.forEach(card => card.addEventListener("click", (ev) => {
 }));
 selectMode(modeCards.some(c => c.dataset.card === loadSetting("metrosim.mode")) ? loadSetting("metrosim.mode") : "driver");
 
-/** Tienda Metro: desde la pantalla de inicio o con K durante el juego. */
+/** Tienda RedMovi: desde la pantalla de inicio o con K durante el juego. */
 function openStore(opts = {}) {
   const walker = game?.walker;
   if (walker) { walker.frozen = true; walker.keys.clear(); }
@@ -455,8 +457,8 @@ function saveSetting(key, value) { try { localStorage.setItem(key, value); } cat
 function useLine(line) {
   setActiveLine(line);
   hud.setLine();
-  $("loadingBadge").textContent = line.id;
-  $("loadingTitle").textContent = `Preparando la ${line.name.charAt(0) + line.name.slice(1).toLowerCase()}…`;
+  $("loadingBadge").textContent = lineSign(line.id);
+  $("loadingTitle").textContent = `Preparando ${lineArticle(line.id)} ${lineLabel(line.id)}…`;
 }
 
 // 1.10 · La primera vez que se juega, antes de empezar se pregunta la fecha de nacimiento (tarifas TNE y adulto mayor)
@@ -830,7 +832,7 @@ async function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = 
   } else if (opts.transferFrom) {
     $("controlsHelp").classList.add("hidden");
     hud.fadeIn();
-    hud.showMessage(`Combinación desde ${opts.transferFrom === "NOS" ? "el" : "la"} ${lineLabel(opts.transferFrom)} · ${STATIONS[stationIndex].name} · ${LINE.name.charAt(0) + LINE.name.slice(1).toLowerCase()} · sigues en zona pagada`, "ok", 6000);
+    hud.showMessage(`Combinación desde ${lineArticle(opts.transferFrom)} ${lineLabel(opts.transferFrom)} · ${STATIONS[stationIndex].name} · ${lineLabel(LINE.id)} · sigues en zona pagada`, "ok", 6000);
   } else hud.showMessage(mode === "driver"
     ? `${net ? `Sala ${net.code} · ` : ""}Servicio ${playerTrip.id} · ${direction.label} · salida ${formatClock(playerTrip.departure)} · cada estación bien servida te paga en tu cuenta`
     : `Calle de ${STATIONS[stationIndex].name} · cuenta ${bank.label} · ${game.touch ? "joystick para caminar · arrastra para mirar · 🎯 misiones" : "W/S caminar · A/D girar · Shift correr · J misiones"}`, "info", 7000);
@@ -1840,7 +1842,7 @@ function celebrateLine() {
   game.audio.fanfare(grand);
   setTimeout(() => game?.audio.announce(grand
     ? "Estimados pasajeros: Metro de Santiago felicita a nuestro nuevo Gran Maestro, que completó las misiones de todas las líneas de la red. ¡Muchas gracias por viajar con nosotros!"
-    : `Estimados pasajeros: Metro de Santiago felicita a nuestro nuevo Pasajero Ilustre de la ${line.name.charAt(0) + line.name.slice(1).toLowerCase()}. ¡Muchas gracias por viajar con nosotros!`), 4200);
+    : `Estimados pasajeros: Metro de Santiago felicita a nuestro nuevo Pasajero Ilustre de${isRail(line.id) ? "l" : " la"} ${lineLabel(line.id)}. ¡Muchas gracias por viajar con nosotros!`), 4200);
   celebrate({
     line, completed: game.missions.completed, reward: MASTERY_REWARD, grand, grandReward: GRAND_REWARD,
     lines: LINES, isMastered: (id) => id === line.id || lineMastered(id),
@@ -2100,7 +2102,7 @@ function openShop(shop, st) {
     icon: shop.icon, kicker: `${shop.label.toUpperCase()} · ${st.name}`, title: shop.name, bank,
     items: () => [
       ...game.missions.actionsAt(st, shop.kind).map(a => ({ name: a.label, action: a.id })),
-      // Kiosko: el recuerdo de la estación para el álbum de la Tienda Metro (uno por estación)
+      // Kiosko: el recuerdo de la estación para el álbum de la Tienda RedMovi (uno por estación)
       ...(shop.kind === "kiosko" && !inventory.has(souvenirId(LINE.id, st.name)) ? [{ id: "souvenir", souvenir: true, name: `🎟️ Recuerdo de ${st.name}`, price: SOUVENIR_PRICE }] : []),
       ...shop.items,
     ],

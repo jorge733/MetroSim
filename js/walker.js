@@ -43,7 +43,7 @@
    ========================================================================== */
 
 import * as THREE from "three";
-import { CONFIG, STATIONS } from "./config.js";
+import { CONFIG, STATIONS, isRail, lineLabel } from "./config.js";
 import { ROUTES, ROUTE_A, ROUTE_B, routeForSide } from "./engine/route.js";
 import { TRAIN_LAYOUT, STOCK } from "./engine/consist.js";
 import { carAt, carLoads, CAR_CAPACITY } from "./engine/passengers.js";
@@ -780,7 +780,7 @@ export class Walker {
     if (lift) return lift.el.openAt(lift.level) ? "Ascensor con las puertas abiertas · entra y pulsa E" : "E · llamar al ascensor";
     if (Math.abs(this.pos.y - MZ.y) < 0.3) {
       const here0 = this.stationAt(this.pos.z);
-      if (this.atTransfer(here0, 6.0)) return `Pasillo de combinación · sigue caminando para cambiarte ${here0.combos[0] === "NOS" ? "al Tren Nos" : `a la Línea ${here0.combos[0]}`}`;
+      if (this.atTransfer(here0, 6.0)) return `Pasillo de combinación · sigue caminando para cambiarte ${isRail(here0.combos[0]) ? "al" : "a la"} ${lineLabel(here0.combos[0])}`;
       const service = this.nearService();
       if (service?.kind === "boleteria") return "E · atención en boletería (cargar tarjeta bip!, comprar tarjeta)";
       if (service?.kind === "totem") return "E · tótem de autoservicio: carga con tarjeta de débito o crédito";
