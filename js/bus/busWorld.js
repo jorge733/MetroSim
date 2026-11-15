@@ -8,16 +8,33 @@
    derecho (x > -3.4); al otro lado del bandejón pasan los autos de vuelta.
    Todo lo que se repite (edificios, árboles, faroles, marcas del piso) va
    en InstancedMesh para que ande bien en el celular.
+
+   1.20 · La calle usa lo mismo que el Metro:
+     · el cielo y la luz de render/outdoor.js (skyAt: hora del día y nubes) y
+       el clima de engine/weather.js (lluvia que cae, calzada mojada, niebla
+       y la cordillera tapada cuando está nublado);
+     · la gente de people.js (busPeople.js, desde la 1.19), que además pasa
+       por las veredas y, al bajar, a veces se va al Metro por el acceso;
+     · el acceso al Metro con su tótem (city/city.js · metroStreetAccess) en
+       los paraderos que están junto a una estación, con las insignias de sus
+       líneas (engine/network.js · linesAtStation).
    ========================================================================== */
 
 import * as THREE from "three";
 import { LANES, CURB_X, MEDIAN_X, lightState } from "./busRoute.js";
 import { BUS_LENGTH, BUS_WIDTH, makeRng } from "./busSim.js";
 import { BusPeople } from "./busPeople.js";
+import { skyAt } from "../render/outdoor.js";
+import { WEATHER } from "../engine/weather.js";
+import { metroStreetAccess } from "../city/city.js";
+import { linesAtStation } from "../engine/network.js";
 
 const ROAD_FAR = -17.6;          // borde de la calzada de vuelta
 const MEDIAN_FAR = -7.4;         // fin del bandejón
 const ONCOMING = [-9.1, -12.5, -15.9];
+/** 1.20 · Acceso al Metro junto al paradero: centro (x desde la vereda, z relativo a la marca) y tamaño. */
+const ACCESS = { dx: 3.9, dz: -9, w: 1.9, len: 5.2 };
+const SIDEWALK_Y = 0.16;
 const CAR_COLORS = ["#d9dde2", "#1d1f24", "#8a9099", "#b3242a", "#21457a", "#e8e4d8", "#4c5a4a", "#6b4a2f", "#c9b03a", "#2f6f8f"];
 
 /* ---------- utilidades ---------- */
@@ -67,14 +84,20 @@ export function signTexture(lines, { w = 512, h = 160, bg = "#0f3d7a", fg = "#ff
 
 export class BusWorld {
   /**
-   * @param {{scene:THREE.Scene, route:object, hour:number}} o  hour: hora del día (0..24) para el cielo y las luces
+   * @param {{scene:THREE.Scene, route:object, clock?:number, hour?:number, ride?:boolean}} o
+   *   clock: hora del día en segundos (o hour, 0..24) para el cielo y las luces · ride: el jugador va sentado adentro
    */
-  constructor({ scene, route, hour, ride = false }) {
+  constructor({ scene, route, clock, hour = 12, ride = false }) {
     this.scene = scene;
     this.route = route;
+    this.ride = ride;
     this.rng = makeRng(20261115);
-    this.night = hour < 6.8 || hour >= 20.3;
-    this.dusk = !this.night && (hour < 8 || hour >= 19);
+    // 1.20 · El mismo cielo que ve el Metro al aire libre: hora y nubosidad del clima vigente
+    this.sky = skyAt(clock ?? hour * 3600);
+    this.rainAmount = WEATHER.rain;
+    this.wet = WEATHER.wet;
+    this.night = this.sky.day < 0.3;
+    this.dusk = !this.night && (this.sky.dusk > 0.25 || this.sky.day < 0.6);
     this.start = -220;
     this.end = route.length + 380;
     this.len = this.end - this.start;
@@ -91,18 +114,24 @@ export class BusWorld {
     this.buildLights();
     this.bus = this.buildBus();
     this.buildOncoming();
-    this.people = new BusPeople(scene, route, this.body, { ride });   // 1.19 · pasajeros 3D
+    this.buildMetroAccesses();
+    this.buildRain();
+    // 1.19 · pasajeros 3D; 1.20: también bajan al Metro por el acceso y pasa gente por las veredas
+    this.people = new BusPeople(scene, route, this.body, { ride, accesses: this.accesses });
   }
 
   /* ----------------------------- Cielo y luz ----------------------------- */
   buildSky() {
     const s = this.scene;
-    const sky = this.night ? "#16223a" : this.dusk ? "#e7a173" : "#a9c9e8";
-    s.background = new THREE.Color(sky);
-    s.fog = new THREE.Fog(sky, 90, this.night ? 380 : 560);
-    const hemi = new THREE.HemisphereLight(this.night ? "#3a4c78" : "#dfeaff", this.night ? "#2a2620" : "#5d5446", this.night ? 1.0 : 1.15);
+    const K = this.sky, rain = this.rainAmount;
+    const sky = K.color.clone();
+    s.background = sky;
+    // Neblina: más corta con lluvia y de noche (la misma idea que la vía al aire libre del Metro)
+    s.fog = new THREE.Fog(sky, 70 - 30 * rain, (this.night ? 380 : 560) * (1 - 0.45 * rain) - 60 * K.cloud);
+    const hemi = new THREE.HemisphereLight(this.night ? "#3a4c78" : "#dfeaff", this.night ? "#2a2620" : "#5d5446", 0.75 + 0.45 * K.light);
     s.add(hemi);
-    const sun = new THREE.DirectionalLight(this.night ? "#8fa6d8" : this.dusk ? "#ffc58f" : "#fff4e0", this.night ? 0.45 : 1.8);
+    const sunColor = new THREE.Color(this.night ? "#8fa6d8" : "#fff4e0").lerp(new THREE.Color("#ffc58f"), Math.min(1, K.dusk));
+    const sun = new THREE.DirectionalLight(sunColor, this.night ? 0.45 : 0.35 + 1.5 * K.light);
     sun.position.set(-60, 120, 40);
     s.add(sun);
     // La cordillera al fondo (hacia el oriente, adonde va el bus)
@@ -117,7 +146,8 @@ export class BusWorld {
         g.fillStyle = "#eef2f6"; g.fillRect(0, 0, w, h * 0.42);
       }
     });
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(2600, 420), new THREE.MeshBasicMaterial({ map: mtn, transparent: true, fog: false, depthWrite: false }));
+    // Con nubes la cordillera casi no se ve (como en Santiago los días grises)
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(2600, 420), new THREE.MeshBasicMaterial({ map: mtn, transparent: true, opacity: this.night ? 0.8 : Math.max(0.12, 1 - 0.85 * K.cloud), fog: false, depthWrite: false }));
     m.position.set(-200, 120, -this.end - 900);
     m.renderOrder = -1;
     s.add(m);
@@ -132,7 +162,9 @@ export class BusWorld {
       noise(g, w, h, 26, rng);
     }, { repeat: [6, this.len / 12] });
     const roadW = CURB_X - ROAD_FAR;
-    const road = new THREE.Mesh(new THREE.PlaneGeometry(roadW, this.len), std("#ffffff", { map: asphalt, roughness: 0.95 }));
+    // 1.20 · Con lluvia la calzada se ve mojada: más oscura y con brillo (reflejos de faroles y focos)
+    const wetK = Math.min(1, this.wet);
+    const road = new THREE.Mesh(new THREE.PlaneGeometry(roadW, this.len), std(new THREE.Color("#ffffff").lerp(new THREE.Color("#8d9196"), wetK), { map: asphalt, roughness: 0.95 - 0.6 * wetK, metalness: 0.25 * wetK }));
     road.rotation.x = -Math.PI / 2;
     road.position.set((CURB_X + ROAD_FAR) / 2, 0, this.zMid);
     s.add(road);
@@ -148,10 +180,19 @@ export class BusWorld {
       noise(g, w, h, 18, rng);
       g.strokeStyle = "rgba(60,60,60,.35)"; g.lineWidth = 2; g.strokeRect(0, 0, w, h);
     }, { repeat: [3, this.len / 3] });
-    const walkMat = std("#ffffff", { map: concrete });
-    const sideR = box(s, 6.2, 0.16, this.len, walkMat, CURB_X + 3.1, 0.08, this.zMid);
-    const sideL = box(s, 6.2, 0.16, this.len, walkMat, ROAD_FAR - 3.1, 0.08, this.zMid);
-    sideR.userData.static = sideL.userData.static = true;
+    const walkMat = std(new THREE.Color("#ffffff").lerp(new THREE.Color("#9a9a9a"), 0.6 * Math.min(1, this.wet)), { map: concrete });
+    // Vereda del lado del bus en tres franjas: la del medio deja el hueco de la escalera del Metro
+    const ax0 = ACCESS.dx - ACCESS.w / 2 - 0.05, ax1 = ACCESS.dx + ACCESS.w / 2 + 0.05;
+    box(s, ax0, 0.16, this.len, walkMat, CURB_X + ax0 / 2, 0.08, this.zMid);
+    box(s, 6.2 - ax1, 0.16, this.len, walkMat, CURB_X + (ax1 + 6.2) / 2, 0.08, this.zMid);
+    const holes = this.accessStops().map(st => -st.s + ACCESS.dz).sort((a, b) => b - a);
+    let zTop = -this.start;
+    for (const zc of [...holes, -Infinity]) {
+      const zEnd = zc === -Infinity ? -this.end : zc + ACCESS.len / 2;
+      if (zTop - zEnd > 0.05) box(s, ax1 - ax0, 0.16, zTop - zEnd, walkMat, CURB_X + (ax0 + ax1) / 2, 0.08, (zTop + zEnd) / 2);
+      zTop = zc - ACCESS.len / 2;
+    }
+    box(s, 6.2, 0.16, this.len, walkMat, ROAD_FAR - 3.1, 0.08, this.zMid);
     const curbMat = std("#c9c6bf");
     box(s, 0.25, 0.18, this.len, curbMat, CURB_X + 0.12, 0.09, this.zMid);
     box(s, 0.25, 0.18, this.len, curbMat, ROAD_FAR - 0.12, 0.09, this.zMid);
@@ -217,7 +258,8 @@ export class BusWorld {
     for (let z = this.start; z < this.end; z += 13) {
       if (this.route.lights.some(l => Math.abs(l.s + 8 - z) < 10)) continue;
       spots.push([(MEDIAN_X + MEDIAN_FAR) / 2 + (rng() - 0.5) * 1.2, z + rng() * 4]);
-      if (!this.route.stops.some(st => z > st.s - 16 && z < st.s + 6)) spots.push([CURB_X + 4.4, z + 6 + rng() * 3]);
+      const ts = z + 6 + rng() * 3;
+      if (!this.route.stops.some(st => ts > st.s - 10 && ts < st.s + (st.metro ? 15 : 6))) spots.push([CURB_X + 4.4, ts]);
       spots.push([ROAD_FAR - 4.4, z + 3 + rng() * 3]);
     }
     const trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.16, 0.22, 4.8, 6), std("#5a4632"), spots.length);
@@ -569,8 +611,55 @@ export class BusWorld {
     }
   }
 
+  /* ----------------------------- 1.20 · Accesos al Metro ----------------------------- */
+  /** Paraderos junto a una estación de Metro (los que llevan acceso con tótem). */
+  accessStops() {
+    return this.route.stops.filter(st => st.metro && linesAtStation(st.metro).length);
+  }
+
+  buildMetroAccesses() {
+    this.accesses = this.accessStops().map(st => {
+      const g = metroStreetAccess(this.scene, { name: st.metro, lines: linesAtStation(st.metro), night: this.night ? 1 : 0, w: ACCESS.w, len: ACCESS.len });
+      g.position.set(CURB_X + ACCESS.dx, SIDEWALK_Y, -st.s + ACCESS.dz);
+      const z = -st.s + ACCESS.dz;
+      return { stop: st, x: CURB_X + ACCESS.dx, z, mouthZ: z + ACCESS.len / 2 + 0.6, bottomZ: z - ACCESS.len / 2 + 0.7 };
+    });
+  }
+
+  /* ----------------------------- 1.20 · Lluvia (como la del Metro al aire libre) ----------------------------- */
+  buildRain() {
+    const N = this.rainN = 2600;
+    this.rainDrops = Array.from({ length: N }, () => ({ x: (Math.random() - 0.5) * 50, y: Math.random() * 20 - 3, z: (Math.random() - 0.5) * 50, s: 0.8 + Math.random() * 0.4 }));
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(N * 6), 3));
+    this.rain = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0xaebccb, transparent: true, opacity: 0.25 + 0.3 * Math.min(1, this.rainAmount), depthWrite: false }));
+    this.rain.frustumCulled = false;
+    this.rain.visible = this.rainAmount > 0.02;
+    this.scene.add(this.rain);
+  }
+
+  updateRain(dt, cam, sim) {
+    if (!this.rain.visible || !cam) return;
+    const pos = this.rain.geometry.attributes.position.array;
+    const n = Math.floor(this.rainN * Math.min(1, this.rainAmount));
+    const b = sim.bus, fall = 11, len = 0.55;
+    // Dentro del bus no llueve
+    const dry = { x0: b.x - BUS_WIDTH / 2, x1: b.x + BUS_WIDTH / 2, z0: -b.s - 0.2, z1: -b.s + BUS_LENGTH + 0.2 };
+    for (let i = 0; i < this.rainN; i++) {
+      const d = this.rainDrops[i];
+      d.y -= fall * d.s * dt;
+      if (d.y < -4) { d.y += 22; d.x = (Math.random() - 0.5) * 50; d.z = (Math.random() - 0.5) * 50; }
+      const k = i * 6;
+      const x = cam.x + d.x, y = cam.y + d.y, z = cam.z + d.z;
+      if (i >= n || (x > dry.x0 && x < dry.x1 && z > dry.z0 && z < dry.z1 && y < 3.2) || y < 0) { pos.fill(0, k, k + 6); pos[k + 1] = pos[k + 4] = -1e4; continue; }
+      pos[k] = x; pos[k + 1] = y; pos[k + 2] = z;
+      pos[k + 3] = x + 0.04; pos[k + 4] = y - len * d.s; pos[k + 5] = z;
+    }
+    this.rain.geometry.attributes.position.needsUpdate = true;
+  }
+
   /* ----------------------------- Cada fotograma ----------------------------- */
-  update(sim, dt, now) {
+  update(sim, dt, now, cam = null) {
     const b = sim.bus;
     // Bus: posición, leve giro al cambiar de pista y ruedas
     const g = this.bus;
@@ -621,6 +710,7 @@ export class BusWorld {
     // Pasajeros: en los paraderos, subiendo, a bordo y bajando (busPeople.js)
     g.updateMatrixWorld();
     this.people.update(sim, dt);
+    this.updateRain(dt, cam, sim);                       // 1.20 · lluvia
     // Cordillera fija respecto del bus (está «en el infinito»)
     this.mountains.position.z = zBus - 900;
   }

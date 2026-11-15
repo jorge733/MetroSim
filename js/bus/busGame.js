@@ -9,6 +9,10 @@
    bancaria (el sueldo del bus se gasta igual como pasajero) y el sonido
    silenciado.
 
+   1.20 · Usa lo mismo que el Metro: el clima (engine/weather.js: lluvia,
+   piso mojado, más gente), el cielo, las personas y el acceso al Metro en
+   la calle (busWorld.js) y la voz de la locución para la próxima parada.
+
    Mandos: W/↑ acelerar · S/↓ frenar · A/← y D/→ cambiar de pista ·
    Espacio puertas · B bocina · C cámara · M sonido · Esc pausa.
    ========================================================================== */
@@ -20,7 +24,9 @@ import { clearTrackLift } from "../render/trackLift.js";
 import { BusSim, BUS_CAPACITY } from "./busSim.js";
 import { BusWorld } from "./busWorld.js";
 import { BusAudio } from "./busAudio.js";
-import { demandAt, dayTypeOf, formatCLP } from "../config.js";
+import { demandAt, dayTypeOf, formatCLP, lineLabel, isRail } from "../config.js";
+import { WEATHER, weatherLabel, weatherDemandFactor } from "../engine/weather.js";
+import { linesAtStation } from "../engine/network.js";
 import { BANK_NAME } from "../economy.js";
 
 const two = (n) => String(Math.floor(n)).padStart(2, "0");
@@ -65,7 +71,7 @@ class BusGame {
     this.onExit = onExit;
     this.audio = new BusAudio();
     this.audio.muted = muted;
-    this.audio.start();
+    this.audio.start({ rain: WEATHER.rain });
     this.camMode = ride ? "seat" : "chase";
     this.paused = false;
     this.keys = new Set();
@@ -103,8 +109,9 @@ class BusGame {
     this.scene = new THREE.Scene();
     const now = new Date();
     const clock = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
-    this.sim = new BusSim({ route: this.route, clock, demand: demandAt(clock, dayTypeOf(now)), startStop: this.ride?.from ?? 0 });
-    this.world = new BusWorld({ scene: this.scene, route: this.route, hour: clock / 3600, ride: !!this.ride });
+    // 1.20 · La misma curva de demanda y el mismo clima que el Metro (con lluvia viaja más gente y el piso está mojado)
+    this.sim = new BusSim({ route: this.route, clock, demand: demandAt(clock, dayTypeOf(now)) * weatherDemandFactor(), startStop: this.ride?.from ?? 0, wet: WEATHER.wet });
+    this.world = new BusWorld({ scene: this.scene, route: this.route, clock, ride: !!this.ride });
     this.scene.add(this.camera);
     this.camPos = null;
     this.earned = 0;
@@ -115,7 +122,7 @@ class BusGame {
     if (this.ride) {
       this.wantOff = null;
       this.toast(`Subiste al bus ${this.route.id} hacia ${this.route.to} · ${this.ride.fareText} · toca el timbre (${this.touch ? "🔔" : "Espacio"}) antes de tu parada`, "ok", 7000);
-    } else this.toast(`Servicio ${this.route.id} · sale a las ${clockText(this.sim.departure, false)} desde ${this.route.from}. ${this.touch ? "Toca Puertas" : "Abre las puertas con Espacio"} para que suban los pasajeros`, "info", 7000);
+    } else this.toast(`Servicio ${this.route.id} · sale a las ${clockText(this.sim.departure, false)} desde ${this.route.from}. ${this.touch ? "Toca Puertas" : "Abre las puertas con Espacio"} para que suban los pasajeros${WEATHER.wet > 0.3 ? ". Llueve: el piso está mojado, frena antes" : ""}`, "info", 7000);
     this.updateBank();
   }
 
@@ -135,6 +142,7 @@ class BusGame {
         <div class="bus-right">
           <div class="bus-pill"><span class="bus-label">CUENTA</span><strong data-k="bank">$0</strong><span class="bus-float" data-k="float"></span></div>
           <div class="bus-pill"><span class="bus-label">HORA</span><strong data-k="clock">--:--</strong></div>
+          <div class="bus-pill bus-weather"><span class="bus-label">CLIMA</span><strong>${esc(weatherLabel())}</strong></div>
           <button class="bus-icon-btn" data-k="sound" aria-label="Sonido">${ICON.sound}</button>
           <button class="bus-icon-btn" data-k="menu" aria-label="Pausa y menú">${ICON.menu}</button>
         </div>
@@ -400,7 +408,7 @@ class BusGame {
       this.sim.step(dt);
     }
     this.handleEvents();
-    this.world.update(this.sim, this.paused ? 0 : dt, now / 1000);
+    this.world.update(this.sim, this.paused ? 0 : dt, now / 1000, this.camera.position);
     this.updateCamera(dt);
     this.audio.update(this.sim.bus.v, this.sim.bus.throttle, !this.paused);
     this.updateHud();
@@ -437,6 +445,8 @@ class BusGame {
   handleEvents() {
     for (const e of this.sim.drain()) {
       this.world.people.onEvent(e, this.sim);                  // 1.19 · los pasajeros 3D suben, bajan y corren
+      if (e.type === "stopDone") this.announceNext(e.index);   // 1.20 · locución: próxima parada
+      if (e.type === "abs") this.audio.abs();
       if (this.ride) { this.rideEvent(e); continue; }
       switch (e.type) {
         case "msg": this.toast(e.text, e.level); break;
@@ -454,6 +464,20 @@ class BusGame {
         case "finished": this.onFinished(e); break;
       }
     }
+  }
+
+  /** 1.20 · Locución a bordo al salir de un paradero: la próxima parada y con qué se combina (como en el Metro). */
+  announceNext(doneIndex) {
+    const st = this.route.stops[doneIndex + 1];
+    if (!st) return;
+    let text = `Próxima parada: ${st.name}.`;
+    const lines = st.metro ? linesAtStation(st.metro) : [];
+    const metro = lines.filter(id => !isRail(id)).map(lineLabel), rail = lines.filter(isRail).map(lineLabel);
+    const join = (a) => a.length > 1 ? `${a.slice(0, -1).join(", ")} y ${a.at(-1)}` : a[0];
+    const combos = [metro.length ? `Metro ${join(metro)}` : null, ...rail].filter(Boolean);
+    if (combos.length) text += ` Combinación con ${join(combos)}.`;
+    if (doneIndex + 1 === this.route.stops.length - 1) text += " Fin del recorrido.";
+    this.audio.announce(text);
   }
 
   /** Eventos durante el viaje como pasajero: sonidos y avisos (sin sueldo ni faltas). */

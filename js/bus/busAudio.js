@@ -3,7 +3,13 @@
    MicroSim (beta): sonidos del bus, todos procedurales (Web Audio, sin
    archivos): motor diésel, rodado, bocina, puertas neumáticas, el «bip» del
    validador, el timbre de parada solicitada y el intermitente.
+
+   1.20 · Del Metro: la misma voz de locución (audio.js · bestSpanishVoice)
+   anuncia la próxima parada y sus combinaciones, y con lluvia suena el agua
+   en el techo (el clima de engine/weather.js).
    ========================================================================== */
+
+import { bestSpanishVoice, waitForSpanishVoice } from "../audio.js";
 
 export class BusAudio {
   constructor() {
@@ -12,9 +18,10 @@ export class BusAudio {
   }
 
   /** Se llama dentro del clic del jugador (los navegadores lo exigen para sonar). */
-  start() {
+  start({ rain = 0 } = {}) {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
+    waitForSpanishVoice().then(v => { this.voice = v; });
     const ctx = this.ctx = new AC();
     this.master = ctx.createGain();
     this.master.gain.value = this.muted ? 0 : 0.8;
@@ -51,6 +58,19 @@ export class BusAudio {
     n.connect(nf).connect(this.roadGain).connect(this.master);
     n.start();
 
+    // 1.20 · Lluvia en el techo y en la calle: ruido suave, más fuerte cuanto más llueve
+    if (rain > 0.02) {
+      const r = ctx.createBufferSource();
+      r.buffer = this.makeNoise(3);
+      r.loop = true;
+      const hp = ctx.createBiquadFilter();
+      hp.type = "highpass"; hp.frequency.value = 1400;
+      const rg = ctx.createGain();
+      rg.gain.value = 0.05 + 0.1 * Math.min(1, rain);
+      r.connect(hp).connect(rg).connect(this.master);
+      r.start();
+    }
+
     // Bocina (se mantiene mientras se aprieta)
     this.hornGain = ctx.createGain();
     this.hornGain.gain.value = 0;
@@ -75,6 +95,7 @@ export class BusAudio {
 
   setMuted(m) {
     this.muted = m;
+    if (m && "speechSynthesis" in window) speechSynthesis.cancel();
     if (this.master) this.master.gain.setTargetAtTime(m ? 0 : 0.8, this.ctx.currentTime, 0.05);
   }
 
@@ -167,7 +188,35 @@ export class BusAudio {
     this.tone(247, 0.3, { type: "sawtooth", gain: 0.08, at: 0.16 });
   }
 
+  /** ABS trabajando en el piso mojado: tableteo corto. */
+  abs() {
+    for (let i = 0; i < 5; i++) this.tone(70 + (i % 2) * 18, 0.05, { type: "square", gain: 0.06, at: i * 0.07, decay: false });
+  }
+
+  /**
+   * 1.20 · Locución a bordo (como en los buses Red nuevos): dos notas y la voz del Metro.
+   * Corta lo que estuviera diciendo antes.
+   */
+  announce(text) {
+    if (!this.ctx || this.muted || !("speechSynthesis" in window)) return;
+    this.tone(784, 0.35, { gain: 0.09 });
+    this.tone(1046, 0.5, { gain: 0.09, at: 0.28 });
+    clearTimeout(this.voiceTimer);
+    this.voiceTimer = setTimeout(() => {
+      if (!this.ctx || this.muted) return;
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      const v = this.voice ?? bestSpanishVoice();
+      u.lang = v?.lang || "es-CL";
+      if (v) u.voice = v;
+      u.rate = 0.95; u.pitch = 1.05; u.volume = 0.9;
+      speechSynthesis.speak(u);
+    }, 900);
+  }
+
   stop() {
+    clearTimeout(this.voiceTimer);
+    try { if (this.ctx && "speechSynthesis" in window) speechSynthesis.cancel(); } catch { /* sin voz */ }
     try { this.ctx?.close(); } catch { /* ya cerrado */ }
     this.ctx = null;
   }

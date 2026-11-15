@@ -124,6 +124,31 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **Salir por los torniquetes es gratis**: solo se cobra el pasaje al pasar hacia la zona pagada (antes, al terminar
   de cruzar el torniquete de salida se cobraba un pasaje).
 
+## Versión 1.20 · La calle del bus usa todo lo del Metro
+
+El modo bus tenía su propio cielo fijo y no conocía el clima, los accesos ni la locución del Metro. Ahora usa las mismas
+piezas que el resto del juego, así la calle se ve y se comporta como el Metro al aire libre:
+
+- **Cielo y clima del Metro** (`render/outdoor.js` · `skyAt`, `engine/weather.js`): la luz sigue la hora y la nubosidad
+  igual que en los tramos al aire libre del Metro, y el tiempo elegido en la portada (o el real de Santiago) también vale
+  en la calle: **lluvia que cae** (no dentro del bus), **calzada y veredas mojadas** con brillo, neblina más cerrada y la
+  cordillera tapada cuando está nublado. En la barra de arriba se ve el clima (en el computador).
+- **Manejo con lluvia** (`js/bus/busSim.js`), como el patinaje del tren: con el piso mojado el **ABS** no deja frenar tan
+  fuerte (desde 50 km/h el bus necesita ~36 m en vez de ~28 m), se oye su tableteo y avisa «frena antes»; al partir
+  patina un poco. Los autos van más lento y dejan más distancia. La flecha de predicción de frenada ya lo considera.
+- **Más gente cuando llueve o hace frío**: los paraderos usan la misma demanda del Metro con su factor de clima.
+- **Accesos al Metro en los paraderos** (`js/city/city.js` · `metroStreetAccess`, `metroTotem`): junto a cada paradero que
+  está en una estación hay una boca del Metro con escalera, baranda de vidrio, franja podotáctil y el **tótem con el
+  logotipo, el nombre de la estación y las insignias de sus líneas** (`linesAtStation` en `js/engine/network.js`), el
+  mismo diseño de la calle del modo pasajero. Parte de los que bajan del bus **se van a combinar por esa escalera**.
+- **Peatones** (`js/bus/busPeople.js`): la gente del Metro también pasa caminando por las dos veredas.
+- **El bus ya viene con gente** cuando subes como pasajero a mitad del recorrido (antes llegaba vacío).
+- **Locución a bordo con la voz del Metro** (`js/bus/busAudio.js`, `bestSpanishVoice` de `js/audio.js`): al salir de
+  cada paradero dos notas y «Próxima parada: Los Héroes. Combinación con Metro Línea 1 y Línea 2.» (también Tren Nos y
+  Tren Rancagua), y «Fin del recorrido» antes del último. Con lluvia suena el agua.
+- **Arreglo: el bus a veces no se veía.** Si un cuadro duraba 0 s (pasa seguido con el primero), la aceleración del bus
+  quedaba en «no es un número» y el bus desaparecía de la pantalla el resto del recorrido. Ahora ese cuadro se salta.
+
 ## Versión 1.19 · Pasajeros realistas en el bus
 
 - **Personas en 3D en vez de cápsulas** (`js/bus/busPeople.js`): las mismas figuras articuladas del Metro, con ropa,

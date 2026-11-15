@@ -1797,6 +1797,8 @@ body.touch-mode .back-button.driver-job-button { top: auto; bottom: calc(120px +
 .bus-route strong { font: 700 15px/1.15 var(--f-display); letter-spacing: .3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bus-pill { position: relative; display: grid; gap: 2px; padding: 7px 12px; border-radius: var(--radius); background: var(--panel); border: 1px solid var(--panel-border); backdrop-filter: blur(6px); }
 .bus-pill strong { font: 700 16px/1 var(--f-data); }
+.bus-weather strong { font-size: 14px; white-space: nowrap; }
+@media (max-width: 1000px) { .bus-weather { display: none; } }
 .bus-float { position: absolute; right: 8px; top: 100%; font: 700 14px var(--f-data); color: var(--ok); opacity: 0; pointer-events: none; }
 .bus-float.show { animation: busFloat 1.6s ease-out; }
 @keyframes busFloat { 0% { opacity: 0; transform: translateY(0); } 15% { opacity: 1; } 100% { opacity: 0; transform: translateY(18px); } }

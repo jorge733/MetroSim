@@ -73,6 +73,73 @@ function lineBadgesTexture(ids) {
   return t;
 }
 
+/**
+ * 1.20 · Acceso al Metro para cualquier vereda (lo usa la calle del bus, js/bus/busWorld.js): la misma boca
+ * revestida, baranda de acero y vidrio, franja podotáctil y tótem del Metro de Santiago que las calles
+ * de las estaciones (City.buildAccess). Origen = centro de la boca, al nivel de la vereda; la escalera baja
+ * hacia −Z. Quien lo use debe dejar un hueco de w × len en la vereda.
+ * @param {{name:string, lines:string[], night?:number, w?:number, len?:number}} o
+ */
+export function metroStreetAccess(parent, { name, lines, night = 0, w = 1.9, len = 5.2 }) {
+  const g = new THREE.Group();
+  parent.add(g);
+  const M = cityMaterials(night);
+  const granite = std(0x8d8a86, { rough: 0.55 });
+  const tile = std(0xe9e4da, { rough: 0.35 });
+  const steel = std(0xd5dade, { metal: 0.85, rough: 0.25 });
+  const x0 = -w / 2, x1 = w / 2, z0 = -len / 2, z1 = len / 2;
+  const n = 14, rise = 3.0 / n, run = (len - 0.9) / n;
+  for (let i = 0; i < n; i++) {
+    const z = z1 - 0.2 - run * (i + 0.5), y = -rise * (i + 1);
+    addBox(g, w - 0.1, rise, run, granite, 0, y + rise / 2, z);
+    addBox(g, w - 0.1, 0.02, 0.05, M.yellow, 0, y + rise + 0.01, z + run / 2 - 0.03);
+  }
+  addBox(g, w, 0.1, 1.2, granite, 0, -3.05, z0 + 0.6);
+  addBox(g, 0.12, 3.3, len, tile, x0 + 0.06, -1.55, 0);
+  addBox(g, 0.12, 3.3, len, tile, x1 - 0.06, -1.55, 0);
+  addBox(g, w, 3.3, 0.12, tile, 0, -1.55, z0 + 0.06);
+  const down = new THREE.Mesh(new THREE.PlaneGeometry(w - 0.3, 0.42), signMaterial("↓  METRO", { bg: "#1b1f24", font: "800 84px Arial", w: 512 }));
+  down.position.set(0, -0.3, z0 + 0.13);
+  g.add(down);
+  addBox(g, w - 0.4, 0.05, 0.25, glow(0xfff0c8), 0, -0.55, z0 + 0.3);
+  const glass = std(0xbfd8e6, { metal: 0.2, rough: 0.05, transparent: true, opacity: 0.28, depthWrite: false });
+  addBox(g, 0.3, 0.16, len + 0.3, granite, x0 - 0.05, 0.08, -0.15);
+  addBox(g, 0.3, 0.16, len + 0.3, granite, x1 + 0.05, 0.08, -0.15);
+  addBox(g, w + 0.4, 0.16, 0.3, granite, 0, 0.08, z0 - 0.05);
+  for (const x of [x0 - 0.05, x1 + 0.05]) {
+    addBox(g, 0.04, 0.85, len - 0.1, glass, x, 0.6, 0);
+    addBox(g, 0.07, 0.07, len, steel, x, 1.05, 0);
+    for (let z = z0; z <= z1 + 0.01; z += len / 3) addBox(g, 0.06, 1.0, 0.06, steel, x, 0.58, z);
+  }
+  addBox(g, w + 0.1, 0.85, 0.04, glass, 0, 0.6, z0 - 0.05);
+  addBox(g, w + 0.2, 0.07, 0.07, steel, 0, 1.05, z0 - 0.05);
+  addBox(g, w, 0.02, 0.4, M.yellow, 0, 0.01, z1 + 0.25);
+  metroTotem(g, name, lines, x1 + 0.75, z1 + 0.7);
+  return g;
+}
+
+/** Tótem del Metro de Santiago: logotipo retroiluminado, nombre de la estación e insignias de sus líneas. */
+export function metroTotem(parent, name, lines, x = 0, z = 0) {
+  const totem = new THREE.Group();
+  totem.position.set(x, 0, z);
+  parent.add(totem);
+  const granite = std(0x8d8a86, { rough: 0.55 });
+  const dark = std(0x2b2f34, { metal: 0.5, rough: 0.45 });
+  addBox(totem, 0.5, 0.12, 0.5, granite, 0, 0.07, 0);
+  addBox(totem, 0.22, 4.1, 0.22, dark, 0, 2.05, 0);
+  const face = (w, h, mat, y, depth = 0.24) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(depth, h, w), [mat, mat, dark, dark, dark, dark]);
+    m.position.y = y;
+    totem.add(m);
+    return m;
+  };
+  face(1.25, 0.9, glow(0xffffff, { map: metroLogoTexture() }), 4.05, 0.3);
+  addBox(totem, 0.34, 0.06, 1.33, dark, 0, 4.53, 0);
+  face(1.7, 0.36, signMaterial(name, { bg: "#1b1f24", font: "800 76px Arial" }), 3.35);
+  if (lines.length) face(0.36 * lines.length + 0.1, 0.36, glow(0xffffff, { map: lineBadgesTexture(lines) }), 2.92);
+  return totem;
+}
+
 const LANES = [{ x: -5.2, dir: 1 }, { x: -1.9, dir: 1 }, { x: 1.9, dir: -1 }, { x: 5.2, dir: -1 }];
 
 export class City {

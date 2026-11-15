@@ -400,3 +400,6 @@ export function transferOf(line, station, otherLine) {
   if (!t) return null;
   return t.a.line === line ? t.b.station : t.a.station;
 }
+
+/** 1.20 · Líneas (ids) que pasan por una estación, por su nombre ("LOS HÉROES" → ["1", "2"]). */
+export const linesAtStation = (name) => LINES.filter(l => l.stations.some(s => s.name === name)).map(l => l.id);

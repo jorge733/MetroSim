@@ -9,6 +9,11 @@
 
    El juego (busGame.js) llama a step(dt) en cada fotograma y lee la cola de
    eventos (sim.drain()) para los mensajes, el sonido y el sueldo.
+
+   1.20 · El clima del Metro (engine/weather.js) también pesa en la calle:
+   con el piso mojado (`wet`, 0..1) el bus frena menos (el ABS recorta el
+   freno, como el antideslizamiento del tren) y patina un poco al partir;
+   los autos van más lento y dejan más distancia.
    ========================================================================== */
 
 import { LANES, lightState, makeTimetable } from "./busRoute.js";
@@ -61,8 +66,11 @@ export class BusSim {
    * @param {{route:object, clock:number, demand:number, seed?:number}} o
    *   clock: hora del día en segundos al empezar · demand: 0..1 (curva de demanda de Santiago)
    */
-  constructor({ route, clock, demand = 0.5, seed, startStop = 0 }) {
+  constructor({ route, clock, demand = 0.5, seed, startStop = 0, wet = 0 }) {
     this.route = route;
+    this.wet = clamp(wet, 0, 1);
+    /** Freno máximo que deja el ABS (fracción del freno en seco) y tracción al partir. */
+    this.grip = 1 - 0.3 * this.wet;
     this.rng = makeRng(seed);
     this.demand = clamp(demand, 0.15, 1);       // de noche igual hay gente: los buses siguen pasando
     this.elapsed = 0;
@@ -91,6 +99,11 @@ export class BusSim {
     this.waiting = route.stops.map((_, i) => i === n - 1 || i < startStop ? 0 : this.initialWaiting(i));
     this.arrivalAcc = new Array(n).fill(0);
     this.onboard = [];                 // destino (índice de paradero) de cada pasajero a bordo
+    // 1.20 · Si el viaje parte a mitad del recorrido (el pasajero sube ahí), el bus ya viene con gente
+    if (startStop > 0) {
+      const k = Math.round(this.demand * 34 * (0.6 + this.rng() * 0.8));
+      for (let j = 0; j < k && startStop < n - 1; j++) this.onboard.push(this.pickDestination(startStop));
+    }
     this.bell = false;                 // «parada solicitada» para el próximo paradero
     this.bellAt = null;
     this.serving = null;               // atención en curso: { index, timer, boarded, alighted, error, arrival }
@@ -201,7 +214,8 @@ export class BusSim {
   /* ----------------------------- Paso ----------------------------- */
 
   step(dt) {
-    if (this.finished) return;
+    // 1.20 · Un cuadro de 0 s (el primero suele serlo) daba aceleración 0/0 = NaN y el bus dejaba de dibujarse
+    if (this.finished || !(dt > 0)) return;
     const sub = Math.max(1, Math.ceil(dt / (1 / 60)));
     const h = dt / sub;
     for (let i = 0; i < sub && !this.finished; i++) this.tick(h);
@@ -231,7 +245,14 @@ export class BusSim {
     b.throttle += clamp(wantT - b.throttle, -3 * dt, 1.8 * dt);
     b.brake += clamp(wantB - b.brake, -3.2 * dt, (wantB < 0.6 ? 1.6 : 2.6) * dt);
     // Tracción: más fuerza al partir (caja automática), cae con la velocidad
-    let a = b.throttle * (1.45 - 0.55 * Math.min(1, b.v / 8)) * Math.max(0, 1 - b.v / 19) - b.brake * 3.4;
+    // 1.20 · Piso mojado: el ABS no deja pasar del agarre disponible (frenada más larga) y la partida patina un poco
+    const brakeDecel = Math.min(b.brake * 3.4, 3.4 * this.grip);
+    if (this.wet > 0.3 && b.brake * 3.4 > brakeDecel + 0.15 && b.v > 3) {
+      this.absT = (this.absT ?? 0) + dt;
+      if (this.absT > 0.4) { this.absT = 0; this.emit("abs"); this.msg("ABS: el piso está mojado y el bus frena menos. Frena antes", "warn", "abs", 9); }
+    } else this.absT = 0;
+    const launch = b.v < 4 ? 1 - 0.18 * this.wet : 1;
+    let a = b.throttle * launch * (1.45 - 0.55 * Math.min(1, b.v / 8)) * Math.max(0, 1 - b.v / 19) - brakeDecel;
     if (b.v > 0) a -= 0.06 + 0.0006 * b.v * b.v;
     // Retardador: al soltar el acelerador sobre 15 km/h el motor frena un poco (como en un bus real)
     if (wantT === 0 && b.throttle < 0.05 && b.v > 4.2) a -= 0.28;
@@ -508,7 +529,7 @@ export class BusSim {
   stopPrediction() {
     const b = this.bus;
     if (b.v < 0.3 || b.brake < 0.05) return null;
-    const d = Math.max(b.decel, b.brake * 3.4 * 0.9);
+    const d = Math.max(b.decel, Math.min(b.brake * 3.4, 3.4 * this.grip) * 0.9);
     return d > 0.15 ? (b.v * b.v) / (2 * d) : null;
   }
 
@@ -526,7 +547,7 @@ export class BusSim {
   }
 
   addCar(lane, s) {
-    const v0 = (38 + this.rng() * 16) / 3.6;
+    const v0 = (38 + this.rng() * 16) / 3.6 * (1 - 0.15 * this.wet);   // con lluvia los autos van más lento
     const car = { id: this.nextCarId++, lane, x: LANES[lane], s, v: v0 * 0.7, v0, len: CAR_LEN, tint: Math.floor(this.rng() * 1e6), kind: this.rng() < 0.18 ? "van" : "car", braking: false };
     this.cars.push(car);
     return car;
@@ -570,7 +591,7 @@ export class BusSim {
       const lead = this.leaderOf(car);
       let a;
       if (lead) {
-        const sStar = 2 + car.v * 1.2 + car.v * (car.v - lead.v) / (2 * Math.sqrt(1.5 * 2.5));
+        const sStar = 2 + car.v * (1.2 + 0.5 * this.wet) + car.v * (car.v - lead.v) / (2 * Math.sqrt(1.5 * 2.5));
         a = 1.5 * (1 - (car.v / car.v0) ** 4 - (Math.max(0, sStar) / Math.max(0.1, lead.gap)) ** 2);
         // Atascado detrás de algo lento: se cambia a la otra pista si está libre
         if (lead.gap < 25 && lead.v < car.v0 * 0.45 && !car.changing && this.rng() < dt * 0.8) {

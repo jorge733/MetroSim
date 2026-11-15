@@ -15,6 +15,10 @@
      · Hay adultos, estudiantes con mochila, adultos mayores (pelo cano,
        caminan despacio y algo encorvados), niños y gente con bolsas.
 
+     · 1.20: peatones que pasan por las dos veredas y, en los paraderos con
+       Metro, parte de los que bajan se van a combinar por el acceso (bajan
+       la escalera junto al tótem, busWorld.js · buildMetroAccesses).
+
    Las CIFRAS (cuántos esperan, cuántos van a bordo) las lleva busSim.js; este
    módulo solo las dibuja (hasta MAX_STOP por paradero y MAX_ON a bordo).
    Todo se pinta con PeopleRenderer: 3 InstancedMesh para todas las personas.
@@ -35,6 +39,8 @@ const DOORS = { front: 1.25, mid: 5.6, rear: 9.95 };   // z de las puertas en el
 const W2 = BUS_WIDTH / 2;
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const wrapAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+/** 1.20 · Peatones: cuántos y por dónde caminan (x de la vereda del bus y de la vereda de enfrente). */
+const PEDS = 30, PED_X = [CURB_X + 5.95, -19.0, -20.8];
 
 /** Asientos del salón (mismas posiciones que busWorld.buildBus) y lugares para ir de pie. */
 function cabinSpots() {
@@ -58,12 +64,23 @@ export class BusPeople {
    * @param {THREE.Object3D} cabin  grupo de la carrocería del bus (los de adentro son sus hijos)
    * @param {{ride:boolean}} o  ride: el jugador va sentado adelante a la derecha (ese lugar queda libre)
    */
-  constructor(scene, route, cabin, { ride = false } = {}) {
+  constructor(scene, route, cabin, { ride = false, accesses = [] } = {}) {
     this.scene = scene;
     this.route = route;
     this.cabin = cabin;
     this.rng = makeRng(route.stops.length * 7919 + route.id.length);
-    this.renderer = new PeopleRenderer(scene, MAX_STOP * 5 + MAX_ON + 30);
+    this.renderer = new PeopleRenderer(scene, MAX_STOP * 5 + MAX_ON + 30 + PEDS);
+    // 1.20 · Acceso al Metro de cada paradero que lo tiene (índice del paradero → { x, z, mouthZ, bottomZ })
+    this.access = new Map(accesses.map(a => [route.stops.indexOf(a.stop), a]));
+    // 1.20 · Peatones por las veredas, en los dos sentidos
+    this.peds = Array.from({ length: PEDS }, (_, i) => {
+      const p = this.person();
+      p.dir = this.rng() < 0.5 ? 1 : -1;
+      p.root.position.set(PED_X[i % 3] + (this.rng() - 0.5) * 0.4, SIDEWALK_Y, -route.stops[0].s + 80 - this.rng() * 420);
+      p.root.rotation.y = p.dir > 0 ? Math.PI : 0;
+      p.pose = "walk";
+      return p;
+    });
     this.time = 0;
     this.stops = route.stops.map((st, i) => ({ index: i, z: -st.s, crowd: [], spots: this.stopSpots(st), shown: false }));
     this.walkers = [];           // en la calle, de paso (suben, bajan, se van)
@@ -249,7 +266,11 @@ export class BusPeople {
     p.root.rotation.y = -Math.PI / 2;
     p.pose = "walk";
     const away = Math.random() < 0.5 ? 1 : -1;
-    p.path = [V(x + W2 + 0.35, SIDEWALK_Y, z), V(CURB_X + 1.2 + Math.random() * 1.8, SIDEWALK_Y, z + away * (2 + Math.random() * 3)), V(CURB_X + 1.5 + Math.random() * 2.5, SIDEWALK_Y, z + away * (28 + Math.random() * 12))];
+    const acc = this.access.get(stop.index);
+    if (acc && Math.random() < 0.5) {
+      // 1.20 · Va a combinar con el Metro: cruza la vereda hasta la boca del acceso y baja la escalera
+      p.path = [V(x + W2 + 0.35, SIDEWALK_Y, z), V(CURB_X + 2.2, SIDEWALK_Y, z - 1), V(acc.x, SIDEWALK_Y, acc.mouthZ), V(acc.x, SIDEWALK_Y - 1.5, acc.z), V(acc.x, SIDEWALK_Y - 2.9, acc.bottomZ)];
+    } else p.path = [V(x + W2 + 0.35, SIDEWALK_Y, z), V(CURB_X + 1.2 + Math.random() * 1.8, SIDEWALK_Y, z + away * (2 + Math.random() * 3)), V(CURB_X + 1.5 + Math.random() * 2.5, SIDEWALK_Y, z + away * (28 + Math.random() * 12))];
     p.onArrive = () => { p.gone = true; };
     this.walkers.push(p);
   }
@@ -395,7 +416,14 @@ export class BusPeople {
     }
     while (this.onboard.length > want) this.leaveCabin(this.onboard.at(-1));
 
-    const all = [...this.walkers, ...this.onboard, this.driver];
+    // 1.20 · Peatones: caminan por su vereda y vuelven a aparecer adelante o atrás del bus
+    const zBus = -sim.bus.s;
+    for (const p of this.peds) {
+      p.root.position.z -= p.dir * p.speed * dt;
+      if (p.root.position.z > zBus + 120) p.root.position.z -= 420;
+      else if (p.root.position.z < zBus - 300) p.root.position.z += 420;
+    }
+    const all = [...this.walkers, ...this.onboard, this.driver, ...this.peds];
     for (const st of this.stops) if (st.shown) all.push(...st.crowd);
     for (const p of all) {
       if (p.leaveAt && this.time > p.leaveAt) {
