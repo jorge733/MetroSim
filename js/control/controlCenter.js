@@ -347,7 +347,7 @@ export class ControlCenter {
     root.innerHTML = `
       <div class="pcc-top">
         <button class="pcc-icon-btn" data-act="exit" title="Volver al menú">${icon("back")}<span>Menú</span></button>
-        <div class="pcc-title"><h1>Centro de Control</h1><small class="pcc-scope">Metro de Santiago · red en tiempo real</small></div>
+        <div class="pcc-title"><h1>Centro de Control</h1><small class="pcc-scope">RedMoviSim · red en tiempo real</small></div>
         <nav class="pcc-views" aria-label="Qué ver"></nav>
         <div class="pcc-time" role="group" aria-label="Velocidad del tiempo">
           <button class="pcc-pause" data-act="pause" title="Pausa (Espacio)" aria-label="Pausa">${icon("pause")}</button>

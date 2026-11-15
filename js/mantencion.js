@@ -10,7 +10,7 @@
    ========================================================================== */
 
 /** true = el sitio muestra la pantalla de mantención en vez del juego. */
-export const ACTIVA = true;
+export const ACTIVA = false;
 
 const CLAVE = "redmovisim.probar";
 

@@ -124,6 +124,25 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **Salir por los torniquetes es gratis**: solo se cobra el pasaje al pasar hacia la zona pagada (antes, al terminar
   de cruzar el torniquete de salida se cobraba un pasaje).
 
+## Versión 2.0 · Interfaz nueva
+
+RedMoviSim estrena una interfaz hecha desde cero: identidad propia (ya no la del Metro) y más fácil de usar.
+
+- **Portada en dos pasos** (`css/home.css`): primero **¿Qué quieres hacer hoy?** con tres tarjetas grandes
+  (**Conducir**, **Viajar** y **Centro de Control**); después se prepara la partida y se juega con un botón grande.
+  En Conducir, **Metro, Tren Nos, Tren Rancagua y Bus Red** están al mismo nivel; la línea solo se pide para el Metro.
+  **Seguir donde quedaste** repite lo último que jugaste con un toque. La hora, la tarifa vigente y la Tienda (con tu
+  saldo) quedan en una barra arriba, y el clima se cambia desde un apartado plegable.
+- **Sistema de diseño** (`css/ui.css`): paleta grafito con el rojo de la marca RedMoviSim, un color por modo (rojo
+  conducir, verde viajar, azul Centro de Control), botones, campos y selectores nuevos. El color de cada línea solo
+  marca lo que es de esa línea.
+- **Menú de la partida** (`css/game.css`): **Esc** o el botón **Menú** reúne Seguir jugando, Controles, Sonido,
+  Tarifas, Tienda, Misiones, Reiniciar el servicio, **Finalizar turno y cobrar** (en un toque) y **Volver a la
+  portada**. Reemplaza los botones sueltos de antes. Arriba se lee el medio y la línea («Metro · Línea 3»,
+  «Tren Nos · EFE») y si estás conduciendo o viajando.
+- **Paneles unificados**: boletería, locales, misiones, tarifas y confirmaciones con la misma forma.
+- Fin de la mantención (`js/mantencion.js`, `ACTIVA = false`). Lo hecho mientras tanto quedó en las 1.20.5 a 1.20.8.
+
 ## Versión 1.20 · La calle del bus usa todo lo del Metro
 
 El modo bus tenía su propio cielo fijo y no conocía el clima, los accesos ni la locución del Metro. Ahora usa las mismas
