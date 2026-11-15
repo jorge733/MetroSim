@@ -150,6 +150,8 @@ piezas que el resto del juego, así la calle se ve y se comporta como el Metro a
   quedaba en «no es un número» y el bus desaparecía de la pantalla el resto del recorrido. Ahora ese cuadro se salta.
 - **1.20.1 · Imágenes del post «Ya está en marcha»** (`post-mejoras/`): post cuadrado, historia y portada horizontal
   para redes sociales, generadas con `node generar.js plantilla.html` desde esa carpeta.
+- **1.20.2 · Imágenes del post «Juega en PC y celular»** (`post-pc-celular/`): post cuadrado, historia y portada
+  horizontal que anuncian que se juega escribiendo redmovisim.cl en el navegador, con capturas reales de la portada.
 
 ## Versión 1.19 · Pasajeros realistas en el bus
 
