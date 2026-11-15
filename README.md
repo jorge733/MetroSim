@@ -2,7 +2,7 @@
 
 Simulador 3D del **transporte público de Santiago**: el **Metro** (líneas 1, 2, 3, 4, 4A, 5 y 6), los trenes de EFE (**Tren Nos** y **Tren Rancagua**) y los **buses**,
 para navegador, hecho con HTML, CSS, JavaScript y [Three.js](https://threejs.org/). Se juega en
-**https://redmovisim.benedettowebs.cl/**. Antes se llamaba **MetroSim**.
+**https://www.redmovisim.cl/** (también **redmovisim.cl**). Antes se llamaba **MetroSim**.
 
 Conductor y pasajero comparten el mismo mundo: los mismos trenes, señales, horarios y viajeros.
 
@@ -136,6 +136,10 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **Esquema del PCC:** los nombres de las últimas estaciones se empinan en vez de cortarse en el borde derecho
   («F. CASTILLO V.»).
 - **Bus:** la lista de teclas de abajo a la derecha va sobre un panel y se lee bien sobre la calle.
+
+**1.17.1 · Dominio propio:** el juego ahora está en **https://www.redmovisim.cl/** (`redmovisim.cl` redirige ahí).
+El enlace canónico, los datos estructurados, `robots.txt`, `sitemap.xml`, la plantilla del anuncio de mantenimiento y
+los textos de `docs/DIFUSION.md` usan la dirección nueva. `redmovisim.benedettowebs.cl` sigue funcionando.
 
 ## Versión 1.16 · Tren Rancagua (EFE) y Tienda RedMovi
 

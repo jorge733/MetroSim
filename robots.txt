@@ -3,4 +3,4 @@ Allow: /
 Disallow: /android/
 Disallow: /tools/
 
-Sitemap: https://redmovisim.benedettowebs.cl/sitemap.xml
+Sitemap: https://www.redmovisim.cl/sitemap.xml
