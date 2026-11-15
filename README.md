@@ -152,6 +152,8 @@ piezas que el resto del juego, así la calle se ve y se comporta como el Metro a
   para redes sociales, generadas con `node generar.js plantilla.html` desde esa carpeta.
 - **1.20.2 · Imágenes del post «Juega en PC y celular»** (`post-pc-celular/`): post cuadrado, historia y portada
   horizontal que anuncian que se juega escribiendo redmovisim.cl en el navegador, con capturas reales de la portada.
+- **1.20.3 · Imágenes del post «Instálalo en tu celular»** (`post-instalar/`): post cuadrado, historia y portada
+  horizontal con los pasos para instalar la app en Android (Chrome) y iPhone (Safari).
 
 ## Versión 1.19 · Pasajeros realistas en el bus
 

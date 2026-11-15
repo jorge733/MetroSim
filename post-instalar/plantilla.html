@@ -1,0 +1,56 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+*{margin:0;box-sizing:border-box}
+html,body{width:var(--w);height:var(--h);overflow:hidden}
+body{font-family:"DejaVu Sans","Liberation Sans",Arial,sans-serif;color:#fff;
+ background:radial-gradient(ellipse at 50% 30%,#26324a 0%,#111722 55%,#05070a 100%);position:relative}
+.wrap{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 50px;gap:var(--gap)}
+.top{display:flex;align-items:center;gap:18px}
+.logo{width:var(--logo)}
+.badge{background:#d7262e;padding:10px 28px;border-radius:999px;font-weight:800;font-size:var(--badge);letter-spacing:.08em}
+h1{font-size:var(--h1);font-weight:900;line-height:1.05;letter-spacing:-.02em}
+h1 em{font-style:normal;color:#f4b400}
+.sub{font-size:var(--p);color:#d6dbe6;line-height:1.3}.sub b{color:#fff}
+.main{display:flex;flex-direction:var(--dir,row);align-items:center;gap:var(--mgap)}
+.phone{position:relative;width:var(--pw);aspect-ratio:390/844;background:#000;border:calc(var(--pw) * .045) solid #1b2230;border-radius:calc(var(--pw) * .14);box-shadow:0 20px 60px rgba(0,0,0,.7);flex:none}
+.phone .scr{position:absolute;inset:0;overflow:hidden;border-radius:calc(var(--pw) * .1)}
+.phone img{display:block;width:100%;height:100%;object-fit:cover}
+.ring{position:absolute;left:2.5%;top:65.8%;width:33%;height:6.4%;border:4px solid #f4b400;border-radius:12px;box-shadow:0 0 0 6px rgba(244,180,0,.35),0 0 30px #f4b400}
+.finger{position:absolute;left:24%;top:70%;font-size:calc(var(--pw) * .2)}
+.cols{display:flex;flex-direction:var(--cdir,column);gap:var(--cgap)}
+.card{background:rgba(10,14,22,.85);border:2px solid #2a3346;border-radius:22px;padding:var(--cpad);text-align:left;width:var(--cw)}
+.card h2{font-size:var(--h2);font-weight:900;margin-bottom:var(--sgap);display:flex;align-items:center;gap:12px}
+.card h2 small{font-size:.62em;color:#9fb0c8;font-weight:700}
+.card.and{border-left:8px solid #00965e}.card.ios{border-left:8px solid #3b82f6}
+ol{list-style:none;display:flex;flex-direction:column;gap:var(--sgap)}
+li{display:flex;align-items:center;gap:14px;font-size:var(--li);line-height:1.25;color:#d6dbe6}
+li b{color:#fff}
+li i{flex:none;width:1.6em;height:1.6em;border-radius:50%;background:#f4b400;color:#111722;font-style:normal;font-weight:900;display:flex;align-items:center;justify-content:center}
+.k{display:inline-block;background:#fff;color:#111722;border-radius:8px;padding:0 8px;font-weight:800}
+.url{font-size:var(--url);font-weight:900;color:#fff;letter-spacing:.02em}.url span{color:#d7262e}
+</style></head><body>
+<div class="wrap">
+ <div class="top">
+ <svg class="logo" viewBox="0 0 200 130"><rect x="6" y="6" width="188" height="118" rx="30" fill="#d7262e"/>
+ <path d="M30 94H78L122 36H170" fill="none" stroke="#fff" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+ <path d="M100 18V112" fill="none" stroke="#ffd2d5" stroke-width="9" stroke-linecap="round" stroke-dasharray="0.1 17"/>
+ <circle cx="30" cy="94" r="10" fill="#fff"/><circle cx="170" cy="36" r="10" fill="#fff"/>
+ <circle cx="100" cy="65" r="17" fill="#fff"/><circle cx="100" cy="65" r="8" fill="#d7262e"/></svg>
+ <div class="badge">RedMoviSim</div></div>
+ <h1>Instálalo en tu&nbsp;<em>celular</em></h1>
+ <div class="sub">Ábrelo como una app y <b>juega incluso sin internet</b></div>
+ <div class="main">
+  <div class="phone"><div class="scr"><img src="cap-inicio.png"></div><div class="ring"></div><div class="finger">👆</div></div>
+  <div class="cols">
+   <div class="card and"><h2>🤖 Android <small>Chrome</small></h2><ol>
+    <li><i>1</i><span>Entra a <b>redmovisim.cl</b></span></li>
+    <li><i>2</i><span>Toca <b>Comenzar</b> y baja hasta el final</span></li>
+    <li><i>3</i><span>Toca <span class="k">⤓ Instalar app</span></span></li></ol></div>
+   <div class="card ios"><h2>🍎 iPhone <small>Safari</small></h2><ol>
+    <li><i>1</i><span>Entra a <b>redmovisim.cl</b></span></li>
+    <li><i>2</i><span>Toca <b>Compartir</b> <span class="k">⬆</span></span></li>
+    <li><i>3</i><span>Elige <b>«Agregar a inicio»</b></span></li></ol></div>
+  </div>
+ </div>
+ <div class="url">redmovisim<span>.cl</span></div>
+</div>
+</body></html>
