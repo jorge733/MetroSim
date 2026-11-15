@@ -780,7 +780,7 @@ export class Walker {
     if (lift) return lift.el.openAt(lift.level) ? "Ascensor con las puertas abiertas · entra y pulsa E" : "E · llamar al ascensor";
     if (Math.abs(this.pos.y - MZ.y) < 0.3) {
       const here0 = this.stationAt(this.pos.z);
-      if (this.atTransfer(here0, 6.0)) return `Pasillo de combinación · sigue caminando para cambiarte a la Línea ${here0.combos[0]}`;
+      if (this.atTransfer(here0, 6.0)) return `Pasillo de combinación · sigue caminando para cambiarte ${here0.combos[0] === "NOS" ? "al Tren Nos" : `a la Línea ${here0.combos[0]}`}`;
       const service = this.nearService();
       if (service?.kind === "boleteria") return "E · atención en boletería (cargar tarjeta bip!, comprar tarjeta)";
       if (service?.kind === "totem") return "E · tótem de autoservicio: carga con tarjeta de débito o crédito";

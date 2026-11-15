@@ -31,6 +31,10 @@ import { skyAt } from "../render/outdoor.js";            // cielo según la hora
 import { buildLandmark } from "./landmarks.js";
 import { cityMaterials, genericBuilding, signMaterial, facingPlane, streetLamp, tree, bench, addMesh } from "./kit.js";
 import { markCity } from "../render/trackLift.js";
+import { BUS_METRO_STOPS, BUS_ROUTE } from "../bus/busRoute.js";
+
+/** 1.15 · Paradero de la calle (local): aquí se toma el bus del recorrido si pasa por esta estación. */
+const BUS_STOP = { x: STREET.roadHalf + 1.5, z: 34 };
 
 const S = STREET;
 /** Origen de la calle en el mundo: justo encima de la estación, con la boca del acceso sobre su escalera de salida. */
@@ -61,7 +65,7 @@ function lineBadgesTexture(ids) {
   ids.forEach((id, i) => {
     const cx = 16 + s * i + s / 2, cy = c.height / 2;
     g.fillStyle = LINE_COLORS[id] || "#888"; g.beginPath(); g.arc(cx, cy, s * 0.42, 0, Math.PI * 2); g.fill();
-    g.fillStyle = "#ffffff"; g.font = `900 ${id.length > 1 ? 50 : 66}px Arial`; g.textAlign = "center"; g.textBaseline = "middle";
+    g.fillStyle = "#ffffff"; g.font = `900 ${id.length > 2 ? 34 : id.length > 1 ? 50 : 66}px Arial`; g.textAlign = "center"; g.textBaseline = "middle";
     g.fillText(id, cx, cy + 3);
   });
   const t = toTexture(c);
@@ -370,6 +374,24 @@ export class City {
     addBox(g, 0.08, 2.6, 5, std(0x9fc6e0, { transparent: true, opacity: 0.35 }), S.roadHalf + 2.2, 1.3, pz);
     bench(g, M, S.roadHalf + 1.7, pz, Math.PI / 2);
     this.blocks.push({ x0: S.roadHalf + 1.2, x1: S.roadHalf + 2.3, z0: pz - 2.5, z1: pz + 2.5 });
+    // 1.15 · Si pasa el recorrido del juego: letrero con su número (se toma con E)
+    this.busStop = BUS_METRO_STOPS.has(this.station?.name);
+    if (this.busStop) {
+      addBox(g, 0.08, 2.9, 0.08, std(0x5d656c, { metal: 0.5, rough: 0.4 }), S.roadHalf + 0.5, 1.45, pz - 3.2);
+      const c = makeCanvas(256, 320), q = c.getContext("2d");
+      q.fillStyle = "#0f3d7a"; q.fillRect(0, 0, 256, 320);
+      q.fillStyle = "#fff"; q.textAlign = "center"; q.textBaseline = "middle";
+      q.font = "800 54px Arial"; q.fillText("PARADA", 128, 52);
+      q.fillStyle = "#d7262e"; q.fillRect(28, 100, 200, 96);
+      q.fillStyle = "#fff"; q.font = "900 76px Arial"; q.fillText(BUS_ROUTE.id, 128, 150);
+      q.font = "700 30px Arial"; q.fillText("Alameda", 128, 238); q.font = "600 24px Arial"; q.fillText("⇄ Baquedano · E. Central", 128, 282);
+      const tex = toTexture(c);
+      tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+      const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 0.94), new THREE.MeshStandardMaterial({ map: tex, side: THREE.DoubleSide, roughness: 0.6 }));
+      plate.position.set(S.roadHalf + 0.5, 2.5, pz - 3.2);
+      plate.rotation.y = Math.PI / 2;
+      g.add(plate);
+    }
   }
 
   /** La avenida sigue más allá de la cuadra (decorado, no transitable). */
@@ -648,6 +670,7 @@ export class City {
     const { lx, lz } = this.local(wpos.x, wpos.z);
     const a = S.access;
     if (Math.hypot(lx - a.x, lz - (a.z + a.mouthZ + 0.8)) < 2.4) return { kind: "access" };
+    if (Math.abs(lx - BUS_STOP.x) < 2.6 && Math.abs(lz - BUS_STOP.z) < 4.5) return { kind: "busstop", served: !!this.busStop };
     let best = null, bd = 2.6;
     for (const shop of this.plan.shops) {
       const d = Math.hypot(lx - shop.door.x, lz - shop.door.z);
@@ -670,6 +693,7 @@ export class City {
     if (n?.kind === "access") return `E (o camina hacia la escalera) · bajar a la estación ${this.station.name}`;
     if (n?.kind === "shop") return n.shop.kind === "banco" ? "E · usar el cajero automático (saldo y movimientos)" : `E · entrar a ${n.shop.name} (${n.shop.label.toLowerCase()})`;
     if (n?.kind === "landmark") return `E · sacar una foto de ${n.landmark.name}`;
+    if (n?.kind === "busstop") return n.served ? `E · paradero del bus ${BUS_ROUTE.id} (Alameda): tomar el bus` : "Paradero: por aquí no pasa el recorrido del juego (el bus A01 va por la Alameda)";
     return this.landmark
       ? `Calle de ${this.station.name} · enfrente: ${this.landmark.name} · locales en la vereda del Metro · J misiones`
       : `Calle de ${this.station.name} · locales en la vereda del Metro · J misiones`;

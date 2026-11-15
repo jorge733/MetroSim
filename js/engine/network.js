@@ -74,7 +74,7 @@ function makeLine({ id, name, data, speedLimits = () => [], scheduleOffset = 0, 
     stations,
     speedLimits: speedLimits(stations),
     routeIds: id === "3" ? ["A", "B"] : [`${id}A`, `${id}B`],
-    tripPrefix: [`L${id}`, `L${id}V`],
+    tripPrefix: id === "NOS" ? ["NOS", "NOSV"] : [`L${id}`, `L${id}V`],
     signalPrefix: id === "3" ? ["1", "2"] : [`${id}1`, `${id}2`],
     scheduleOffset,                    // desfase de su malla respecto a la de referencia
     peakHeadway, demand, centers, terrain, deep, sections, express,
@@ -94,7 +94,7 @@ export const L1 = makeLine({
     { name: "ECUADOR",                   short: "ECUADOR",          gap: 800 },
     { name: "SAN ALBERTO HURTADO",       short: "S. A. HURTADO",    gap: 750 },
     { name: "UNIVERSIDAD DE SANTIAGO",   short: "U. DE SANTIAGO",   gap: 700 },
-    { name: "ESTACIÓN CENTRAL",          short: "EST. CENTRAL",     gap: 650 },
+    { name: "ESTACIÓN CENTRAL",          short: "EST. CENTRAL",     gap: 650,  combos: ["NOS"] },
     { name: "UNIÓN LATINOAMERICANA",     short: "U. LATINOAMER.",   gap: 700 },
     { name: "REPÚBLICA",                 short: "REPÚBLICA",        gap: 650 },
     { name: "LOS HÉROES",                short: "LOS HÉROES",       gap: 700,  combos: ["2"] },
@@ -310,8 +310,8 @@ export const L6 = makeLine({
   description: "La más moderna: de Cerrillos a Providencia, sin conductor en la realidad.",
   data: [
     { name: "CERRILLOS",                      short: "CERRILLOS",     gap: 0 },
-    { name: "LO VALLEDOR",                    short: "LO VALLEDOR",   gap: 1900 },
-    { name: "PRESIDENTE PEDRO AGUIRRE CERDA", short: "P. A. CERDA",   gap: 1500 },
+    { name: "LO VALLEDOR",                    short: "LO VALLEDOR",   gap: 1900, combos: ["NOS"] },
+    { name: "PRESIDENTE PEDRO AGUIRRE CERDA", short: "P. A. CERDA",   gap: 1500, combos: ["NOS"] },
     { name: "FRANKLIN",                       short: "FRANKLIN",      gap: 2400, combos: ["2"] },
     { name: "BIO BÍO",                        short: "BIO BÍO",       gap: 950 },
     { name: "ÑUBLE",                          short: "ÑUBLE",         gap: 1150, combos: ["5"] },
@@ -322,8 +322,33 @@ export const L6 = makeLine({
   ],
 });
 
+/* ---------- 1.15 · Tren Nos (EFE): Estación Central → Nos ----------
+   Tren de cercanías de superficie hacia San Bernardo. Va todo al aire libre (se simula como
+   trinchera: el motor no tiene vía a nivel de calle). Usa la composición de 5 coches del juego
+   (el real son X'Trapolis Modular de 2 o 4 coches) y la velocidad máxima de la red (80 km/h;
+   el real llega a 120). Las combinaciones son las reales: L1 en Estación Central (estación
+   Alameda) y L6 en Lo Valledor y Pedro Aguirre Cerda. Distancias aproximadas (~20 km). */
+export const NOS = makeLine({
+  id: "NOS", name: "TREN NOS", scheduleOffset: 60, peakHeadway: 360, demand: 0.5, terrain: [520, 570],
+  centers: ["ESTACIÓN CENTRAL", "SAN BERNARDO"],
+  description: "Tren de cercanías de superficie, de Estación Central a San Bernardo y Nos.",
+  sections: [{ from: "ESTACIÓN CENTRAL", to: "NOS", type: "trinchera" }],
+  data: [
+    { name: "ESTACIÓN CENTRAL",               short: "ALAMEDA",       gap: 0,    combos: ["1"] },
+    { name: "LO VALLEDOR",                    short: "LO VALLEDOR",   gap: 3400, combos: ["6"] },
+    { name: "PRESIDENTE PEDRO AGUIRRE CERDA", short: "P. A. CERDA",   gap: 2100, combos: ["6"] },
+    { name: "LO ESPEJO",                      short: "LO ESPEJO",     gap: 2500 },
+    { name: "LO BLANCO",                      short: "LO BLANCO",     gap: 2500 },
+    { name: "FREIRE",                         short: "FREIRE",        gap: 1900 },
+    { name: "SAN BERNARDO",                   short: "SAN BERNARDO",  gap: 1900 },
+    { name: "MAESTRANZA",                     short: "MAESTRANZA",    gap: 1500 },
+    { name: "CINCO PINOS",                    short: "CINCO PINOS",   gap: 1600 },
+    { name: "NOS",                            short: "NOS",           gap: 2600 },
+  ],
+});
+
 /** Todas las líneas de la red, en el orden de la pantalla principal. */
-export const LINES = [L1, L2, L3, L4, L4A, L5, L6];
+export const LINES = [L1, L2, L3, L4, L4A, L5, L6, NOS];
 
 /** Línea por id ("1", "4A"...). */
 export const lineById = (id) => LINES.find(l => l.id === String(id)) || null;

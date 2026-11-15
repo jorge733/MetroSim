@@ -98,12 +98,12 @@
         <header class="start-brand">
           <img class="metro-mark" src="logo.svg" alt="">
           <h1>Red<span>Movi</span>Sim</h1>
-          <span class="start-ver">v1.14.1</span>
+          <span class="start-ver">v1.15</span>
         </header>
         <div class="start-hero">
           <p class="eyebrow">Simulador del transporte público de Santiago</p>
           <h2>Conduce el Metro, maneja buses y viaja por Santiago en 3D</h2>
-          <p class="tagline" id="startTagline">Siete líneas reales, con sus estaciones, horarios y combinaciones.</p>
+          <p class="tagline" id="startTagline">Las siete líneas del Metro, el Tren Nos y los buses de la Alameda, con sus estaciones, horarios y combinaciones.</p>
         </div>
 
         <div class="line-picker">
@@ -150,18 +150,26 @@
       <div class="start-main">
         <span class="small-label">Modo de juego</span>
         <div class="mode-selection">
-          <span class="mode-group"><i class="mode-group-dot metro"></i>Metro</span>
           <article class="mode-card" data-card="driver">
             <div class="mode-head">
               <span class="mode-icon"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="14" rx="3"/><path d="M5 11h14M9 17l-2 4M15 17l2 4"/><path d="M9 14h.01M15 14h.01"/></svg></span>
               <div class="mode-text">
                 <strong>Conductor</strong>
-                <small>El tren real de cada línea: neumáticos o acero, viaductos y Ruta Expresa. Respeta señales y horario: cada estación bien servida te paga al instante.</small>
+                <small id="driverText">Elige qué conducir: un tren del Metro, el Tren Nos a San Bernardo o un bus de la Red por la Alameda. Cada estación o paradero bien servido te paga al instante.</small>
               </div>
-              <button class="go-button" data-mode="driver">Conducir <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+              <button class="go-button" data-mode="driver" id="driverGo">Conducir <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
             </div>
             <div class="mode-opts">
-              <div class="field">
+              <div class="field vehicle-field">
+                <span class="small-label" id="vehicleLabel">¿Qué quieres conducir?</span>
+                <div id="vehicleSeg" class="seg vehicle-seg" role="radiogroup" aria-labelledby="vehicleLabel">
+                  <button type="button" role="radio" data-vehicle="metro"><b>🚇 Tren del Metro</b><span>Líneas 1 a 6</span></button>
+                  <button type="button" role="radio" data-vehicle="nos"><b>🚆 Tren Nos</b><span>Est. Central → Nos</span></button>
+                  <button type="button" role="radio" data-vehicle="bus"><b>🚌 Bus Red</b><span>Alameda · beta</span></button>
+                </div>
+              </div>
+              <p id="busDriverNote" class="mode-note" hidden>Recorrido A01 (ficticio) por la Alameda, de Estación Central a Plaza Baquedano, con paraderos en lugares reales. <kbd>W</kbd><kbd>S</kbd> acelerar y frenar · <kbd>A</kbd><kbd>D</kbd> cambiar de pista · <kbd>Espacio</kbd> puertas · <kbd>C</kbd> cámara.</p>
+              <div class="field train-only">
                 <span class="small-label" id="directionLabel">Servicio</span>
                 <div id="directionSeg" class="seg" role="radiogroup" aria-labelledby="directionLabel"></div>
                 <select id="startDirection" hidden>
@@ -169,8 +177,8 @@
                   <option value="B">Vuelta · F. Castillo Velasco → Plaza Quilicura</option>
                 </select>
               </div>
-              <button class="tutorial-launch" data-tutorial="driver"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m2 9 10-5 10 5-10 5zM6 11v5c0 1.5 3 3 6 3s6-1.5 6-3v-5M22 9v6"/></svg> ¿Primera vez? Con tutorial</button>
-              <button class="tutorial-launch net-launch" id="netJoinToggle" aria-controls="netJoin"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M16 5a3 3 0 0 1 0 6M18 14c2 .8 3 2.7 3 6"/></svg> Unirse a una sala (multijugador)</button>
+              <button class="tutorial-launch train-only" data-tutorial="driver"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m2 9 10-5 10 5-10 5zM6 11v5c0 1.5 3 3 6 3s6-1.5 6-3v-5M22 9v6"/></svg> ¿Primera vez? Con tutorial</button>
+              <button class="tutorial-launch net-launch train-only" id="netJoinToggle" aria-controls="netJoin"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M16 5a3 3 0 0 1 0 6M18 14c2 .8 3 2.7 3 6"/></svg> Unirse a una sala (multijugador)</button>
               <div id="netJoin" class="net-join" hidden>
                 <label class="field"><span class="small-label">Tu nombre</span><input id="netName" maxlength="16" autocomplete="nickname" placeholder="Cómo te verá el PCC"></label>
                 <label class="field"><span class="small-label">Código de la sala</span><input id="netCode" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCD"></label>
@@ -213,20 +221,6 @@
               <button class="tutorial-launch" data-tutorial="control"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m2 9 10-5 10 5-10 5zM6 11v5c0 1.5 3 3 6 3s6-1.5 6-3v-5M22 9v6"/></svg> ¿Primera vez? Con tutorial</button>
             </div>
           </article>
-          <span class="mode-group"><i class="mode-group-dot bus"></i>Buses</span>
-          <article class="mode-card" data-card="bus">
-            <div class="mode-head">
-              <span class="mode-icon"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="15" rx="2"/><path d="M4 10h16M8 18v3M16 18v3M8 14h.01M16 14h.01"/></svg></span>
-              <div class="mode-text">
-                <strong>Conductor de bus <span class="beta-tag">beta</span></strong>
-                <small>Maneja un bus por la Alameda, de Estación Central a Plaza Baquedano: pista Solo Bus, semáforos, autos y paraderos con gente esperando. El sueldo va a la misma cuenta.</small>
-              </div>
-              <button class="go-button" data-mode="bus">Manejar <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
-            </div>
-            <div class="mode-opts">
-              <small class="mode-note">Recorrido de prueba A01 (ficticio) con paraderos en lugares reales. <kbd>W</kbd><kbd>S</kbd> acelerar y frenar · <kbd>A</kbd><kbd>D</kbd> cambiar de pista · <kbd>Espacio</kbd> puertas · <kbd>C</kbd> cámara.</small>
-            </div>
-          </article>
         </div>
 
         <button id="shopButton" class="shop-launch">
@@ -256,7 +250,7 @@
         <p class="start-note disclaimer">RedMoviSim es un proyecto independiente y gratuito, sin relación con Red Metropolitana de Movilidad, Metro de Santiago ni el Ministerio de Transportes. Los nombres de líneas, estaciones y lugares se usan solo como referencia.</p>
       </div>
     </main>
-    <p class="version">RedMoviSim 1.14.1 · simulador no oficial del transporte público de Santiago · Metro: 7 líneas, conductor, pasajero y Centro de Control · Buses: conductor de bus por la Alameda (beta) · multijugador · app instalable</p>
+    <p class="version">RedMoviSim 1.15 · simulador no oficial del transporte público de Santiago · Metro (7 líneas) y Tren Nos · buses por la Alameda · conductor, pasajero con combinaciones bus ⇄ Metro y Centro de Control · multijugador · app instalable</p>
   </section>
 
   <!-- =============================== PANTALLA DE CARGA =============================== -->

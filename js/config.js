@@ -26,13 +26,19 @@
    y curva de demanda horaria de un día real de Santiago.
    ========================================================================== */
 
-export const VERSION = "1.14.1";
+export const VERSION = "1.15";
 
 /* ---------- Colores oficiales de las líneas ---------- */
 export const LINE_COLORS = {
   "1": "#e1251b", "2": "#f4b400", "3": "#8b5a2b", "4": "#1d3f95",
   "4A": "#3c86c6", "5": "#00965e", "6": "#9b26b6",
+  "NOS": "#0f7f86",                 // Tren Nos (EFE): color propio del juego, no oficial
 };
+
+/** 1.15 · Nombre corto de una línea para textos: "L1", "L4A"… y "Tren Nos". */
+export const lineTag = (id) => id === "NOS" ? "Tren Nos" : `L${id}`;
+/** Nombre largo: "Línea 1"… y "Tren Nos". */
+export const lineLabel = (id) => id === "NOS" ? "Tren Nos" : `Línea ${id}`;
 
 /* ---------- Línea activa (la que se juega) ---------- */
 /** Datos de la línea activa: id, nombre, color… */

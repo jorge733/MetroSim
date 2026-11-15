@@ -113,7 +113,7 @@ kbd {
 .tagline { color: #a8b3bf; font-size: 15px; line-height: 1.45; }
 
 .line-picker { display: grid; gap: 8px; }
-.line-chips { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.line-chips { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)) minmax(0, 1.25fr); gap: 5px; }
 .line-chip {
   position: relative;
   height: 44px;
@@ -173,10 +173,6 @@ kbd {
 .creator-launch { border-color: #34d17c66; color: #bff0d3; }
 
 .mode-selection { display: grid; gap: 10px; }
-.mode-group { display: flex; align-items: center; gap: 8px; margin-top: 4px; font: 700 13px/1 var(--f-display); letter-spacing: 1.6px; text-transform: uppercase; color: #c3ccd6; }
-.mode-group:first-child { margin-top: 0; }
-.mode-group-dot { width: 10px; height: 10px; border-radius: 3px; background: linear-gradient(90deg, #e1251b 0 25%, #f4b400 0 50%, #1d3f95 0 75%, #00965e 0); }
-.mode-group-dot.bus { background: #d7262e; border-radius: 50%; }
 .start-note.disclaimer { margin-top: 6px; font-size: 11.5px; line-height: 1.5; color: var(--dim); }
 .mode-card {
   display: grid;
@@ -1872,3 +1868,37 @@ body.touch-mode .back-button.driver-job-button { top: auto; bottom: calc(120px +
   .bus-toast { top: calc(max(8px, env(safe-area-inset-top)) + 86px); font-size: 13px; padding: 7px 12px; }
   .bus-route .bus-label { display: none; }
 }
+
+/* 1.15 · Conductor: ¿qué quieres conducir? (tren del Metro, Tren Nos o bus) */
+.vehicle-field { grid-column: 1 / -1; }
+.vehicle-seg button { flex: 1 1 0; }
+.mode-card.bus-vehicle .train-only, .mode-card.bus-vehicle #netJoin, .mode-card.bus-vehicle #driverLock { display: none !important; }
+#busDriverNote[hidden] { display: none; }
+
+/* 1.15 · Viaje en bus como pasajero */
+.bus-ride-bar { display: none; }
+.bus-ride-mode .bus-ride-bar { position: absolute; right: max(14px, env(safe-area-inset-right)); bottom: max(14px, env(safe-area-inset-bottom)); display: flex; gap: 10px; }
+.bus-ride-mode .bus-speed, .bus-ride-mode .bus-keys, .bus-ride-mode .bus-touch, .bus-ride-mode .bus-delay, .bus-ride-mode .bus-guide { display: none !important; }
+.bus-ride-mode .bus-bottom { justify-content: flex-start; padding-right: 340px; }
+.bus-ride-mode.bus-touch-mode .bus-bottom { padding-left: max(14px, env(safe-area-inset-left)); }
+.bus-ride-btn { display: grid; justify-items: center; align-content: center; gap: 3px; min-width: 96px; height: 92px; padding: 8px 12px; border-radius: 14px; border: 1px solid #ffffff30; background: #0b1118d0; color: var(--text); font-size: 26px; cursor: pointer; backdrop-filter: blur(4px); }
+.bus-ride-btn span { font: 700 13px/1.1 var(--f-body); }
+.bus-ride-btn small { font: 600 10px/1 var(--f-data); color: var(--muted); min-height: 10px; }
+.bus-ride-btn svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.bus-ride-btn.bell.on { background: #b5121bcc; border-color: #ff6b6b; }
+.bus-ride-btn.off:not(:disabled) { background: #1d7a46d9; border-color: #34d17c; animation: busPulse 1s ease-in-out infinite alternate; }
+.bus-ride-btn:disabled { opacity: .45; cursor: default; }
+@media (max-width: 720px) { .bus-ride-btn { min-width: 74px; height: 76px; font-size: 22px; } .bus-ride-mode .bus-bottom { padding-right: 260px; } }
+
+/* 1.15 · Paradero en la calle (modo pasajero) */
+.bus-stop-panel { position: fixed; inset: 0; z-index: 45; display: grid; place-items: center; padding: 16px; background: #02050acc; backdrop-filter: blur(3px); }
+.bus-stop-panel .bus-card { display: grid; gap: 12px; width: min(460px, 100%); padding: 22px; border-radius: 14px; background: var(--surface); border: 1px solid var(--panel-border); text-align: center; }
+.bus-stop-panel h2 { font: 700 26px/1.1 var(--f-display); }
+.bus-stop-panel p { font-size: 14px; line-height: 1.5; color: #b6c1cc; }
+.bus-stop-dirs { display: grid; gap: 8px; }
+.bus-stop-dir { display: grid; gap: 3px; padding: 12px 14px; border-radius: 10px; border: 1px solid #ffffff26; background: var(--raise); color: var(--text); text-align: left; cursor: pointer; }
+.bus-stop-dir:hover { border-color: #d7262e; }
+.bus-stop-dir b { font: 700 17px/1.2 var(--f-display); }
+.bus-stop-dir b i { font-style: normal; display: inline-block; margin-right: 8px; padding: 1px 7px; border-radius: 5px; background: #d7262e; color: #fff; font: 700 13px/1.4 var(--f-data); }
+.bus-stop-dir small { font-size: 12.5px; line-height: 1.4; color: var(--muted); }
+.bus-stop-panel .bus-btn { padding: 11px 18px; border-radius: var(--radius); border: 1px solid #ffffff2e; background: transparent; color: var(--text); font-weight: 700; cursor: pointer; }

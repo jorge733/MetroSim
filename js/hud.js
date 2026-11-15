@@ -80,7 +80,7 @@ export class Hud {
     document.documentElement.style.setProperty("--line", LINE.color);
     document.documentElement.style.setProperty("--on-line", textOn(LINE.color));
     this.setText($("hudLineBadge"), LINE.id);
-    this.setText($("hudLineLabel"), `METRO DE SANTIAGO · ${LINE.name}`);
+    this.setText($("hudLineLabel"), LINE.id === "NOS" ? "TREN NOS · ESTACIÓN CENTRAL ⇄ NOS" : `METRO DE SANTIAGO · ${LINE.name}`);
     this.setText($("hudLineRoute"), `${STATIONS[0].name} ⇄ ${STATIONS.at(-1).name}`);
     this.stripDots?.forEach(d => d.remove());
     this.stripIdx = undefined;

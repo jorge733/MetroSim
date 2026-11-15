@@ -68,7 +68,7 @@
 
 import * as THREE from "three";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
-import { CONFIG, STATIONS, LINE, NOTCH_INDEX, FARES, spokenName, fareBandAt, formatCLP, demandAt, dayTypeOf, inService, SERVICE_HOURS, DAY_TYPE_LABEL } from "./config.js";
+import { CONFIG, STATIONS, LINE, NOTCH_INDEX, FARES, lineTag, lineLabel, spokenName, fareBandAt, formatCLP, demandAt, dayTypeOf, inService, SERVICE_HOURS, DAY_TYPE_LABEL } from "./config.js";
 import { ROUTES, ROUTE_A, ROUTE_B, routeForSide, oppositeRoute, setActiveLine } from "./engine/route.js";
 import { LINES, lineById } from "./engine/network.js";
 import { BipCard } from "./card.js";
@@ -123,6 +123,7 @@ import { setupFareInfo, openFareInfo, closeFareInfo, fareInfoOpen, tickFareInfo 
 import { riderFare, riderSpecial, riderAsked, riderCategory } from "./rider.js";
 import { setupRiderPanel, openRiderPanel, closeRiderPanel, riderPanelOpen } from "./riderPanel.js";
 import { startBusGame } from "./bus/busGame.js";
+import { busTripsFrom } from "./bus/busRoute.js";
 
 // La vía en 3D sigue las pendientes reales: se engancha antes de compilar ningún material
 installTrackLift();
@@ -162,6 +163,24 @@ for (const sel of [driverLineSelect, paxLineSelect]) {
   LINES.forEach(l => sel.append(new Option(`${l.name} · ${l.stations[0].short} ⇄ ${l.stations.at(-1).short}`, l.id)));
   sel.value = lineById(savedLine) ? savedLine : "3";
 }
+/* 1.15 · Modo Conductor: primero se elige QUÉ conducir (tren del Metro, Tren Nos o bus de la Red).
+   El Tren Nos es una línea más de la red (botón NOS); el bus tiene su propio modo (js/bus/). */
+const driverCard = document.querySelector('.mode-card[data-card="driver"]');
+const vehicleButtons = [...document.querySelectorAll("#vehicleSeg [data-vehicle]")];
+let driverVehicle = loadSetting("metrosim.mode") === "bus" ? "bus" : (loadSetting("metrosim.vehicle") || (savedLine === "NOS" ? "nos" : "metro"));
+function selectVehicle(v, { fromLine = false } = {}) {
+  driverVehicle = ["metro", "nos", "bus"].includes(v) ? v : "metro";
+  saveSetting("metrosim.vehicle", driverVehicle);
+  vehicleButtons.forEach(b => b.setAttribute("aria-checked", String(b.dataset.vehicle === driverVehicle)));
+  driverCard.classList.toggle("bus-vehicle", driverVehicle === "bus");
+  $("busDriverNote").hidden = driverVehicle !== "bus";
+  $("driverGo").firstChild.textContent = driverVehicle === "bus" ? "Manejar " : "Conducir ";
+  if (fromLine) return;
+  if (driverVehicle === "nos" && driverLineSelect.value !== "NOS") selectLine("NOS");
+  if (driverVehicle === "metro" && driverLineSelect.value === "NOS") selectLine(lineById(loadSetting("metrosim.metroLine")) ? loadSetting("metrosim.metroLine") : "3");
+}
+vehicleButtons.forEach(b => b.addEventListener("click", () => { selectVehicle(b.dataset.vehicle); selectMode("driver"); }));
+
 const lineChips = LINES.map(l => {
   const chip = document.createElement("button");
   chip.className = "line-chip";
@@ -174,6 +193,7 @@ const lineChips = LINES.map(l => {
   return chip;
 });
 selectLine(driverLineSelect.value);
+selectVehicle(driverVehicle);
 directionSelect.addEventListener("change", renderDirections);
 
 /** Elige la línea para los dos modos: botones, ficha de la línea, servicios, estaciones y color de acento. */
@@ -181,6 +201,10 @@ function selectLine(id) {
   const line = lineById(id);
   driverLineSelect.value = paxLineSelect.value = line.id;
   saveSetting("metrosim.line", line.id);
+  if (line.id !== "NOS") saveSetting("metrosim.metroLine", line.id);
+  // El botón NOS elige el Tren Nos para conducir; una línea del Metro vuelve al tren del Metro (el bus no cambia)
+  if (line.id === "NOS" && driverVehicle === "metro") selectVehicle("nos", { fromLine: true });
+  if (line.id !== "NOS" && driverVehicle === "nos") selectVehicle("metro", { fromLine: true });
   startScreen.style.setProperty("--line", line.color);
   startScreen.style.setProperty("--on-line", textOn(line.color));
   lineChips.forEach(c => c.setAttribute("aria-checked", String(c.dataset.line === line.id)));
@@ -206,7 +230,7 @@ function renderLineCard(line) {
     const dot = document.createElement("i");
     if (s.combos.length) dot.className = "combo";
     dot.style.left = `${(s.km / last.km) * 100}%`;
-    dot.title = s.name + (s.combos.length ? ` · combinación L${s.combos.join(", L")}` : "");
+    dot.title = s.name + (s.combos.length ? ` · combinación ${s.combos.map(lineTag).join(", ")}` : "");
     map.append(dot);
   }
 }
@@ -297,7 +321,7 @@ function renderDirections() {
 /** Estaciones del modo pasajero de la línea elegida (por defecto, la de más combinaciones). */
 function fillStations(line) {
   stationSelect.replaceChildren(...line.stations.map(st =>
-    new Option(st.name + (st.combos.length ? `  (L${st.combos.join(", L")})` : ""), st.index)));
+    new Option(st.name + (st.combos.length ? `  (${st.combos.map(lineTag).join(", ")})` : ""), st.index)));
   const preferred = line.stations.find(s => s.name === "UNIVERSIDAD DE CHILE")
     || [...line.stations].sort((a, b) => b.combos.length - a.combos.length)[0];
   stationSelect.value = String(preferred.index);
@@ -307,7 +331,7 @@ function fillStations(line) {
 function lineRealismText(line) {
   const fleet = LINE_FLEETS[line.id] || [];
   const rubber = STOCKS[fleet[0]?.[0]]?.tyre === "rubber";
-  const parts = [`Trenes ${fleet.map(([m]) => m).join(", ")} (${rubber ? "neumáticos" : "rueda de acero"}).`];
+  const parts = [`Trenes ${fleet.map(([m]) => STOCKS[m]?.model || m).join(", ")} (${rubber ? "neumáticos" : "rueda de acero"}).`];
   const open = {};
   for (const sp of line.sectionsInfo?.spans || []) {
     if (sp.type === "tunel") continue;
@@ -527,7 +551,7 @@ async function joinRoomAsDriver() {
 
 function startGame(mode, opts = {}) {
   if (game) stopGame();
-  if (mode === "bus") return startBus();
+  if (mode === "bus" || (mode === "driver" && driverVehicle === "bus" && !opts.net && !opts.tutorial)) return startBus();
   if (mode === "control") return startControl(opts);
   if (mode === "driver" && !inventory.canDrive(driverLineSelect.value)) {
     const lic = LICENSES.find(x => x.lineId === driverLineSelect.value);
@@ -799,10 +823,14 @@ async function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = 
     });
   }
 
-  if (opts.transferFrom) {
+  if (opts.fromBus) {
     $("controlsHelp").classList.add("hidden");
     hud.fadeIn();
-    hud.showMessage(`Combinación desde la Línea ${opts.transferFrom} · ${STATIONS[stationIndex].name} · ${LINE.name.charAt(0) + LINE.name.slice(1).toLowerCase()} · sigues en zona pagada`, "ok", 6000);
+    hud.showMessage(`Bajaste del bus en ${opts.fromBus} · calle de ${STATIONS[stationIndex].name} · el acceso al Metro está en esta vereda`, "ok", 6500);
+  } else if (opts.transferFrom) {
+    $("controlsHelp").classList.add("hidden");
+    hud.fadeIn();
+    hud.showMessage(`Combinación desde ${opts.transferFrom === "NOS" ? "el" : "la"} ${lineLabel(opts.transferFrom)} · ${STATIONS[stationIndex].name} · ${LINE.name.charAt(0) + LINE.name.slice(1).toLowerCase()} · sigues en zona pagada`, "ok", 6000);
   } else hud.showMessage(mode === "driver"
     ? `${net ? `Sala ${net.code} · ` : ""}Servicio ${playerTrip.id} · ${direction.label} · salida ${formatClock(playerTrip.departure)} · cada estación bien servida te paga en tu cuenta`
     : `Calle de ${STATIONS[stationIndex].name} · cuenta ${bank.label} · ${game.touch ? "joystick para caminar · arrastra para mirar · 🎯 misiones" : "W/S caminar · A/D girar · Shift correr · J misiones"}`, "info", 7000);
@@ -814,6 +842,8 @@ async function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = 
 
 function stopGame({ keepFullscreen = false } = {}) {
   if (!game) return;
+  busStopPanel?.remove();
+  busStopPanel = null;
   closeFareInfo();
   if (game.net) { game.net.leave(); applyWeatherChoice(); }     // sale de la sala y vuelve al tiempo elegido
   game.touch?.destroy();
@@ -848,12 +878,12 @@ function stopGame({ keepFullscreen = false } = {}) {
 
 /* 1.13 · Conductor de bus (beta, antes «MicroSim»): el modo bus tiene su propia pantalla y su propio ciclo (js/bus/) */
 let bus = null;
-function startBus() {
+function startBus({ ride = null } = {}) {
   if (bus) return;
   startScreen.classList.add("hidden");
   if (wantsTouch()) enterMobileFullscreen();       // dentro del gesto del usuario
   bus = startBusGame({
-    bank, muted, touch: wantsTouch(),
+    bank, muted, touch: wantsTouch(), ride,
     onMuteChange: (m) => { muted = m; saveSetting("metrosim.muted", m ? "1" : "0"); hud.setSound(!m); },
     onExit: () => {
       bus = null;
@@ -909,6 +939,7 @@ window.addEventListener("popstate", () => {
   else if (confirmOpen) closeConfirm(false);
   else if (riderPanelOpen()) closeRiderPanel();
   else if (fareInfoOpen()) closeFareInfo();
+  else if (busStopPanel) { closeBusStop(); armBackTrap(); }
   else if (bus) { bus.requestExit(); if (bus) armBackTrap(); }   // MicroSim: pausa (y desde la pausa, portada)
   else if (game && hud.ticketOpen) hud.closeTicket();
   else if (game && hud.storeOpen) hud.closeStore();
@@ -1064,6 +1095,7 @@ function toggleSound() {
    ========================================================================== */
 
 function onKeyDown(event) {
+  if (busStopPanel) { if (event.key === "Escape") closeBusStop(); return; }
   if (!game || game.warming) return;
   const key = event.key.toLowerCase();
   if (["arrowup", "arrowdown", "arrowleft", "arrowright", " ", "pageup", "pagedown"].includes(key)) event.preventDefault();
@@ -1691,13 +1723,14 @@ function onWalkerEvent(type, data) {
 function validateFare() {
   const band = riderFare(game.clock);              // 1.10: la tarifa TNE o de adulto mayor, si le corresponde
   const gate = game.world.nearestGate(game.walker.pos);
-  const r = card.pay(band.price);
+  const r = payTrip(band.price, "metro");              // 1.15: desde el bus antes de 2 horas es transbordo
   hud.setCard(card);
   if (r.ok) {
     game.audio.bip();
     if (gate) game.world.flashValidator(gate, true);
     game.ride.fare = band;
-    hud.showMessage(`bip! · ${band.label}${band.card ? ` ${band.card}` : ""} ${formatCLP(band.price)} · saldo ${formatCLP(card.balance)}`, "ok", 2500);
+    hud.showMessage(r.transfer ? `bip! · Transbordo desde el bus · $0 · saldo ${formatCLP(card.balance)}`
+      : `bip! · ${band.label}${band.card ? ` ${band.card}` : ""} ${formatCLP(band.price)} · saldo ${formatCLP(card.balance)}`, "ok", 2500);
     return { ok: true };
   }
   game.audio.deny();
@@ -1889,7 +1922,7 @@ function transferLine(lineId, st) {
   game.transition = true;
   game.walker.frozen = true;
   game.walker.keys.clear();
-  hud.fadeOut(`Combinación · Línea ${lineId} · ${st.name}`);
+  hud.fadeOut(`Combinación · ${lineLabel(lineId)} · ${st.name}`);
   setTimeout(() => {
     if (!game) return;
     stopGame({ keepFullscreen: true });          // en el celular sigue a pantalla completa
@@ -1920,10 +1953,114 @@ function arriveByTransfer(st) {
   game.ride = { origin: null, boardedClock: null };
 }
 
+/* ==========================================================================
+   1.15 · Todo conectado: el pasajero toma el bus en el paradero de la calle
+   ========================================================================== */
+
+/* Transbordo (como en Santiago): pagado un pasaje, en las 2 horas siguientes hay hasta 2 transbordos
+   entre bus y Metro (o Metro y bus) sin volver a pagar (se paga la diferencia, que en el juego es 0). */
+let lastFare = null;          // { at: Date.now(), mode: "metro" | "bus", left }
+function payTrip(price, mode) {
+  if (lastFare && lastFare.mode !== mode && lastFare.left > 0 && Date.now() - lastFare.at < 2 * 3600e3) {
+    lastFare.left--;
+    lastFare.mode = mode;
+    return { ok: true, transfer: true };
+  }
+  const r = card.pay(price);
+  if (r.ok) lastFare = { at: Date.now(), mode, left: 2 };
+  return r;
+}
+
+let busStopPanel = null;
+function closeBusStop() {
+  busStopPanel?.remove();
+  busStopPanel = null;
+  if (game?.walker && !game.transition) { game.walker.frozen = false; game.walker.keys.clear(); }
+}
+
+/** Paradero de la calle: elige el sentido del bus y sube (paga con la bip!). */
+function openBusStop(st) {
+  const trips = busTripsFrom(st.name);
+  if (!trips.length || busStopPanel) return;
+  const walker = game.walker;
+  walker.frozen = true;
+  walker.keys.clear();
+  if (document.pointerLockElement) document.exitPointerLock?.();
+  const band = riderFare(game.clock);
+  const transfer = lastFare && lastFare.mode !== "bus" && lastFare.left > 0 && Date.now() - lastFare.at < 2 * 3600e3;
+  const fareText = transfer ? "transbordo desde el Metro: $0" : `pasaje ${band.label.toLowerCase()} ${formatCLP(band.price)} con tu bip!`;
+  const el = document.createElement("div");
+  el.className = "bus-stop-panel";
+  el.innerHTML = `<div class="bus-card" role="dialog" aria-label="Paradero">
+    <span class="small-label">PARADERO · ${st.name}</span>
+    <h2>¿Hacia dónde vas?</h2>
+    <div class="bus-stop-dirs">${trips.map((t, i) => {
+      const next = t.route.stops.slice(t.from + 1, t.from + 4).map(s => s.name).join(", ");
+      return `<button class="bus-stop-dir" data-i="${i}"><b><i>${t.route.id}</i>hacia ${t.route.to}</b><small>Próximas paradas: ${next}${t.route.stops.length - t.from > 4 ? "…" : ""}</small></button>`;
+    }).join("")}</div>
+    <p>${transfer ? "Pagaste un pasaje hace menos de 2 horas: este viaje es un <b>transbordo</b> y no se cobra." : `Al subir se cobra el ${fareText}. Si después tomas el Metro antes de 2 horas, es transbordo y no pagas de nuevo.`} Saldo bip!: ${card.label}.</p>
+    <button class="bus-btn" data-close>Seguir a pie</button>
+  </div>`;
+  el.addEventListener("click", (ev) => {
+    if (ev.target === el || ev.target.closest("[data-close]")) return closeBusStop();
+    const b = ev.target.closest(".bus-stop-dir");
+    if (b) boardBus(trips[Number(b.dataset.i)], st);
+  });
+  document.body.append(el);
+  busStopPanel = el;
+}
+
+function boardBus(trip, st) {
+  const band = riderFare(game.clock);
+  const r = payTrip(band.price, "bus");
+  hud.setCard(card);
+  if (!r.ok) {
+    game.audio.deny();
+    closeBusStop();
+    return hud.showMessage(r.reason === "nocard"
+      ? "Necesitas una tarjeta bip! para subir al bus: cómprala en la boletería de la estación"
+      : `Saldo bip! insuficiente (${card.label}) · pasaje ${formatCLP(band.price)} · carga en la boletería o en un tótem`, "alert", 5000);
+  }
+  game.audio.bip();
+  const fareText = r.transfer ? "transbordo $0" : `bip! ${formatCLP(band.price)} · saldo ${card.label}`;
+  busStopPanel?.remove();
+  busStopPanel = null;
+  const fromLine = LINE.id;
+  game.transition = true;
+  game.walker.frozen = true;
+  hud.fadeOut(`Bus ${trip.route.id} hacia ${trip.route.to}`);
+  setTimeout(() => {
+    if (!game) return;
+    stopGame({ keepFullscreen: true });
+    startBus({ ride: { route: trip.route, from: trip.from, fareText, onArrive: (stop) => arriveByBus(stop, fromLine) } });
+  }, 700);
+}
+
+/** Se bajó del bus: aparece en la calle de la estación de Metro de ese paradero. */
+function arriveByBus(stop, fromLine) {
+  bus = null;
+  const line = [lineById(fromLine), lineById("1"), ...LINES].find(l => l?.stations.some(s => s.name === stop.metro));
+  if (!line) { startScreen.classList.remove("hidden"); return; }
+  const target = line.stations.find(s => s.name === stop.metro);
+  paxLineSelect.value = line.id;
+  fillStations(line);
+  stationSelect.value = String(target.index);
+  saveSetting("metrosim.line", line.id);
+  useLine(line);
+  startScreen.classList.add("hidden");
+  showLoading();
+  const audio = new AudioSystem();
+  audio.muted = muted;
+  audio.start();
+  setTimeout(() => buildGame("passenger", target.index, audio, ROUTE_A, { fromBus: stop.name }), 40);
+}
+
 /** Interacción en la calle (E): acceso al Metro, un local o el hito. */
 function onStreetTarget(target) {
   const st = game.walker.station;
   if (target.kind === "access") return hud.showMessage("Camina hacia la escalera para bajar a la estación", "info");
+  if (target.kind === "busstop") return target.served ? openBusStop(st)
+    : hud.showMessage("Por este paradero no pasa el recorrido del juego: el bus A01 va por la Alameda (Línea 1, de Estación Central a Baquedano)", "info", 5500);
   if (target.kind === "shop") return openShop(target.shop, st);
   if (target.kind === "landmark") return takePhoto(target.landmark, st);
 }
@@ -2850,7 +2987,7 @@ function walkerHudData() {
     };
   }
   const st = w.stationAt(w.pos.z) || w.station;
-  const combos = st.combos.length ? ` · COMBINACIÓN L${st.combos.join(", L")}` : "";
+  const combos = st.combos.length ? ` · COMBINACIÓN ${st.combos.map(lineTag).join(", ").toUpperCase()}` : "";
   const side = w.platformSide();
   if (side) {
     const route = routeForSide(side);
@@ -2882,7 +3019,7 @@ function transferText(st) {
         const when = !a ? "sin trenes" : a.here ? "en andén" : a.minutes < 1 ? "llegando" : `${a.minutes} min`;
         return `dir. ${r.last.short} ${when}`;
       });
-    parts.push(` · Combinación L${ls.line.id}: ${dirs.join(" · ")}`);
+    parts.push(` · Combinación ${lineTag(ls.line.id)}: ${dirs.join(" · ")}`);
   }
   return parts.join("");
 }

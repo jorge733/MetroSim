@@ -51,7 +51,7 @@ export class BusSim {
    * @param {{route:object, clock:number, demand:number, seed?:number}} o
    *   clock: hora del día en segundos al empezar · demand: 0..1 (curva de demanda de Santiago)
    */
-  constructor({ route, clock, demand = 0.5, seed }) {
+  constructor({ route, clock, demand = 0.5, seed, startStop = 0 }) {
     this.route = route;
     this.rng = makeRng(seed);
     this.demand = clamp(demand, 0.15, 1);       // de noche igual hay gente: los buses siguen pasando
@@ -59,10 +59,13 @@ export class BusSim {
     this.clockStart = clock;
     this.departure = clock + 45;
     this.timetable = makeTimetable(route, this.departure);
+    // 1.15 · Viaje de pasajero: el bus parte en un paradero intermedio (el horario se cuenta desde ahí)
+    const shift = this.timetable[startStop].time - this.departure;
+    this.timetable.forEach(t => { t.time -= shift; });
     this.events = [];
     this.finished = false;
 
-    const first = route.stops[0];
+    const first = route.stops[startStop];
     this.bus = {
       s: first.s, v: 0, x: LANES[0], lane: 0, targetLane: 0,
       throttle: 0, brake: 0, accel: 0,
@@ -71,8 +74,8 @@ export class BusSim {
     this.input = { throttle: false, brake: false };
 
     const n = route.stops.length;
-    this.stopIndex = 0;                // próximo paradero por atender
-    this.waiting = route.stops.map((_, i) => i === n - 1 ? 0 : this.initialWaiting(i));
+    this.stopIndex = startStop;        // próximo paradero por atender
+    this.waiting = route.stops.map((_, i) => i === n - 1 || i < startStop ? 0 : this.initialWaiting(i));
     this.arrivalAcc = new Array(n).fill(0);
     this.onboard = [];                 // destino (índice de paradero) de cada pasajero a bordo
     this.bell = false;                 // «parada solicitada» para el próximo paradero
@@ -119,6 +122,15 @@ export class BusSim {
   drain() { const e = this.events; this.events = []; return e; }
 
   /* ----------------------------- Mandos ----------------------------- */
+
+  /** 1.15 · El pasajero (jugador) toca el timbre: el bus para en el próximo paradero. */
+  requestStop() {
+    if (this.bell || !this.nextStop) return false;
+    this.bell = true;
+    this.bellAt = null;
+    this.emit("bell", { player: true });
+    return true;
+  }
 
   changeLane(dir) {
     const b = this.bus;

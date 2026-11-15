@@ -53,7 +53,7 @@ export function celebrate(o) {
 
   const $ = (s) => root.querySelector(s);
   $(".medal-disc b").textContent = o.line.id;
-  $(".celebration-title").textContent = `¡LÍNEA ${o.line.id} COMPLETADA!`;
+  $(".celebration-title").textContent = `¡${o.line.id === "NOS" ? "TREN NOS COMPLETADO" : `LÍNEA ${o.line.id} COMPLETADA`}!`;
   $(".celebration-sub").textContent = `Ahora eres Pasajero Ilustre de la ${titleCase(o.line.name)}`;
   $(".c-done").textContent = String(o.completed);
   $(".celebration-types").replaceChildren(...MISSION_TYPES.map((t, i) => {

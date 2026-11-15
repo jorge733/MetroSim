@@ -1,6 +1,6 @@
 # RedMoviSim
 
-Simulador 3D del **transporte público de Santiago**: el **Metro** (líneas 1, 2, 3, 4, 4A, 5 y 6) y los **buses**,
+Simulador 3D del **transporte público de Santiago**: el **Metro** (líneas 1, 2, 3, 4, 4A, 5 y 6), el **Tren Nos** y los **buses**,
 para navegador, hecho con HTML, CSS, JavaScript y [Three.js](https://threejs.org/). Se juega en
 **https://redmovisim.benedettowebs.cl/**. Antes se llamaba **MetroSim**.
 
@@ -123,6 +123,35 @@ trenes de los dos motores quedan a ~1 m (mediana).
   (Esc, «Seguir jugando» u otro «atrás» cancela; Enter confirma).
 - **Salir por los torniquetes es gratis**: solo se cobra el pasaje al pasar hacia la zona pagada (antes, al terminar
   de cruzar el torniquete de salida se cobraba un pasaje).
+
+## Versión 1.15 · Todo conectado: Tren Nos y bus para el pasajero
+
+- **Conductor: elige qué conducir.** La tarjeta Conductor de la portada pregunta primero *¿Qué quieres conducir?*:
+  **🚇 Tren del Metro** (líneas 1 a 6), **🚆 Tren Nos** o **🚌 Bus Red** (el modo bus de la 1.13, que ya no tiene
+  tarjeta aparte). El botón de línea **NOS** también elige el Tren Nos.
+- **Tren Nos** (`js/engine/network.js`): una línea más de la red, de Estación Central (estación Alameda) a Nos
+  pasando por Lo Valledor, Pedro Aguirre Cerda, Lo Espejo, Lo Blanco, Freire, San Bernardo, Maestranza y Cinco Pinos
+  (~20 km, distancias aproximadas). Va al aire libre, con trenes X'Trapolis (`js/engine/fleet.js`). **Combina con la L1
+  en Estación Central y con la L6 en Lo Valledor y Pedro Aguirre Cerda**: los viajeros se cambian de un tren al otro,
+  el pasajero puede combinar a pie y el Centro de Control lo supervisa junto a las demás líneas. Para conducirlo se
+  compra su licencia en la Tienda ($18.000).
+  Simplificaciones: usa la composición de 5 coches del juego (el real tiene 2 o 4) y la velocidad máxima de la red
+  (80 km/h; el real llega a 120), y se dibuja en trinchera (el motor todavía no tiene vía a nivel de calle).
+- **Pasajero: tomar el bus.** En la calle de las estaciones de la Alameda (L1 entre Estación Central y Baquedano;
+  también Los Héroes de la L2, Universidad de Chile de la L3 y Baquedano de la L5) el paradero tiene el letrero del
+  recorrido **A01**. Con <kbd>E</kbd> se elige el sentido (hacia Plaza Baquedano o hacia Estación Central), se paga con
+  la bip! y se sube. **Viajas sentado** mientras el bus maneja solo (`js/bus/busAutopilot.js`): para en los paraderos
+  con gente o donde alguien tocó el timbre y respeta los semáforos. Toca el **timbre** (<kbd>Espacio</kbd>) antes de tu
+  parada y, con las puertas abiertas, **bájate** (<kbd>E</kbd>): apareces en la calle de esa estación, junto al
+  acceso al Metro. <kbd>C</kbd> cambia entre la vista desde tu asiento y desde atrás del bus.
+- **Transbordo como en Santiago**: después de pagar un pasaje, en las 2 horas siguientes hay hasta 2 transbordos entre
+  bus y Metro sin volver a pagar (se paga la diferencia, que en el juego es $0).
+- **Multijugador**: el Centro de Control también supervisa el Tren Nos, y un conductor puede unirse a la sala con el
+  Tren Nos (los dos con la 1.15). El protocolo de la sala no cambió (`NET_LEVEL` igual).
+- Los textos dicen «Tren Nos» donde antes iría «L…» (combinaciones, pantallas, preguntas de ruta, letreros).
+- El bus por dentro tiene asientos, pasamanos y luces. El recorrido también corre en sentido contrario
+  (Plaza Baquedano → Estación Central).
+- Corregido: el primer cuadro del modo bus a veces avanzaba la simulación hacia atrás y el bus quedaba fuera de la calle.
 
 ## Versión 1.14 · RedMoviSim
 

@@ -440,8 +440,12 @@ export class BusWorld {
     g.add(body);
     // Carrocería (origen = centro del frente, al nivel del suelo; el bus se extiende hacia +z)
     box(body, W, 2.55, L, white, 0, 1.75, L / 2);
-    box(body, W + 0.02, 0.5, L - 0.2, red, 0, 0.72, L / 2);
-    box(body, W + 0.03, 0.12, L - 0.4, red, 0, 1.42, L / 2);
+    for (const side of [-1, 1]) {                                        // franjas rojas (paneles a cada lado, no cajas macizas: desde dentro no tapan)
+      box(body, 0.02, 0.5, L - 0.2, red, side * (W / 2 + 0.01), 0.72, L / 2);
+      box(body, 0.02, 0.12, L - 0.4, red, side * (W / 2 + 0.015), 1.42, L / 2);
+    }
+    box(body, W - 0.2, 0.5, 0.02, red, 0, 0.72, -0.01);                  // franja del frente
+    box(body, W - 0.2, 0.5, 0.02, red, 0, 0.72, L + 0.01);               // y de atrás
     box(body, W + 0.02, 1.05, L - 1.4, glass, 0, 2.18, L / 2 + 0.6);   // ventanas laterales
     const windshield = new THREE.MeshStandardMaterial({ color: "#1b2733", roughness: 0.1, metalness: 0.5, transparent: true, opacity: 0.55, depthWrite: false });
     this.windshield = box(body, W - 0.2, 1.45, 0.02, windshield, 0, 1.95, -0.01);   // parabrisas (se ve a través desde la cabina)
@@ -504,6 +508,20 @@ export class BusWorld {
     for (const x of [-1, 1]) box(body, 0.07, 1.45, 0.07, white, x * (W / 2 - 0.05), 1.95, 0.0);
     box(body, W, 0.3, 0.1, white, 0, 2.83, 0.0);
     box(body, W - 0.06, 0.04, L - 0.3, std("#3d4146", { roughness: 0.9 }), 0, 1.0, L / 2);   // piso del salón
+    // 1.15 · Salón (se ve desde el asiento del pasajero): asientos, pasamanos y luces del techo
+    const seat = std("#7a1d22", { roughness: 0.8 }), pole = std("#e2b021", { metalness: 0.5, roughness: 0.35 });
+    for (let z = 2.6; z < L - 0.8; z += 1.05) {
+      if (Math.abs(z - 5.6) < 1.1) continue;                         // espacio de la puerta central
+      for (const x of [-0.78, 0.78]) {
+        if (x > 0 && Math.abs(z - 9.95) < 0.8) continue;               // puerta trasera
+        box(body, 0.85, 0.12, 0.45, seat, x, 1.48, z);
+        box(body, 0.85, 0.55, 0.1, seat, x, 1.8, z + 0.22);
+      }
+    }
+    for (const z of [3.2, 5.6, 7.6, 9.9]) for (const x of [-0.35, 0.35]) box(body, 0.04, 1.95, 0.04, pole, x, 2.0, z);
+    box(body, 0.05, 0.05, L - 2, pole, -0.35, 2.92, L / 2 + 0.5);
+    box(body, 0.05, 0.05, L - 2, pole, 0.35, 2.92, L / 2 + 0.5);
+    box(body, 0.3, 0.03, L - 1.5, new THREE.MeshBasicMaterial({ color: "#f3f1e6" }), 0, 2.99, L / 2 + 0.3);
     this.body = body;
     this.scene.add(g);
     if (this.night) {

@@ -121,6 +121,23 @@ export function setTrackLiftLine() {
   U.uTrackLiftInfo.value.set(z0, STEP, TEX_W, n);
 }
 
+/**
+ * 1.15 · Deja el mundo plano (para el modo bus, que no tiene pendientes): cota 0 en todas partes.
+ * La textura no queda en null para que los materiales ya compilados con el doblado sigan siendo válidos.
+ */
+export function clearTrackLift() {
+  profile = null;
+  ref = 0;
+  U.uTrackLift.value?.dispose();
+  const tex = new THREE.DataTexture(new Float32Array(TEX_W), TEX_W, 1, THREE.RedFormat, THREE.FloatType);
+  tex.minFilter = tex.magFilter = THREE.NearestFilter;
+  tex.needsUpdate = true;
+  U.uTrackLift.value = tex;
+  U.uTrackLiftInfo.value.set(0, STEP, TEX_W, 2);
+  U.uCamLift.value = 0;
+  U.uCityLift.value = 0;
+}
+
 /** Marca los materiales de un grupo (la calle) para que no se doblen. */
 export function markCity(group) {
   group.traverse(o => {

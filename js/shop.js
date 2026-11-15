@@ -26,7 +26,7 @@ const KEY = "metrosim.owned";
 export const FREE_LINE = "3";
 
 /** Licencias de conductor: una por línea (salvo la gratuita). */
-const LICENSE_PRICE = { "1": 30000, "2": 20000, "4": 25000, "4A": 12000, "5": 25000, "6": 15000 };
+const LICENSE_PRICE = { "1": 30000, "2": 20000, "4": 25000, "4A": 12000, "5": 25000, "6": 15000, "NOS": 18000 };
 export const LICENSES = LINES.filter(l => l.id !== FREE_LINE).map(l => ({
   id: `license-${l.id}`, lineId: l.id, kind: "license", icon: "🪪",
   name: `Licencia ${l.name.charAt(0) + l.name.slice(1).toLowerCase()}`,

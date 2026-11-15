@@ -1103,7 +1103,7 @@ function drawPid(pid, st, clock, arrivals) {
   g.fillStyle = "#050607"; g.fillRect(0, 0, W, H);
   g.fillStyle = LINE.color; g.fillRect(0, 0, W, 34);
   g.fillStyle = "#fff"; g.font = "800 19px Arial"; g.textBaseline = "middle"; g.textAlign = "left";
-  g.fillText(`L${LINE.id} · DIR. ${route.last.short}`, 12, 18);
+  g.fillText(`${LINE.id === "NOS" ? "NOS" : `L${LINE.id}`} · DIR. ${route.last.short}`, 12, 18);
   g.textAlign = "right"; g.fillText(formatClock(clock).slice(0, 5), W - 12, 18);
 
   g.font = "700 30px monospace";

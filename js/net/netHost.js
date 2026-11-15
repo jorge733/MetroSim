@@ -113,7 +113,7 @@ export class NetHost {
     if (this.drivers.length >= MAX_DRIVERS) return reject(`La sala está llena (máximo ${MAX_DRIVERS} conductores)`);
     const ls = this.engine.lines.get(String(m.line));
     if (!ls || !this.lines().has(ls.line.id)) {
-      return reject(`Este Centro de Control supervisa ${[...this.lines()].map(id => `L${id}`).join(", ")}: elige una de esas líneas`);
+      return reject(`Este Centro de Control supervisa ${[...this.lines()].map(id => id === "NOS" ? "Tren Nos" : `L${id}`).join(", ")}: elige una de esas líneas`);
     }
     const route = ls.routes[m.dir === "B" ? 1 : 0];
     p.name = String(m.name || "Conductor").trim().slice(0, 16) || "Conductor";

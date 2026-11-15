@@ -368,6 +368,7 @@ const MAP_PATHS = {
   "4A": [[0.46, 0.8], [0.6, 0.8], [0.74, 0.78]],
   "5": [[0.07, 0.6], [0.28, 0.54], [0.47, 0.49], [0.6, 0.6], [0.66, 0.78], [0.72, 0.9]],
   "6": [[0.2, 0.72], [0.4, 0.66], [0.56, 0.62], [0.72, 0.56]],
+  "NOS": [[0.3, 0.5], [0.3, 0.7], [0.34, 0.85], [0.37, 0.97]],
 };
 
 function startMap(canvas, legend) {
@@ -574,7 +575,7 @@ export function playIntro({ isMuted = () => false, menuReady = null } = {}) {
       <div class="intro-mapbox">
         <canvas></canvas>
         <span class="intro-maplabel">RED DE METRO · EN VIVO</span>
-        <div class="intro-legend">${LINES.map(l => `<span style="--c:${l.color}" data-id="${l.id}">L${l.id}</span>`).join("")}</div>
+        <div class="intro-legend">${LINES.map(l => `<span style="--c:${l.color}" data-id="${l.id}">${l.id === "NOS" ? "Nos" : `L${l.id}`}</span>`).join("")}</div>
       </div>
     </div>`;
   document.body.append(root);

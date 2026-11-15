@@ -80,6 +80,15 @@ export const STOCKS = {
     maxElectricBrake: 300000, maxElectricBrakePower: 3.8e6,
     auxPower: 120000,
   },
+  /* 1.15 · Tren Nos: Alstom X'Trapolis Modular (acero, pantógrafo, catenaria de 3 kV CC, aire acondicionado) */
+  "XTRAPOLIS": {
+    ...STOCK, model: "X'Trapolis", builder: "Alstom", tyre: "steel", supply: "catenaria", year: 2017, ac: true,
+    tare: 180000, maxTractive: 260000, maxPower: 3.2e6,
+    maxElectricBrake: 280000, maxElectricBrakePower: 3.8e6,
+    lineVoltage: 3000,
+    auxPower: 160000,
+    wetAdhesion: 0.11,
+  },
   "NS-2016": {
     ...STOCK, ...RUBBER, model: "NS-2016", builder: "Alstom", year: 2018, ac: true,
     tare: 172000, maxTractive: 315000, maxPower: 3.3e6,
@@ -100,6 +109,7 @@ export const LINE_FLEETS = {
   "4A": [["AS-2002", 1]],
   "5":  [["NS-74", 0.49], ["NS-2016", 0.31], ["NS-93", 0.2]],
   "6":  [["AS-2014", 1]],
+  "NOS": [["XTRAPOLIS", 1]],
 };
 
 /** Número 0..1 estable a partir de un texto (mismo servicio → mismo tren). */
