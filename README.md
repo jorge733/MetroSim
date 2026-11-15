@@ -143,6 +143,10 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **Cada persona tarda lo suyo**: subir toma de 0,7 a 3 s según quién sea (antes todos 0,85 s) y la bajada va en
   paralelo. **Más gente se baja en las estaciones de Metro** (para combinar) y en la terminal.
 - En el modo pasajero tu asiento y el pasillo de adelante quedan libres, para que se vea la calle.
+- **1.19.1 · Fila ordenada en el paradero:** la gente forma **una sola fila** junto a la solera, detrás de la señal
+  del paradero, con espacio entre una persona y otra y mirando hacia la puerta. El orden se decide cuando se forma
+  (primero los que estaban más cerca) y los que llegan después se ponen al final: nadie se cuela ni se reordena.
+  Para entrar a la fila se acercan por el lado de la vereda y, cada vez que alguien sube, el resto avanza un puesto.
 
 ## Versión 1.18 · Recorridos reales de Red y mejor manejo del bus
 

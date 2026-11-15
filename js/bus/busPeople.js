@@ -29,6 +29,7 @@ const MAX_STOP = 16;             // personas dibujadas por paradero
 const MAX_ON = 44;               // personas dibujadas dentro del bus
 const VIEW = 230;                // m: más lejos, el paradero no se dibuja
 const WALK = 1.25, RUN = 3.6;    // m/s
+const LINE_GAP = 0.78;           // m entre una persona y la siguiente en la fila
 const SIDEWALK_Y = 0.16, FLOOR_Y = 1.02;
 const DOORS = { front: 1.25, mid: 5.6, rear: 9.95 };   // z de las puertas en el bus (origen = frente)
 const W2 = BUS_WIDTH / 2;
@@ -280,10 +281,20 @@ export class BusPeople {
 
   /* ----------------------------- Paraderos ----------------------------- */
 
-  /** La fila: el que va a subir primero adelante (el que llegó corriendo y alcanzó, va de primero). */
+  /**
+   * 1.19.1 · La fila: el orden se decide UNA vez, cuando se forma (primero los que estaban más cerca de la
+   * señal del paradero) y después solo se agregan los que llegan, al final. Así nadie se cuela ni se reordena.
+   */
   queueOrder(stop, sim) {
+    if (stop.line) return stop.line.filter(p => stop.crowd.includes(p));
     const d = this.doorWorld(sim, stop);
-    return stop.crowd.filter(p => !p.runner || p.arrived).sort((a, b) => (a.queue ?? 99) - (b.queue ?? 99) || (Math.hypot(a.root.position.x - d.x, a.root.position.z - d.z) - Math.hypot(b.root.position.x - d.x, b.root.position.z - d.z)));
+    return stop.crowd.filter(p => !p.runner || p.arrived).sort((a, b) => Math.hypot(a.root.position.x - d.x, a.root.position.z - d.z) - Math.hypot(b.root.position.x - d.x, b.root.position.z - d.z));
+  }
+
+  /** Puesto k de la fila: una sola hilera junto a la solera, detrás de la señal del paradero (puerta delantera). */
+  lineSlot(stop, k, p) {
+    p.qjit ??= (this.rng() - 0.5) * 0.12;            // nadie queda perfectamente alineado
+    return V(CURB_X + 0.62 + p.qjit, SIDEWALK_Y, stop.z + DOORS.front + 0.65 + k * LINE_GAP);
   }
 
   updateStop(stop, sim, dt) {
@@ -307,7 +318,6 @@ export class BusPeople {
       if (!stop.shown || serving) {
         // Al aparecer el paradero (o atrás de la fila mientras suben): ya está ahí
         this.placeAt(p, spot, stop);
-        if (serving) p.queue = 50;
       } else {
         // Va llegando por la vereda
         const dir = this.rng() < 0.5 ? 1 : -1;
@@ -322,27 +332,31 @@ export class BusPeople {
     if (!near) return;
 
     // ¿El bus viene a detenerse aquí? Entonces se arriman a la solera y hacen fila junto a la puerta delantera
-    const d = this.doorWorld(sim, stop);
     const coming = serving || (sim.stopIndex === stop.index && sim.bus.doors === "closed" && -b.s - stop.z < 45 && -b.s - stop.z > -4 && b.v < 9 && sim.waiting[stop.index] > 0);
     if (coming) {
-      const order = this.queueOrder(stop, sim);
-      order.forEach((p, k) => {
-        if (p.runner && !p.arrived) return;
-        const qx = CURB_X + 0.55 + (k >= 8 ? 0.6 : 0), qz = d.z + 0.7 + (k % 8) * 0.62;
-        const target = V(qx, SIDEWALK_Y, qz);
+      // La fila se forma una vez; los que llegan después (o el que llegó corriendo) se ponen al final
+      stop.line = this.queueOrder(stop, sim);
+      for (const p of stop.crowd) if (!stop.line.includes(p) && (!p.runner || p.arrived)) stop.line.push(p);
+      stop.line.forEach((p, k) => {
+        if (p.queue === k && (p.path.length || p.pose !== "sit")) return;   // ya va a su puesto o está en él
+        const target = this.lineSlot(stop, k, p);
+        const pos = p.root.position;
+        if (p.pose === "sit") { p.pose = "stand"; pos.y = SIDEWALK_Y; }
+        // Para entrar a la fila se acerca por el lado de la vereda (no camina entre los que ya están formados);
+        // para avanzar un puesto, da un paso adelante
+        const far = p.queue == null && Math.hypot(pos.x - target.x, pos.z - target.z) > 1.2;
+        p.path = far ? [V(target.x + 0.9, SIDEWALK_Y, target.z), target] : [target];
+        p.speed = Math.min(p.speed, p.queue == null ? WALK : 0.9);
         p.queue = k;
-        const last = p.path.at(-1) ?? p.root.position;
-        if (Math.hypot(last.x - target.x, last.z - target.z) > 0.25) {
-          if (p.pose === "sit") { p.pose = "stand"; p.root.position.y = SIDEWALK_Y; }
-          p.path = [target];
-          p.onArrive = () => { p.pose = "stand"; p.targetYaw = Math.PI; };
-        }
+        p.onArrive = () => { p.pose = "stand"; p.targetYaw = Math.PI + (this.rng() - 0.5) * 0.25; };
       });
     } else {
+      stop.line = null;
       // El bus se fue o no para aquí: vuelven a su lugar (sin apuro)
       for (const p of stop.crowd) {
-        if (p.queue == null || p.path.length) continue;
+        if (p.queue == null) continue;
         p.queue = null;
+        if (p.kind === "mayor") p.speed = 0.75 + this.rng() * 0.15; else if (!p.runner) p.speed = WALK * (0.85 + this.rng() * 0.3);
         if (!p.spot) continue;
         p.path = [V(p.spot.x, SIDEWALK_Y, stop.z + p.spot.z)];
         p.onArrive = () => this.placeAt(p, p.spot, stop);
