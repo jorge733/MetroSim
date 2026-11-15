@@ -49,6 +49,7 @@ const CSS = `
 .intro-version::before{content:"";width:7px;height:7px;border-radius:50%;background:#3ddc84;box-shadow:0 0 8px #3ddc84}
 .intro.city .intro-version{opacity:1;transform:none}
 .intro-sub{max-width:520px;color:#d4dfeb;font-size:clamp(14px,1.5vw,17px);line-height:1.45;text-shadow:0 2px 12px #000}
+.intro-sub .ghost{color:transparent;text-shadow:none}
 .intro-sub .caret{display:inline-block;width:2px;height:1em;margin-left:2px;background:#ffd166;vertical-align:-2px;animation:introBlink .8s steps(2) infinite}
 .intro-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;width:min(100%,580px)}
 .intro-stats div{padding:9px 12px;border:1px solid #ffffff26;border-radius:12px;background:#08101acc;backdrop-filter:blur(8px)}
@@ -87,9 +88,44 @@ const CSS = `
   .intro-cards b{font-size:13px;margin-bottom:1px}
 }
 @media(max-width:860px){
-  .intro-ui{grid-template-columns:1fr;align-content:start;overflow:auto;gap:16px;padding-top:56px}
-  .intro-mapbox{width:min(100%,360px);order:-1}   /* overflow:clip (no hidden): así su aspect-ratio cuenta para la fila y no se monta sobre el texto */
-  .intro-cards{grid-template-columns:1fr}
+  /* Celular/tableta en vertical: primero la marca y «Comenzar» (antes quedaban bajo el mapa, fuera de la pantalla);
+     el mapa va después de los datos. overflow:clip (no hidden): su aspect-ratio cuenta para la fila. */
+  .intro-ui{grid-template-columns:1fr;align-content:start;overflow:auto;gap:18px;padding-top:56px;padding-bottom:28px}
+  .intro-mapbox{width:min(100%,360px)}
+  .intro-actions{order:1}
+  .intro-stats{order:2;grid-template-columns:repeat(2,minmax(0,1fr))}
+  .intro-cards{order:3;grid-template-columns:1fr}
+  .intro-start{padding:14px 34px}
+}
+@media(max-width:560px){
+  .intro-logo{width:64px}
+  .intro-eyebrow{font-size:10.5px;letter-spacing:2px}
+  .intro-title{font-size:clamp(48px,15vw,64px)}
+  .intro-actions{width:100%}
+  .intro-start{flex:1}
+  .intro-hint{display:none}
+}
+/* Celular en horizontal: texto y mapa lado a lado, todo más compacto (antes el mapa tapaba la pantalla entera) */
+@media(max-height:520px) and (orientation:landscape){
+  .intro-ui{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);align-content:center;gap:18px;padding:14px max(16px,env(safe-area-inset-right)) 14px max(16px,env(safe-area-inset-left))}
+  .intro-left{gap:8px}
+  .intro-logo{width:46px}
+  .intro-brand{gap:10px}
+  .intro-brand>div{gap:4px}
+  .intro-eyebrow{font-size:9.5px;letter-spacing:1.5px}
+  .intro-version{font-size:9.5px;padding:2px 8px 2px 6px}
+  .intro-title{font-size:44px}
+  .intro-sub{font-size:12.5px;line-height:1.35}
+  .intro-stats{order:0;grid-template-columns:repeat(4,minmax(0,1fr))}
+  .intro-stats div{padding:5px 9px}
+  .intro-stats b{font-size:17px}
+  .intro-stats small{font-size:8.5px;letter-spacing:.5px}
+  .intro-cards{display:none}
+  .intro-actions{order:0}
+  .intro-start{padding:10px 24px;font-size:15px}
+  .intro-mapbox{width:min(100%,calc(100dvh - 72px));order:0;margin-top:36px}
+  .intro-maplabel{font-size:9px;top:8px;left:12px}
+  .intro-legend span{font-size:9px;padding:2px 6px}
 }
 `;
 
@@ -546,12 +582,12 @@ export function playIntro({ isMuted = () => false, menuReady = null } = {}) {
   const title = "RedMoviSim".split("").map((ch, i) => `<span${ch === "M" || ch === "o" || ch === "v" || (ch === "i" && i === 6) ? ' class="mv"' : ""} style="animation-delay:${0.25 + i * 0.06}s">${ch}</span>`).join("");
   const C = LINE_COLORS;
   const cards = [
-    [C["1"], "🚇 Conduce desde la cabina", "DMI, mandos y señales reales. Cada estación bien servida te paga al instante."],
+    [C["1"], "🚇 Conduce Metro y trenes", "Las líneas del Metro, el Tren Nos y el Tren Rancagua, con DMI, mandos y señales reales."],
     [C["2"], "🚶 Viaja a pie", "Combina entre líneas por los pasillos, usa los ascensores y sal caminando a la calle."],
     [C["4A"], "🏙️ Sal a la ciudad", `${landmarks} hitos: La Moneda, Costanera Center, la Catedral, el Estadio Nacional…`],
     [C["5"], "🎯 Libreta de misiones", "Compras, fotos, encargos y contrarreloj. Completar una línea se celebra."],
     ["#d7262e", "🚌 Maneja un bus", "Por la Alameda: pista Solo Bus, semáforos, autos y paraderos con gente esperando."],
-    [C["6"], "🖥️ Centro de Control", `Supervisa las ${LINES.length} líneas en tiempo real: retén trenes y regula intervalos.`],
+    [C["6"], "🖥️ Centro de Control", `Supervisa las ${LINES.length} líneas en tiempo real o abre una sala para que tus amigos conduzcan.`],
   ];
 
   const root = document.createElement("section");
@@ -563,7 +599,7 @@ export function playIntro({ isMuted = () => false, menuReady = null } = {}) {
       <div class="intro-left">
         <div class="intro-brand"><img class="intro-logo" src="logo.svg" alt="RedMoviSim"><div><span class="intro-eyebrow">SIMULADOR · TRANSPORTE PÚBLICO DE SANTIAGO</span><span class="intro-version">VERSIÓN ${VERSION} · ESTABLE</span></div></div>
         <h1 class="intro-title">${title}</h1>
-        <p class="intro-sub"><span class="typed"></span><span class="caret"></span></p>
+        <p class="intro-sub"><span class="typed"></span><span class="caret"></span><span class="ghost" aria-hidden="true"></span></p>
         <div class="intro-stats">
           <div><b data-count="${LINES.length}">0</b><small>LÍNEAS</small></div>
           <div><b data-count="${stations}">0</b><small>ESTACIONES</small></div>
@@ -575,7 +611,7 @@ export function playIntro({ isMuted = () => false, menuReady = null } = {}) {
       </div>
       <div class="intro-mapbox">
         <canvas></canvas>
-        <span class="intro-maplabel">RED DE METRO · EN VIVO</span>
+        <span class="intro-maplabel">METRO Y TRENES · EN VIVO</span>
         <div class="intro-legend">${LINES.map(l => `<span style="--c:${l.color}" data-id="${l.id}">${isRail(l.id) ? RAIL_LINES[l.id].short : `L${l.id}`}</span>`).join("")}</div>
       </div>
     </div>`;
@@ -588,12 +624,14 @@ export function playIntro({ isMuted = () => false, menuReady = null } = {}) {
 
   // Cuando aparece la ciudad: texto que se escribe solo, contadores y plano
   const typed = root.querySelector(".typed");
-  const text = "Conduce desde la cabina, viaja a pie y recorre Santiago. Un Metro vivo que funciona aunque no lo mires: gana tu sueldo, cumple misiones y gástalo en la Tienda RedMovi.";
+  const text = "Conduce el Metro, los trenes de EFE y los buses, viaja a pie y recorre Santiago. Una red viva que funciona aunque no la mires: gana tu sueldo, cumple misiones y gástalo en la Tienda RedMovi.";
   let typer = 0, counters = 0;
   const onCity = () => {
     map.start();
     let i = 0;
-    typer = setInterval(() => { typed.textContent = text.slice(0, ++i); if (i >= text.length) clearInterval(typer); }, 22);
+    // El resto del texto queda escrito pero invisible: así ocupa su lugar desde el principio y nada salta al escribir
+    const ghost = root.querySelector(".intro-sub .ghost");
+    typer = setInterval(() => { typed.textContent = text.slice(0, ++i); ghost.textContent = text.slice(i); if (i >= text.length) clearInterval(typer); }, 22);
     const els = [...root.querySelectorAll("[data-count]")];
     const t0 = performance.now();
     counters = setInterval(() => {

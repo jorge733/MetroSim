@@ -149,6 +149,12 @@ trenes de los dos motores quedan a ~1 m (mediana).
   - **Aviso de distancia**: si vas por una pista de autos, un indicador muestra los metros al auto de adelante y
     avisa («¡Distancia!») antes de chocarlo.
   - El bus automático del modo pasajero frena dosificado (más suave para la gente de pie).
+- **1.18.1 · Pantalla de inicio y portada al día:** la intro habla del Metro, los trenes de EFE y los buses (texto,
+  tarjetas y mapa «Metro y trenes · en vivo»; el Centro de Control menciona la sala multijugador). En el celular en
+  vertical, «Comenzar» aparece arriba, justo bajo el texto (antes quedaba bajo el mapa), y los datos van en 2×2; en
+  horizontal, texto y mapa van lado a lado (antes el mapa tapaba todo). El texto que se escribe solo ya reserva su
+  espacio y no empuja los botones. En la portada, el titular es «Conduce trenes y buses, y viaja por Santiago en 3D»
+  y las tarjetas Pasajero y Centro de Control nombran el tren, el bus y la sala multijugador.
 
 ## Versión 1.17 · Interfaz más clara en todas las pantallas
 
