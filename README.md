@@ -142,6 +142,8 @@ al aire libre:
 - **Árboles** con copa de varios bultos, más oscura abajo (sombra propia), y tronco con ramas.
 - **Reflejos:** los autos, los vidrios y la calzada mojada reflejan el cielo de la hora.
 - **De noche,** los faroles dejan un círculo de luz cálida en el piso.
+- **2.4.1** · Post «La calle se ve más real» para redes sociales (`post-realista/`: antes y ahora del bus, con el
+  celular en horizontal; cuadrado, historia y horizontal).
 
 ## Versión 2.3 · La calle dobla como el recorrido real · taxi en los dos sentidos
 
