@@ -98,7 +98,7 @@
         <header class="start-brand">
           <img class="metro-mark" src="logo.svg" alt="">
           <h1>Red<span>Movi</span>Sim</h1>
-          <span class="start-ver">v1.17.1</span>
+          <span class="start-ver">v1.18</span>
         </header>
         <div class="start-hero">
           <p class="eyebrow">Simulador del transporte público de Santiago</p>
@@ -155,7 +155,7 @@
               <span class="mode-icon"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="14" rx="3"/><path d="M5 11h14M9 17l-2 4M15 17l2 4"/><path d="M9 14h.01M15 14h.01"/></svg></span>
               <div class="mode-text">
                 <strong>Conductor</strong>
-                <small id="driverText">Elige qué conducir: un tren del Metro, un tren de EFE (Tren Nos o Tren Rancagua) o un bus de la Red por la Alameda. Cada estación o paradero bien servido te paga al instante.</small>
+                <small id="driverText">Elige qué conducir: un tren del Metro, un tren de EFE (Tren Nos o Tren Rancagua) o un bus de la Red en uno de sus recorridos reales. Cada estación o paradero bien servido te paga al instante.</small>
               </div>
               <button class="go-button" data-mode="driver" id="driverGo">Conducir <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
             </div>
@@ -166,10 +166,11 @@
                   <button type="button" role="radio" data-vehicle="metro"><b>🚇 Tren del Metro</b><span>Líneas 1 a 6</span></button>
                   <button type="button" role="radio" data-vehicle="nos"><b>🚆 Tren Nos</b><span>Est. Central → Nos</span></button>
                   <button type="button" role="radio" data-vehicle="efe"><b>🚄 Tren Rancagua</b><span>EFE · → Rancagua</span></button>
-                  <button type="button" role="radio" data-vehicle="bus"><b>🚌 Bus Red</b><span>Alameda · beta</span></button>
+                  <button type="button" role="radio" data-vehicle="bus"><b>🚌 Bus Red</b><span>Recorridos reales · beta</span></button>
                 </div>
               </div>
-              <p id="busDriverNote" class="mode-note" hidden>Recorrido A01 (ficticio) por la Alameda, de Estación Central a Plaza Baquedano, con paraderos en lugares reales. <kbd>W</kbd><kbd>S</kbd> acelerar y frenar · <kbd>A</kbd><kbd>D</kbd> cambiar de pista · <kbd>Espacio</kbd> puertas · <kbd>C</kbd> cámara.</p>
+              <label class="field bus-only" id="busRouteField"><span class="small-label">Recorrido</span><select id="busRouteSelect"></select></label>
+              <p id="busDriverNote" class="mode-note" hidden><span id="busRouteInfo"></span> <kbd>W</kbd><kbd>S</kbd> acelerar y frenar (el pedal queda donde lo dejas) · <kbd>Shift</kbd> freno suave · <kbd>A</kbd><kbd>D</kbd> cambiar de pista · <kbd>Espacio</kbd> puertas · <kbd>C</kbd> cámara.</p>
               <div class="field train-only">
                 <span class="small-label" id="directionLabel">Servicio</span>
                 <div id="directionSeg" class="seg" role="radiogroup" aria-labelledby="directionLabel"></div>

@@ -31,7 +31,7 @@ import { skyAt } from "../render/outdoor.js";            // cielo según la hora
 import { buildLandmark } from "./landmarks.js";
 import { cityMaterials, genericBuilding, signMaterial, facingPlane, streetLamp, tree, bench, addMesh } from "./kit.js";
 import { markCity } from "../render/trackLift.js";
-import { BUS_METRO_STOPS, BUS_ROUTE } from "../bus/busRoute.js";
+import { BUS_METRO_STOPS, busRoutesAt } from "../bus/busRoute.js";
 
 /** 1.15 · Paradero de la calle (local): aquí se toma el bus del recorrido si pasa por esta estación. */
 const BUS_STOP = { x: STREET.roadHalf + 1.5, z: 34 };
@@ -382,9 +382,16 @@ export class City {
       q.fillStyle = "#0f3d7a"; q.fillRect(0, 0, 256, 320);
       q.fillStyle = "#fff"; q.textAlign = "center"; q.textBaseline = "middle";
       q.font = "800 54px Arial"; q.fillText("PARADA", 128, 52);
-      q.fillStyle = "#d7262e"; q.fillRect(28, 100, 200, 96);
-      q.fillStyle = "#fff"; q.font = "900 76px Arial"; q.fillText(BUS_ROUTE.id, 128, 150);
-      q.font = "700 30px Arial"; q.fillText("Alameda", 128, 238); q.font = "600 24px Arial"; q.fillText("⇄ Baquedano · E. Central", 128, 282);
+      // 1.18 · Los recorridos que paran aquí (hasta 4 números, como en los paraderos de Red)
+      const ids = busRoutesAt(this.station.name).map(r => r.id).slice(0, 4);
+      const cols = ids.length > 2 ? 2 : ids.length, rows = Math.ceil(ids.length / cols);
+      const bw = 200 / cols, bh = rows > 1 ? 70 : 96;
+      ids.forEach((id, k) => {
+        const x = 28 + (k % cols) * bw, y = 92 + Math.floor(k / cols) * (bh + 8);
+        q.fillStyle = "#d7262e"; q.fillRect(x + 3, y, bw - 6, bh);
+        q.fillStyle = "#fff"; q.font = `900 ${cols > 1 ? 50 : 76}px Arial`; q.fillText(id, x + bw / 2, y + bh / 2 + 3);
+      });
+      q.font = "600 24px Arial"; q.fillText(ids.length > 1 ? `${ids.length} recorridos · E` : "Bus Red · E", 128, 282);
       const tex = toTexture(c);
       tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
       const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 0.94), new THREE.MeshStandardMaterial({ map: tex, side: THREE.DoubleSide, roughness: 0.6 }));
@@ -693,7 +700,7 @@ export class City {
     if (n?.kind === "access") return `E (o camina hacia la escalera) · bajar a la estación ${this.station.name}`;
     if (n?.kind === "shop") return n.shop.kind === "banco" ? "E · usar el cajero automático (saldo y movimientos)" : `E · entrar a ${n.shop.name} (${n.shop.label.toLowerCase()})`;
     if (n?.kind === "landmark") return `E · sacar una foto de ${n.landmark.name}`;
-    if (n?.kind === "busstop") return n.served ? `E · paradero del bus ${BUS_ROUTE.id} (Alameda): tomar el bus` : "Paradero: por aquí no pasa el recorrido del juego (el bus A01 va por la Alameda)";
+    if (n?.kind === "busstop") return n.served ? `E · paradero (${busRoutesAt(this.station?.name).map(r => r.id).join(", ")}): tomar el bus` : "Paradero: por aquí no pasa ninguno de los recorridos del juego";
     return this.landmark
       ? `Calle de ${this.station.name} · enfrente: ${this.landmark.name} · locales en la vereda del Metro · J misiones`
       : `Calle de ${this.station.name} · locales en la vereda del Metro · J misiones`;

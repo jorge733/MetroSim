@@ -1823,6 +1823,19 @@ body.touch-mode .back-button.driver-job-button { top: auto; bottom: calc(120px +
 .bus-guide-bar { position: relative; height: 10px; margin-top: 7px; border-radius: 5px; background: linear-gradient(90deg, #ff4d4d55, #ffc24755 30%, #34d17c88 45%, #34d17c88 55%, #ffc24755 70%, #ff4d4d55); }
 .bus-guide-bar b { position: absolute; left: 50%; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: #fff; }
 .bus-guide-bar i { position: absolute; top: -4px; width: 10px; height: 18px; margin-left: -5px; border-radius: 3px; background: #d7262e; border: 2px solid #fff; transition: left .1s linear; }
+/* 1.18 · Predicción: dónde quedarías detenido si sigues frenando igual */
+.bus-guide-bar u { position: absolute; top: -6px; width: 0; height: 0; margin-left: -6px; border: 6px solid transparent; border-top: 8px solid #ffd447; border-bottom: 0; transition: left .1s linear; }
+.bus-guide small { display: block; min-height: 1em; margin-top: 6px; font: 500 12px/1.3 var(--f-body); color: #c6d0da; }
+.bus-guide.light { border-color: #ff6b5b88; }
+.bus-lead { position: absolute; right: max(14px, env(safe-area-inset-right)); top: calc(max(8px, env(safe-area-inset-top)) + 96px); display: grid; justify-items: center; padding: 6px 12px; border-radius: var(--radius); background: var(--panel); border: 1px solid var(--panel-border); pointer-events: none; }
+.bus-lead strong { font: 700 20px/1.1 var(--f-data); }
+.bus-lead.warn { border-color: #ffc247; color: #ffe3a3; }
+.bus-lead.bad { border-color: #ff4d4d; color: #ffb3b3; background: #3a0d0dcc; }
+.bus-lead.hidden { display: none; }
+.bus-limit { position: relative; cursor: default; }
+.bus-limit small { position: absolute; bottom: -15px; font: 700 9px/1 var(--f-data); letter-spacing: .6px; color: #9aa6b3; }
+.bus-limit.on { box-shadow: 0 0 0 3px #34d17c; }
+.bus-limit.on small { color: #34d17c; }
 
 .bus-bottom { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: center; align-items: flex-end; gap: 10px; padding: 0 max(14px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); pointer-events: none; }
 .bus-panel { padding: 12px 14px; border-radius: 12px; background: var(--panel); border: 1px solid var(--panel-border); backdrop-filter: blur(6px); }
@@ -1866,6 +1879,14 @@ body.touch-mode .back-button.driver-job-button { top: auto; bottom: calc(120px +
 .bus-pedal.brake { border-color: #ffb54777 !important; }
 .bus-pedal.gas.on { background: #5cc8ff55 !important; }
 .bus-pedal.brake.on { background: #ffb54755 !important; }
+/* 1.18 · Pedales analógicos: el relleno muestra cuánto está pisado (apoya el dedo más arriba = más fuerte) */
+.bus-pedal { position: relative; overflow: hidden; }
+.bus-pedal span { position: relative; }
+.bus-pedal i { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: #5cc8ff66; pointer-events: none; }
+.bus-pedal.brake i { background: #ffb54766; }
+.bus-pedal.gas.on, .bus-pedal.brake.on { background: #0b1118b8 !important; }
+.bus-touch-mid button.lit { background: #34d17c44; border-color: #34d17c; }
+.bus-lim-ico { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 3px solid #d01f1f; background: #fff; color: #111; font: 700 10px/1 var(--f-data); }
 .bus-touch-mode .bus-bottom { justify-content: center; padding-left: 190px; padding-right: 200px; }
 .bus-touch-mode .bus-speed { padding: 8px 10px; }
 .bus-touch-mode .bus-speed-num strong { font-size: 32px; }
@@ -1908,6 +1929,8 @@ body.touch-mode .back-button.driver-job-button { top: auto; bottom: calc(120px +
 .vehicle-seg button { flex: 1 1 0; }
 .mode-card.bus-vehicle .train-only, .mode-card.bus-vehicle #netJoin, .mode-card.bus-vehicle #driverLock { display: none !important; }
 #busDriverNote[hidden] { display: none; }
+.mode-card:not(.bus-vehicle) .bus-only { display: none; }
+#busRouteField { grid-column: 1 / -1; }
 
 /* 1.15 · Viaje en bus como pasajero */
 .bus-ride-bar { display: none; }
@@ -1929,7 +1952,7 @@ body.touch-mode .back-button.driver-job-button { top: auto; bottom: calc(120px +
 .bus-stop-panel .bus-card { display: grid; gap: 12px; width: min(460px, 100%); padding: 22px; border-radius: 14px; background: var(--surface); border: 1px solid var(--panel-border); text-align: center; }
 .bus-stop-panel h2 { font: 700 26px/1.1 var(--f-display); }
 .bus-stop-panel p { font-size: 14px; line-height: 1.5; color: #b6c1cc; }
-.bus-stop-dirs { display: grid; gap: 8px; }
+.bus-stop-dirs { display: grid; gap: 8px; max-height: min(52vh, 420px); overflow-y: auto; overscroll-behavior: contain; }
 .bus-stop-dir { display: grid; gap: 3px; padding: 12px 14px; border-radius: 10px; border: 1px solid #ffffff26; background: var(--raise); color: var(--text); text-align: left; cursor: pointer; }
 .bus-stop-dir:hover { border-color: #d7262e; }
 .bus-stop-dir b { font: 700 17px/1.2 var(--f-display); }

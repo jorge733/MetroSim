@@ -50,6 +50,6 @@ export function autopilot(sim, dt, { hold = false } = {}) {
     if (L.state === "red" || canStop) target = Math.min(target, Math.sqrt(2 * PLAN_DECEL * Math.max(0, L.d - 2.5)));
   }
   if (b.v < target - 0.4) inp.throttle = true;
-  else if (b.v > target + 0.15) inp.brake = true;
+  else if (b.v > target + 0.15) inp.brake = b.v > target + 1.5 ? 1 : 0.6;   // 1.18: freno dosificado (más suave para la gente de pie)
   if (target < 0.05 && b.v < 0.3) inp.brake = true;
 }

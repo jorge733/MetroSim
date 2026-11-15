@@ -123,7 +123,7 @@ import { setupFareInfo, openFareInfo, closeFareInfo, fareInfoOpen, tickFareInfo 
 import { riderFare, riderSpecial, riderAsked, riderCategory } from "./rider.js";
 import { setupRiderPanel, openRiderPanel, closeRiderPanel, riderPanelOpen } from "./riderPanel.js";
 import { startBusGame } from "./bus/busGame.js";
-import { busTripsFrom } from "./bus/busRoute.js";
+import { busTripsFrom, BUS_ROUTES, busRouteById } from "./bus/busRoute.js";
 
 // La vía en 3D sigue las pendientes reales: se engancha antes de compilar ningún material
 installTrackLift();
@@ -183,6 +183,20 @@ function selectVehicle(v, { fromLine = false } = {}) {
   if (driverVehicle === "metro" && isRail(driverLineSelect.value)) selectLine(lineById(loadSetting("metrosim.metroLine")) ? loadSetting("metrosim.metroLine") : "3");
 }
 vehicleButtons.forEach(b => b.addEventListener("click", () => { selectVehicle(b.dataset.vehicle); selectMode("driver"); }));
+
+/* 1.18 · Bus: qué recorrido manejar (el A01 de práctica o un tramo real de Red, de js/bus/redRoutes.js) */
+const busRouteSelect = $("busRouteSelect");
+busRouteSelect.innerHTML = BUS_ROUTES.map(r => `<option value="${r.id}">${r.id} · ${r.practice ? "Práctica · " : ""}${r.from} → ${r.to} (${(r.length / 1000).toFixed(1)} km)</option>`).join("");
+busRouteSelect.value = busRouteById(loadSetting("metrosim.busRoute") || "A01").id;
+function renderBusRouteInfo() {
+  const r = busRouteById(busRouteSelect.value);
+  const metros = r.stops.filter(s => s.metro).length;
+  $("busRouteInfo").textContent = r.practice
+    ? "Recorrido de práctica A01 (ficticio) por la Alameda, de Estación Central a Plaza Baquedano."
+    : `Tramo real del ${r.id} de Red por ${r.name} (hacia ${r.destino}${r.operador ? `, ${r.operador}` : ""}): ${r.stops.length} paraderos, ${metros} junto al Metro.`;
+}
+busRouteSelect.addEventListener("change", () => { saveSetting("metrosim.busRoute", busRouteSelect.value); renderBusRouteInfo(); });
+renderBusRouteInfo();
 
 const lineChips = LINES.map(l => {
   const chip = document.createElement("button");
@@ -888,7 +902,7 @@ function startBus({ ride = null } = {}) {
   startScreen.classList.add("hidden");
   if (wantsTouch()) enterMobileFullscreen();       // dentro del gesto del usuario
   bus = startBusGame({
-    bank, muted, touch: wantsTouch(), ride,
+    bank, muted, touch: wantsTouch(), ride, route: ride ? null : busRouteById(busRouteSelect.value),
     onMuteChange: (m) => { muted = m; saveSetting("metrosim.muted", m ? "1" : "0"); hud.setSound(!m); },
     onExit: () => {
       bus = null;
@@ -2001,7 +2015,7 @@ function openBusStop(st) {
     <h2>¿Hacia dónde vas?</h2>
     <div class="bus-stop-dirs">${trips.map((t, i) => {
       const next = t.route.stops.slice(t.from + 1, t.from + 4).map(s => s.name).join(", ");
-      return `<button class="bus-stop-dir" data-i="${i}"><b><i>${t.route.id}</i>hacia ${t.route.to}</b><small>Próximas paradas: ${next}${t.route.stops.length - t.from > 4 ? "…" : ""}</small></button>`;
+      return `<button class="bus-stop-dir" data-i="${i}"><b><i style="background:${t.route.color}">${t.route.id}</i>hacia ${t.route.to}</b><small>Próximas paradas: ${next}${t.route.stops.length - t.from > 4 ? "…" : ""}</small></button>`;
     }).join("")}</div>
     <p>${transfer ? "Pagaste un pasaje hace menos de 2 horas: este viaje es un <b>transbordo</b> y no se cobra." : `Al subir se cobra el ${fareText}. Si después tomas el Metro antes de 2 horas, es transbordo y no pagas de nuevo.`} Saldo bip!: ${card.label}.</p>
     <button class="bus-btn" data-close>Seguir a pie</button>
@@ -2065,7 +2079,7 @@ function onStreetTarget(target) {
   const st = game.walker.station;
   if (target.kind === "access") return hud.showMessage("Camina hacia la escalera para bajar a la estación", "info");
   if (target.kind === "busstop") return target.served ? openBusStop(st)
-    : hud.showMessage("Por este paradero no pasa el recorrido del juego: el bus A01 va por la Alameda (Línea 1, de Estación Central a Baquedano)", "info", 5500);
+    : hud.showMessage("Por este paradero no pasa ninguno de los recorridos del juego (A01, 210, 385, 401, 403, 109, 107, 211 y 506)", "info", 5500);
   if (target.kind === "shop") return openShop(target.shop, st);
   if (target.kind === "landmark") return takePhoto(target.landmark, st);
 }

@@ -124,6 +124,32 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **Salir por los torniquetes es gratis**: solo se cobra el pasaje al pasar hacia la zona pagada (antes, al terminar
   de cruzar el torniquete de salida se cobraba un pasaje).
 
+## Versión 1.18 · Recorridos reales de Red y mejor manejo del bus
+
+- **8 recorridos reales de buses Red** además del A01 de práctica: **210, 385, 401 y 403** por la Alameda,
+  **109** (Quinta Normal · Estación Central), **107** (Av. Dorsal), **211** (Américo Vespucio · La Cisterna) y
+  **506** (Av. Matta · Estadio Nacional). Salen de la **API pública de red.cl** («Conoce tu recorrido»): paraderos con
+  su código real y distancias medidas sobre el trazado del bus. De cada servicio se juega un tramo de 10 a 13
+  paraderos (4 a 6 km) que pasa por estaciones de Metro. El juego no consulta la API en vivo (red.cl no lo permite
+  desde otra página y el juego tiene que andar sin conexión): `node tools/recorridos-red.mjs` toma una foto y la deja
+  en `js/bus/redRoutes.js`; volver a correrlo actualiza los datos.
+- **Conductor → Bus Red** tiene un selector **Recorrido** con todos los servicios (largo y estaciones de Metro).
+- **Pasajero**: en la calle de cada estación por la que pasa uno de estos recorridos, el letrero del paradero muestra
+  sus números y con <kbd>E</kbd> se elige servicio y sentido. Solo se puede bajar en paraderos junto al Metro (el
+  juego te deja en la calle de esa estación); los demás se avisan como «sin Metro».
+- **Manejo del bus**:
+  - **Freno suave** con <kbd>Shift</kbd> (35 %) para clavar la parada; en el celular los **pedales son analógicos**:
+    cuanto más arriba apoyas el dedo, más fuerte (se puede deslizar sin soltar), y el pedal se va llenando.
+  - **Predicción de frenada**: en la guía del paradero, una flecha amarilla marca dónde quedarías detenido si sigues
+    frenando igual («así te pasas 1,6 m: frena más»). Lo mismo frente a un semáforo en rojo o amarillo.
+  - **Limitador de velocidad** (<kbd>L</kbd> o el botón del celular): el motor no pasa de 50 km/h.
+  - **Retardador**: al soltar el acelerador sobre 15 km/h el bus frena un poco solo, como uno real; y arranca con más
+    fuerza desde detenido.
+  - **Cambio de pista con curva suave** (el bus acelera y endereza de lado en vez de moverse a velocidad fija).
+  - **Aviso de distancia**: si vas por una pista de autos, un indicador muestra los metros al auto de adelante y
+    avisa («¡Distancia!») antes de chocarlo.
+  - El bus automático del modo pasajero frena dosificado (más suave para la gente de pie).
+
 ## Versión 1.17 · Interfaz más clara en todas las pantallas
 
 - **Tienda:** si no te alcanza, el precio se ve apagado (borde punteado) y dice cuánto te falta («faltan $37.000»);

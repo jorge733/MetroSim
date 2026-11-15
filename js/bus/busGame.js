@@ -54,11 +54,11 @@ export function startBusGame(o) {
 }
 
 class BusGame {
-  constructor({ bank, muted, touch, onMuteChange, onExit, ride = null }) {
+  constructor({ bank, muted, touch, onMuteChange, onExit, ride = null, route = null }) {
     /* 1.15 · ride: el jugador viaja como PASAJERO (maneja el piloto automático):
        { route, from, onArrive(stop), line } · onArrive se llama al bajarse en un paradero */
     this.ride = ride;
-    this.route = ride ? ride.route : BUS_ROUTE;
+    this.route = ride ? ride.route : (route ?? BUS_ROUTE);
     this.bank = bank;
     this.touch = touch;
     this.onMuteChange = onMuteChange;
@@ -69,6 +69,7 @@ class BusGame {
     this.camMode = ride ? "seat" : "chase";
     this.paused = false;
     this.keys = new Set();
+    this.touchPedal = { throttle: 0, brake: 0 };
     this.earned = 0;
 
     clearTrackLift();           // la Alameda es plana: sin las pendientes de la última línea de Metro jugada
@@ -141,11 +142,12 @@ class BusGame {
       <div class="bus-strip" data-k="strip"></div>
       <div class="bus-bell hidden" data-k="bell">PARADA SOLICITADA</div>
       <div class="bus-toast hidden" data-k="toast"></div>
-      <div class="bus-guide hidden" data-k="guide"><span data-k="guideText"></span><div class="bus-guide-bar"><i data-k="guideMark"></i><b></b></div></div>
+      <div class="bus-guide hidden" data-k="guide"><span data-k="guideText"></span><div class="bus-guide-bar"><i data-k="guideMark"></i><u data-k="guidePred"></u><b></b></div><small data-k="guideSub"></small></div>
+      <div class="bus-lead hidden" data-k="lead"><span class="bus-label">AUTO ADELANTE</span><strong data-k="leadGap">—</strong></div>
       <footer class="bus-bottom">
         <div class="bus-panel bus-speed">
           <div class="bus-speed-num"><strong data-k="speed">0</strong><span class="bus-label">KM/H</span></div>
-          <div class="bus-limit">${Math.round(R.speedLimit * 3.6)}</div>
+          <div class="bus-limit" data-k="limit" title="Limitador (L)">${Math.round(R.speedLimit * 3.6)}<small>LIM</small></div>
           <div class="bus-pedals"><span class="bus-label">ACEL</span><i><b data-k="thr"></b></i><span class="bus-label">FRENO</span><i class="brk"><b data-k="brk"></b></i></div>
         </div>
         <div class="bus-panel bus-next">
@@ -166,6 +168,8 @@ class BusGame {
       </footer>
       <div class="bus-keys">
         <span><kbd>W</kbd><kbd>S</kbd> acelerar / frenar</span>
+        <span><kbd>Shift</kbd> freno suave</span>
+        <span><kbd>L</kbd> limitador</span>
         <span><kbd>A</kbd><kbd>D</kbd> cambiar de pista</span>
         <span><kbd>Espacio</kbd> puertas</span>
         <span><kbd>B</kbd> bocina</span>
@@ -186,10 +190,11 @@ class BusGame {
           <button data-t="doors">${ICON.doors}<span>Puertas</span></button>
           <button data-t="horn">${ICON.horn}<span>Bocina</span></button>
           <button data-t="cam">${ICON.cam}<span>Cámara</span></button>
+          <button data-t="limiter"><b class="bus-lim-ico">50</b><span>Limitador</span></button>
         </div>
         <div class="bus-touch-right">
-          <button data-t="brake" class="bus-pedal brake">FRENO</button>
-          <button data-t="throttle" class="bus-pedal gas">ACELERAR</button>
+          <button data-t="brake" class="bus-pedal brake"><i data-k="brkFill"></i><span>FRENO</span></button>
+          <button data-t="throttle" class="bus-pedal gas"><i data-k="thrFill"></i><span>ACELERAR</span></button>
         </div>
       </div>
       <div class="bus-overlay bus-pause hidden" data-k="pause">
@@ -242,30 +247,47 @@ class BusGame {
     if (!this.ride || this.paused) return;
     const here = this.exitStop();
     if (!here) return this.toast(this.sim.bus.v > 0.3 ? "Espera que el bus se detenga y abra las puertas" : "Las puertas están cerradas: toca el timbre para bajarte en la próxima parada", "info");
+    if (!here.stop.metro) return this.toast(`En ${here.stop.name} no hay estación de Metro: bájate en un paradero con Metro (el juego te deja en su calle)`, "info", 4200);
     const onArrive = this.ride.onArrive;
     this.destroy();
     onArrive?.(here.stop, this.route);
   }
 
   bindTouch() {
-    const hold = { throttle: "w", brake: "s", horn: "b" };
+    const hold = { horn: "b" };
+    /* 1.18 · Pedales táctiles ANALÓGICOS: cuanto más arriba apoyas el dedo, más fuerte (abajo = suave).
+       Se puede deslizar el dedo sin soltar para dosificar. */
+    const level = (btn, e) => {
+      const r = btn.getBoundingClientRect();
+      return Math.max(0.15, Math.min(1, 1 - (e.clientY - r.top) / r.height + 0.15));
+    };
     this.root.querySelectorAll("[data-t]").forEach(btn => {
       const t = btn.dataset.t;
+      const pedal = t === "throttle" || t === "brake";
       const down = (e) => {
         e.preventDefault();
         btn.classList.add("on");
         try { btn.setPointerCapture(e.pointerId); } catch { /* sin captura */ }
+        if (pedal) { this.touchPedal[t] = level(btn, e); this.syncInput(); return; }
         if (hold[t]) { this.keys.add(hold[t]); this.syncInput(); return; }
         if (t === "left") this.sim.changeLane(1);
         else if (t === "right") this.sim.changeLane(-1);
         else if (t === "doors") this.sim.toggleDoors();
         else if (t === "cam") this.toggleCam();
+        else if (t === "limiter") this.sim.toggleLimiter();
+      };
+      const move = (e) => {
+        if (!pedal || !btn.classList.contains("on")) return;
+        this.touchPedal[t] = level(btn, e);
+        this.syncInput();
       };
       const up = () => {
         btn.classList.remove("on");
+        if (pedal) { this.touchPedal[t] = 0; this.syncInput(); }
         if (hold[t]) { this.keys.delete(hold[t]); this.syncInput(); }
       };
       btn.addEventListener("pointerdown", down);
+      btn.addEventListener("pointermove", move);
       btn.addEventListener("pointerup", up);
       btn.addEventListener("pointercancel", up);
       btn.addEventListener("lostpointercapture", up);
@@ -346,6 +368,7 @@ class BusGame {
     if (k === "d" || k === "arrowright") return this.sim.changeLane(-1);
     if (k === " " || k === "e") return this.sim.toggleDoors();
     if (k === "c") return this.toggleCam();
+    if (k === "l") return this.sim.toggleLimiter();
     this.keys.add(k);
     this.syncInput();
   }
@@ -354,9 +377,10 @@ class BusGame {
     this.syncInput();
   }
   syncInput() {
-    const k = this.keys;
-    this.sim.input.throttle = k.has("w") || k.has("arrowup");
-    this.sim.input.brake = k.has("s") || k.has("arrowdown");
+    const k = this.keys, tp = this.touchPedal;
+    // Teclado: W/S a fondo; Shift (solo o con S) freno suave para clavar la parada. Táctil: el nivel del dedo.
+    this.sim.input.throttle = k.has("w") || k.has("arrowup") ? 1 : tp.throttle;
+    this.sim.input.brake = k.has("s") || k.has("arrowdown") ? (k.has("shift") ? 0.35 : 1) : k.has("shift") ? 0.35 : tp.brake;
     this.audio.horn(k.has("b") || k.has("h"));
   }
 
@@ -414,6 +438,8 @@ class BusGame {
         case "bell": this.audio.bell(); break;
         case "blinker": this.audio.blinker(); break;
         case "crash": this.audio.crash(); break;
+        case "headway": this.audio.fault(); break;
+        case "limiter": break;
         case "redLight": break;
         case "stopDone": this.onStopDone(e); break;
         case "finished": this.onFinished(e); break;
@@ -427,7 +453,7 @@ class BusGame {
       this.audio.door(e.open);
       if (e.open) setTimeout(() => {
         const at = this.exitStop();
-        if (at && !this.dead) this.toast(at.index === this.wantOff ? `${at.stop.name}: es tu parada · «Bajarse aquí»` : `${at.stop.name} · puedes bajarte aquí`, at.index === this.wantOff ? "ok" : "info", 3500);
+        if (at && !this.dead && at.stop.metro) this.toast(at.index === this.wantOff ? `${at.stop.name}: es tu parada · «Bajarse aquí»` : `${at.stop.name} · puedes bajarte aquí`, at.index === this.wantOff ? "ok" : "info", 3500);
       }, 1200);
       return;
     }
@@ -500,6 +526,17 @@ class BusGame {
     el.speed.parentElement.classList.toggle("over", b.v > this.route.speedLimit * 1.05);
     el.thr.style.width = `${b.throttle * 100}%`;
     el.brk.style.width = `${b.brake * 100}%`;
+    if (el.thrFill) { el.thrFill.style.height = `${b.throttle * 100}%`; el.brkFill.style.height = `${b.brake * 100}%`; }
+    el.limit.classList.toggle("on", sim.limiter);
+    this.root.querySelector('[data-t="limiter"]')?.classList.toggle("lit", sim.limiter);
+    // Distancia al auto de adelante (solo si está cerca)
+    const lead = !this.ride && sim.lead && sim.lead.gap < 45 && b.v > 1 ? sim.lead : null;
+    el.lead.classList.toggle("hidden", !lead);
+    if (lead) {
+      el.leadGap.textContent = `${Math.max(0, Math.round(lead.gap))} m`;
+      el.lead.classList.toggle("warn", lead.ttc < 4 || lead.gap < b.v * 1.2);
+      el.lead.classList.toggle("bad", lead.ttc < 2.6 || lead.gap < b.v * 0.8);
+    }
     el.onboard.textContent = sim.onboard.length;
     el.doors.textContent = { closed: "Puertas cerradas", opening: "Abriendo puertas…", open: "Puertas abiertas", closing: "Cerrando puertas…" }[b.doors];
     el.doors.classList.toggle("open", b.doors !== "closed");
@@ -522,21 +559,41 @@ class BusGame {
       el.light.innerHTML = `<i class="bus-dot ${L.state}"></i>${esc(L.light.street)} · ${Math.max(0, Math.round(L.d))} m`;
     } else el.light.textContent = "";
 
-    // Guía de parada: aparece al acercarse al paradero
+    // Guía de parada: aparece al acercarse al paradero (o a un semáforo en rojo/amarillo)
+    const pred = sim.stopPrediction();
+    const pct = (e) => `${50 + Math.max(-50, Math.min(50, e / 9 * 50))}%`;
     const near = !this.ride && st && st.s - b.s < 70 && st.s - b.s > -14 && !sim.serving;
-    el.guide.classList.toggle("hidden", !near);
+    const red = !this.ride && !near && L && L.state !== "green" && L.d > 0.5 && L.d < 60 && b.v > 0.5;
+    el.guide.classList.toggle("hidden", !near && !red);
+    el.guide.classList.toggle("light", !!red);
     if (near) {
       const err = b.s - st.s;
       const curb = Math.abs(b.x - LANES[0]) < 1.0;
       const ok = Math.abs(err) <= 1.5;
       el.guideText.textContent = !curb ? "Acércate a la vereda: pista Solo Bus" : err < -1.5 ? `Marca del paradero en ${Math.round(-err)} m` : err > 1.5 ? `Te pasaste ${err.toFixed(1)} m` : "¡En la marca!";
-      el.guide.classList.toggle("ok", ok && curb);
-      el.guideMark.style.left = `${50 + Math.max(-50, Math.min(50, err / 9 * 50))}%`;
+      el.guide.classList.toggle("ok", ok && curb && b.v < 0.3);
+      el.guideMark.style.left = pct(err);
+      // Dónde quedarías detenido si sigues frenando igual
+      const pe = pred != null ? err + pred : null;
+      el.guidePred.style.display = pe != null && pe < 30 ? "" : "none";
+      if (pe != null) el.guidePred.style.left = pct(pe);
+      el.guideSub.textContent = pe == null ? (b.v > 0.3 && -err < 40 ? `Frena: a ${Math.round(b.v * 3.6)} km/h necesitas ~${Math.round(b.v * b.v / 3)} m` : "")
+        : Math.abs(pe) <= 1.5 ? "Así frenando quedas en la marca ✓"
+        : pe < 0 ? `Así quedas ${(-pe).toFixed(1)} m antes: suelta un poco el freno`
+        : `Así te pasas ${pe.toFixed(1)} m: frena más`;
+    } else if (red) {
+      const pe = pred != null ? pred - (L.d - 1) : null;     // + = cruzarías la línea
+      el.guideText.textContent = `Semáforo ${L.state === "red" ? "en rojo" : "en amarillo"} · línea en ${Math.round(L.d)} m`;
+      el.guide.classList.remove("ok");
+      el.guideMark.style.left = pct(-(L.d - 1));
+      el.guidePred.style.display = pe != null && pe > -9 ? "" : "none";
+      if (pe != null) el.guidePred.style.left = pct(pe);
+      el.guideSub.textContent = pe == null ? (L.d < b.v * b.v / 3 + 8 ? "¡Frena!" : "") : pe > 0.3 ? `Así cruzas la línea: frena más` : "Así frenando te detienes antes de la línea ✓";
     }
     el.hint.textContent = this.ride ? this.rideHint() : this.hint();
     if (this.ride) {
       const off = this.root.querySelector('[data-r="off"]');
-      off.disabled = !this.exitStop();
+      off.disabled = !this.exitStop()?.stop.metro;
       this.root.querySelector('[data-r="bell"]').classList.toggle("on", sim.bell);
     }
   }
@@ -544,9 +601,11 @@ class BusGame {
   rideHint() {
     const sim = this.sim, at = this.exitStop(), st = sim.nextStop;
     const K = this.touch ? { bell: "🔔 Timbre", off: "Bajarse aquí" } : { bell: "Espacio", off: "E" };
-    if (at) return `${at.stop.name}${at.stop.hint ? ` · ${at.stop.hint}` : ""} · bájate con ${K.off}`;
+    if (at && at.stop.metro) return `${at.stop.name}${at.stop.hint ? ` · ${at.stop.hint}` : ""} · bájate con ${K.off}`;
+    const metroNext = sim.route.stops.slice(sim.stopIndex).find(s => s.metro);
     if (!st) return "";
     if (sim.bell) return `Parada solicitada: el bus se detiene en ${st.name}`;
+    if (!st.metro) return `Próximo: ${st.name} (sin Metro)${metroNext ? ` · después ${metroNext.name}` : ""}`;
     return `Toca el timbre (${K.bell}) para bajarte en ${st.name}${st.hint ? ` · ${st.hint}` : ""}`;
   }
 
@@ -568,7 +627,7 @@ class BusGame {
     if (d < 160 && b.lane !== 0) return `Pásate a la pista Solo Bus (${K.right}) para el paradero`;
     const L = sim.nextLight(70);
     if (L && L.state === "red" && L.d > 0) return "Semáforo en rojo: detente antes de la línea blanca";
-    if (d < 120 && d > 0) return `Frena con ${K.brake} para dejar la puerta delantera junto al letrero azul «BUS»`;
+    if (d < 120 && d > 0) return `Frena con ${K.brake}${this.touch ? "" : " (Shift: freno suave)"} para dejar la puerta delantera junto al letrero azul «BUS»: la flecha amarilla muestra dónde quedarías`;
     if (sim.stopIndex === 0) return sim.time < sim.departure ? `Sales a las ${clockText(sim.departure, false)}` : "";
     if (b.v < 0.5) return `Acelera con ${K.gas}`;
     return "";

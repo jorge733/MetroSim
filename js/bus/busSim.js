@@ -67,11 +67,14 @@ export class BusSim {
 
     const first = route.stops[startStop];
     this.bus = {
-      s: first.s, v: 0, x: LANES[0], lane: 0, targetLane: 0,
-      throttle: 0, brake: 0, accel: 0,
+      s: first.s, v: 0, x: LANES[0], lane: 0, targetLane: 0, latV: 0,
+      throttle: 0, brake: 0, accel: 0, decel: 0,
       doors: "closed", doorT: 0,
     };
+    /* Pedales: true/false (teclado) o un número 0..1 (pedal táctil analógico, freno suave). */
     this.input = { throttle: false, brake: false };
+    this.limiter = false;              // 1.18 · limitador de velocidad (L): corta el acelerador en el máximo de la calle
+    this.lead = null;                  // 1.18 · lo que va adelante en la pista del bus: { gap, v, ttc }
 
     const n = route.stops.length;
     this.stopIndex = startStop;        // próximo paradero por atender
@@ -145,6 +148,14 @@ export class BusSim {
     this.emit("blinker", { dir });
   }
 
+  /** 1.18 · Limitador de velocidad: el motor no pasa del máximo de la calle (el freno sigue siendo tuyo). */
+  toggleLimiter() {
+    this.limiter = !this.limiter;
+    this.emit("limiter", { on: this.limiter });
+    this.msg(this.limiter ? `Limitador encendido: máximo ${Math.round(this.route.speedLimit * 3.6)} km/h` : "Limitador apagado", "info");
+    return this.limiter;
+  }
+
   toggleDoors() {
     const b = this.bus;
     if (b.doors === "closed") {
@@ -172,6 +183,7 @@ export class BusSim {
     this.updateDoors(dt);
     this.updateCars(dt);
     this.checkCollisions();
+    this.updateLead(dt);
     this.updateWaiting(dt);
     this.updateBell();
     this.checkSkip();
@@ -181,23 +193,34 @@ export class BusSim {
     const b = this.bus, R = this.route;
     const closed = b.doors === "closed";
     if (this.input.throttle && !closed) this.msg("Con las puertas abiertas el bus no acelera (enclavamiento)", "warn", "interlock", 4);
-    const wantT = this.input.throttle && closed ? 1 : 0;
-    const wantB = this.input.brake ? 1 : 0;
+    let wantT = closed ? clamp(+this.input.throttle || 0, 0, 1) : 0;
+    const wantB = clamp(+this.input.brake || 0, 0, 1);
+    // Limitador: el acelerador se va soltando solo al acercarse al máximo
+    if (this.limiter) wantT = Math.min(wantT, clamp((R.speedLimit - 0.4 - b.v) / 1.6, 0, 1));
+    // Pedales: suben y bajan de a poco (al soltar el freno vuelve más rápido que al pisarlo)
     b.throttle += clamp(wantT - b.throttle, -3 * dt, 1.8 * dt);
-    b.brake += clamp(wantB - b.brake, -4 * dt, 2.6 * dt);
-    let a = b.throttle * 1.35 * Math.max(0, 1 - b.v / 19) - b.brake * 3.4;
+    b.brake += clamp(wantB - b.brake, -3.2 * dt, (wantB < 0.6 ? 1.6 : 2.6) * dt);
+    // Tracción: más fuerza al partir (caja automática), cae con la velocidad
+    let a = b.throttle * (1.45 - 0.55 * Math.min(1, b.v / 8)) * Math.max(0, 1 - b.v / 19) - b.brake * 3.4;
     if (b.v > 0) a -= 0.06 + 0.0006 * b.v * b.v;
+    // Retardador: al soltar el acelerador sobre 15 km/h el motor frena un poco (como en un bus real)
+    if (wantT === 0 && b.throttle < 0.05 && b.v > 4.2) a -= 0.28;
     if (!closed) a = Math.min(a, -2);                     // freno de parada con puertas abiertas
     const v0 = b.v;
     b.v = Math.max(0, b.v + a * dt);
     b.accel = (b.v - v0) / dt;
+    b.decel += ((b.v > 0.05 ? -b.accel : 0) - b.decel) * Math.min(1, dt * 6);   // frenada suavizada (para la predicción)
     const prevS = b.s;
     b.s += b.v * dt;
 
     // Movimiento lateral hacia la pista elegida
+    // 1.18: con una curva suave (el bus acelera y frena de lado, como al girar el volante y enderezarlo)
     const tx = LANES[b.targetLane];
     const rate = Math.min(2.2, 0.5 + b.v * 0.35);
-    if (b.v > 0.05) b.x += clamp(tx - b.x, -rate * dt, rate * dt);
+    const want = b.v > 0.05 ? clamp((tx - b.x) * 2.4, -rate, rate) : 0;
+    b.latV += clamp(want - b.latV, -4.5 * dt, 4.5 * dt);
+    if (Math.abs(tx - b.x) < 0.04 && Math.abs(b.latV) < 0.12) { b.x = tx; b.latV = 0; }
+    else b.x += b.latV * dt;
     b.lane = LANES.reduce((best, x, i) => Math.abs(x - b.x) < Math.abs(LANES[best] - b.x) ? i : best, 0);
 
     // Semáforos en rojo
@@ -385,6 +408,41 @@ export class BusSim {
       this.bellAt = null;
       this.emit("bell");
     }
+  }
+
+  /** 1.18 · Distancia al auto de adelante en la pista del bus y aviso si se viene encima. */
+  updateLead(dt) {
+    const b = this.bus;
+    let gap = Infinity, v = 0;
+    for (const c of this.cars) {
+      if (Math.abs(c.x - b.x) > (BUS_WIDTH + CAR_WIDTH) / 2 - 0.1) continue;
+      const g = c.s - c.len - b.s;
+      if (g > -0.5 && g < gap) { gap = g; v = c.v; }
+    }
+    if (gap === Infinity || gap > 80) { this.lead = null; return; }
+    const closing = b.v - v;
+    const ttc = closing > 0.3 ? gap / closing : Infinity;
+    this.lead = { gap, v, ttc };
+    this.closeT = (b.v > 2.5 && (ttc < 2.6 || gap < b.v * 0.8)) ? (this.closeT ?? 0) + dt : 0;
+    if (this.closeT > 0.25) {
+      this.closeT = 0;
+      if (!(this.cool.headway > this.elapsed)) {
+        this.cool.headway = this.elapsed + 3;
+        this.emit("headway", { gap });
+        this.msg(`¡Distancia! Auto adelante a ${Math.max(0, Math.round(gap))} m: frena`, "warn");
+      }
+    }
+  }
+
+  /**
+   * 1.18 · Dónde quedaría detenido el bus si sigue frenando igual (metros desde la puerta delantera),
+   * o null si no está frenando. Sirve para clavar la parada en el paradero o en la línea del semáforo.
+   */
+  stopPrediction() {
+    const b = this.bus;
+    if (b.v < 0.3 || b.brake < 0.05) return null;
+    const d = Math.max(b.decel, b.brake * 3.4 * 0.9);
+    return d > 0.15 ? (b.v * b.v) / (2 * d) : null;
   }
 
   /* ----------------------------- Tráfico ----------------------------- */

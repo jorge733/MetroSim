@@ -13,6 +13,8 @@
    Sin Three.js: se puede usar en Node.
    ========================================================================== */
 
+import { RED_ROUTES } from "./redRoutes.js";
+
 /** Carriles del sentido en que va el bus (x del centro del carril, en metros). 0 = pista Solo Bus, junto a la vereda. */
 export const LANES = [5.1, 1.7, -1.7];
 export const LANE_WIDTH = 3.4;
@@ -23,6 +25,7 @@ export const MEDIAN_X = -3.4;
 export const BUS_ROUTE = {
   id: "A01",
   name: "Alameda",
+  practice: true,                             // recorrido de práctica (ficticio): el más corto
   from: "Estación Central",
   to: "Plaza Baquedano",
   color: "#d7262e",
@@ -54,7 +57,22 @@ export const BUS_ROUTE = {
 };
 
 /**
- * 1.15 · El recorrido en sentido contrario (Plaza Baquedano → Estación Central), para el pasajero:
+ * 1.18 · Recorridos reales de buses Red (js/bus/redRoutes.js, generado desde la API de red.cl con
+ * `node tools/recorridos-red.mjs`): un tramo de cada servicio por estaciones de Metro. Se completan con
+ * los datos que el juego necesita (velocidad máxima y ciclo de los semáforos, distinto en cada cruce).
+ */
+const RED = RED_ROUTES.map(r => ({
+  ...r,
+  real: true,
+  speedLimit: 50 / 3.6,
+  lights: r.lights.map((l, i) => ({ ...l, cycle: 40 + (i % 3) * 4, green: 22 + (i % 3) * 3, amber: 3, offset: (i * 17) % 40 })),
+}));
+
+/** Todos los recorridos que se pueden manejar o tomar: el A01 de práctica y los de Red. */
+export const BUS_ROUTES = [BUS_ROUTE, ...RED];
+
+/**
+ * 1.15 · El recorrido en sentido contrario (p. ej. Plaza Baquedano → Estación Central), para el pasajero:
  * los mismos paraderos y semáforos, espejados sobre el largo del recorrido.
  */
 function reversed(r) {
@@ -66,12 +84,17 @@ function reversed(r) {
     lights: r.lights.slice().reverse().map(l => ({ ...l, s: span - l.s - 16 })),
   };
 }
-export const BUS_ROUTE_BACK = reversed(BUS_ROUTE);
-/** Sentidos del recorrido: "ida" (hacia Plaza Baquedano) y "vuelta" (hacia Estación Central). */
-export const busRouteFor = (dir) => dir === "vuelta" ? BUS_ROUTE_BACK : BUS_ROUTE;
+const BACK = new Map(BUS_ROUTES.map(r => [r.id, reversed(r)]));
+export const BUS_ROUTE_BACK = BACK.get(BUS_ROUTE.id);
+export const busRouteById = (id) => BUS_ROUTES.find(r => r.id === id) ?? BUS_ROUTE;
+/** Sentidos de un recorrido: "ida" (como viene) y "vuelta" (al revés). */
+export const busRouteFor = (dir, id = BUS_ROUTE.id) => dir === "vuelta" ? BACK.get(busRouteById(id).id) : busRouteById(id);
 
-/** Nombres de las estaciones de Metro que tienen un paradero del recorrido en su calle. */
-export const BUS_METRO_STOPS = new Set(BUS_ROUTE.stops.map(st => st.metro));
+/** Nombres de las estaciones de Metro que tienen un paradero de algún recorrido en su calle. */
+export const BUS_METRO_STOPS = new Set(BUS_ROUTES.flatMap(r => r.stops.map(st => st.metro).filter(Boolean)));
+
+/** Recorridos que paran en la calle de una estación (para el letrero del paradero). */
+export const busRoutesAt = (metroName) => BUS_ROUTES.filter(r => r.stops.some(st => st.metro === metroName));
 
 /**
  * Viajes en bus que se pueden tomar en la calle de una estación de Metro:
@@ -79,10 +102,12 @@ export const BUS_METRO_STOPS = new Set(BUS_ROUTE.stops.map(st => st.metro));
  */
 export function busTripsFrom(metroName) {
   const out = [];
-  for (const dir of ["ida", "vuelta"]) {
-    const route = busRouteFor(dir);
-    const from = route.stops.findIndex(st => st.metro === metroName);
-    if (from >= 0 && from < route.stops.length - 1) out.push({ dir, route, from });
+  for (const r of BUS_ROUTES) {
+    for (const dir of ["ida", "vuelta"]) {
+      const route = busRouteFor(dir, r.id);
+      const from = route.stops.findIndex(st => st.metro === metroName);
+      if (from >= 0 && from < route.stops.length - 1) out.push({ dir, route, from });
+    }
   }
   return out;
 }
