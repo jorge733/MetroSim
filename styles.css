@@ -1742,3 +1742,127 @@ body.touch-mode .back-button.driver-job-button { top: auto; bottom: calc(120px +
 .fare-mine { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px 8px 12px; border-radius: 8px; background: #ffffff08; font-size: 13px; }
 .fare-mine.special { background: #34d17c1a; box-shadow: inset 3px 0 0 var(--ok); }
 .fare-mine .ghost-button { min-height: 32px; padding: 0 12px; font-size: 12.5px; flex: none; }
+
+/* =============================== 1.13 · MICROSIM (BUS, BETA) =============================== */
+.beta-tag { display: inline-block; vertical-align: 3px; margin-left: 6px; padding: 1px 6px; border-radius: 4px; background: #d7262e; color: #fff; font: 700 11px/1.4 var(--f-data); letter-spacing: .5px; text-transform: uppercase; }
+.mode-note { grid-column: 1 / -1; font-size: 13px; line-height: 1.6; color: #9aa6b3; }
+.mode-note kbd { margin-right: 2px; }
+
+.bus-screen { position: fixed; inset: 0; z-index: 30; background: #000; user-select: none; -webkit-user-select: none; touch-action: none; }
+.bus-canvas, .bus-canvas canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.bus-label { font: 600 10px/1.2 var(--f-data); letter-spacing: 1.2px; color: var(--muted); text-transform: uppercase; }
+.bus-screen .hidden { display: none !important; }
+
+.bus-top { position: absolute; top: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: max(12px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) 0 max(14px, env(safe-area-inset-left)); pointer-events: none; }
+.bus-brand, .bus-right { display: flex; align-items: center; gap: 10px; pointer-events: auto; }
+.bus-brand { padding: 8px 14px 8px 8px; border-radius: var(--radius); background: var(--panel); border: 1px solid var(--panel-border); backdrop-filter: blur(6px); min-width: 0; }
+.bus-badge { display: grid; place-items: center; min-width: 46px; height: 34px; padding: 0 8px; border-radius: 7px; background: #d7262e; color: #fff; font: 700 17px/1 var(--f-data); }
+.bus-route { display: grid; gap: 2px; min-width: 0; }
+.bus-route strong { font: 700 15px/1.15 var(--f-display); letter-spacing: .3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bus-pill { position: relative; display: grid; gap: 2px; padding: 7px 12px; border-radius: var(--radius); background: var(--panel); border: 1px solid var(--panel-border); backdrop-filter: blur(6px); }
+.bus-pill strong { font: 700 16px/1 var(--f-data); }
+.bus-float { position: absolute; right: 8px; top: 100%; font: 700 14px var(--f-data); color: var(--ok); opacity: 0; pointer-events: none; }
+.bus-float.show { animation: busFloat 1.6s ease-out; }
+@keyframes busFloat { 0% { opacity: 0; transform: translateY(0); } 15% { opacity: 1; } 100% { opacity: 0; transform: translateY(18px); } }
+.bus-icon-btn { display: grid; place-items: center; width: 42px; height: 42px; border-radius: var(--radius); background: var(--panel); border: 1px solid var(--panel-border); color: var(--text); cursor: pointer; }
+.bus-icon-btn svg, .bus-touch svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+.bus-strip { position: absolute; top: calc(max(12px, env(safe-area-inset-top)) + 62px); left: 50%; transform: translateX(-50%); width: min(720px, calc(100% - 32px)); height: 30px; pointer-events: none; }
+.bus-strip-track { position: absolute; left: 0; right: 0; top: 8px; height: 4px; border-radius: 2px; background: #d7262e; box-shadow: 0 0 0 1px #0006; }
+.bus-strip-stop { position: absolute; top: 4px; transform: translateX(-50%); display: grid; justify-items: center; }
+.bus-strip-stop i { width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 3px solid #d7262e; }
+.bus-strip-stop.done i { background: var(--ok); border-color: #fff; }
+.bus-strip-stop.skipped i { background: var(--emergency); border-color: #fff; }
+.bus-strip-stop em { display: none; }
+.bus-strip-bus { position: absolute; top: 2px; width: 16px; height: 16px; margin-left: -8px; border-radius: 4px; background: #fff; box-shadow: 0 0 0 2px #d7262e, 0 2px 6px #0008; transition: left .2s linear; }
+
+.bus-bell { position: absolute; top: calc(max(12px, env(safe-area-inset-top)) + 100px); left: 50%; transform: translateX(-50%); padding: 7px 16px; border-radius: 8px; background: #b5121b; color: #fff; font: 700 15px/1 var(--f-data); letter-spacing: 1.5px; box-shadow: 0 0 22px #ff2a2a88; animation: busPulse 1s ease-in-out infinite alternate; pointer-events: none; }
+@keyframes busPulse { from { opacity: .75; } to { opacity: 1; } }
+.bus-toast { position: absolute; top: calc(max(12px, env(safe-area-inset-top)) + 140px); left: 50%; transform: translateX(-50%); max-width: min(640px, calc(100% - 32px)); padding: 10px 16px; border-radius: var(--radius); background: var(--panel); border: 1px solid var(--panel-border); backdrop-filter: blur(6px); font-size: 15px; line-height: 1.4; text-align: center; pointer-events: none; }
+.bus-toast.ok { border-color: #34d17c88; }
+.bus-toast.warn { border-color: #ffc24799; color: #ffe2a8; }
+
+.bus-guide { position: absolute; left: max(14px, env(safe-area-inset-left)); bottom: max(14px, env(safe-area-inset-bottom)); width: min(300px, calc(100% - 32px)); padding: 9px 14px; border-radius: var(--radius); background: var(--panel); border: 1px solid var(--panel-border); text-align: center; font: 600 14px/1.3 var(--f-body); pointer-events: none; }
+.bus-guide.ok { border-color: var(--ok); color: #c9f5da; }
+.bus-guide-bar { position: relative; height: 10px; margin-top: 7px; border-radius: 5px; background: linear-gradient(90deg, #ff4d4d55, #ffc24755 30%, #34d17c88 45%, #34d17c88 55%, #ffc24755 70%, #ff4d4d55); }
+.bus-guide-bar b { position: absolute; left: 50%; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: #fff; }
+.bus-guide-bar i { position: absolute; top: -4px; width: 10px; height: 18px; margin-left: -5px; border-radius: 3px; background: #d7262e; border: 2px solid #fff; transition: left .1s linear; }
+
+.bus-bottom { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: center; align-items: flex-end; gap: 10px; padding: 0 max(14px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); pointer-events: none; }
+.bus-panel { padding: 12px 14px; border-radius: 12px; background: var(--panel); border: 1px solid var(--panel-border); backdrop-filter: blur(6px); }
+.bus-speed { display: grid; grid-template-columns: auto auto; gap: 8px 12px; align-items: center; }
+.bus-speed-num { display: grid; justify-items: center; }
+.bus-speed-num strong { font: 700 44px/1 var(--f-data); }
+.bus-speed-num.over strong { color: var(--emergency); }
+.bus-limit { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 50%; background: #fff; border: 5px solid #d01f1f; color: #111; font: 700 17px/1 var(--f-data); }
+.bus-pedals { grid-column: 1 / -1; display: grid; grid-template-columns: auto 1fr; gap: 4px 8px; align-items: center; }
+.bus-pedals i { display: block; height: 6px; border-radius: 3px; background: #ffffff14; overflow: hidden; }
+.bus-pedals b { display: block; height: 100%; width: 0; background: var(--power); }
+.bus-pedals .brk b { background: var(--brake); }
+.bus-next { display: grid; gap: 5px; width: min(440px, 52vw); }
+.bus-next strong { font: 700 24px/1.1 var(--f-display); }
+.bus-next-row { display: flex; flex-wrap: wrap; gap: 6px 14px; font: 600 13px/1.3 var(--f-body); color: #cfd8e2; }
+.bus-next-sub { color: var(--muted); }
+.bus-next-sub b { color: var(--text); }
+.bus-delay.ok { color: var(--ok); } .bus-delay.warn { color: var(--warn); } .bus-delay.bad { color: var(--emergency); }
+[data-k=doors].open { color: var(--warn); }
+.bus-dot { display: inline-block; width: 9px; height: 9px; margin-right: 5px; border-radius: 50%; vertical-align: 0; }
+.bus-dot.green { background: #2cff7a; } .bus-dot.amber { background: #ffb21e; } .bus-dot.red { background: #ff2d22; box-shadow: 0 0 8px #ff2d22; }
+.bus-hint { min-height: 1.3em; font: 600 13.5px/1.35 var(--f-body); color: #ffd98a; }
+
+.bus-keys { position: absolute; right: max(14px, env(safe-area-inset-right)); bottom: max(14px, env(safe-area-inset-bottom)); display: grid; gap: 4px; justify-items: end; font-size: 12px; color: var(--muted); pointer-events: none; text-shadow: 0 1px 3px #000; }
+.bus-keys kbd { margin-right: 2px; }
+@media (max-width: 1180px) { .bus-keys { display: none; } }
+
+.bus-touch { display: none; }
+.bus-touch-mode .bus-keys { display: none; }
+.bus-touch-mode .bus-touch { display: block; }
+.bus-touch button { touch-action: none; display: grid; place-items: center; gap: 2px; border-radius: 14px; border: 1px solid #ffffff30; background: #0b1118b8; color: var(--text); font: 700 11px/1 var(--f-body); backdrop-filter: blur(4px); -webkit-tap-highlight-color: transparent; }
+.bus-touch button.on { background: #ffffff30; }
+.bus-touch-left { position: absolute; left: max(12px, env(safe-area-inset-left)); bottom: max(12px, env(safe-area-inset-bottom)); display: flex; gap: 10px; }
+.bus-touch-left button { width: 70px; height: 70px; }
+.bus-touch-left svg { width: 30px; height: 30px; }
+.bus-touch-mid { position: absolute; left: max(12px, env(safe-area-inset-left)); bottom: calc(max(12px, env(safe-area-inset-bottom)) + 82px); display: flex; gap: 8px; }
+.bus-touch-mid button { width: 62px; height: 54px; }
+.bus-touch-right { position: absolute; right: max(12px, env(safe-area-inset-right)); bottom: max(12px, env(safe-area-inset-bottom)); display: flex; gap: 10px; align-items: flex-end; }
+.bus-pedal { width: 84px; height: 120px; font-size: 12px !important; letter-spacing: .8px; }
+.bus-pedal.gas { height: 150px; border-color: #5cc8ff77 !important; }
+.bus-pedal.brake { border-color: #ffb54777 !important; }
+.bus-pedal.gas.on { background: #5cc8ff55 !important; }
+.bus-pedal.brake.on { background: #ffb54755 !important; }
+.bus-touch-mode .bus-bottom { justify-content: center; padding-left: 190px; padding-right: 200px; }
+.bus-touch-mode .bus-speed { padding: 8px 10px; }
+.bus-touch-mode .bus-speed-num strong { font-size: 32px; }
+.bus-touch-mode .bus-limit { width: 36px; height: 36px; border-width: 4px; font-size: 13px; }
+.bus-touch-mode .bus-pedals { display: none; }
+.bus-touch-mode .bus-next { padding: 8px 12px; gap: 3px; }
+.bus-touch-mode .bus-next strong { font-size: 18px; }
+.bus-touch-mode .bus-guide { left: 50%; bottom: 150px; transform: translateX(-50%); }
+@media (max-width: 1100px) { .bus-screen:not(.bus-touch-mode) .bus-guide { left: 50%; bottom: 196px; transform: translateX(-50%); } }
+
+.bus-overlay { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px; background: #02050acc; backdrop-filter: blur(3px); }
+.bus-card { display: grid; gap: 12px; width: min(460px, 100%); max-height: calc(100% - 8px); overflow: auto; padding: 22px; border-radius: 14px; background: var(--surface); border: 1px solid var(--panel-border); text-align: center; }
+.bus-card h2 { font: 700 26px/1.1 var(--f-display); }
+.bus-card p { font-size: 14px; line-height: 1.5; color: #b6c1cc; }
+.bus-card-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.bus-btn { padding: 11px 18px; border-radius: var(--radius); border: 1px solid #ffffff2e; background: transparent; color: var(--text); font-weight: 700; cursor: pointer; }
+.bus-btn.primary { background: #d7262e; border-color: transparent; color: #fff; }
+.bus-btn:hover { filter: brightness(1.12); }
+.bus-grade { justify-self: center; display: grid; place-items: center; width: 84px; height: 84px; border-radius: 50%; font: 700 46px/1 var(--f-display); background: var(--raise); border: 3px solid var(--muted); }
+.bus-grade.grade-S { border-color: #ffd34d; color: #ffd34d; } .bus-grade.grade-A { border-color: var(--ok); color: var(--ok); }
+.bus-grade.grade-B { border-color: var(--power); color: var(--power); } .bus-grade.grade-C { border-color: var(--warn); color: var(--warn); }
+.bus-stats { display: grid; gap: 4px; text-align: left; }
+.bus-stats div { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border-bottom: 1px solid var(--hair); font-size: 14px; }
+.bus-stats dt { color: var(--muted); } .bus-stats dd { font: 600 14px var(--f-data); }
+
+@media (max-width: 720px) {
+  .bus-route strong { font-size: 12px; }
+  .bus-pill:nth-of-type(2) { display: none; }
+  .bus-next { width: auto; flex: 1; }
+}
+@media (max-height: 520px) and (orientation: landscape) {
+  .bus-strip { top: calc(max(8px, env(safe-area-inset-top)) + 54px); }
+  .bus-bell { top: calc(max(8px, env(safe-area-inset-top)) + 86px); }
+  .bus-toast { top: calc(max(8px, env(safe-area-inset-top)) + 86px); font-size: 13px; padding: 7px 12px; }
+  .bus-route .bus-label { display: none; }
+}

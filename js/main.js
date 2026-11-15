@@ -122,6 +122,7 @@ import { startPoint } from "./net/replica.js";
 import { setupFareInfo, openFareInfo, closeFareInfo, fareInfoOpen, tickFareInfo } from "./fareInfo.js";
 import { riderFare, riderSpecial, riderAsked, riderCategory } from "./rider.js";
 import { setupRiderPanel, openRiderPanel, closeRiderPanel, riderPanelOpen } from "./riderPanel.js";
+import { startBusGame } from "./bus/busGame.js";
 
 // La vía en 3D sigue las pendientes reales: se engancha antes de compilar ningún material
 installTrackLift();
@@ -485,7 +486,7 @@ window.addEventListener("resize", onResize);
 if (wantsTouch()) document.body.classList.add("touch-mode");
 
 // Acceso de depuración desde la consola: MetroSim.game.traffic, etc.
-window.MetroSim = { get game() { return game; }, hud, bank, card, CONFIG, get STATIONS() { return STATIONS; }, get ROUTES() { return ROUTES; }, LINES };
+window.MetroSim = { get game() { return game; }, get bus() { return bus; }, hud, bank, card, CONFIG, get STATIONS() { return STATIONS; }, get ROUTES() { return ROUTES; }, LINES };
 
 
 /* ==========================================================================
@@ -526,6 +527,7 @@ async function joinRoomAsDriver() {
 
 function startGame(mode, opts = {}) {
   if (game) stopGame();
+  if (mode === "bus") return startBus();
   if (mode === "control") return startControl(opts);
   if (mode === "driver" && !inventory.canDrive(driverLineSelect.value)) {
     const lic = LICENSES.find(x => x.lineId === driverLineSelect.value);
@@ -844,6 +846,28 @@ function stopGame({ keepFullscreen = false } = {}) {
   }
 }
 
+/* 1.13 · MicroSim (beta): el modo bus tiene su propia pantalla y su propio ciclo (js/bus/) */
+let bus = null;
+function startBus() {
+  if (bus) return;
+  startScreen.classList.add("hidden");
+  if (wantsTouch()) enterMobileFullscreen();       // dentro del gesto del usuario
+  bus = startBusGame({
+    bank, muted, touch: wantsTouch(),
+    onMuteChange: (m) => { muted = m; saveSetting("metrosim.muted", m ? "1" : "0"); hud.setSound(!m); },
+    onExit: () => {
+      bus = null;
+      startScreen.classList.remove("hidden");
+      refreshDriverLines();                        // saldo al volver a la portada
+      exitMobileFullscreen();
+      disarmBackTrap();
+      releaseScreen();
+    },
+  });
+  armBackTrap();
+  keepScreenOn();
+}
+
 /* Celular: pantalla completa y horizontal mientras se juega (si el navegador lo permite;
    en iPhone no existe y el juego sigue igual, con el aviso de girar el teléfono). */
 let ownFullscreen = false;
@@ -885,6 +909,7 @@ window.addEventListener("popstate", () => {
   else if (confirmOpen) closeConfirm(false);
   else if (riderPanelOpen()) closeRiderPanel();
   else if (fareInfoOpen()) closeFareInfo();
+  else if (bus) { bus.requestExit(); if (bus) armBackTrap(); }   // MicroSim: pausa (y desde la pausa, portada)
   else if (game && hud.ticketOpen) hud.closeTicket();
   else if (game && hud.storeOpen) hud.closeStore();
   else if (game && hud.missionsOpen) hud.closeMissions();

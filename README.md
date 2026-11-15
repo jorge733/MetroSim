@@ -118,6 +118,32 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **Salir por los torniquetes es gratis**: solo se cobra el pasaje al pasar hacia la zona pagada (antes, al terminar
   de cruzar el torniquete de salida se cobraba un pasaje).
 
+## Versión 1.13 · MicroSim: conductor de bus (beta)
+
+Un modo nuevo en la portada, **MicroSim · Bus**, el primer paso para simular también los buses de Santiago
+(código en `js/bus/`, aparte del metro):
+
+- **Recorrido de prueba A01 por la Alameda**, de Estación Central a Plaza Baquedano (~4 km, 9 paraderos con el nombre
+  del lugar real; el número de recorrido es ficticio y las distancias son aproximadas).
+- **Manejo**: <kbd>W</kbd>/<kbd>S</kbd> acelerar y frenar (el pedal sube y baja de a poco), <kbd>A</kbd>/<kbd>D</kbd>
+  cambiar de pista (con intermitente; no deja si el auto de al lado está ahí), <kbd>Espacio</kbd> puertas,
+  <kbd>B</kbd> bocina, <kbd>C</kbd> cámara (desde atrás o desde el asiento del conductor), <kbd>Esc</kbd> pausa.
+  En el celular hay botones táctiles: pedales de freno y acelerador, pistas, puertas, bocina y cámara.
+- **Calle con tráfico**: pista Solo Bus junto a la vereda, dos pistas para autos, bandejón central con árboles y
+  autos de vuelta al otro lado. Los autos siguen al de adelante (modelo IDM), frenan ante el bus, se cambian de pista
+  si quedan atrapados y respetan los **8 semáforos** de las calles que cruzan.
+- **Paraderos**: hay que detenerse en la pista Solo Bus con la puerta delantera junto al letrero azul «BUS» (una guía
+  muestra la distancia a la marca), abrir las puertas y esperar que bajen y suban todos (cada uno valida su bip!).
+  Con las puertas abiertas el bus no acelera (enclavamiento). La gente que espera aumenta con el tiempo y depende de la
+  hora (la misma curva de demanda del metro). El **timbre de parada solicitada** se enciende cuando alguien a bordo
+  quiere bajar en el próximo paradero; si nadie espera ni pidió parada, se puede seguir de largo.
+- **Puntaje y sueldo**: cada paradero paga según la precisión de la parada, el horario (velocidad comercial de
+  21 km/h) y los pasajeros atendidos, menos las faltas: luz roja, exceso de velocidad, frenadas bruscas con gente a
+  bordo, choques, abrir fuera del paradero, saltarse un paradero o dejar gente abajo. Al final hay nota (S a D) y bono.
+  **El sueldo va a la misma cuenta del Banco Andino** que el del metro.
+- De día, al atardecer o de noche según la hora real, con la cordillera al fondo. Sonidos procedurales: motor diésel,
+  puertas neumáticas, validador, timbre, intermitente y bocina.
+
 ## Versión 1.12 · Consola realista en el celular
 
 Solo en pantallas de celular (en la tablet y el computador todo sigue igual):
