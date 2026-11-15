@@ -1891,6 +1891,7 @@ body.touch-mode .back-button.driver-job-button { top: auto; bottom: calc(120px +
 .bus-touch-mode .bus-speed { padding: 8px 10px; }
 .bus-touch-mode .bus-speed-num strong { font-size: 32px; }
 .bus-touch-mode .bus-limit { width: 36px; height: 36px; border-width: 4px; font-size: 13px; }
+.bus-touch-mode .bus-limit small { display: none; }
 .bus-touch-mode .bus-pedals { display: none; }
 .bus-touch-mode .bus-next { padding: 8px 12px; gap: 3px; }
 .bus-touch-mode .bus-next strong { font-size: 18px; }

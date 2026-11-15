@@ -155,6 +155,15 @@ trenes de los dos motores quedan a ~1 m (mediana).
   horizontal, texto y mapa van lado a lado (antes el mapa tapaba todo). El texto que se escribe solo ya reserva su
   espacio y no empuja los botones. En la portada, el titular es «Conduce trenes y buses, y viaja por Santiago en 3D»
   y las tarjetas Pasajero y Centro de Control nombran el tren, el bus y la sala multijugador.
+- **1.18.2 · Arreglos del conductor de bus:**
+  - **La nota ya no baja al pasar de largo un paradero vacío** (sin gente esperando ni timbre): antes contaba
+    200 puntos posibles que no se podían ganar, y un recorrido bien hecho de noche terminaba en D.
+  - **Llegar adelantado se corrige esperando**: si llegas antes de la hora, la puntualidad se mide al cerrar las
+    puertas (al salir), como hacen los conductores para no adelantarse. El aviso y el consejo dicen desde qué hora
+    puedes salir. Antes se medía al abrir las puertas, así que esperar no servía.
+  - Los **pedales táctiles** ya no quedan pisados al pausar, al cambiar de app o al terminar el recorrido.
+  - Después de **rozar un auto al cambiar de pista** el bus ya no sigue deslizándose de lado hacia él.
+  - En el celular, la etiqueta «LIM» del límite de velocidad ya no queda cortada en el borde de la pantalla.
 
 ## Versión 1.17 · Interfaz más clara en todas las pantallas
 

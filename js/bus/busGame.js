@@ -86,7 +86,7 @@ class BusGame {
     this.onKeyDown = (e) => this.keyDown(e);
     this.onKeyUp = (e) => this.keyUp(e);
     this.onResize = () => this.resize();
-    this.onBlur = () => { this.keys.clear(); this.syncInput(); };
+    this.onBlur = () => { this.releaseControls(); this.syncInput(); };
     addEventListener("keydown", this.onKeyDown);
     addEventListener("keyup", this.onKeyUp);
     addEventListener("resize", this.onResize);
@@ -342,7 +342,7 @@ class BusGame {
     if (this.sim.finished) return;
     this.paused = p;
     this.el.pause.classList.toggle("hidden", !p);
-    this.keys.clear();
+    this.releaseControls();
     this.syncInput();
     this.audio.horn(false);
   }
@@ -375,6 +375,12 @@ class BusGame {
   keyUp(e) {
     this.keys.delete(e.key.toLowerCase());
     this.syncInput();
+  }
+  /** Suelta todo (teclas y pedales táctiles): al pausar, al perder el foco y al terminar. */
+  releaseControls() {
+    this.keys.clear();
+    this.touchPedal.throttle = this.touchPedal.brake = 0;
+    this.root?.querySelectorAll(".bus-touch .on").forEach(b => b.classList.remove("on"));
   }
   syncInput() {
     const k = this.keys, tp = this.touchPedal;
@@ -515,7 +521,7 @@ class BusGame {
     this.el.summaryCard.querySelector("[data-a=again]").addEventListener("click", () => this.newRun());
     this.el.summaryCard.querySelector("[data-a=quit]").addEventListener("click", () => this.exit());
     setTimeout(() => this.el.summary.classList.remove("hidden"), 900);
-    this.keys.clear();
+    this.releaseControls();
     this.syncInput();
   }
 
@@ -617,7 +623,11 @@ class BusGame {
       : { doors: "Espacio", gas: "W", brake: "S", right: "D" };
     if (sim.finished) return "";
     if (sim.serving && !sim.serving.done) return "Subiendo y bajando pasajeros…";
-    if (sim.serving?.done) return `Cierra las puertas (${K.doors}) y sigue`;
+    if (sim.serving?.done) {
+      const due = sim.timetable[sim.serving.index].time;
+      if (due - sim.time > 60) return `Vas adelantado: espera con las puertas abiertas; puedes salir desde las ${clockText(due - 60)}`;
+      return `Cierra las puertas (${K.doors}) y sigue`;
+    }
     if (b.doors !== "closed") return `Cierra las puertas (${K.doors}) para poder avanzar`;
     if (!st) return "";
     const d = st.s - b.s;

@@ -318,8 +318,10 @@ export class BusSim {
     sv.done = true;
     const full = this.onboard.length >= BUS_CAPACITY && this.waiting[sv.index] > 0;
     this.emit("boardingDone", { index: sv.index, full });
+    const early = this.timetable[sv.index].time - this.time;
     this.msg(last ? "Fin del recorrido: todos abajo. Cierra las puertas para terminar el servicio"
       : full ? "Bus lleno: el resto espera el próximo. Cierra las puertas"
+      : early > 60 ? `Todos arriba. Vas ${Math.round(early)} s adelantado: espera con las puertas abiertas antes de seguir`
       : "Todos arriba: cierra las puertas y sigue", "ok");
   }
 
@@ -339,14 +341,16 @@ export class BusSim {
   }
 
   /** Cierra la atención de un paradero: puntos, sueldo y siguiente paradero. */
-  finishStop(i, sv) {
+  finishStop(i, sv, { free = false } = {}) {
     const st = this.route.stops[i];
     const due = this.timetable[i].time;
     let precision = 0, punctual = 0, delay = null;
     if (sv) {
       const err = Math.abs(sv.error);
       precision = err <= 1.5 ? 100 : err <= 3.5 ? 70 : err <= 6 ? 40 : 15;
-      delay = (i === 0 ? this.time : sv.arrival) - due;
+      // Atrasado: cuenta la llegada. Adelantado: cuenta la SALIDA (esperar con las puertas abiertas lo corrige,
+      // como hacen los conductores para no adelantarse al horario). En el primer paradero, siempre la salida.
+      delay = i === 0 || sv.arrival < due ? this.time - due : sv.arrival - due;
       punctual = Math.abs(delay) <= 60 ? 100 : Math.abs(delay) <= 180 ? 50 : 0;
       if (punctual === 100) this.totals.onTime++;
       this.totals.boarded += sv.boarded;
@@ -361,7 +365,7 @@ export class BusSim {
     const pay = gross - discount;
     this.pendingDeduction = 0;
     this.points += gained;
-    this.totals.maxPoints += 200 + moved * 5;
+    if (!free) this.totals.maxPoints += 200 + moved * 5;     // pasar de largo un paradero vacío no baja la nota
     this.totals.wage += pay;
     const result = { index: i, name: st.name, served: !!sv, precision, punctual, delay, moved, gained, perfect, pay, discount, error: sv?.error ?? null };
     this.results.push(result);
@@ -387,7 +391,7 @@ export class BusSim {
       this.emit("complaint");
     } else this.msg(`Nadie en ${st.name} y nadie pidió parada: sigues de largo`, "ok");
     if (!wanted) this.totals.served++;
-    this.finishStop(i, null);
+    this.finishStop(i, null, { free: !wanted && i !== this.route.stops.length - 1 });
   }
 
   updateWaiting(dt) {
@@ -562,6 +566,7 @@ export class BusSim {
           this.emit("crash");
         }
         b.targetLane = LANES.indexOf(LANES.reduce((best, x) => Math.abs(x - b.x) < Math.abs(best - b.x) ? x : best));
+        b.latV = 0;
         car.s = rear - 0.4;
         car.v = 0;
       }
