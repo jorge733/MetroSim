@@ -144,6 +144,7 @@ RedMoviSim estrena una interfaz hecha desde cero: identidad propia (ya no la del
 - Fin de la mantención (`js/mantencion.js`, `ACTIVA = false`). Lo hecho mientras tanto quedó en las 1.20.5 a 1.20.8.
 - **2.0.1 · Imágenes del post «¡Ya volvimos! · RedMoviSim 2.0»** (`post-volvimos/`): post cuadrado, historia y
   portada horizontal con capturas reales de la portada nueva en PC y celular. Se generan con `node generar.js plantilla.html`.
+- **2.0.2 · Post «¡Ya volvimos!» con el celular en horizontal** (`post-volvimos/`).
 
 ## Versión 1.20 · La calle del bus usa todo lo del Metro
 

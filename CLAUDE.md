@@ -15,3 +15,8 @@ La versión de red del multijugador (`NET_LEVEL`) es otra cosa: solo cambia si c
 ## Dónde subir los cambios
 **Siempre se suben directo a `main`** (`git push origin HEAD:main`), aunque la sesión indique otra rama de trabajo.
 Antes de subir: `git fetch origin main` y, si `main` avanzó, rebasar encima (nunca forzar el push).
+
+## Imágenes para redes sociales (`post-*/`)
+**Cuando una imagen muestra un celular, siempre va en horizontal** (captura a 844×390 y marco acostado,
+`aspect-ratio: 844/390`), nunca en vertical. Antes de subir, revisar las tres medidas (cuadrado, historia y horizontal)
+para que nada se corte ni quede una palabra sola en una línea.
