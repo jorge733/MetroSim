@@ -159,8 +159,9 @@ kbd {
 @keyframes clockPulse { 0% { transform: scale(1.12); } 100% { transform: none; } }
 .clock-note { font-size: 12px; color: var(--muted); line-height: 1.35; }
 .weather-picker { display: grid; gap: 6px; }
-.weather-seg button { padding: 4px 6px; text-align: center; }
-.weather-seg button b { font-size: 15px; white-space: nowrap; }
+.weather-seg button { padding: 6px 2px 5px; text-align: center; justify-items: center; gap: 2px; }
+.weather-seg button b { font-size: 17px; line-height: 1; white-space: nowrap; }
+.weather-seg button span { font-size: 11px; max-width: 100%; letter-spacing: -.1px; }
 .weather-now { font-size: 12px; color: var(--muted); line-height: 1.35; }
 
 .start-tools { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -282,6 +283,22 @@ body.touch-mode .start-keys { display: none; }
   .mode-opts { grid-template-columns: minmax(0, 1fr); margin-left: 0; }
   .shop-launch { grid-template-columns: auto minmax(0, 1fr) auto; }
   .shop-launch span { display: none; }
+}
+/* Celular o tableta en vertical: los modos de juego suben justo después de la línea elegida
+   (antes había que bajar pasando por la hora y el clima para llegar a «Conducir») */
+@media (max-width: 900px) and (min-height: 521px) {
+  .start-side, .start-main { display: contents; }
+  .start-layout { gap: 14px; }
+  .start-brand { order: 1; } .start-hero { order: 2; } .line-picker { order: 3; } .line-card { order: 4; }
+  .start-main > .small-label { order: 5; margin-top: 8px; } .mode-selection { order: 6; } .shop-launch { order: 7; }
+  .clock-now { order: 8; margin-top: 2px; } .weather-picker { order: 9; } .start-tools { order: 10; }
+  .start-keys { order: 11; } .start-note { order: 12; }
+  .start-tools:not(:has(.tool-button:not([hidden]))) { display: none; }
+}
+@media (max-width: 900px), (max-height: 520px) and (orientation: landscape) {
+  /* Ida/Vuelta y vehículos: el recorrido se lee entero en dos líneas en vez de cortarse con «…» */
+  #directionSeg button span, #vehicleSeg button span { white-space: normal; }
+  #vehicleSeg button { padding-inline: 10px; }
 }
 /* Celular en horizontal: marca y modos lado a lado, todo más compacto */
 @media (max-height: 520px) and (orientation: landscape) {

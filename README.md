@@ -140,6 +140,10 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - Mismas simplificaciones que el Tren Nos: 5 coches, 80 km/h y vía dibujada en trinchera. Como el recorrido es largo,
   la escena 3D del Tren Rancagua pesa unas 3 veces la del Tren Nos (~650 mil triángulos por cuadro): bien en un
   computador, puede andar más lento en celulares modestos.
+- **1.16.1 · Portada más cómoda:** en el celular y la tableta en vertical, los modos de juego (Conducir, Pasajero,
+  Centro de Control) aparecen justo después de la línea elegida; la hora, la tarifa y el clima quedan más abajo. Los
+  botones del clima muestran ícono y nombre («Ahora» lleva el ícono del tiempo real), y el recorrido de Ida/Vuelta y
+  de cada vehículo se lee entero en pantallas angostas en vez de cortarse con «…».
 
 ## Versión 1.15 · Todo conectado: Tren Nos y bus para el pasajero
 

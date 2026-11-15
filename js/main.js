@@ -365,8 +365,11 @@ function renderWeather() {
   if (!seg) return;
   seg.replaceChildren(...WEATHER_CHOICES.map(id => {
     const btn = document.createElement("button");
-    btn.innerHTML = `<b></b>`;
-    btn.firstChild.textContent = id === "real" ? "Real" : WEATHER_KINDS[id].icon;
+    btn.innerHTML = `<b></b><span></span>`;
+    // Ícono arriba y nombre abajo («Real» muestra el ícono del tiempo de ahora)
+    const now = realWeather?.kind || typicalWeather(new Date()).kind;
+    btn.firstChild.textContent = WEATHER_KINDS[id === "real" ? now : id]?.icon || "📍";
+    btn.lastChild.textContent = id === "real" ? "Ahora" : id === "despejado" ? "Sol" : WEATHER_KINDS[id].label;
     btn.title = id === "real" ? "El tiempo de ahora en Santiago" : WEATHER_KINDS[id].label;
     btn.setAttribute("aria-label", btn.title);
     btn.setAttribute("role", "radio");
