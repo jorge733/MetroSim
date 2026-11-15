@@ -119,7 +119,7 @@ class BusGame {
       <header class="bus-top">
         <div class="bus-brand">
           <span class="bus-badge">${R.id}</span>
-          <div class="bus-route"><span class="bus-label">MICROSIM · BETA · CONDUCTOR DE BUS</span><strong>${esc(R.name.toUpperCase())} · ${esc(R.from.toUpperCase())} → ${esc(R.to.toUpperCase())}</strong></div>
+          <div class="bus-route"><span class="bus-label">BUSES · CONDUCTOR DE BUS · BETA</span><strong>${esc(R.name.toUpperCase())} · ${esc(R.from.toUpperCase())} → ${esc(R.to.toUpperCase())}</strong></div>
         </div>
         <div class="bus-right">
           <div class="bus-pill"><span class="bus-label">CUENTA</span><strong data-k="bank">$0</strong><span class="bus-float" data-k="float"></span></div>
@@ -179,7 +179,7 @@ class BusGame {
       </div>
       <div class="bus-overlay bus-pause hidden" data-k="pause">
         <div class="bus-card">
-          <span class="bus-label">MICROSIM · PAUSA</span>
+          <span class="bus-label">CONDUCTOR DE BUS · PAUSA</span>
           <h2>Recorrido ${R.id} · ${esc(R.name)}</h2>
           <p>El sueldo de cada paradero ya está en tu cuenta. Si terminas ahora no recibes el bono del servicio.</p>
           <div class="bus-card-actions">
@@ -362,7 +362,7 @@ class BusGame {
 
   onStopDone(r) {
     if (r.pay > 0) {
-      this.bank.deposit(r.pay, `MicroSim · paradero ${r.name}`, { wage: true });
+      this.bank.deposit(r.pay, `Bus ${BUS_ROUTE.id} · paradero ${r.name}`, { wage: true });
       this.earned += r.pay;
       this.updateBank();
       this.moneyFloat(r.pay);
@@ -380,7 +380,7 @@ class BusGame {
 
   onFinished(e) {
     if (e.bonus) {
-      this.bank.deposit(e.bonus, `MicroSim · bono del recorrido ${BUS_ROUTE.id} (nota ${e.grade})`, { wage: true });
+      this.bank.deposit(e.bonus, `Bus · bono del recorrido ${BUS_ROUTE.id} (nota ${e.grade})`, { wage: true });
       this.earned += e.bonus;
       this.updateBank();
       this.moneyFloat(e.bonus);
@@ -398,11 +398,11 @@ class BusGame {
       ["Ganado en este recorrido", formatCLP(this.earned)],
     ];
     this.el.summaryCard.innerHTML = `
-      <span class="bus-label">MICROSIM · FIN DEL RECORRIDO ${BUS_ROUTE.id}</span>
+      <span class="bus-label">BUSES · FIN DEL RECORRIDO ${BUS_ROUTE.id}</span>
       <div class="bus-grade grade-${e.grade}">${e.grade}</div>
       <h2>${esc(BUS_ROUTE.from)} → ${esc(BUS_ROUTE.to)}</h2>
       <dl class="bus-stats">${rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("")}</dl>
-      <p>Lo ganado ya está en tu cuenta del ${esc(BANK_NAME)}: úsalo como pasajero en el metro.</p>
+      <p>Lo ganado ya está en tu cuenta del ${esc(BANK_NAME)}: úsalo como pasajero en el Metro o en la Tienda.</p>
       <div class="bus-card-actions">
         <button class="bus-btn primary" data-a="again">Otra vuelta</button>
         <button class="bus-btn" data-a="quit">Volver a la portada</button>

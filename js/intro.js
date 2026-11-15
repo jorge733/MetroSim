@@ -37,11 +37,12 @@ const CSS = `
 .intro.city .intro-ui{opacity:1}
 .intro-left{display:grid;gap:14px;justify-items:start}
 .intro-brand{display:flex;align-items:center;gap:16px}
-.intro-logo{width:clamp(84px,10vw,120px);height:auto;filter:drop-shadow(0 0 30px #e1251b88);transform:scale(.4) rotate(-12deg);opacity:0;transition:transform 1s cubic-bezier(.2,1.6,.4,1),opacity .6s}
+.intro-logo{width:clamp(84px,10vw,120px);height:auto;filter:drop-shadow(0 0 30px #d7262e88);transform:scale(.4) rotate(-12deg);opacity:0;transition:transform 1s cubic-bezier(.2,1.6,.4,1),opacity .6s}
 .intro.city .intro-logo{transform:none;opacity:1}
 .intro-title{font-family:var(--f-display);font-weight:700;font-size:clamp(52px,8.5vw,112px);line-height:.9;letter-spacing:-1px;text-shadow:0 10px 50px #000c}
 .intro-title span{display:inline-block;opacity:0;transform:translateY(-60px) rotate(-8deg)}
 .intro.city .intro-title span{animation:introDrop .7s cubic-bezier(.2,1.4,.4,1) forwards}
+.intro-title span.mv{color:#ff5a61}
 .intro-brand>div{display:grid;gap:8px;justify-items:start}
 .intro-eyebrow{font-family:var(--f-data);font-size:12px;letter-spacing:3px;color:#ffd166;font-weight:700}
 .intro-version{display:inline-flex;align-items:center;gap:7px;padding:4px 10px 4px 8px;border:1px solid #ffd16655;border-radius:999px;background:#ffd16614;color:#ffe3a3;font-size:11px;font-weight:800;letter-spacing:2px;opacity:0;transform:translateY(8px);transition:opacity .6s 1.1s,transform .6s 1.1s}
@@ -506,7 +507,7 @@ function welcomeSound(muted) {
       speechSynthesis.cancel();
       speechSynthesis.resume();   // Chrome a veces deja la cola en pausa
       const natural = v && /natural|online|neural|premium|enhanced|google/i.test(v.name);
-      const phrases = [greeting(), "Te damos la bienvenida a MetroSim,", "el simulador del Metro de Santiago."];
+      const phrases = [greeting(), "Te damos la bienvenida a RedMoviSim,", "el simulador del transporte público de Santiago."];
       phrases.forEach((text, i) => {
         const u = new SpeechSynthesisUtterance(text);
         if (v) { u.voice = v; u.lang = v.lang; } else u.lang = "es-CL";
@@ -540,14 +541,14 @@ export function playIntro({ isMuted = () => false, menuReady = null } = {}) {
   // Artículos de la Tienda Metro: licencias, libreas de pago, contratos, el depto, sus muebles y un recuerdo por estación de cada línea
   const shopItems = LICENSES.length + LIVERIES.filter(l => l.price > 0).length + CONTRACTS.length + 1 + FURNITURE.length
     + LINES.reduce((n, l) => n + l.stations.length, 0);
-  const title = "MetroSim".split("").map((ch, i) => `<span style="animation-delay:${0.25 + i * 0.07}s">${ch}</span>`).join("");
+  const title = "RedMoviSim".split("").map((ch, i) => `<span${ch === "M" || ch === "o" || ch === "v" || (ch === "i" && i === 6) ? ' class="mv"' : ""} style="animation-delay:${0.25 + i * 0.06}s">${ch}</span>`).join("");
   const C = LINE_COLORS;
   const cards = [
     [C["1"], "🚇 Conduce desde la cabina", "DMI, mandos y señales reales. Cada estación bien servida te paga al instante."],
     [C["2"], "🚶 Viaja a pie", "Combina entre líneas por los pasillos, usa los ascensores y sal caminando a la calle."],
     [C["4A"], "🏙️ Sal a la ciudad", `${landmarks} hitos: La Moneda, Costanera Center, la Catedral, el Estadio Nacional…`],
     [C["5"], "🎯 Libreta de misiones", "Compras, fotos, encargos y contrarreloj. Completar una línea se celebra."],
-    [C["3"], "🛍️ Tienda Metro", "Licencias, libreas para tu tren, contratos con más sueldo, tu depto y recuerdos."],
+    ["#d7262e", "🚌 Maneja un bus", "Por la Alameda: pista Solo Bus, semáforos, autos y paraderos con gente esperando."],
     [C["6"], "🖥️ Centro de Control", `Supervisa las ${LINES.length} líneas en tiempo real: retén trenes y regula intervalos.`],
   ];
 
@@ -558,7 +559,7 @@ export function playIntro({ isMuted = () => false, menuReady = null } = {}) {
     <button class="intro-skip">Saltar ›</button>
     <div class="intro-ui">
       <div class="intro-left">
-        <div class="intro-brand"><img class="intro-logo" src="logo.svg" alt="MetroSim"><div><span class="intro-eyebrow">SIMULADOR · METRO DE SANTIAGO</span><span class="intro-version">VERSIÓN ${VERSION} · ESTABLE</span></div></div>
+        <div class="intro-brand"><img class="intro-logo" src="logo.svg" alt="RedMoviSim"><div><span class="intro-eyebrow">SIMULADOR · TRANSPORTE PÚBLICO DE SANTIAGO</span><span class="intro-version">VERSIÓN ${VERSION} · ESTABLE</span></div></div>
         <h1 class="intro-title">${title}</h1>
         <p class="intro-sub"><span class="typed"></span><span class="caret"></span></p>
         <div class="intro-stats">

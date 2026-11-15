@@ -1,7 +1,7 @@
 /* ==========================================================================
    MetroSim — 1.0 · pwa.js
    App instalable (PWA): registra el service worker (sw.js) y muestra el
-   botón "Instalar MetroSim" en la pantalla inicial.
+   botón "Instalar RedMoviSim" en la pantalla inicial.
 
      · Chrome / Edge / Android: el navegador avisa que se puede instalar
        (beforeinstallprompt); el botón abre su diálogo de instalación.
@@ -42,7 +42,7 @@ export function setupPWA(button) {
       deferred = null;
       if (outcome === "accepted") show(false);
     } else if (isIOS()) {
-      alert("Para instalar MetroSim en tu iPhone o iPad:\n\n1. Toca Compartir (el cuadrado con la flecha).\n2. Elige «Agregar a inicio».\n\nSe abrirá a pantalla completa, como una app.");
+      alert("Para instalar RedMoviSim en tu iPhone o iPad:\n\n1. Toca Compartir (el cuadrado con la flecha).\n2. Elige «Agregar a inicio».\n\nSe abrirá a pantalla completa, como una app.");
     }
   });
 }

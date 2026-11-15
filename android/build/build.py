@@ -102,13 +102,13 @@ def manifest_xml(version_name, version_code):
         # orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|screenLayout|uiMode|navigation: no se reinicia al girar
         a("configChanges", 0xFF0, H),
         a("screenOrientation", 6, I),             # sensorLandscape: horizontal, en cualquiera de los dos sentidos
-        a("label", "MetroSim", S),
+        a("label", "RedMoviSim", S),
     ], [("intent-filter", [], [
         ("action", [a("name", "android.intent.action.MAIN", S)], []),
         ("category", [a("name", "android.intent.category.LAUNCHER", S)], []),
     ])])
     app = ("application", [
-        a("label", "MetroSim", S),
+        a("label", "RedMoviSim", S),
         a("icon", 0x7F010000, R),
         a("theme", 0x01030007, R),                 # @android:style/Theme.NoTitleBar.Fullscreen
         a("hardwareAccelerated", True, B),

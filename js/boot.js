@@ -13,4 +13,4 @@ const isMuted = () => { try { return localStorage.getItem("metrosim.muted") === 
 
 const game = import("./main.js");
 playIntro({ isMuted, menuReady: game });
-game.catch(err => console.error("MetroSim no pudo cargar el juego:", err));
+game.catch(err => console.error("RedMoviSim no pudo cargar el juego:", err));

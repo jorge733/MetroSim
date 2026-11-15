@@ -1,8 +1,14 @@
-# MetroSim
+# RedMoviSim
 
-Simulador ferroviario 3D del **Metro de Santiago**: líneas 1, 2, 3, 4, 4A, 5 y 6 para navegador, hecho con HTML, CSS, JavaScript y [Three.js](https://threejs.org/).
+Simulador 3D del **transporte público de Santiago**: el **Metro** (líneas 1, 2, 3, 4, 4A, 5 y 6) y los **buses**,
+para navegador, hecho con HTML, CSS, JavaScript y [Three.js](https://threejs.org/). Se juega en
+**https://redmovisim.benedettowebs.cl/**. Antes se llamaba **MetroSim**.
 
 Conductor y pasajero comparten el mismo mundo: los mismos trenes, señales, horarios y viajeros.
+
+> RedMoviSim es un proyecto independiente y gratuito, **sin relación** con Red Metropolitana de Movilidad, Metro de
+> Santiago ni el Ministerio de Transportes y Telecomunicaciones. El logo es propio; los nombres de líneas, estaciones y
+> lugares se usan solo como referencia.
 
 ## Cómo ejecutarlo
 
@@ -117,6 +123,22 @@ trenes de los dos motores quedan a ~1 m (mediana).
   (Esc, «Seguir jugando» u otro «atrás» cancela; Enter confirma).
 - **Salir por los torniquetes es gratis**: solo se cobra el pasaje al pasar hacia la zona pagada (antes, al terminar
   de cruzar el torniquete de salida se cobraba un pasaje).
+
+## Versión 1.14 · RedMoviSim
+
+**MetroSim pasa a llamarse RedMoviSim, simulador del transporte público de Santiago**: Metro y buses en un mismo juego.
+
+- **Nombre y logo propio** (`logo.svg`, `favicon.svg`, `icons/icon.svg` y sus PNG): una placa roja con dos recorridos
+  que se cruzan en un nodo de combinación. No usa el logo ni la tipografía de Red ni de Metro.
+- **Dominio nuevo**: **https://redmovisim.benedettowebs.cl/** en el enlace canónico, los datos estructurados,
+  `robots.txt` y `sitemap.xml`. Nueva `icons/og.jpg` para compartir el enlace.
+- **Portada por medio de transporte**: los modos se agrupan en **Metro** (Conductor, Pasajero a pie, Centro de Control)
+  y **Buses** (Conductor de bus, antes «MicroSim»). Abajo, una nota aclara que es un proyecto independiente.
+- La intro, la app instalable (PWA), el título de la página, la descripción para buscadores y el nombre del APK
+  (al reconstruirlo) dicen RedMoviSim.
+- **Nada se pierde**: el saldo, las licencias, la tienda y el progreso siguen guardados igual en el navegador. El APK
+  mantiene su paquete (`cl.metrosim.app`), así que se actualiza encima del anterior. La sala multijugador no cambió
+  (`NET_LEVEL` igual): se puede jugar entre RedMoviSim y MetroSim 1.13.
 
 ## Versión 1.13 · MicroSim: conductor de bus (beta)
 

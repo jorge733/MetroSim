@@ -486,7 +486,7 @@ window.addEventListener("resize", onResize);
 if (wantsTouch()) document.body.classList.add("touch-mode");
 
 // Acceso de depuración desde la consola: MetroSim.game.traffic, etc.
-window.MetroSim = { get game() { return game; }, get bus() { return bus; }, hud, bank, card, CONFIG, get STATIONS() { return STATIONS; }, get ROUTES() { return ROUTES; }, LINES };
+window.MetroSim = window.RedMoviSim = { get game() { return game; }, get bus() { return bus; }, hud, bank, card, CONFIG, get STATIONS() { return STATIONS; }, get ROUTES() { return ROUTES; }, LINES };
 
 
 /* ==========================================================================
@@ -846,7 +846,7 @@ function stopGame({ keepFullscreen = false } = {}) {
   }
 }
 
-/* 1.13 · MicroSim (beta): el modo bus tiene su propia pantalla y su propio ciclo (js/bus/) */
+/* 1.13 · Conductor de bus (beta, antes «MicroSim»): el modo bus tiene su propia pantalla y su propio ciclo (js/bus/) */
 let bus = null;
 function startBus() {
   if (bus) return;

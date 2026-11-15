@@ -1,6 +1,6 @@
-# Kit de difusión · MetroSim
+# Kit de difusión · RedMoviSim
 
-Enlace del juego: **https://metrosim.app/**
+Enlace del juego: **https://redmovisim.benedettowebs.cl/**
 Código: https://github.com/jorge733/MetroSim
 
 ---
@@ -17,17 +17,18 @@ Código: https://github.com/jorge733/MetroSim
 
 ## 1. Frase corta (bio, descripción, pie de foto)
 
-> MetroSim: simulador 3D del Metro de Santiago, gratis en el navegador. Conduce, viaja o dirige las líneas 1 a 6. 🚇
+> RedMoviSim: simulador 3D del transporte público de Santiago, gratis en el navegador. Conduce el Metro, maneja buses o dirige la red. 🚇🚌
 
 ## 2. Descripción larga (itch.io, GitHub, Game Jolt)
 
-**MetroSim** es un simulador ferroviario 3D del **Metro de Santiago de Chile** que se juega en el navegador,
+**RedMoviSim** es un simulador 3D (no oficial) del **transporte público de Santiago de Chile**, Metro y buses, que se juega en el navegador,
 sin instalar nada (y se puede instalar como app en el celular).
 
 - 🚆 **Conductor**: maneja el AS-2014 real de la Línea 3 —5 coches, 120 m, física por fuerzas,
   freno regenerativo, señales, pendientes y horarios reales—. Gana puntos por puntualidad y suavidad.
 - 🧍 **Pasajero**: parte en la calle de cualquier estación, baja al andén, espera el tren y viaja
   entre la gente. Si el tren va lleno, te toca esperar el siguiente.
+- 🚌 **Conductor de bus** (beta): maneja por la Alameda con pista Solo Bus, semáforos, autos y paraderos.
 - 🖥️ **Centro de Control**: vigila la red en un esquema, retiene trenes, activa la regulación
   y responde a incidentes (puertas obstruidas, fallas de señal, restricciones de velocidad).
 - 🗺️ Las 7 líneas: 1, 2, 3, 4, 4A, 5 y 6, con combinaciones, demanda por hora del día y hora real local.
@@ -39,20 +40,20 @@ Hecho por una persona, con HTML, JavaScript y Three.js. Código abierto en GitHu
 
 ### Reddit — r/chile, r/Santiago (español)
 **Título:** Hice un simulador 3D del Metro de Santiago que se juega en el navegador (gratis)
-> Llevo un tiempo armando MetroSim: puedes manejar un tren de la L3 con física real, viajar como
+> Llevo un tiempo armando RedMoviSim: puedes manejar un tren de la L3 con física real, viajar como
 > pasajero desde la calle hasta el andén, o dirigir la red desde un Centro de Control. Están las
 > 7 líneas y usa la hora real (si es hora punta, los andenes se llenan).
-> Juégalo aquí: https://metrosim.app/
+> Juégalo aquí: https://redmovisim.benedettowebs.cl/
 > Es un proyecto personal y abierto; cualquier comentario o error que encuentren me sirve mucho. 🚇
 
 *Revisar las reglas de cada subreddit (algunos piden flair "OC" o solo permiten autopromoción ciertos días).*
 
 ### Reddit — r/WebGames, r/trainsim, r/indiegames, r/threejs (inglés)
 **Título:** I made a browser-based 3D simulator of the Santiago (Chile) Metro — drive, ride or dispatch
-> MetroSim runs in any browser (and on phones). Drive a real-spec AS-2014 train with force-based
+> RedMoviSim runs in any browser (and on phones). Drive a real-spec AS-2014 train with force-based
 > physics, regenerative braking and real gradients; ride as a passenger from street to platform;
 > or run the network from a control center. All 7 lines, real local time, offline PWA.
-> Play: https://metrosim.app/ · Source: https://github.com/jorge733/MetroSim
+> Play: https://redmovisim.benedettowebs.cl/ · Source: https://github.com/jorge733/MetroSim
 > (UI is in Spanish for now.)
 
 *En r/threejs funciona mejor contar el truco técnico: las pendientes se doblan en el shader con una
@@ -67,13 +68,13 @@ Ideas de clip (vertical, 15–40 s, texto grande en pantalla):
 Hashtags: `#MetroDeSantiago #Santiago #Chile #Simulador #IndieDev #GameDev #Trenes`
 
 ### X / Bluesky / Mastodon
-> Hice MetroSim 🚇 un simulador 3D del Metro de Santiago que se juega en el navegador:
+> Hice RedMoviSim 🚇 un simulador 3D del Metro de Santiago que se juega en el navegador:
 > conduce, viaja como pasajero o dirige la red. Gratis y en el celular.
-> 👉 https://metrosim.app/ #gamedev #indiedev #MetroDeSantiago
+> 👉 https://redmovisim.benedettowebs.cl/ #gamedev #indiedev #MetroDeSantiago
 
 ### WhatsApp / Discord (amigos, grupos de trenes)
 > Oigan, hice un juego del Metro de Santiago 🚇 se juega en el navegador o el celu, sin instalar:
-> https://metrosim.app/ — díganme qué les parece o si algo falla 🙏
+> https://redmovisim.benedettowebs.cl/ — díganme qué les parece o si algo falla 🙏
 
 ## 4. Dónde más publicarlo
 

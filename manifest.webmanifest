@@ -1,8 +1,8 @@
 {
   "id": "./",
-  "name": "MetroSim · Metro de Santiago",
-  "short_name": "MetroSim",
-  "description": "Simulador 3D gratuito del Metro de Santiago de Chile: conduce trenes, viaja como pasajero y dirige el Centro de Control en las 7 líneas.",
+  "name": "RedMoviSim · Transporte público de Santiago",
+  "short_name": "RedMoviSim",
+  "description": "Simulador 3D gratuito y no oficial del transporte público de Santiago de Chile: conduce el Metro en sus 7 líneas, maneja buses, viaja como pasajero y dirige el Centro de Control.",
   "lang": "es-CL",
   "start_url": "./",
   "scope": "./",

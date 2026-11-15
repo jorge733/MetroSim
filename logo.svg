@@ -1,5 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 130">
-  <!-- Logotipo de MetroSim: óvalo gris con los tres rombos rojos del Metro de Santiago -->
-  <ellipse cx="100" cy="65" rx="91" ry="58" fill="#fff" stroke="#3d4248" stroke-width="10"/>
-  <path fill="#e1251b" d="M56 27l21 38-21 38-21-38zM100 27l21 38-21 38-21-38zM144 27l21 38-21 38-21-38z"/>
+  <!-- Logotipo de RedMoviSim (propio, no oficial): placa roja redondeada con un plano de red de transporte,
+       dos recorridos que se cruzan en un nodo de combinación (metro y bus). -->
+  <rect x="6" y="6" width="188" height="118" rx="30" fill="#d7262e"/>
+  <path d="M30 94H78L122 36H170" fill="none" stroke="#fff" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M100 18V112" fill="none" stroke="#ffd2d5" stroke-width="9" stroke-linecap="round" stroke-dasharray="0.1 17"/>
+  <circle cx="30" cy="94" r="10" fill="#fff"/>
+  <circle cx="170" cy="36" r="10" fill="#fff"/>
+  <circle cx="100" cy="65" r="17" fill="#fff"/>
+  <circle cx="100" cy="65" r="8" fill="#d7262e"/>
 </svg>

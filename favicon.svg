@@ -1,5 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <!-- Favicon de MetroSim: óvalo gris con los tres rombos rojos -->
-  <ellipse cx="32" cy="32" rx="29" ry="22" fill="#fff" stroke="#3d4248" stroke-width="4.5"/>
-  <path fill="#e1251b" d="M17.5 17l7.5 15-7.5 15-7.5-15zM32 17l7.5 15-7.5 15-7.5-15zM46.5 17l7.5 15-7.5 15-7.5-15z"/>
+  <!-- Favicon de RedMoviSim: placa roja con dos recorridos que se cruzan en un nodo -->
+  <rect x="2" y="2" width="60" height="60" rx="16" fill="#d7262e"/>
+  <path d="M11 45H25L39 19H53" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="32" cy="32" r="8.5" fill="#fff"/>
+  <circle cx="32" cy="32" r="4" fill="#d7262e"/>
 </svg>

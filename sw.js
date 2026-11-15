@@ -1,6 +1,6 @@
 /* ==========================================================================
    MetroSim — 1.5 · sw.js
-   Service worker de la PWA: permite instalar MetroSim y jugar sin conexión.
+   Service worker de la PWA: permite instalar RedMoviSim y jugar sin conexión.
 
    Estrategia:
      · Archivos propios (HTML, CSS, js/, audio/, íconos): primero la RED y,
@@ -14,7 +14,7 @@
    sin conexión.
    ========================================================================== */
 
-const CACHE = "metrosim-v1.13";
+const CACHE = "metrosim-v1.14";
 const CDN = ["cdn.jsdelivr.net", "unpkg.com"];
 
 /** Lo mínimo para que la portada abra sin conexión aunque no se haya jugado. */

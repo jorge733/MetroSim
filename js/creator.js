@@ -63,7 +63,7 @@ export async function setupCreator(badge) {
       if (!CREATOR_HASH) alert("El Modo Creador aún no tiene clave.\nGenérala con:  node tools/clave-creador.mjs \"tu clave\"");
       else if (!crypto?.subtle) alert("El Modo Creador necesita https o localhost.");
       else {
-        const pass = prompt("Clave de creador de MetroSim:");
+        const pass = prompt("Clave de creador de RedMoviSim:");
         if (pass) {
           if (await sha256(SALT + pass) === CREATOR_HASH) {
             try { localStorage.setItem(KEY, CREATOR_HASH); } catch { /* sin almacenamiento */ }

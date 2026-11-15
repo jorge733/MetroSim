@@ -3,4 +3,4 @@ Allow: /
 Disallow: /android/
 Disallow: /tools/
 
-Sitemap: https://metrosim.app/sitemap.xml
+Sitemap: https://redmovisim.benedettowebs.cl/sitemap.xml
