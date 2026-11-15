@@ -1,0 +1,45 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+*{margin:0;box-sizing:border-box}
+html,body{width:var(--w);height:var(--h);overflow:hidden}
+body{font-family:"DejaVu Sans","Liberation Sans",Arial,sans-serif;color:#fff;
+ background:radial-gradient(ellipse at 50% 30%,#26324a 0%,#111722 55%,#05070a 100%);position:relative}
+.tape{position:absolute;left:-10%;width:120%;height:var(--tape,70px);background:repeating-linear-gradient(-45deg,#f4b400 0 40px,#111 40px 80px);
+ box-shadow:0 6px 20px rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center}
+.tape span{background:#111;color:#f4b400;font-weight:900;letter-spacing:.3em;padding:6px 26px;font-size:var(--tapefs,28px)}
+.t1{top:var(--t1);transform:rotate(-4deg)} .t2{bottom:var(--t2);transform:rotate(3deg)}
+.wrap{position:absolute;inset:0;padding-bottom:var(--pb,0)!important;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 70px;gap:var(--gap)}
+.logo{width:var(--logo);display:var(--logod,block)}
+h1{font-size:var(--h1);font-weight:900;line-height:1;letter-spacing:-.02em}
+h1 em{font-style:normal;color:#f4b400;display:block;font-size:.5em;letter-spacing:.06em;margin-top:14px}
+p{font-size:var(--p);line-height:1.35;color:#d6dbe6;max-width:900px}
+p b{color:#fff}
+.save{display:grid;grid-template-columns:var(--savecols,repeat(2,auto));gap:.5em 1.2em;justify-content:center;
+ width:var(--savew);font-size:var(--save);font-weight:700;background:#ffffff0d;border:2px solid #34d17c66;border-radius:18px;padding:.7em 1em}
+.save span{display:flex;align-items:center;gap:.45em;text-align:left;white-space:nowrap}
+.save svg{width:1.15em;height:1.15em;flex:none}
+.lines{display:flex;width:560px;height:16px;border-radius:4px;overflow:hidden}
+.lines i{flex:1}
+.url{font-size:var(--url);color:#9fb0c8;letter-spacing:.04em;font-weight:700}
+.board{display:var(--boardd,block);font-family:"DejaVu Sans Mono",monospace;background:#000;border:3px solid #333;border-radius:10px;padding:12px 26px;color:#ffb000;font-size:var(--board);letter-spacing:.08em;text-shadow:0 0 8px #ff9000}
+</style></head><body>
+<div class="tape t1"><span>EN MANTENCIÓN</span></div>
+<div class="wrap">
+ <svg class="logo" viewBox="0 0 200 130"><rect x="6" y="6" width="188" height="118" rx="30" fill="#d7262e"/>
+ <path d="M30 94H78L122 36H170" fill="none" stroke="#fff" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+ <path d="M100 18V112" fill="none" stroke="#ffd2d5" stroke-width="9" stroke-linecap="round" stroke-dasharray="0.1 17"/>
+ <circle cx="30" cy="94" r="10" fill="#fff"/><circle cx="170" cy="36" r="10" fill="#fff"/>
+ <circle cx="100" cy="65" r="17" fill="#fff"/><circle cx="100" cy="65" r="8" fill="#d7262e"/></svg>
+ <h1>Volvemos en<br>unas pocas horas<em>RENOVAMOS LA INTERFAZ</em></h1>
+ <div class="lines"><i style="background:#e1251b"></i><i style="background:#f4b400"></i><i style="background:#8b5a2b"></i><i style="background:#1d3f95"></i><i style="background:#3c86c6"></i><i style="background:#00965e"></i><i style="background:#9b26b6"></i><i style="background:#fff"></i></div>
+ <p>Tranquilo: <b>todo queda guardado en tu celular o computador.</b><br>No pierdes nada de lo que llevas.</p>
+ <div class="save">
+  <span><svg viewBox="0 0 24 24" fill="none" stroke="#34d17c" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5 9.5 18 20 6"/></svg>Tu dinero</span>
+  <span><svg viewBox="0 0 24 24" fill="none" stroke="#34d17c" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5 9.5 18 20 6"/></svg>Tu tarjeta bip!</span>
+  <span><svg viewBox="0 0 24 24" fill="none" stroke="#34d17c" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5 9.5 18 20 6"/></svg>Tus compras</span>
+  <span><svg viewBox="0 0 24 24" fill="none" stroke="#34d17c" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5 9.5 18 20 6"/></svg>Tus misiones</span>
+ </div>
+ <div class="board">PRÓXIMA ESTACIÓN: RedMoviSim 2.0</div>
+ <div class="url">redmovisim.cl</div>
+</div>
+<div class="tape t2"><span>VOLVEMOS PRONTO</span></div>
+</body></html>

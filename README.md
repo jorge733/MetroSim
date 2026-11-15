@@ -159,6 +159,9 @@ piezas que el resto del juego, así la calle se ve y se comporta como el Metro a
   la pantalla «Estamos renovando RedMoviSim · Volvemos pronto» y no carga el juego. Para entrar igual a revisarlo se
   agrega **`?probar`** a la dirección (`redmovisim.cl/?probar`); se recuerda mientras la pestaña siga abierta. Se apaga
   con `ACTIVA = false` en `js/mantencion.js`. La cuenta, la bip! y las misiones siguen guardadas en cada dispositivo.
+- **1.20.6 · Imágenes del post «Volvemos en unas pocas horas»** (`post-volvemos/`): post cuadrado, historia y portada
+  horizontal que avisan que el juego vuelve en unas horas con la interfaz renovada y que el dinero, la bip!, las
+  compras y las misiones quedan guardados en el celular o computador. Se generan con `node generar.js plantilla.html`.
 
 ## Versión 1.19 · Pasajeros realistas en el bus
 
