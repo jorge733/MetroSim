@@ -38,7 +38,9 @@ export const PASSENGER_KINDS = {
   nino:       { share: 0.06, board: [0.7, 1.0], alight: [0.5, 0.8] },   // niño (no valida: va con un adulto)
 };
 const NO_BALANCE = 0.025;         // tarjeta sin saldo: el validador la rechaza y la persona se baja
-const COMMERCIAL = 21 / 3.6;      // velocidad comercial del horario (m/s)
+const COMMERCIAL = 21 / 3.6;
+/** 2.2 · Potencia del bus: aceleración al partir (m/s²), freno máximo (m/s²) y velocidad en que se acaba la tracción (m/s). */
+export const BUS_SPEC = { accel: 1.45, brake: 3.4, vmax: 19 };      // velocidad comercial del horario (m/s)
 
 const round10 = (n) => Math.max(0, Math.round(n / 10) * 10);
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
@@ -66,8 +68,12 @@ export class BusSim {
    * @param {{route:object, clock:number, demand:number, seed?:number}} o
    *   clock: hora del día en segundos al empezar · demand: 0..1 (curva de demanda de Santiago)
    */
-  constructor({ route, clock, demand = 0.5, seed, startStop = 0, wet = 0 }) {
+  constructor({ route, clock, demand = 0.5, seed, startStop = 0, wet = 0, vehicle = null }) {
     this.route = route;
+    // 2.2 · Tamaño y potencia del vehículo (el taxi, taxiSim.js, pasa los suyos en `vehicle`)
+    this.len = vehicle?.len ?? BUS_LENGTH;
+    this.wid = vehicle?.wid ?? BUS_WIDTH;
+    this.spec = vehicle?.spec ?? BUS_SPEC;
     this.wet = clamp(wet, 0, 1);
     /** Freno máximo que deja el ABS (fracción del freno en seco) y tracción al partir. */
     this.grip = 1 - 0.3 * this.wet;
@@ -185,7 +191,7 @@ export class BusSim {
     if (b.doors !== "closed") return this.msg("Cierra las puertas antes de moverte", "warn", "laneDoors");
     if (b.v < 0.8) return this.msg("Para cambiar de pista el bus tiene que ir avanzando", "warn", "laneSlow");
     const tx = LANES[target];
-    const blocked = this.cars.some(c => Math.abs(c.x - tx) < 2.4 && c.s > b.s - BUS_LENGTH - 5 && c.s - CAR_LEN < b.s + 4);
+    const blocked = this.cars.some(c => Math.abs(c.x - tx) < 2.4 && c.s > b.s - this.len - 5 && c.s - CAR_LEN < b.s + 4);
     if (blocked) return this.msg("Pista ocupada: espera que pase el auto", "warn", "laneBusy", 2);
     b.targetLane = target;
     this.emit("blinker", { dir });
@@ -246,13 +252,14 @@ export class BusSim {
     b.brake += clamp(wantB - b.brake, -3.2 * dt, (wantB < 0.6 ? 1.6 : 2.6) * dt);
     // Tracción: más fuerza al partir (caja automática), cae con la velocidad
     // 1.20 · Piso mojado: el ABS no deja pasar del agarre disponible (frenada más larga) y la partida patina un poco
-    const brakeDecel = Math.min(b.brake * 3.4, 3.4 * this.grip);
-    if (this.wet > 0.3 && b.brake * 3.4 > brakeDecel + 0.15 && b.v > 3) {
+    const B = this.spec.brake;
+    const brakeDecel = Math.min(b.brake * B, B * this.grip);
+    if (this.wet > 0.3 && b.brake * B > brakeDecel + 0.15 && b.v > 3) {
       this.absT = (this.absT ?? 0) + dt;
       if (this.absT > 0.4) { this.absT = 0; this.emit("abs"); this.msg("ABS: el piso está mojado y el bus frena menos. Frena antes", "warn", "abs", 9); }
     } else this.absT = 0;
     const launch = b.v < 4 ? 1 - 0.18 * this.wet : 1;
-    let a = b.throttle * launch * (1.45 - 0.55 * Math.min(1, b.v / 8)) * Math.max(0, 1 - b.v / 19) - brakeDecel;
+    let a = b.throttle * launch * (this.spec.accel - 0.55 * Math.min(1, b.v / 8)) * Math.max(0, 1 - b.v / this.spec.vmax) - brakeDecel;
     if (b.v > 0) a -= 0.06 + 0.0006 * b.v * b.v;
     // Retardador: al soltar el acelerador sobre 15 km/h el motor frena un poco (como en un bus real)
     if (wantT === 0 && b.throttle < 0.05 && b.v > 4.2) a -= 0.28;
@@ -503,7 +510,7 @@ export class BusSim {
     const b = this.bus;
     let gap = Infinity, v = 0;
     for (const c of this.cars) {
-      if (Math.abs(c.x - b.x) > (BUS_WIDTH + CAR_WIDTH) / 2 - 0.1) continue;
+      if (Math.abs(c.x - b.x) > (this.wid + CAR_WIDTH) / 2 - 0.1) continue;
       const g = c.s - c.len - b.s;
       if (g > -0.5 && g < gap) { gap = g; v = c.v; }
     }
@@ -529,7 +536,7 @@ export class BusSim {
   stopPrediction() {
     const b = this.bus;
     if (b.v < 0.3 || b.brake < 0.05) return null;
-    const d = Math.max(b.decel, Math.min(b.brake * 3.4, 3.4 * this.grip) * 0.9);
+    const d = Math.max(b.decel, Math.min(b.brake * this.spec.brake, this.spec.brake * this.grip) * 0.9);
     return d > 0.15 ? (b.v * b.v) / (2 * d) : null;
   }
 
@@ -555,7 +562,7 @@ export class BusSim {
 
   laneFree(lane, s, back = 12, front = 12) {
     const x = LANES[lane], b = this.bus;
-    if (Math.abs(b.x - x) < 2.6 && s - CAR_LEN < b.s + front && s > b.s - BUS_LENGTH - back) return false;
+    if (Math.abs(b.x - x) < 2.6 && s - CAR_LEN < b.s + front && s > b.s - this.len - back) return false;
     return !this.cars.some(c => Math.abs(c.x - x) < 2 && c.s > s - CAR_LEN - back && c.s - CAR_LEN < s + front);
   }
 
@@ -567,8 +574,8 @@ export class BusSim {
       const g = o.s - o.len - car.s;
       if (g < gap) { gap = g; v = o.v; }
     }
-    const b = this.bus, rear = b.s - BUS_LENGTH;
-    if (Math.abs(b.x - car.x) < (BUS_WIDTH + CAR_WIDTH) / 2 + 0.2 && b.s > car.s) {
+    const b = this.bus, rear = b.s - this.len;
+    if (Math.abs(b.x - car.x) < (this.wid + CAR_WIDTH) / 2 + 0.2 && b.s > car.s) {
       const g = rear - car.s;
       if (g < gap) { gap = g; v = b.v; }
     }
@@ -624,9 +631,9 @@ export class BusSim {
   }
 
   checkCollisions() {
-    const b = this.bus, rear = b.s - BUS_LENGTH;
+    const b = this.bus, rear = b.s - this.len;
     for (const car of this.cars) {
-      if (Math.abs(car.x - b.x) > (BUS_WIDTH + CAR_WIDTH) / 2 - 0.15) continue;
+      if (Math.abs(car.x - b.x) > (this.wid + CAR_WIDTH) / 2 - 0.15) continue;
       const cRear = car.s - car.len;
       if (car.s < rear || cRear > b.s) continue;
       // Se tocan: el que va atrás se detiene pegado al de adelante

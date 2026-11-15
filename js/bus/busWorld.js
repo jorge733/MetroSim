@@ -35,6 +35,9 @@ const ONCOMING = [-9.1, -12.5, -15.9];
 /** 1.20 · Acceso al Metro junto al paradero: centro (x desde la vereda, z relativo a la marca) y tamaño. */
 const ACCESS = { dx: 3.9, dz: -9, w: 1.9, len: 5.2 };
 const SIDEWALK_Y = 0.16;
+/** 2.2 · Taxi: largo, ancho y asientos (conductor adelante a la izquierda, pasajero atrás a la derecha). */
+const TAXI_L = 4.6, TAXI_W = 1.85;
+const TAXI_SEATS = { driver: { x: -0.4, y: 0.62, z: 2.05 }, rider: { x: 0.42, y: 0.62, z: 3.2 } };
 const CAR_COLORS = ["#d9dde2", "#1d1f24", "#8a9099", "#b3242a", "#21457a", "#e8e4d8", "#4c5a4a", "#6b4a2f", "#c9b03a", "#2f6f8f"];
 
 /* ---------- utilidades ---------- */
@@ -87,8 +90,9 @@ export class BusWorld {
    * @param {{scene:THREE.Scene, route:object, clock?:number, hour?:number, ride?:boolean}} o
    *   clock: hora del día en segundos (o hour, 0..24) para el cielo y las luces · ride: el jugador va sentado adentro
    */
-  constructor({ scene, route, clock, hour = 12, ride = false }) {
+  constructor({ scene, route, clock, hour = 12, ride = false, vehicle = "bus" }) {
     this.scene = scene;
+    this.taxi = vehicle === "taxi";
     this.route = route;
     this.ride = ride;
     this.rng = makeRng(20261115);
@@ -112,12 +116,13 @@ export class BusWorld {
     this.buildCrossStreets();
     this.buildStops();
     this.buildLights();
-    this.bus = this.buildBus();
+    this.bus = this.taxi ? this.buildTaxi() : this.buildBus();
     this.buildOncoming();
     this.buildMetroAccesses();
     this.buildRain();
     // 1.19 · pasajeros 3D; 1.20: también bajan al Metro por el acceso y pasa gente por las veredas
-    this.people = new BusPeople(scene, route, this.body, { ride, accesses: this.accesses });
+    this.people = new BusPeople(scene, route, this.body, { ride, accesses: this.accesses, taxi: this.taxi ? TAXI_SEATS : null });
+    if (this.taxi) this.buildFareMarker();
   }
 
   /* ----------------------------- Cielo y luz ----------------------------- */
@@ -580,6 +585,140 @@ export class BusWorld {
     return g;
   }
 
+  /* ----------------------------- 2.2 · Taxi ----------------------------- */
+  /** Taxi básico de Santiago: negro con el techo amarillo y el letrero TAXI. Mismo origen que el bus (centro del frente). */
+  buildTaxi() {
+    const g = new THREE.Group();
+    const L = TAXI_L, W = TAXI_W;
+    const black = std("#121417", { roughness: 0.32, metalness: 0.55 });
+    const yellow = std("#f2c200", { roughness: 0.45, metalness: 0.2 });
+    const dark = std("#1d2024", { roughness: 0.7 });
+    const glass = new THREE.MeshStandardMaterial({ color: "#1d2a35", roughness: 0.08, metalness: 0.5, transparent: true, opacity: 0.42, depthWrite: false });
+    const body = new THREE.Group();
+    g.add(body);
+    box(body, W, 0.5, L, black, 0, 0.5, L / 2);                         // carrocería
+    box(body, W - 0.04, 0.12, 1.15, black, 0, 0.8, 0.65);                  // capó
+    box(body, W - 0.04, 0.12, 0.9, black, 0, 0.8, L - 0.5);                // maleta
+    // Cabina de vidrio (se ve a la gente adentro) con pilares
+    for (const x of [-1, 1]) {
+      box(body, 0.02, 0.48, 2.25, glass, x * (W / 2 - 0.08), 1.1, 2.55);
+      for (const z of [1.45, 2.6, 3.65]) box(body, 0.06, 0.5, 0.08, black, x * (W / 2 - 0.08), 1.1, z);
+    }
+    this.windshield = box(body, W - 0.2, 0.5, 0.02, glass, 0, 1.1, 1.42);
+    box(body, W - 0.2, 0.46, 0.02, glass, 0, 1.08, 3.68);
+    box(body, W - 0.14, 0.06, 2.3, yellow, 0, 1.38, 2.55);               // techo amarillo
+    // Letrero TAXI en el techo (se ilumina de noche)
+    const tex = signTexture(["TAXI"], { w: 256, h: 80, bg: "#f2c200", fg: "#111", font: "800 56px Barlow, Arial" });
+    const signMat = new THREE.MeshStandardMaterial({ map: tex, emissive: new THREE.Color("#ffd23a"), emissiveIntensity: this.night ? 0.8 : 0.1, emissiveMap: tex });
+    const sign = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.18, 0.2), signMat);
+    sign.position.set(0, 1.5, 2.4);
+    body.add(sign);
+    box(body, W - 0.1, 0.12, 0.1, dark, 0, 0.3, -0.03);                  // parachoques
+    box(body, W - 0.1, 0.12, 0.1, dark, 0, 0.3, L + 0.03);
+    // Luces
+    this.headMat = new THREE.MeshStandardMaterial({ color: "#fff", emissive: new THREE.Color("#fff6dd"), emissiveIntensity: this.night ? 2 : 0.3 });
+    this.tailMat = new THREE.MeshStandardMaterial({ color: "#400", emissive: new THREE.Color("#ff1a10"), emissiveIntensity: 0.4 });
+    for (const x of [-0.68, 0.68]) {
+      box(body, 0.34, 0.12, 0.04, this.headMat, x, 0.62, -0.01);
+      box(body, 0.3, 0.14, 0.04, this.tailMat, x, 0.66, L + 0.01);
+    }
+    this.blinkMat = new THREE.MeshStandardMaterial({ color: "#552e00", emissive: new THREE.Color("#ffa000"), emissiveIntensity: 0 });
+    for (const [x, z] of [[-W / 2, 0.2], [W / 2, 0.2], [-W / 2, L - 0.2], [W / 2, L - 0.2]]) box(body, 0.04, 0.08, 0.16, this.blinkMat, x, 0.64, z);
+    for (const x of [-1, 1]) box(body, 0.16, 0.1, 0.08, black, x * (W / 2 + 0.08), 1.0, 1.55);   // espejos
+    // Ruedas
+    this.wheels = [];
+    const wheelGeo = new THREE.CylinderGeometry(0.32, 0.32, 0.22, 16);
+    wheelGeo.rotateZ(Math.PI / 2);
+    const tire = std("#16181a", { roughness: 0.9 });
+    for (const z of [0.85, L - 0.85]) for (const x of [-1, 1]) {
+      const w = new THREE.Mesh(wheelGeo, tire);
+      w.position.set(x * (W / 2 - 0.1), 0.32, z);
+      body.add(w);
+      this.wheels.push(w);
+    }
+    // Interior: tablero con el taxímetro, volante y asientos
+    box(body, W - 0.2, 0.22, 0.3, dark, 0, 0.82, 1.6);
+    box(body, 0.22, 0.08, 0.12, std("#0b0b0b", { emissive: new THREE.Color("#ff3b30"), emissiveIntensity: 0.9 }), 0.25, 0.97, 1.62);
+    const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.025, 8, 20), dark);
+    wheel.position.set(-0.4, 0.92, 1.78);
+    wheel.rotation.x = -1.1;
+    body.add(wheel);
+    this.steering = wheel;
+    const seat = std("#2a2d33", { roughness: 0.9 });
+    for (const x of [-0.4, 0.4]) { box(body, 0.6, 0.12, 0.5, seat, x, 0.52, 2.15); box(body, 0.6, 0.5, 0.1, seat, x, 0.82, 2.42); }
+    box(body, W - 0.3, 0.12, 0.55, seat, 0, 0.52, 3.25); box(body, W - 0.3, 0.5, 0.1, seat, 0, 0.82, 3.55);
+    // Puerta trasera derecha (por ahí sube y baja el pasajero): gira desde su borde delantero
+    this.doorLeaves = [];
+    this.taxiDoor = new THREE.Group();
+    this.taxiDoor.position.set(W / 2 + 0.01, 0, 2.62);
+    box(this.taxiDoor, 0.05, 0.5, 1.0, black, 0, 0.5, 0.5);
+    box(this.taxiDoor, 0.03, 0.42, 0.9, glass, 0, 1.08, 0.5);
+    body.add(this.taxiDoor);
+    this.body = body;
+    this.scene.add(g);
+    if (this.night) {
+      const spot = new THREE.SpotLight("#fff3d6", 40, 55, 0.5, 0.6, 1.4);
+      spot.position.set(0, 0.7, -0.2);
+      spot.target.position.set(0, 0, -25);
+      g.add(spot, spot.target);
+    }
+    return g;
+  }
+
+  /** Marcador del lugar donde detenerse (amarillo: recoger · verde: destino) y un haz de luz para verlo de lejos. */
+  buildFareMarker() {
+    const m = new THREE.Group();
+    this.markMat = new THREE.MeshBasicMaterial({ color: "#ffd23a", transparent: true, opacity: 0.5, depthWrite: false });
+    const pad = new THREE.Mesh(new THREE.PlaneGeometry(2.6, TAXI_L + 0.8), this.markMat);
+    pad.rotation.x = -Math.PI / 2;
+    pad.position.set(0, 0.03, TAXI_L / 2);
+    this.beamMat = new THREE.MeshBasicMaterial({ color: "#ffd23a", transparent: true, opacity: 0.18, depthWrite: false, side: THREE.DoubleSide });
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 9, 12, 1, true), this.beamMat);
+    beam.position.set(0, 4.5, TAXI_L / 2);
+    m.add(pad, beam);
+    m.visible = false;
+    this.fareMarker = m;
+    this.scene.add(m);
+  }
+
+  /** Personas y marcador de la carrera en curso (lee sim.fare de taxiSim.js). */
+  updateTaxi(sim, dt) {
+    const f = sim.fare;
+    const key = f ? `${f.n ?? ""}:${f.phase}` : "none";
+    if (key !== this.fareKey) {
+      const prev = this.fareKey;
+      this.fareKey = key;
+      if (f?.phase === "pickup") {
+        this.people.dropExtra(this.hailerP);
+        this.hailerP = this.people.hailer(f.s);
+        this.riderKind = this.hailerP.kind;
+      } else if (f?.phase === "ride") {
+        this.people.dropExtra(this.hailerP);
+        this.hailerP = null;
+        this.people.taxiRider(true, this.riderKind);
+      } else if (f?.phase === "done" && prev?.endsWith(":ride")) {
+        this.people.taxiRider(false);
+        this.people.taxiAlight(sim, this.riderKind);
+      } else if (!f) {
+        this.people.dropExtra(this.hailerP);           // se fue en otro taxi
+        this.hailerP = null;
+      }
+    }
+    const t = sim.target;
+    this.fareMarker.visible = !!t;
+    if (t) {
+      const col = t.kind === "pickup" ? "#ffd23a" : "#3ad37f";
+      this.markMat.color.set(col);
+      this.beamMat.color.set(col);
+      this.fareMarker.position.set(LANES[0], 0, -t.s);
+      this.beamMat.opacity = 0.28 + 0.12 * Math.sin(performance.now() / 300);
+    }
+    // Puerta trasera: se abre hacia afuera
+    const b = sim.bus;
+    const open = b.doors === "open" ? 1 : b.doors === "opening" ? b.doorT / 1.1 : b.doors === "closing" ? 1 - b.doorT / 1.1 : 0;
+    this.taxiDoor.rotation.y = open * 1.0;
+  }
+
   /* ----------------------------- Autos ----------------------------- */
   carMesh(car) {
     const g = new THREE.Group();
@@ -709,6 +848,7 @@ export class BusWorld {
     }
     // Pasajeros: en los paraderos, subiendo, a bordo y bajando (busPeople.js)
     g.updateMatrixWorld();
+    if (this.taxi) this.updateTaxi(sim, dt);
     this.people.update(sim, dt);
     this.updateRain(dt, cam, sim);                       // 1.20 · lluvia
     // Cordillera fija respecto del bus (está «en el infinito»)

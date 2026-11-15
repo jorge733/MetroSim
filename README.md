@@ -124,6 +124,24 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **Salir por los torniquetes es gratis**: solo se cobra el pasaje al pasar hacia la zona pagada (antes, al terminar
   de cruzar el torniquete de salida se cobraba un pasaje).
 
+## Versión 2.2 · Taxi
+
+- **Conducir un taxi** (beta): en la portada, Conducir › **Taxi**, por la calle de cualquier recorrido de bus
+  (Alameda u otro de Red). Es un taxi básico de Santiago, negro con el techo amarillo y el letrero TAXI.
+  - **Carreras:** alguien hace señas en la vereda (marcador amarillo en la pista de la derecha y en el esquema de
+    arriba). Pásate a la pista de la vereda, detente a su lado y abre la puerta (**Espacio**): sube, cierra la puerta y
+    te dice adónde va, una esquina más adelante (marcador verde). Al llegar te detienes junto a la vereda y abres la
+    puerta: paga lo que marca el **taxímetro** y, si el viaje fue suave (sin frenadas bruscas ni faltas), deja
+    **propina**. Si te pasas de largo de quien hace señas, toma otro taxi.
+  - **Taxímetro aproximado** (no oficial): $450 la bajada de bandera y $210 cada 200 m o cada minuto detenido.
+  - Lo ganado va a tu cuenta, como el sueldo del bus o del Metro. El turno termina al acabarse la calle (o desde el
+    menú), con su resumen y nota.
+  - Usa lo mismo que el bus: tráfico, semáforos, clima (con lluvia frena menos), cambio de pista, limitador, cámaras
+    (detrás y desde el asiento) y faltas (luz roja, exceso de velocidad, choques).
+- `js/bus/taxiSim.js` (la simulación, se puede probar en Node) hereda de `busSim.js`, que ahora recibe el tamaño y la
+  potencia del vehículo (`vehicle: { len, wid, spec }`). El modelo 3D, el marcador y las personas del taxi están en
+  `busWorld.js` y `busPeople.js`; el HUD, en `busGame.js` y `css/bus.css`.
+
 ## Versión 2.1 · Centro de Control y bus con la interfaz nueva
 
 - **Centro de Control** (`js/control/controlCenter.js`): rehecho con el sistema de diseño 2.0 y su color propio

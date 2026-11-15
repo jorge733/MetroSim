@@ -64,8 +64,12 @@ export class BusPeople {
    * @param {THREE.Object3D} cabin  grupo de la carrocería del bus (los de adentro son sus hijos)
    * @param {{ride:boolean}} o  ride: el jugador va sentado adelante a la derecha (ese lugar queda libre)
    */
-  constructor(scene, route, cabin, { ride = false, accesses = [] } = {}) {
+  constructor(scene, route, cabin, { ride = false, accesses = [], taxi = null } = {}) {
     this.scene = scene;
+    /* 2.2 · Taxi: { driver: {x,y,z}, rider: {x,y,z} } posiciones del conductor y del pasajero (asiento de atrás).
+       En el taxi nadie se dibuja en el salón del bus (sim.onboard solo sirve para los avisos). */
+    this.taxi = taxi;
+    this.extras = [];
     this.route = route;
     this.cabin = cabin;
     this.rng = makeRng(route.stops.length * 7919 + route.id.length);
@@ -95,10 +99,57 @@ export class BusPeople {
     d.mesh.parts.filter(x => x.obj.parent === d.mesh.armL || x.obj.parent === d.mesh.armR).forEach(x => x.color.setHex(0x9fc3e0));
     d.pose = "drive";
     d.local = true;
-    d.root.position.set(-0.75, FLOOR_Y + 0.5 - d.mesh.legLen, 1.32);
+    if (taxi) d.root.position.set(taxi.driver.x, taxi.driver.y - d.mesh.legLen, taxi.driver.z);
+    else d.root.position.set(-0.75, FLOOR_Y + 0.5 - d.mesh.legLen, 1.32);
     d.root.rotation.y = Math.PI;
     cabin.add(d.root);
     this.driver = d;
+  }
+
+  /* ----------------------------- 2.2 · Taxi ----------------------------- */
+  /** Alguien en la vereda a la altura `s` que hace señas al taxi. */
+  hailer(s) {
+    const p = this.person(this.rng() < 0.2 ? "carga" : this.rng() < 0.3 ? "estudiante" : "adulto");
+    p.root.position.set(CURB_X + 0.75, SIDEWALK_Y, -s);
+    p.root.rotation.y = -Math.PI / 2;               // mira hacia la calle
+    p.pose = "hail";
+    this.scene.add(p.root);
+    this.extras.push(p);
+    return p;
+  }
+  /** Quita a una persona de los extras (sube al taxi o se va). */
+  dropExtra(p) {
+    if (!p) return;
+    this.extras = this.extras.filter(q => q !== p);
+    p.root.parent?.remove(p.root);
+  }
+  /** Pasajero sentado en el asiento de atrás del taxi (o null para que no haya nadie). */
+  taxiRider(on, kind) {
+    this.dropExtra(this.rider);
+    this.rider = null;
+    if (!on) return;
+    const p = this.person(kind);
+    const r = this.taxi.rider;
+    p.root.position.set(r.x, r.y - p.mesh.legLen, r.z);
+    p.root.rotation.y = Math.PI;
+    p.pose = "sit";
+    p.local = true;
+    this.cabin.add(p.root);
+    this.extras.push(p);
+    this.rider = p;
+  }
+  /** Se baja del taxi por la puerta derecha y se va por la vereda. */
+  taxiAlight(sim, kind) {
+    const p = this.person(kind);
+    const b = sim.bus, z = -b.s + 2.6;
+    p.root.position.set(b.x + 1.1, SIDEWALK_Y, z);
+    p.root.rotation.y = -Math.PI / 2;
+    p.pose = "walk";
+    this.scene.add(p.root);
+    const away = Math.random() < 0.5 ? 1 : -1;
+    p.path = [V(CURB_X + 0.9, SIDEWALK_Y, z), V(CURB_X + 1.6 + Math.random() * 2, SIDEWALK_Y, z + away * 30)];
+    p.onArrive = () => { p.gone = true; };
+    this.walkers.push(p);
   }
 
   /** En la vista desde la cabina la cámara está en la cabeza del conductor: ahí no se dibuja. */
@@ -402,7 +453,7 @@ export class BusPeople {
     // A bordo: tantos como lleva la simulación (hasta MAX_ON). Los que faltan (p. ej. al subir en un paradero
     // que no se dibujaba) aparecen en su lugar; los que sobran se quitan.
     const boarding = this.walkers.filter(p => p.onArrive && !p.gone && p.path.length && p.path.at(-1).y === FLOOR_Y && !p.leaving).length;
-    const want = Math.min(MAX_ON, sim.onboard.length);
+    const want = this.taxi ? 0 : Math.min(MAX_ON, sim.onboard.length);
     while (this.onboard.length + boarding < want) {
       const p = this.person();
       const spot = this.takeSpot(p);
@@ -423,7 +474,7 @@ export class BusPeople {
       if (p.root.position.z > zBus + 120) p.root.position.z -= 420;
       else if (p.root.position.z < zBus - 300) p.root.position.z += 420;
     }
-    const all = [...this.walkers, ...this.onboard, this.driver, ...this.peds];
+    const all = [...this.walkers, ...this.onboard, this.driver, ...this.peds, ...this.extras];
     for (const st of this.stops) if (st.shown) all.push(...st.crowd);
     for (const p of all) {
       if (p.leaveAt && this.time > p.leaveAt) {
@@ -497,6 +548,14 @@ export class BusPeople {
         to(m.armL, -1.05); to(m.armR, -1.05);
         m.body.position.y = 0;
         break;
+      case "hail": {
+        // 2.2 · Hace señas al taxi: brazo derecho arriba, moviéndolo
+        to(m.hipL, 0); to(m.hipR, 0); to(m.kneeL, 0); to(m.kneeR, 0);
+        m.armR.rotation.x = -2.7 + Math.sin(this.time * 5 + p.idle) * 0.25;
+        to(m.armL, 0.05);
+        m.body.position.y = 0;
+        break;
+      }
       case "sit":
         to(m.hipL, -Math.PI / 2); to(m.hipR, -Math.PI / 2);
         to(m.kneeL, Math.PI / 2); to(m.kneeR, Math.PI / 2);

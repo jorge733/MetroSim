@@ -22,6 +22,7 @@ import { BUS_ROUTE, LANES } from "./busRoute.js";
 import { autopilot } from "./busAutopilot.js";
 import { clearTrackLift } from "../render/trackLift.js";
 import { BusSim, BUS_CAPACITY } from "./busSim.js";
+import { TaxiSim, TAXI_FARE } from "./taxiSim.js";
 import { BusWorld } from "./busWorld.js";
 import { BusAudio } from "./busAudio.js";
 import { demandAt, dayTypeOf, formatCLP, lineLabel, isRail } from "../config.js";
@@ -60,7 +61,9 @@ export function startBusGame(o) {
 }
 
 class BusGame {
-  constructor({ bank, muted, touch, onMuteChange, onExit, ride = null, route = null }) {
+  constructor({ bank, muted, touch, onMuteChange, onExit, ride = null, route = null, taxi = false }) {
+    /* 2.2 · taxi: conducir un taxi por la misma calle (taxiSim.js): carreras en vez de paraderos */
+    this.taxi = !ride && taxi;
     /* 1.15 · ride: el jugador viaja como PASAJERO (maneja el piloto automático):
        { route, from, onArrive(stop), line } · onArrive se llama al bajarse en un paradero */
     this.ride = ride;
@@ -110,8 +113,9 @@ class BusGame {
     const now = new Date();
     const clock = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
     // 1.20 · La misma curva de demanda y el mismo clima que el Metro (con lluvia viaja más gente y el piso está mojado)
-    this.sim = new BusSim({ route: this.route, clock, demand: demandAt(clock, dayTypeOf(now)) * weatherDemandFactor(), startStop: this.ride?.from ?? 0, wet: WEATHER.wet });
-    this.world = new BusWorld({ scene: this.scene, route: this.route, clock, ride: !!this.ride });
+    const simOpts = { route: this.route, clock, demand: demandAt(clock, dayTypeOf(now)) * weatherDemandFactor(), startStop: this.ride?.from ?? 0, wet: WEATHER.wet };
+    this.sim = this.taxi ? new TaxiSim(simOpts) : new BusSim(simOpts);
+    this.world = new BusWorld({ scene: this.scene, route: this.route, clock, ride: !!this.ride, vehicle: this.taxi ? "taxi" : "bus" });
     this.scene.add(this.camera);
     this.camPos = null;
     this.earned = 0;
@@ -119,7 +123,9 @@ class BusGame {
     this.el.summary.classList.add("hidden");
     this.el.pause.classList.add("hidden");
     this.paused = false;
-    if (this.ride) {
+    if (this.taxi) {
+      this.toast(`Taxi por ${this.route.name} · busca a quien haga señas en la vereda, detente a su lado junto a la vereda y abre la puerta (${this.touch ? "Puerta" : "Espacio"})${WEATHER.wet > 0.3 ? ". Llueve: frena antes" : ""}`, "info", 7000);
+    } else if (this.ride) {
       this.wantOff = null;
       this.toast(`Subiste al bus ${this.route.id} hacia ${this.route.to} · ${this.ride.fareText} · toca el timbre (${this.touch ? "🔔" : "Espacio"}) antes de tu parada`, "ok", 7000);
     } else this.toast(`Servicio ${this.route.id} · sale a las ${clockText(this.sim.departure, false)} desde ${this.route.from}. ${this.touch ? "Toca Puertas" : "Abre las puertas con Espacio"} para que suban los pasajeros${WEATHER.wet > 0.3 ? ". Llueve: el piso está mojado, frena antes" : ""}`, "info", 7000);
@@ -136,8 +142,8 @@ class BusGame {
       <div class="bus-canvas"></div>
       <header class="bus-top">
         <div class="bus-brand">
-          <span class="bus-badge">${R.id}</span>
-          <div class="bus-route"><span class="bus-label">${this.ride ? "BUS RED · VIAJANDO" : "BUS RED · CONDUCIENDO · BETA"}</span><strong>${esc(R.name.toUpperCase())} · ${esc(R.from.toUpperCase())} → ${esc(R.to.toUpperCase())}</strong></div>
+          <span class="bus-badge${this.taxi ? " taxi" : ""}">${this.taxi ? "TAXI" : R.id}</span>
+          <div class="bus-route"><span class="bus-label">${this.taxi ? "TAXI · CONDUCIENDO · BETA" : this.ride ? "BUS RED · VIAJANDO" : "BUS RED · CONDUCIENDO · BETA"}</span><strong>${esc(R.name.toUpperCase())} · ${esc(R.from.toUpperCase())} → ${esc(R.to.toUpperCase())}</strong></div>
         </div>
         <div class="bus-right">
           <div class="bus-pill"><span class="bus-label">CUENTA</span><strong data-k="bank">$0</strong><span class="bus-float" data-k="float"></span></div>
@@ -159,7 +165,7 @@ class BusGame {
           <div class="bus-pedals"><span class="bus-label">ACEL</span><i><b data-k="thr"></b></i><span class="bus-label">FRENO</span><i class="brk"><b data-k="brk"></b></i></div>
         </div>
         <div class="bus-panel bus-next">
-          <span class="bus-label">PRÓXIMO PARADERO</span>
+          <span class="bus-label" data-k="nextLabel">${this.taxi ? "CARRERA" : "PRÓXIMO PARADERO"}</span>
           <strong data-k="stopName">—</strong>
           <div class="bus-next-row">
             <span data-k="stopDist">—</span>
@@ -167,7 +173,7 @@ class BusGame {
             <span data-k="delay" class="bus-delay">—</span>
           </div>
           <div class="bus-next-row bus-next-sub">
-            <span>A bordo <b data-k="onboard">0</b>/${BUS_CAPACITY}</span>
+            ${this.taxi ? `<span class="taxi-meter">Taxímetro <b data-k="meter">—</b></span>` : `<span>A bordo <b data-k="onboard">0</b>/${BUS_CAPACITY}</span>`}
             <span data-k="doors">Puertas cerradas</span>
             <span data-k="light"></span>
           </div>
@@ -179,7 +185,7 @@ class BusGame {
         <span><kbd>Shift</kbd> freno suave</span>
         <span><kbd>L</kbd> limitador</span>
         <span><kbd>A</kbd><kbd>D</kbd> cambiar de pista</span>
-        <span><kbd>Espacio</kbd> puertas</span>
+        <span><kbd>Espacio</kbd> ${this.taxi ? "puerta (subir y bajar pasajero)" : "puertas"}</span>
         <span><kbd>B</kbd> bocina</span>
         <span><kbd>C</kbd> cámara</span>
         <span><kbd>Esc</kbd> pausa</span>
@@ -195,7 +201,7 @@ class BusGame {
           <button data-t="right" aria-label="Pista a la derecha">${ICON.right}</button>
         </div>
         <div class="bus-touch-mid">
-          <button data-t="doors">${ICON.doors}<span>Puertas</span></button>
+          <button data-t="doors">${ICON.doors}<span>${this.taxi ? "Puerta" : "Puertas"}</span></button>
           <button data-t="horn">${ICON.horn}<span>Bocina</span></button>
           <button data-t="cam">${ICON.cam}<span>Cámara</span></button>
           <button data-t="limiter"><b class="bus-lim-ico">50</b><span>Limitador</span></button>
@@ -209,19 +215,20 @@ class BusGame {
         <div class="bus-card bus-menu-card ticket-card game-menu-card" role="dialog" aria-modal="true" aria-label="Menú">
           <header class="ticket-head">
             <div class="ticket-head-text">
-              <span class="small-label">${this.ride ? "VIAJANDO EN BUS · PAUSA" : "CONDUCIENDO · PAUSA"}</span>
+              <span class="small-label">${this.taxi ? "TAXI · PAUSA" : this.ride ? "VIAJANDO EN BUS · PAUSA" : "CONDUCIENDO · PAUSA"}</span>
               <strong>Menú</strong>
             </div>
           </header>
-          <p class="bus-menu-route"><b>${R.id}</b> ${esc(R.name)} · ${esc(R.from)} → ${esc(R.to)}</p>
+          <p class="bus-menu-route"><b${this.taxi ? ' class="taxi"' : ""}>${this.taxi ? "TAXI" : R.id}</b> ${esc(R.name)} · ${esc(R.from)} → ${esc(R.to)}</p>
           <div class="game-menu-list">
             <button class="go-button game-menu-resume" data-k="resume"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16l13-8z"/></svg> ${this.ride ? "Seguir el viaje" : "Seguir manejando"}</button>
+            ${this.taxi ? `<button class="game-menu-item" data-k="pmEnd"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg><span>Terminar el turno y ver el resumen</span></button>` : ""}
             ${this.ride ? "" : `<button class="game-menu-item" data-k="pmKeys"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg><span>Controles · <b data-k="pmKeysState">ocultos</b></span></button>`}
             <button class="game-menu-item" data-k="pmSound"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4zM16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/></svg><span>Sonido · <b data-k="pmSoundState">activado</b></span><kbd>M</kbd></button>
           </div>
           <footer class="game-menu-exit">
             <button class="ghost-button" data-k="quit"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11 12 4l9 7M5 10v10h14V10M10 20v-6h4v6"/></svg> Volver a la portada</button>
-            <p class="game-menu-note">${this.ride ? "Para bajarte, toca el timbre antes de tu parada y, con las puertas abiertas, elige «Bajarse aquí»." : "El sueldo de cada paradero ya está en tu cuenta. Si terminas ahora no recibes el bono del servicio."}</p>
+            <p class="game-menu-note">${this.taxi ? "Lo que cobraste en cada carrera ya está en tu cuenta." : this.ride ? "Para bajarte, toca el timbre antes de tu parada y, con las puertas abiertas, elige «Bajarse aquí»." : "El sueldo de cada paradero ya está en tu cuenta. Si terminas ahora no recibes el bono del servicio."}</p>
           </footer>
         </div>
       </div>
@@ -244,6 +251,7 @@ class BusGame {
     this.syncMenu = syncMenu;
     this.el.pmSound.addEventListener("click", () => this.toggleMute());
     this.el.pmKeys?.addEventListener("click", () => { this.root.classList.toggle("bus-keys-on"); syncMenu(); });
+    this.el.pmEnd?.addEventListener("click", () => { this.setPaused(false); this.sim.finish(); });
     this.root.classList.add("bus-keys-on");
     this.keysTimer = setTimeout(() => { this.root.classList.remove("bus-keys-on"); syncMenu(); }, 12000);
     syncMenu();
@@ -325,6 +333,15 @@ class BusGame {
 
   renderStrip() {
     const R = this.route, span = R.stops.at(-1).s - R.stops[0].s;
+    if (this.taxi) {
+      // Taxi: la calle completa con el punto de la carrera (recoger o destino) y el taxi
+      const pct = (s) => ((s - R.stops[0].s) / span) * 100;
+      this.el.strip.innerHTML = `<div class="bus-strip-track"></div><span class="taxi-strip-pin" data-k="stripPin" hidden></span><span class="bus-strip-bus taxi" data-k="stripBus"></span>`;
+      this.el.stripBus = this.el.strip.querySelector("[data-k=stripBus]");
+      this.el.stripPin = this.el.strip.querySelector("[data-k=stripPin]");
+      this.stripPct = pct;
+      return;
+    }
     const pct = (s) => ((s - R.stops[0].s) / span) * 100;
     this.el.strip.innerHTML = `<div class="bus-strip-track"></div>` +
       R.stops.map((st, i) => `<span class="bus-strip-stop" data-i="${i}" style="left:${pct(st.s)}%"><i></i><em>${esc(st.name)}</em></span>`).join("") +
@@ -448,18 +465,18 @@ class BusGame {
       cam.fov = 70;
     } else if (this.camMode === "cab") {
       g.updateMatrixWorld();
-      const p = new THREE.Vector3(-0.72, 2.2, 1.55).applyMatrix4(g.matrixWorld);
-      const look = new THREE.Vector3(-0.4, 1.4, -30).applyMatrix4(g.matrixWorld);
+      const p = (this.taxi ? new THREE.Vector3(-0.4, 1.2, 2.05) : new THREE.Vector3(-0.72, 2.2, 1.55)).applyMatrix4(g.matrixWorld);
+      const look = (this.taxi ? new THREE.Vector3(-0.3, 0.9, -30) : new THREE.Vector3(-0.4, 1.4, -30)).applyMatrix4(g.matrixWorld);
       cam.position.copy(p);
       cam.lookAt(look);
       cam.fov = 68;
     } else {
       g.updateMatrixWorld();
-      const want = new THREE.Vector3(0, 5.6, 25).applyMatrix4(g.matrixWorld);
+      const want = (this.taxi ? new THREE.Vector3(0, 3.1, 10.5) : new THREE.Vector3(0, 5.6, 25)).applyMatrix4(g.matrixWorld);
       if (!this.camPos || this.camPos.distanceTo(want) > 60) this.camPos = want.clone();
       this.camPos.lerp(want, Math.min(1, dt * 4));
       cam.position.copy(this.camPos);
-      cam.lookAt(new THREE.Vector3(0, 1.8, -10).applyMatrix4(g.matrixWorld));
+      cam.lookAt((this.taxi ? new THREE.Vector3(0, 1.0, -8) : new THREE.Vector3(0, 1.8, -10)).applyMatrix4(g.matrixWorld));
       cam.fov = 60;
     }
     cam.updateProjectionMatrix();
@@ -471,6 +488,7 @@ class BusGame {
       if (e.type === "stopDone") this.announceNext(e.index);   // 1.20 · locución: próxima parada
       if (e.type === "abs") this.audio.abs();
       if (this.ride) { this.rideEvent(e); continue; }
+      if (this.taxi && this.taxiEvent(e)) continue;
       switch (e.type) {
         case "msg": this.toast(e.text, e.level); break;
         case "penalty": this.toast(`${e.text} · −${e.points} pts`, "warn", 3600); this.audio.fault(); break;
@@ -594,6 +612,7 @@ class BusGame {
       el.lead.classList.toggle("warn", lead.ttc < 4 || lead.gap < b.v * 1.2);
       el.lead.classList.toggle("bad", lead.ttc < 2.6 || lead.gap < b.v * 0.8);
     }
+    if (this.taxi) return this.updateTaxiHud();
     el.onboard.textContent = sim.onboard.length;
     el.doors.textContent = { closed: "Puertas cerradas", opening: "Abriendo puertas…", open: "Puertas abiertas", closing: "Cerrando puertas…" }[b.doors];
     el.doors.classList.toggle("open", b.doors !== "closed");
@@ -654,6 +673,138 @@ class BusGame {
       this.root.querySelector('[data-r="bell"]').classList.toggle("on", sim.bell);
     }
   }
+
+  /* ----------------------------- 2.2 · Taxi ----------------------------- */
+  /** Eventos propios del taxi. Devuelve true si lo manejó (los demás siguen como en el bus). */
+  taxiEvent(e) {
+    switch (e.type) {
+      case "fareHail": this.audio.bell(); return true;
+      case "fareBoarding": case "farePaying": case "fareDest": return true;
+      case "fareBoard": this.audio.door(false); return true;
+      case "fareLost": this.audio.fault(); return true;
+      case "farePaid": {
+        const total = e.amount + e.tip;
+        this.bank.deposit(total, `Taxi · carrera a ${e.fare.destName}${e.tip ? ` (propina ${formatCLP(e.tip)})` : ""}`, { wage: true });
+        this.earned += total;
+        this.updateBank();
+        this.moneyFloat(total);
+        this.audio.coin();
+        return true;
+      }
+      case "finished": this.onTaxiFinished(e); return true;
+    }
+    return false;
+  }
+
+  updateTaxiHud() {
+    const sim = this.sim, b = sim.bus, el = this.el, f = sim.fare, t = sim.target;
+    el.doors.textContent = { closed: "Puerta cerrada", opening: "Abriendo la puerta…", open: "Puerta abierta", closing: "Cerrando la puerta…" }[b.doors];
+    el.doors.classList.toggle("open", b.doors !== "closed");
+    el.bell.classList.add("hidden");
+    el.meter.textContent = f?.phase === "ride" ? formatCLP(f.meter) : "libre";
+    el.meter.parentElement.classList.toggle("on", f?.phase === "ride");
+    el.stripBus.style.left = `${Math.max(0, Math.min(100, this.stripPct(b.s)))}%`;
+    el.stripPin.hidden = !t;
+    if (t) { el.stripPin.style.left = `${Math.max(0, Math.min(100, this.stripPct(t.s)))}%`; el.stripPin.classList.toggle("dest", t.kind === "dest"); }
+    el.nextLabel.textContent = t?.kind === "pickup" ? "PASAJERO ESPERANDO" : t?.kind === "dest" ? "DESTINO" : "CARRERA";
+    if (t) {
+      const d = t.s - b.s;
+      el.stopName.textContent = t.name;
+      el.stopDist.textContent = Math.abs(d) <= 7 ? "aquí" : d > 1000 ? `${(d / 1000).toFixed(1).replace(".", ",")} km` : d > 0 ? `${Math.round(d)} m` : `te pasaste ${Math.round(-d)} m`;
+    } else {
+      el.stopName.textContent = f?.phase === "done" ? "Cierra la puerta" : "Buscando pasajeros…";
+      el.stopDist.textContent = "";
+    }
+    el.stopWait.textContent = `${sim.taxi.fares} ${sim.taxi.fares === 1 ? "carrera" : "carreras"}`;
+    el.delay.textContent = sim.taxi.earned ? `${formatCLP(sim.taxi.earned)} ganados` : "";
+    el.delay.className = "bus-delay ok";
+    const L = sim.nextLight(140);
+    if (L) el.light.innerHTML = `<i class="bus-dot ${L.state}"></i>${esc(L.light.street)} · ${Math.max(0, Math.round(L.d))} m`;
+    else el.light.textContent = "";
+
+    // Guía para detenerse a la altura de la persona o del destino (o ante un semáforo en rojo)
+    const pred = sim.stopPrediction();
+    const pct = (e) => `${50 + Math.max(-50, Math.min(50, e / 9 * 50))}%`;
+    const near = t && t.s - b.s < 70 && t.s - b.s > -14 && b.doors === "closed";
+    const red = !near && L && L.state !== "green" && L.d > 0.5 && L.d < 60 && b.v > 0.5;
+    el.guide.classList.toggle("hidden", !near && !red);
+    el.guide.classList.toggle("light", !!red);
+    if (near) {
+      const err = b.s - t.s;
+      const curb = Math.abs(b.x - LANES[0]) < 1.0;
+      el.guideText.textContent = !curb ? "Acércate a la vereda (pista de la derecha)" : err < -7 ? `${t.kind === "pickup" ? "La persona" : "El destino"} en ${Math.round(-err)} m` : err > 7 ? `Te pasaste ${err.toFixed(0)} m` : "¡Aquí! Detente";
+      el.guide.classList.toggle("ok", Math.abs(err) <= 7 && curb && b.v < 0.3);
+      el.guideMark.style.left = pct(err * 9 / 14);
+      const pe = pred != null ? err + pred : null;
+      el.guidePred.style.display = pe != null && pe < 30 ? "" : "none";
+      if (pe != null) el.guidePred.style.left = pct(pe * 9 / 14);
+      el.guideSub.textContent = pe == null ? "" : Math.abs(pe) <= 7 ? "Así frenando quedas justo ✓" : pe < 0 ? "Así quedas antes: suelta un poco el freno" : "Así te pasas: frena más";
+    } else if (red) {
+      const pe = pred != null ? pred - (L.d - 1) : null;
+      el.guideText.textContent = `Semáforo ${L.state === "red" ? "en rojo" : "en amarillo"} · línea en ${Math.round(L.d)} m`;
+      el.guide.classList.remove("ok");
+      el.guideMark.style.left = pct(-(L.d - 1));
+      el.guidePred.style.display = pe != null && pe > -9 ? "" : "none";
+      if (pe != null) el.guidePred.style.left = pct(pe);
+      el.guideSub.textContent = pe == null ? (L.d < b.v * b.v / 6 + 8 ? "¡Frena!" : "") : pe > 0.3 ? "Así cruzas la línea: frena más" : "Así frenando te detienes antes de la línea ✓";
+    }
+    el.hint.textContent = this.taxiHint();
+  }
+
+  /** Consejo según lo que está pasando en la carrera (sirve de tutorial). */
+  taxiHint() {
+    const sim = this.sim, b = sim.bus, f = sim.fare, t = sim.target;
+    const K = this.touch ? { doors: "toca Puerta", right: "▶", gas: "ACELERAR" } : { doors: "Espacio", right: "D", gas: "W" };
+    if (sim.finished) return "";
+    if (f?.phase === "pickup" && f.boardT != null) return "Subiendo al taxi…";
+    if (f?.phase === "ride" && f.payT != null) return "Pagando…";
+    if (f?.phase === "done") return `Cierra la puerta (${K.doors}) para seguir`;
+    if (b.doors !== "closed") return `Cierra la puerta (${K.doors}) para poder avanzar`;
+    if (!t) return b.v < 0.5 ? `Acelera con ${K.gas} y busca a quien haga señas` : "Atento a la vereda: alguien te va a hacer señas";
+    const d = t.s - b.s, curb = Math.abs(b.x - LANES[0]) < 1.0;
+    if (Math.abs(d) <= 7 && b.v < 0.3 && curb) return `Abre la puerta (${K.doors})`;
+    if (d < 160 && !curb) return `Pásate a la pista de la derecha (${K.right}) para ${t.kind === "pickup" ? "recogerlo" : "dejarlo"} junto a la vereda`;
+    const L = sim.nextLight(70);
+    if (L && L.state === "red" && L.d > 0) return "Semáforo en rojo: detente antes de la línea blanca";
+    if (t.kind === "dest") return f.smooth ? "Viaje suave = propina: sin frenadas bruscas ni faltas" : "Lleva a tu pasajero a su destino";
+    return "";
+  }
+
+  onTaxiFinished(e) {
+    if (e.bonus) {
+      this.bank.deposit(e.bonus, `Taxi · bono del turno (nota ${e.grade})`, { wage: true });
+      this.earned += e.bonus;
+      this.updateBank();
+      this.moneyFloat(e.bonus);
+    }
+    const x = e.taxi, t = e.totals;
+    const rows = [
+      ["Carreras", x.fares],
+      ["Tomaron otro taxi", x.lost],
+      ["Kilómetros con pasajero", x.km.toFixed(1).replace(".", ",")],
+      ["Propinas", formatCLP(x.tips)],
+      ["Luces rojas", t.reds],
+      ["Choques", t.crashes],
+      ["Bono del turno", formatCLP(e.bonus)],
+      ["Ganado en este turno", formatCLP(this.earned)],
+    ];
+    this.el.summaryCard.innerHTML = `
+      <span class="bus-label">TAXI · FIN DEL TURNO</span>
+      <div class="bus-grade grade-${e.grade}">${e.grade}</div>
+      <h2>${esc(this.route.name)}</h2>
+      <dl class="bus-stats">${rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("")}</dl>
+      <p>Lo ganado ya está en tu cuenta del ${esc(BANK_NAME)}. Taxímetro aproximado: ${formatCLP(TAXI_FARE.flag)} la bajada de bandera y ${formatCLP(TAXI_FARE.step)} cada ${TAXI_FARE.meters} m o cada minuto detenido.</p>
+      <div class="bus-card-actions">
+        <button class="bus-btn primary" data-a="again">Otro turno</button>
+        <button class="bus-btn" data-a="quit">Volver a la portada</button>
+      </div>`;
+    this.el.summaryCard.querySelector("[data-a=again]").addEventListener("click", () => this.newRun());
+    this.el.summaryCard.querySelector("[data-a=quit]").addEventListener("click", () => this.exit());
+    setTimeout(() => this.el.summary.classList.remove("hidden"), 900);
+    this.releaseControls();
+    this.syncInput();
+  }
+
 
   rideHint() {
     const sim = this.sim, at = this.exitStop(), st = sim.nextStop;

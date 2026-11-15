@@ -2,7 +2,7 @@
    RedMoviSim 2.0 · home.css — portada
    Paso 1 (data-step="1"): ¿Qué quieres hacer? → Conducir, Viajar, Centro de Control.
    Paso 2 (data-step="2"): prepararlo y Jugar. main.js pone en #startScreen
-   data-home-mode (driver | passenger | control) y data-home-vehicle (metro | nos | efe | bus);
+   data-home-mode (driver | passenger | control) y data-home-vehicle (metro | nos | efe | bus | taxi) y data-home-road="1" para los que van por la calle (bus y taxi);
    lo que no corresponde se oculta aquí con .only-* / .train-only / .bus-only.
    ========================================================================== */
 
@@ -116,19 +116,19 @@
 .home:not([data-home-mode="driver"]) .only-driver,
 .home:not([data-home-mode="passenger"]) .only-passenger,
 .home:not([data-home-mode="control"]) .only-control,
-.home[data-home-mode="driver"][data-home-vehicle="bus"] .train-only,
+.home[data-home-mode="driver"][data-home-road="1"] .train-only,
 .home:not([data-home-mode="driver"]) .bus-only,
-.home[data-home-mode="driver"]:not([data-home-vehicle="bus"]) .bus-only { display: none !important; }
+.home[data-home-mode="driver"]:not([data-home-road="1"]) .bus-only { display: none !important; }
 .home[data-home-mode="control"] .line-picker,
 .home[data-home-mode="driver"]:not([data-home-vehicle="metro"]) .line-picker,
 .home[data-home-mode="control"] #lineCard,
-.home[data-home-mode="driver"][data-home-vehicle="bus"] #lineCard { display: none; }
+.home[data-home-mode="driver"][data-home-road="1"] #lineCard { display: none; }
 .home[data-home-mode="driver"] .line-chip[data-line="NOS"], .home[data-home-mode="driver"] .line-chip[data-line="RAN"] { display: none; }
 .home:not([data-home-mode="driver"]) #busDriverNote,
-.home:not([data-home-mode="driver"]) #driverLock, .home[data-home-mode="driver"][data-home-vehicle="bus"] #driverLock { display: none !important; }
+.home:not([data-home-mode="driver"]) #driverLock, .home[data-home-mode="driver"][data-home-road="1"] #driverLock { display: none !important; }
 
 /* Vehículo */
-.vehicle-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.vehicle-tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
 .vehicle-tiles button {
   display: grid; justify-items: start; gap: 4px; min-height: 104px; padding: 14px; border-radius: 14px; text-align: left;
   border: 1px solid var(--panel-border); background: var(--surface); color: var(--text); cursor: pointer;
@@ -256,7 +256,7 @@ body.touch-mode .keys-only { display: none; }
   .setup-side { position: sticky; top: 64px; padding: 14px; }
   .setup-main { gap: 14px; }
   .line-card-text { display: none; }
-  .vehicle-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+  .vehicle-tiles { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
   .vehicle-tiles button { display: grid; grid-template-columns: 1fr; padding: 10px; min-height: 0; }
   .vehicle-tiles .ico { display: none; }
   .vehicle-tiles b { font-size: 16px; }

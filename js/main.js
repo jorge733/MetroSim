@@ -171,13 +171,17 @@ const driverCard = document.querySelector('.mode-card[data-card="driver"]');
 const vehicleButtons = [...document.querySelectorAll("#vehicleSeg [data-vehicle]")];
 let driverVehicle = loadSetting("metrosim.mode") === "bus" ? "bus" : (loadSetting("metrosim.vehicle") || vehicleOfLine(savedLine));
 function selectVehicle(v, { fromLine = false } = {}) {
-  driverVehicle = ["metro", "nos", "efe", "bus"].includes(v) ? v : "metro";
+  driverVehicle = ["metro", "nos", "efe", "bus", "taxi"].includes(v) ? v : "metro";
+  const road = driverVehicle === "bus" || driverVehicle === "taxi";      // 2.2 · bus y taxi van por la calle
+  startScreen.dataset.homeRoad = road ? "1" : "0";
   saveSetting("metrosim.vehicle", driverVehicle);
   vehicleButtons.forEach(b => b.setAttribute("aria-checked", String(b.dataset.vehicle === driverVehicle)));
-  driverCard.classList.toggle("bus-vehicle", driverVehicle === "bus");
+  driverCard.classList.toggle("bus-vehicle", road);
   startScreen.dataset.homeVehicle = driverVehicle;
-  $("busDriverNote").hidden = driverVehicle !== "bus";
-  $("driverGo").firstChild.textContent = driverVehicle === "bus" ? "Manejar " : "Conducir ";
+  $("busDriverNote").hidden = !road;
+  $("driverGo").firstChild.textContent = road ? "Manejar " : "Conducir ";
+  $("busRouteLabel").textContent = driverVehicle === "taxi" ? "Calle" : "Recorrido";
+  renderBusRouteInfo?.();
   if (fromLine) return;
   const wanted = VEHICLE_LINE[driverVehicle];
   if (wanted && driverLineSelect.value !== wanted) selectLine(wanted);
@@ -191,6 +195,10 @@ busRouteSelect.innerHTML = BUS_ROUTES.map(r => `<option value="${r.id}">${r.id} 
 busRouteSelect.value = busRouteById(loadSetting("metrosim.busRoute") || "A01").id;
 function renderBusRouteInfo() {
   const r = busRouteById(busRouteSelect.value);
+  if (driverVehicle === "taxi") {
+    $("busRouteInfo").textContent = `Taxi por ${r.name} (${(r.length / 1000).toFixed(1).replace(".", ",")} km de calle): recoge a quien haga señas en la vereda y llévalo a su destino. Cobras lo que marca el taxímetro y, si el viaje es suave, propina.`;
+    return;
+  }
   const metros = r.stops.filter(s => s.metro).length;
   $("busRouteInfo").textContent = r.practice
     ? "Recorrido de práctica A01 (ficticio) por la Alameda, de Estación Central a Plaza Baquedano."
@@ -221,7 +229,7 @@ function selectLine(id) {
   saveSetting("metrosim.line", line.id);
   if (!isRail(line.id)) saveSetting("metrosim.metroLine", line.id);
   // Los botones NOS y RCG eligen ese tren de EFE; una línea del Metro vuelve al tren del Metro (el bus no cambia)
-  if (driverVehicle !== "bus" && vehicleOfLine(line.id) !== driverVehicle) selectVehicle(vehicleOfLine(line.id), { fromLine: true });
+  if (driverVehicle !== "bus" && driverVehicle !== "taxi" && vehicleOfLine(line.id) !== driverVehicle) selectVehicle(vehicleOfLine(line.id), { fromLine: true });
   startScreen.style.setProperty("--line", line.color);
   startScreen.style.setProperty("--on-line", textOn(line.color));
   lineChips.forEach(c => c.setAttribute("aria-checked", String(c.dataset.line === line.id)));
@@ -310,6 +318,7 @@ function renderResume() {
   let text = MODE_TITLES[last];
   if (last === "driver") {
     if (driverVehicle === "bus") text += ` · Bus ${busRouteById(busRouteSelect.value).id}`;
+    else if (driverVehicle === "taxi") text += ` · Taxi por ${busRouteById(busRouteSelect.value).name}`;
     else text += ` · ${lineLabel(driverLineSelect.value)} · ${directionSelect.selectedOptions[0]?.textContent.split(" · ")[1] || ""}`;
   } else if (last === "passenger") text += ` · desde ${stationSelect.selectedOptions[0]?.textContent.trim().replace(/\s+\(.*$/, "") || ""}`;
   $("homeResumeText").textContent = text;
@@ -621,6 +630,7 @@ function startGame(mode, opts = {}) {
   if (game) stopGame();
   if (!opts.tutorial && MODE_TITLES[mode]) saveSetting("redmovisim.lastPlay", mode);
   if (mode === "bus" || (mode === "driver" && driverVehicle === "bus" && !opts.net && !opts.tutorial)) return startBus();
+  if (mode === "driver" && driverVehicle === "taxi" && !opts.net) return startBus({ taxi: true });
   if (mode === "control") return startControl(opts);
   if (mode === "driver" && !inventory.canDrive(driverLineSelect.value)) {
     const lic = LICENSES.find(x => x.lineId === driverLineSelect.value);
@@ -949,12 +959,12 @@ function stopGame({ keepFullscreen = false } = {}) {
 
 /* 1.13 · Conductor de bus (beta, antes «MicroSim»): el modo bus tiene su propia pantalla y su propio ciclo (js/bus/) */
 let bus = null;
-function startBus({ ride = null } = {}) {
+function startBus({ ride = null, taxi = false } = {}) {
   if (bus) return;
   startScreen.classList.add("hidden");
   if (wantsTouch()) enterMobileFullscreen();       // dentro del gesto del usuario
   bus = startBusGame({
-    bank, muted, touch: wantsTouch(), ride, route: ride ? null : busRouteById(busRouteSelect.value),
+    bank, muted, touch: wantsTouch(), ride, taxi, route: ride ? null : busRouteById(busRouteSelect.value),
     onMuteChange: (m) => { muted = m; saveSetting("metrosim.muted", m ? "1" : "0"); hud.setSound(!m); },
     onExit: () => {
       bus = null;
