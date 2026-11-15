@@ -1,0 +1,133 @@
+/* ==========================================================================
+   RedMoviSim 2.0 · ui.css — sistema de diseño
+   Se carga DESPUÉS de styles.css: redefine la paleta y las piezas comunes
+   (botones, campos, selectores segmentados, chips de hora y tarifa), así todo
+   el juego toma el estilo nuevo. Identidad propia de RedMoviSim (rojo de la
+   marca + grafito); el color de la línea (--line) solo marca lo que es de esa
+   línea o recorrido.
+   ========================================================================== */
+
+:root {
+  /* Superficies (de atrás hacia adelante) */
+  --bg: #090c11;
+  --surface: #11151c;
+  --raise: #1a2029;
+  --raise-2: #222a35;
+  --panel: #0e1218eb;
+  --panel-border: #ffffff1c;
+  --hair: #ffffff12;
+  /* Texto */
+  --text: #f1f4f8;
+  --muted: #9ba5b3;
+  --dim: #626c7a;
+  /* Marca RedMoviSim */
+  --brand: #e8343f;
+  --brand-hi: #ff5560;
+  --brand-soft: #e8343f24;
+  --on-brand: #fff;
+  /* Acentos de cada modo de juego */
+  --c-drive: #ff5560;
+  --c-ride: #2fc6a2;
+  --c-control: #6c9bff;
+  /* Estados */
+  --ok: #3ad37f;
+  --warn: #ffc247;
+  --emergency: #ff4d4d;
+  --focus: #8ccaff;
+  /* Forma */
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 18px;
+  --shadow: 0 10px 30px #00000073;
+  --ease: cubic-bezier(.2, .7, .2, 1);
+}
+
+[hidden] { display: none !important; }
+.sr-only { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-visible, [tabindex]:focus-visible {
+  outline: 2px solid var(--focus); outline-offset: 2px;
+}
+.eyebrow { color: var(--brand-hi); }
+
+/* ---------- Botones ---------- */
+.go-button, .ghost-button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 44px; padding: 0 20px; border-radius: 10px;
+  font: 600 15px/1 var(--f-body); letter-spacing: .1px; cursor: pointer;
+  transition: background .15s, border-color .15s, transform .15s var(--ease), filter .15s;
+}
+.go-button { border: 0; background: var(--brand); color: var(--on-brand); box-shadow: 0 6px 18px #e8343f40; }
+.go-button:hover { background: var(--brand-hi); filter: none; }
+.go-button:active { transform: translateY(1px); }
+.go-button:disabled { opacity: .55; cursor: default; box-shadow: none; }
+.ghost-button { border: 1px solid var(--panel-border); background: transparent; color: var(--text); }
+.ghost-button:hover { background: var(--raise); }
+.go-button .ico, .ghost-button .ico { width: 18px; height: 18px; }
+
+/* ---------- Campos ---------- */
+.field { display: grid; gap: 8px; min-width: 0; }
+.field select, .field input, .net-join input {
+  width: 100%; min-height: 46px; padding: 0 14px; border-radius: 10px;
+  border: 1px solid var(--panel-border); background: var(--surface); color: var(--text); font-size: 15px;
+  text-overflow: ellipsis;
+}
+.field select { appearance: none; padding-right: 40px; cursor: pointer;
+  background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239ba5b3' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") right 12px center / 18px no-repeat; }
+.field select:hover, .field input:hover { border-color: #ffffff33; }
+
+/* ---------- Selector segmentado (Ida/Vuelta, clima, tipo de día) ---------- */
+.seg { display: flex; min-width: 0; gap: 4px; padding: 4px; border-radius: 12px; background: var(--surface); border: 1px solid var(--panel-border); }
+.seg button {
+  flex: 1; min-width: 0; min-height: 44px; padding: 6px 12px; display: grid; gap: 2px; align-content: center; text-align: left;
+  border: 0; border-radius: 9px; background: transparent; color: var(--muted); cursor: pointer; transition: background .15s, color .15s;
+}
+.seg button + button { border-left: 0; }
+.seg button:hover { background: #ffffff0a; color: var(--text); }
+.seg button b { font: 600 14px/1.2 var(--f-body); color: inherit; }
+.seg button span { font-size: 12px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.seg button[aria-checked="true"], .seg button[aria-selected="true"] { background: var(--raise-2); color: var(--text); box-shadow: inset 0 0 0 1px #ffffff1f; }
+.weather-seg button { justify-items: center; text-align: center; padding: 6px 2px; }
+.weather-seg button b { font-size: 18px; line-height: 1; }
+.weather-seg button span { font-size: 11.5px; max-width: 100%; }
+
+/* ---------- Hora y tramo tarifario (portada y panel de tarifas) ---------- */
+.clock-time { font: 700 30px/1 var(--f-data); font-variant-numeric: tabular-nums; }
+.clock-band {
+  --c: var(--muted); display: inline-flex; align-items: center; gap: 7px; padding: 5px 11px 5px 9px;
+  border: 1px solid color-mix(in srgb, var(--c) 50%, transparent); border-radius: 999px;
+  background: color-mix(in srgb, var(--c) 12%, transparent); font-size: 13px; font-weight: 600; white-space: nowrap;
+}
+.clock-band i { width: 8px; height: 8px; border-radius: 50%; background: var(--c); box-shadow: 0 0 8px var(--c); }
+.clock-band b { font-family: var(--f-data); font-size: 12px; color: var(--muted); }
+.clock-band.punta { --c: #ff5a4f; }
+.clock-band.valle { --c: var(--warn); }
+.clock-band.baja { --c: var(--ok); }
+.clock-band.closed { --c: var(--dim); }
+.clock-band.changed { animation: clockPulse .9s ease-out; }
+@keyframes clockPulse { 0% { transform: scale(1.12); } 100% { transform: none; } }
+.clock-note { font-size: 12px; color: var(--muted); line-height: 1.35; }
+
+/* ---------- Multijugador (unirse a una sala) ---------- */
+.net-join { display: grid; grid-template-columns: minmax(0, 1fr) 120px auto; gap: 10px 12px; align-items: end; margin-top: 10px; }
+#netCode { font-family: var(--f-data); letter-spacing: 4px; text-transform: uppercase; }
+.net-msg { grid-column: 1 / -1; font-size: 13px; color: #ffd9a0; }
+.net-msg:empty { display: none; }
+.net-join small { grid-column: 1 / -1; color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+@media (max-width: 560px) { .net-join { grid-template-columns: minmax(0, 1fr) 100px; } .net-join .go-button { grid-column: 1 / -1; } }
+.net-badge {
+  position: absolute; left: calc(18px + env(safe-area-inset-left)); top: calc(118px + env(safe-area-inset-top)); z-index: 6;
+  padding: 4px 10px; border-radius: 999px; background: #0b1a12cc; border: 1px solid #3ad37f66; color: #bff0d3;
+  font: 600 12px/1.3 var(--f-data); pointer-events: none; white-space: nowrap;
+}
+.touch-mode .net-badge { left: 50%; top: calc(12px + env(safe-area-inset-top)); transform: translateX(-50%); }
+.net-badge.off { background: #2a1a0ccc; border-color: #ffb02066; color: #ffd9a0; }
+
+/* Licencia que falta para conducir una línea */
+.mode-lock { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 10px; font-size: 13.5px; line-height: 1.4;
+  color: #ffe1b0; background: #ffc2470f; border: 1px solid #ffc24740; }
+.mode-lock .ico { flex: none; width: 18px; height: 18px; margin-top: 1px; }
+.chip-lock { position: absolute; top: 4px; right: 4px; width: 12px; height: 12px; opacity: .8; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}

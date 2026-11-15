@@ -175,6 +175,7 @@ function selectVehicle(v, { fromLine = false } = {}) {
   saveSetting("metrosim.vehicle", driverVehicle);
   vehicleButtons.forEach(b => b.setAttribute("aria-checked", String(b.dataset.vehicle === driverVehicle)));
   driverCard.classList.toggle("bus-vehicle", driverVehicle === "bus");
+  startScreen.dataset.homeVehicle = driverVehicle;
   $("busDriverNote").hidden = driverVehicle !== "bus";
   $("driverGo").firstChild.textContent = driverVehicle === "bus" ? "Manejar " : "Conducir ";
   if (fromLine) return;
@@ -233,6 +234,7 @@ function selectLine(id) {
 /** Ficha de la línea elegida: recorrido, esquema con sus estaciones y datos. */
 function renderLineCard(line) {
   const st = line.stations, first = st[0], last = st.at(-1);
+  $("lineCardBadge").textContent = lineLabel(line.id);
   $("lineCardRoute").textContent = `${first.name} ⇄ ${last.name}`;
   $("lineCardFirst").textContent = first.short;
   $("lineCardLast").textContent = last.short;
@@ -271,15 +273,56 @@ function refreshDriverLines() {
 }
 
 /* Tarjetas de modo: la elegida muestra sus opciones; su botón empieza la partida */
+/* 2.0 · Portada en dos pasos: 1) qué quieres hacer · 2) prepararlo y Jugar */
 const modeCards = [...document.querySelectorAll(".mode-card")];
+const MODE_TITLES = { driver: "Conducir", passenger: "Viajar", control: "Centro de Control" };
 function selectMode(mode) {
   modeCards.forEach(c => c.classList.toggle("selected", c.dataset.card === mode));
+  startScreen.dataset.homeMode = mode;
+  $("setupTitle").textContent = MODE_TITLES[mode] || "";
   saveSetting("metrosim.mode", mode);
 }
-modeCards.forEach(card => card.addEventListener("click", (ev) => {
-  if (!ev.target.closest("button, select")) selectMode(card.dataset.card);
-}));
+/** Paso de la portada (1: elegir qué hacer · 2: prepararlo). */
+function homeStep(n) {
+  startScreen.dataset.step = String(n);
+  startScreen.scrollTop = 0;
+  const focus = n === 2 ? [...startScreen.querySelectorAll(".home-setup .go-big")].find(b => b.offsetParent) : startScreen.querySelector(`.mode-card[data-card="${startScreen.dataset.homeMode}"]`);
+  focus?.focus({ preventScroll: true });
+}
+modeCards.forEach(card => {
+  const pick = () => { selectMode(card.dataset.card); homeStep(2); };
+  card.addEventListener("click", pick);
+  card.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); pick(); } });
+});
+$("homeBack").addEventListener("click", () => homeStep(1));
+window.addEventListener("keydown", (ev) => {
+  if (ev.key !== "Escape" || game || startScreen.classList.contains("hidden") || startScreen.dataset.step !== "2") return;
+  if (fareInfoOpen() || riderPanelOpen() || document.querySelector(".shop-overlay:not(.hidden), .ticket-panel:not(.hidden)")) return;
+  homeStep(1);
+});
 selectMode(modeCards.some(c => c.dataset.card === loadSetting("metrosim.mode")) ? loadSetting("metrosim.mode") : "driver");
+
+/** «Seguir donde quedaste»: repite lo último que se jugó con lo elegido entonces (se guarda al empezar). */
+function renderResume() {
+  const last = loadSetting("redmovisim.lastPlay"), btn = $("homeResume");
+  btn.hidden = !MODE_TITLES[last];
+  if (btn.hidden) return;
+  let text = MODE_TITLES[last];
+  if (last === "driver") {
+    if (driverVehicle === "bus") text += ` · Bus ${busRouteById(busRouteSelect.value).id}`;
+    else text += ` · ${lineLabel(driverLineSelect.value)} · ${directionSelect.selectedOptions[0]?.textContent.split(" · ")[1] || ""}`;
+  } else if (last === "passenger") text += ` · desde ${stationSelect.selectedOptions[0]?.textContent.trim().replace(/\s+\(.*$/, "") || ""}`;
+  $("homeResumeText").textContent = text;
+  btn.onclick = () => { selectMode(last); firstAskThen(() => startGame(last)); };
+}
+renderResume();
+// Al volver a la portada (fin de partida, menú): se actualiza «Seguir donde quedaste» y se parte del paso 1
+// (salvo que haya un aviso de la sala multijugador, que se lee en el paso 2)
+new MutationObserver(() => {
+  if (startScreen.classList.contains("hidden")) return;
+  renderResume();
+  if (!$("netJoinMsg").textContent) homeStep(1);
+}).observe(startScreen, { attributes: true, attributeFilter: ["class"] });
 
 /** Tienda RedMovi: desde la pantalla de inicio o con K durante el juego. */
 function openStore(opts = {}) {
@@ -570,6 +613,7 @@ async function joinRoomAsDriver() {
 
 function startGame(mode, opts = {}) {
   if (game) stopGame();
+  if (!opts.tutorial && MODE_TITLES[mode]) saveSetting("redmovisim.lastPlay", mode);
   if (mode === "bus" || (mode === "driver" && driverVehicle === "bus" && !opts.net && !opts.tutorial)) return startBus();
   if (mode === "control") return startControl(opts);
   if (mode === "driver" && !inventory.canDrive(driverLineSelect.value)) {

@@ -162,6 +162,12 @@ piezas que el resto del juego, así la calle se ve y se comporta como el Metro a
 - **1.20.6 · Imágenes del post «Volvemos en unas pocas horas»** (`post-volvemos/`): post cuadrado, historia y portada
   horizontal que avisan que el juego vuelve en unas horas con la interfaz renovada y que el dinero, la bip!, las
   compras y las misiones quedan guardados en el celular o computador. Se generan con `node generar.js plantilla.html`.
+- **1.20.7 · Portada nueva (avance de la 2.0, detrás de la mantención):** sistema de diseño propio de RedMoviSim
+  (`css/ui.css`: paleta grafito con el rojo de la marca, botones, campos y selectores) y portada en dos pasos
+  (`css/home.css`): primero **¿Qué quieres hacer hoy?** (Conducir, Viajar o Centro de Control) y después se prepara
+  la partida (Metro, Tren Nos, Tren Rancagua o Bus Red al mismo nivel, línea o recorrido, sentido y clima plegable)
+  con un botón grande para jugar. **Seguir donde quedaste** repite lo último que se jugó. La hora, la tarifa y la
+  Tienda quedan en una barra arriba. Se ve con `?probar`.
 
 ## Versión 1.19 · Pasajeros realistas en el bus
 
