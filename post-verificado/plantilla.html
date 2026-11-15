@@ -1,0 +1,51 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+*{margin:0;box-sizing:border-box}
+html,body{width:var(--w);height:var(--h);overflow:hidden}
+body{font-family:"DejaVu Sans","Liberation Sans",Arial,sans-serif;color:#fff;
+ background:radial-gradient(ellipse at 50% 30%,#26324a 0%,#111722 55%,#05070a 100%);position:relative}
+.wrap{position:absolute;inset:0;display:flex;flex-direction:var(--dir,column);align-items:center;justify-content:center;text-align:var(--ta,center);padding:0 60px;gap:var(--gap)}
+.col{display:flex;flex-direction:column;align-items:var(--ai,center);gap:var(--gap)}
+.seal{width:var(--seal);height:var(--seal);flex:none;filter:drop-shadow(0 0 40px rgba(29,155,240,.55))}
+.badge{display:inline-flex;align-items:center;background:#1d9bf0;padding:10px 28px;border-radius:999px;font-weight:800;font-size:var(--badge);letter-spacing:.08em}
+h1{font-size:var(--h1);font-weight:900;line-height:1.02;letter-spacing:-.02em}
+h1 em{font-style:normal;color:#4cb5ff}
+h1 small{display:block;margin-top:.3em;font-size:.4em;font-weight:800;letter-spacing:.04em;color:#ff8a90}
+.card{display:flex;align-items:center;gap:calc(var(--card) * .6);background:#fff;color:#111722;border-radius:calc(var(--card) * 1.2);padding:calc(var(--card) * .55) calc(var(--card) * 1.1) calc(var(--card) * .55) calc(var(--card) * .55);
+ box-shadow:0 0 0 8px rgba(29,155,240,.35),0 14px 40px rgba(0,0,0,.5);text-align:left}
+.card .av{width:calc(var(--card) * 3);height:calc(var(--card) * 3);border-radius:50%;background:#d7262e;display:flex;align-items:center;justify-content:center;flex:none}
+.card .av svg{width:92%}
+.card .name{display:flex;align-items:center;gap:.3em;font-size:var(--card);font-weight:900}
+.card .name svg{width:1em;height:1em}
+.card .sub{font-size:calc(var(--card) * .55);color:#5b6475;font-weight:700;margin-top:.25em}
+.lines{display:flex;width:var(--linesw,520px);height:14px;border-radius:4px;overflow:hidden}
+.lines i{flex:1}
+p{font-size:var(--p);line-height:1.35;color:#d6dbe6}
+p b{color:#fff}
+.hb{display:var(--hb,none)}
+.url{font-size:var(--url);color:#9fb0c8;letter-spacing:.04em;font-weight:700}
+.url span{color:#ff8a90}
+</style></head><body>
+<svg width="0" height="0" style="position:absolute"><defs>
+ <symbol id="chk" viewBox="0 0 100 100"><path fill="#1d9bf0" d="M50 3l11 9 14-2 5 13 13 5-2 14 9 11-9 11 2 14-13 5-5 13-14-2-11 9-11-9-14 2-5-13-13-5 2-14-9-11 9-11-2-14 13-5 5-13 14 2z"/>
+ <path d="M30 51l13 13 27-28" fill="none" stroke="#fff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+ <symbol id="logo" viewBox="0 0 200 130"><rect x="6" y="6" width="188" height="118" rx="30" fill="#d7262e"/>
+ <path d="M30 94H78L122 36H170" fill="none" stroke="#fff" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+ <path d="M100 18V112" fill="none" stroke="#ffd2d5" stroke-width="9" stroke-linecap="round" stroke-dasharray="0.1 17"/>
+ <circle cx="30" cy="94" r="10" fill="#fff"/><circle cx="170" cy="36" r="10" fill="#fff"/>
+ <circle cx="100" cy="65" r="17" fill="#fff"/><circle cx="100" cy="65" r="8" fill="#d7262e"/></symbol>
+</defs></svg>
+<div class="wrap">
+ <svg class="seal"><use href="#chk"/></svg>
+ <div class="col">
+ <div class="badge">CUENTA OFICIAL</div>
+ <h1>¡Ya estamos<br><em>verificados</em>!<small>RedMoviSim tiene <br class="hb">la insignia de Meta</small></h1>
+ <div class="card">
+  <div class="av"><svg viewBox="0 0 200 130"><use href="#logo"/></svg></div>
+  <div><div class="name">RedMoviSim <svg><use href="#chk"/></svg></div><div class="sub">Verificado por Meta</div></div>
+ </div>
+ <div class="lines"><i style="background:#e1251b"></i><i style="background:#f4b400"></i><i style="background:#8b5a2b"></i><i style="background:#1d3f95"></i><i style="background:#3c86c6"></i><i style="background:#00965e"></i><i style="background:#9b26b6"></i><i style="background:#fff"></i></div>
+ <p>Busca la <b>insignia azul</b> junto a nuestro nombre:<br>así sabes que es <b>la cuenta oficial del juego.</b></p>
+ <div class="url">redmovisim<span>.cl</span></div>
+ </div>
+</div>
+</body></html>

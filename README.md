@@ -141,6 +141,9 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - `js/bus/taxiSim.js` (la simulación, se puede probar en Node) hereda de `busSim.js`, que ahora recibe el tamaño y la
   potencia del vehículo (`vehicle: { len, wid, spec }`). El modelo 3D, el marcador y las personas del taxi están en
   `busWorld.js` y `busPeople.js`; el HUD, en `busGame.js` y `css/bus.css`.
+- **2.2.1 · Imágenes del post «¡Ya estamos verificados!»** (`post-verificado/`): post cuadrado, historia y portada
+  horizontal que anuncian que la cuenta de RedMoviSim tiene la insignia de verificación de Meta. Se generan con
+  `node generar.js plantilla.html`.
 
 ## Versión 2.1 · Centro de Control y bus con la interfaz nueva
 
