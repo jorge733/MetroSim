@@ -7,10 +7,16 @@
    ========================================================================== */
 
 import { playIntro } from "./intro.js";
+import { ACTIVA, saltarMantencion, mostrarMantencion } from "./mantencion.js";
 
 /** El sonido silenciado se guarda en el navegador (lo cambia main.js con la tecla M). */
 const isMuted = () => { try { return localStorage.getItem("metrosim.muted") === "1"; } catch { return false; } };
 
-const game = import("./main.js");
-playIntro({ isMuted, menuReady: game });
-game.catch(err => console.error("RedMoviSim no pudo cargar el juego:", err));
+// En mantención (js/mantencion.js) no se carga el juego, salvo con ?probar en la dirección.
+if (ACTIVA && !saltarMantencion()) {
+  mostrarMantencion();
+} else {
+  const game = import("./main.js");
+  playIntro({ isMuted, menuReady: game });
+  game.catch(err => console.error("RedMoviSim no pudo cargar el juego:", err));
+}

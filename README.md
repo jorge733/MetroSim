@@ -155,6 +155,10 @@ piezas que el resto del juego, así la calle se ve y se comporta como el Metro a
 - **1.20.3 · Imágenes del post «Instálalo en tu celular»** (`post-instalar/`): post cuadrado, historia y portada
   horizontal con los pasos para instalar la app en Android (Chrome) y iPhone (Safari).
 - **1.20.4 · Post «Instálalo en tu celular» con el celular en horizontal** (`post-instalar/`).
+- **1.20.5 · Juego en mantención** (`js/mantencion.js`): mientras se rehace la interfaz para la 2.0, el sitio muestra
+  la pantalla «Estamos renovando RedMoviSim · Volvemos pronto» y no carga el juego. Para entrar igual a revisarlo se
+  agrega **`?probar`** a la dirección (`redmovisim.cl/?probar`); se recuerda mientras la pestaña siga abierta. Se apaga
+  con `ACTIVA = false` en `js/mantencion.js`. La cuenta, la bip! y las misiones siguen guardadas en cada dispositivo.
 
 ## Versión 1.19 · Pasajeros realistas en el bus
 
