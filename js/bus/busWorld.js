@@ -23,7 +23,9 @@
 import * as THREE from "three";
 import { LANES, CURB_X, MEDIAN_X, lightState } from "./busRoute.js";
 import { BUS_LENGTH, BUS_WIDTH, makeRng } from "./busSim.js";
+import { MIRROR_X } from "./taxiSim.js";
 import { BusPeople } from "./busPeople.js";
+import { RoutePath } from "./busPath.js";
 import { skyAt } from "../render/outdoor.js";
 import { WEATHER } from "../engine/weather.js";
 import { metroStreetAccess } from "../city/city.js";
@@ -35,6 +37,7 @@ const ONCOMING = [-9.1, -12.5, -15.9];
 /** 1.20 · Acceso al Metro junto al paradero: centro (x desde la vereda, z relativo a la marca) y tamaño. */
 const ACCESS = { dx: 3.9, dz: -9, w: 1.9, len: 5.2 };
 const SIDEWALK_Y = 0.16;
+const TZ = new THREE.Matrix4();
 /** 2.2 · Taxi: largo, ancho y asientos (conductor adelante a la izquierda, pasajero atrás a la derecha). */
 const TAXI_L = 4.6, TAXI_W = 1.85;
 const TAXI_SEATS = { driver: { x: -0.4, y: 0.62, z: 2.05 }, rider: { x: 0.42, y: 0.62, z: 3.2 } };
@@ -61,7 +64,8 @@ function noise(g, w, h, amount, rng) {
 }
 const std = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.85, metalness: 0, ...o });
 function box(parent, w, h, d, mat, x, y, z) {
-  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+  // 2.3 · Las cajas largas llevan cortes cada 3 m para poder doblarse con la calle (busPath.js)
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d, 1, 1, d > 8 ? Math.ceil(d / 3) : 1), mat);
   m.position.set(x, y, z);
   parent.add(m);
   return m;
@@ -107,7 +111,9 @@ export class BusWorld {
     this.len = this.end - this.start;
     this.zMid = -(this.start + this.end) / 2;
     this.carMeshes = new Map();
+    this.path = new RoutePath(route);            // 2.3 · trazado real (la calle dobla como el recorrido)
     this.buildSky();
+    const before = new Set(scene.children);
     this.buildGround();
     this.buildRoadMarks();
     this.buildMedian();
@@ -116,13 +122,94 @@ export class BusWorld {
     this.buildCrossStreets();
     this.buildStops();
     this.buildLights();
+    const statics = scene.children.filter(o => !before.has(o) && o !== this.ground);
     this.bus = this.taxi ? this.buildTaxi() : this.buildBus();
     this.buildOncoming();
+    const before2 = new Set(scene.children);
     this.buildMetroAccesses();
+    statics.push(...scene.children.filter(o => !before2.has(o)));
+    this.bendStatic(statics);
     this.buildRain();
     // 1.19 · pasajeros 3D; 1.20: también bajan al Metro por el acceso y pasa gente por las veredas
-    this.people = new BusPeople(scene, route, this.body, { ride, accesses: this.accesses, taxi: this.taxi ? TAXI_SEATS : null });
+    this.people = new BusPeople(scene, route, this.body, { ride, accesses: this.accesses, taxi: this.taxi ? TAXI_SEATS : null, bend: this });
     if (this.taxi) this.buildFareMarker();
+  }
+
+  /* ----------------------------- 2.3 · La calle dobla con el recorrido ----------------------------- */
+  /** Matriz que lleva el espacio «recto» (x de lado, z = −s) al mapa en el entorno de `s`. */
+  bendMatrix(s, out = new THREE.Matrix4()) {
+    const f = this.path.frame(s, this._f ??= {});
+    out.makeRotationY(f.phi);
+    out.setPosition(f.x, 0, f.z);
+    return out.multiply(TZ.makeTranslation(0, 0, s));
+  }
+  /** Rumbo de la calle en `s` (radianes, giro sobre Y). */
+  heading(s) { return this.path.frame(s, this._f ??= {}).phi; }
+  /** Punto recto → mapa. */
+  toWorld(x, y, z, out = new THREE.Vector3()) { return this.path.toWorld(x, y, z, out); }
+  /** Ubica un objeto que en el espacio recto está en (x, 0, −s) con su frente hacia −z y `len` de largo. */
+  place(obj, x, s, len = 0, yaw = 0) {
+    this.toWorld(x, 0, -s, obj.position);
+    obj.rotation.set(0, this.heading(s + (this.path.straight ? 0 : -len / 2)) + yaw, 0);
+  }
+
+  /** Dobla lo que no se mueve (calle, veredas, edificios, paraderos…) siguiendo el trazado, una sola vez. */
+  bendStatic(objs) {
+    if (this.path.straight) return this.straightToEast(objs);
+    const seenGeo = new Set(), M = new THREE.Matrix4(), W = new THREE.Matrix4(), B = new THREE.Matrix4(), ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
+    const v = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
+    const lights = [];
+    for (const root of objs) {
+      root.updateMatrixWorld(true);
+      root.traverse(o => {
+        if (o.isInstancedMesh) {
+          for (let i = 0; i < o.count; i++) {
+            o.getMatrixAt(i, M);
+            W.multiplyMatrices(o.matrixWorld, M);
+            W.decompose(v, q, sc);
+            const sPos = -v.z;
+            // Edificios, árboles y faroles que quedarían sobre la calle en la parte de adentro de una curva: no van
+            if (Math.abs(v.x) > 7.5 && this.path.inside(v.x > 0 ? v.x - 2 : v.x + 2, sPos, 14)) { o.setMatrixAt(i, ZERO); continue; }
+            o.setMatrixAt(i, this.bendMatrix(sPos, B).multiply(W));
+          }
+          o.instanceMatrix.needsUpdate = true;
+          o.frustumCulled = false;
+        } else if (o.isMesh) {
+          if (seenGeo.has(o.geometry)) o.geometry = o.geometry.clone();
+          seenGeo.add(o.geometry);
+          const geo = o.geometry;
+          geo.applyMatrix4(o.matrixWorld);
+          const pos = geo.attributes.position, nor = geo.attributes.normal;
+          for (let i = 0; i < pos.count; i++) {
+            const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+            this.path.toWorld(x, y, z, v);
+            pos.setXYZ(i, v.x, v.y, v.z);
+            if (nor) {
+              const phi = this.heading(-z), c = Math.cos(phi), sn = Math.sin(phi);
+              const nx = nor.getX(i), nz = nor.getZ(i);
+              nor.setXYZ(i, nx * c + nz * sn, nor.getY(i), -nx * sn + nz * c);
+            }
+          }
+          pos.needsUpdate = true;
+          if (nor) nor.needsUpdate = true;
+          geo.computeBoundingSphere();
+          geo.computeBoundingBox();
+        } else if (o.isLight) {
+          o.getWorldPosition(v);
+          lights.push([o, this.toWorld(v.x, v.y, v.z)]);
+        }
+      });
+      // Todo quedó en coordenadas del mapa: las transformaciones del grupo vuelven a cero
+      root.traverse(o => { if (!o.isLight) { o.position.set(0, 0, 0); o.rotation.set(0, 0, 0); o.scale.set(1, 1, 1); } });
+    }
+    for (const [l, p] of lights) { l.parent?.worldToLocal(p); l.position.copy(p); }
+  }
+  /** A01 de práctica (sin trazado): la calle recta va hacia el oriente. */
+  straightToEast(objs) {
+    const g = new THREE.Group();
+    g.rotation.y = -Math.PI / 2;
+    this.scene.add(g);
+    for (const o of objs) g.add(o);
   }
 
   /* ----------------------------- Cielo y luz ----------------------------- */
@@ -153,7 +240,7 @@ export class BusWorld {
     });
     // Con nubes la cordillera casi no se ve (como en Santiago los días grises)
     const m = new THREE.Mesh(new THREE.PlaneGeometry(2600, 420), new THREE.MeshBasicMaterial({ map: mtn, transparent: true, opacity: this.night ? 0.8 : Math.max(0.12, 1 - 0.85 * K.cloud), fog: false, depthWrite: false }));
-    m.position.set(-200, 120, -this.end - 900);
+    m.rotation.y = -Math.PI / 2;            // mira al poniente: la cordillera queda al oriente (como en Santiago)
     m.renderOrder = -1;
     s.add(m);
     this.mountains = m;
@@ -169,13 +256,13 @@ export class BusWorld {
     const roadW = CURB_X - ROAD_FAR;
     // 1.20 · Con lluvia la calzada se ve mojada: más oscura y con brillo (reflejos de faroles y focos)
     const wetK = Math.min(1, this.wet);
-    const road = new THREE.Mesh(new THREE.PlaneGeometry(roadW, this.len), std(new THREE.Color("#ffffff").lerp(new THREE.Color("#8d9196"), wetK), { map: asphalt, roughness: 0.95 - 0.6 * wetK, metalness: 0.25 * wetK }));
+    const road = new THREE.Mesh(new THREE.PlaneGeometry(roadW, this.len, 1, Math.ceil(this.len / 3)), std(new THREE.Color("#ffffff").lerp(new THREE.Color("#8d9196"), wetK), { map: asphalt, roughness: 0.95 - 0.6 * wetK, metalness: 0.25 * wetK }));
     road.rotation.x = -Math.PI / 2;
     road.position.set((CURB_X + ROAD_FAR) / 2, 0, this.zMid);
     s.add(road);
 
     // Pista Solo Bus: un poco más rojiza
-    const busLane = new THREE.Mesh(new THREE.PlaneGeometry(3.3, this.len), std("#6a3b37", { roughness: 0.95, transparent: true, opacity: 0.55 }));
+    const busLane = new THREE.Mesh(new THREE.PlaneGeometry(3.3, this.len, 1, Math.ceil(this.len / 3)), std("#6a3b37", { roughness: 0.95, transparent: true, opacity: 0.55 }));
     busLane.rotation.x = -Math.PI / 2;
     busLane.position.set(LANES[0], 0.004, this.zMid);
     s.add(busLane);
@@ -202,17 +289,19 @@ export class BusWorld {
     box(s, 0.25, 0.18, this.len, curbMat, CURB_X + 0.12, 0.09, this.zMid);
     box(s, 0.25, 0.18, this.len, curbMat, ROAD_FAR - 0.12, 0.09, this.zMid);
 
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(900, this.len + 1600), std(this.night ? "#1a1c1a" : "#5f6650"));
+    // Terreno: un plano grande que acompaña al vehículo (la calle dobla encima)
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(3200, 3200), std(this.night ? "#1a1c1a" : "#5f6650"));
     ground.rotation.x = -Math.PI / 2;
-    ground.position.set(0, -0.05, this.zMid - 400);
+    ground.position.y = -0.05;
     s.add(ground);
+    this.ground = ground;
   }
 
   buildRoadMarks() {
     const s = this.scene;
     const white = std("#e9e9e4", { roughness: 0.7 });
     const line = (x, w = 0.15) => {
-      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, this.len), white);
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, this.len, 1, Math.ceil(this.len / 3)), white);
       m.rotation.x = -Math.PI / 2;
       m.position.set(x, 0.012, this.zMid);
       s.add(m);
@@ -690,7 +779,8 @@ export class BusWorld {
       this.fareKey = key;
       if (f?.phase === "pickup") {
         this.people.dropExtra(this.hailerP);
-        this.hailerP = this.people.hailer(f.s);
+        // En la vereda del sentido en que iba el taxi (la de enfrente si iba de vuelta)
+        this.hailerP = this.people.hailer(f.ws, f.dir > 0 ? CURB_X + 0.75 : MIRROR_X - CURB_X - 0.75, f.dir > 0 ? -Math.PI / 2 : Math.PI / 2);
         this.riderKind = this.hailerP.kind;
       } else if (f?.phase === "ride") {
         this.people.dropExtra(this.hailerP);
@@ -710,7 +800,7 @@ export class BusWorld {
       const col = t.kind === "pickup" ? "#ffd23a" : "#3ad37f";
       this.markMat.color.set(col);
       this.beamMat.color.set(col);
-      this.fareMarker.position.set(LANES[0], 0, -t.s);
+      this.place(this.fareMarker, t.dir > 0 ? LANES[0] : MIRROR_X - LANES[0], t.ws, 0, t.dir > 0 ? 0 : Math.PI);
       this.beamMat.opacity = 0.28 + 0.12 * Math.sin(performance.now() / 300);
     }
     // Puerta trasera: se abre hacia afuera
@@ -744,9 +834,7 @@ export class BusWorld {
     for (let i = 0; i < 18; i++) {
       const car = { tint: Math.floor(this.rng() * 1e6), kind: this.rng() < 0.2 ? "van" : "car", len: 4.4 };
       const mesh = this.carMesh(car);
-      mesh.rotation.y = Math.PI;
-      mesh.position.set(ONCOMING[i % 3], 0, -40 * i + this.rng() * 20);
-      this.oncoming.push({ mesh, v: 11 + this.rng() * 4 });
+      this.oncoming.push({ mesh, v: 11 + this.rng() * 4, x: ONCOMING[i % 3], z: -40 * i + this.rng() * 20, len: car.len });
     }
   }
 
@@ -781,16 +869,23 @@ export class BusWorld {
     if (!this.rain.visible || !cam) return;
     const pos = this.rain.geometry.attributes.position.array;
     const n = Math.floor(this.rainN * Math.min(1, this.rainAmount));
-    const b = sim.bus, fall = 11, len = 0.55;
-    // Dentro del bus no llueve
-    const dry = { x0: b.x - BUS_WIDTH / 2, x1: b.x + BUS_WIDTH / 2, z0: -b.s - 0.2, z1: -b.s + BUS_LENGTH + 0.2 };
+    const fall = 11, len = 0.55;
+    // Dentro del vehículo no llueve (se mira en coordenadas de la carrocería: la calle puede ir doblada)
+    const W = (sim.wid ?? BUS_WIDTH) / 2, L = sim.len ?? BUS_LENGTH;
+    this.bus.updateMatrixWorld();
+    const inv = (this._inv ??= new THREE.Matrix4()).copy(this.bus.matrixWorld).invert().elements;
+    const dryAt = (x, y, z) => {
+      if (y > 3.2) return false;
+      const lx = inv[0] * x + inv[4] * y + inv[8] * z + inv[12], lz = inv[2] * x + inv[6] * y + inv[10] * z + inv[14];
+      return lx > -W && lx < W && lz > -0.2 && lz < L + 0.2;
+    };
     for (let i = 0; i < this.rainN; i++) {
       const d = this.rainDrops[i];
       d.y -= fall * d.s * dt;
       if (d.y < -4) { d.y += 22; d.x = (Math.random() - 0.5) * 50; d.z = (Math.random() - 0.5) * 50; }
       const k = i * 6;
       const x = cam.x + d.x, y = cam.y + d.y, z = cam.z + d.z;
-      if (i >= n || (x > dry.x0 && x < dry.x1 && z > dry.z0 && z < dry.z1 && y < 3.2) || y < 0) { pos.fill(0, k, k + 6); pos[k + 1] = pos[k + 4] = -1e4; continue; }
+      if (i >= n || y < 0 || dryAt(x, y, z)) { pos.fill(0, k, k + 6); pos[k + 1] = pos[k + 4] = -1e4; continue; }
       pos[k] = x; pos[k + 1] = y; pos[k + 2] = z;
       pos[k + 3] = x + 0.04; pos[k + 4] = y - len * d.s; pos[k + 5] = z;
     }
@@ -805,11 +900,14 @@ export class BusWorld {
     const latV = this.prevX == null ? 0 : (b.x - this.prevX) / Math.max(dt, 1e-3);
     this.prevX = b.x;
     const yaw = b.v > 0.3 ? -Math.atan2(latV, b.v) : 0;
-    g.rotation.y += (yaw - g.rotation.y) * Math.min(1, dt * 8);
-    g.position.set(b.x, 0, -b.s);
+    this.busYaw = (this.busYaw ?? 0) + (yaw - (this.busYaw ?? 0)) * Math.min(1, dt * 8);
+    // 2.3 · El taxi puede ir en el otro sentido: se dibuja en la calzada de enfrente, dado vuelta
+    const flip = sim.dir < 0 ? Math.PI : 0;
+    if (this.lastDir !== sim.dir) { this.lastDir = sim.dir; this.prevX = b.x; this.busYaw = 0; }
+    this.place(g, sim.toIdaX(b.x), sim.idaS, (sim.len ?? BUS_LENGTH) * sim.dir, this.busYaw + flip);
     this.body.rotation.x = THREE.MathUtils.lerp(this.body.rotation.x, THREE.MathUtils.clamp(-b.accel * 0.006, -0.02, 0.02), Math.min(1, dt * 4));
     for (const w of this.wheels) w.rotation.x -= (b.v * dt) / 0.5;
-    this.steering.rotation.z = THREE.MathUtils.lerp(this.steering.rotation.z, -yaw * 6, Math.min(1, dt * 6));
+    this.steering.rotation.z = THREE.MathUtils.lerp(this.steering.rotation.z, -yaw * 6 + this.path.curvature(b.s) * 25, Math.min(1, dt * 6));
     // Puertas
     const open = b.doors === "open" ? 1 : b.doors === "opening" ? b.doorT / 1.1 : b.doors === "closing" ? 1 - b.doorT / 1.1 : 0;
     for (const leaf of this.doorLeaves) {
@@ -827,7 +925,7 @@ export class BusWorld {
     for (const car of sim.cars) {
       let m = this.carMeshes.get(car.id);
       if (!m) { m = this.carMesh(car); this.carMeshes.set(car.id, m); }
-      m.position.set(car.x, 0, -car.s);
+      this.place(m, sim.toIdaX(car.x), sim.toIdaS(car.s), car.len * sim.dir, flip);
       m.userData.tails.emissiveIntensity = car.braking || car.v < 0.3 ? 2.2 : this.night ? 0.9 : 0.3;
       seen.add(car.id);
     }
@@ -835,9 +933,10 @@ export class BusWorld {
     // Autos de vuelta (decorado)
     const zBus = -b.s;
     for (const o of this.oncoming) {
-      o.mesh.position.z += o.v * dt;
-      if (o.mesh.position.z > zBus + 160) o.mesh.position.z -= 720;
-      if (o.mesh.position.z < zBus - 560) o.mesh.position.z += 720;
+      o.z += o.v * dt;
+      if (o.z > zBus + 160) o.z -= 720;
+      if (o.z < zBus - 560) o.z += 720;
+      this.place(o.mesh, sim.toIdaX(o.x), sim.toIdaS(-o.z), -o.len * sim.dir, Math.PI + flip);
     }
     // Semáforos
     for (const sg of this.signals) {
@@ -852,7 +951,8 @@ export class BusWorld {
     this.people.update(sim, dt);
     this.updateRain(dt, cam, sim);                       // 1.20 · lluvia
     // Cordillera fija respecto del bus (está «en el infinito»)
-    this.mountains.position.z = zBus - 900;
+    this.mountains.position.set(g.position.x + 1500, 120, g.position.z);
+    this.ground.position.x = g.position.x; this.ground.position.z = g.position.z;
   }
 
   dispose() {

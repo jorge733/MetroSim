@@ -124,6 +124,25 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **Salir por los torniquetes es gratis**: solo se cobra el pasaje al pasar hacia la zona pagada (antes, al terminar
   de cruzar el torniquete de salida se cobraba un pasaje).
 
+## Versión 2.3 · La calle dobla como el recorrido real · taxi en los dos sentidos
+
+- **Recorridos con sus giros** (`js/bus/busPath.js`): la calle del bus y del taxi sigue el **trazado real** de cada
+  recorrido de Red (de red.cl): dobla donde dobla el bus de verdad (p. ej. el 403 hacia Plaza Italia, el 109 por
+  J. Walker Martínez) y la cordillera queda al oriente. Las esquinas se suavizan (radio de unos 30 m o más) para que las
+  pistas no se crucen; los edificios que quedarían montados en la parte de adentro de una curva se omiten. El A01 de
+  práctica sigue siendo recto.
+  - `tools/recorridos-red.mjs` guarda ahora el trazado de cada tramo (`path`: puntos [este, norte, s]) y
+    `js/bus/redRoutes.js` se regeneró (paraderos y semáforos iguales).
+  - La simulación no cambia (sigue midiendo la distancia `s` a lo largo del recorrido): el mundo 3D se arma recto y se
+    dobla una vez al empezar (`busWorld.js · bendStatic`); el vehículo, los autos y la gente se ubican sobre el trazado
+    en cada cuadro.
+- **Taxi en los dos sentidos** (`js/bus/taxiSim.js`): el destino del pasajero puede quedar **adelante o atrás**. Para
+  ir hacia atrás se da la **vuelta en U** (tecla **U** o botón **Vuelta**): despacio, desde la pista de la izquierda
+  (junto al bandejón) y en un cruce con semáforo, o al final de la calle. El taxi pasa a la calzada de enfrente y sigue
+  por la misma calle en el otro sentido. Quien hace señas espera en la vereda del sentido en que ibas: si das la vuelta
+  antes de recogerlo, queda en la vereda de enfrente. El HUD avisa «atrás · da la vuelta» y guía paso a paso. Para dejar
+  al pasajero basta detenerse a menos de 18 m del destino; el turno sigue mientras quieras (se termina desde el menú).
+
 ## Versión 2.2 · Taxi
 
 - **Conducir un taxi** (beta): en la portada, Conducir › **Taxi**, por la calle de cualquier recorrido de bus

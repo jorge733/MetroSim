@@ -64,8 +64,12 @@ export class BusPeople {
    * @param {THREE.Object3D} cabin  grupo de la carrocería del bus (los de adentro son sus hijos)
    * @param {{ride:boolean}} o  ride: el jugador va sentado adelante a la derecha (ese lugar queda libre)
    */
-  constructor(scene, route, cabin, { ride = false, accesses = [], taxi = null } = {}) {
+  constructor(scene, route, cabin, { ride = false, accesses = [], taxi = null, bend = null } = {}) {
     this.scene = scene;
+    /* 2.3 · La calle dobla (busWorld.js · bendMatrix): la gente camina en el espacio «recto» (x de lado, z = −s)
+       y se dobla al dibujarla. Los que van en el vehículo (local) ya siguen la carrocería. */
+    this.bend = bend;
+    this.bendM = bend ? new THREE.Matrix4() : null;
     /* 2.2 · Taxi: { driver: {x,y,z}, rider: {x,y,z} } posiciones del conductor y del pasajero (asiento de atrás).
        En el taxi nadie se dibuja en el salón del bus (sim.onboard solo sirve para los avisos). */
     this.taxi = taxi;
@@ -108,10 +112,10 @@ export class BusPeople {
 
   /* ----------------------------- 2.2 · Taxi ----------------------------- */
   /** Alguien en la vereda a la altura `s` que hace señas al taxi. */
-  hailer(s) {
+  hailer(s, x = CURB_X + 0.75, yaw = -Math.PI / 2) {
     const p = this.person(this.rng() < 0.2 ? "carga" : this.rng() < 0.3 ? "estudiante" : "adulto");
-    p.root.position.set(CURB_X + 0.75, SIDEWALK_Y, -s);
-    p.root.rotation.y = -Math.PI / 2;               // mira hacia la calle
+    p.root.position.set(x, SIDEWALK_Y, -s);
+    p.root.rotation.y = yaw;                        // mira hacia la calle
     p.pose = "hail";
     this.scene.add(p.root);
     this.extras.push(p);
@@ -141,13 +145,14 @@ export class BusPeople {
   /** Se baja del taxi por la puerta derecha y se va por la vereda. */
   taxiAlight(sim, kind) {
     const p = this.person(kind);
-    const b = sim.bus, z = -b.s + 2.6;
-    p.root.position.set(b.x + 1.1, SIDEWALK_Y, z);
-    p.root.rotation.y = -Math.PI / 2;
+    // En el espacio recto de la ida (si el taxi va de vuelta, todo se refleja hacia la vereda de enfrente)
+    const b = sim.bus, X = (x) => sim.toIdaX(x), z = -sim.toIdaS(b.s - 2.6);
+    p.root.position.set(X(b.x + 1.1), SIDEWALK_Y, z);
+    p.root.rotation.y = sim.dir > 0 ? -Math.PI / 2 : Math.PI / 2;
     p.pose = "walk";
     this.scene.add(p.root);
     const away = Math.random() < 0.5 ? 1 : -1;
-    p.path = [V(CURB_X + 0.9, SIDEWALK_Y, z), V(CURB_X + 1.6 + Math.random() * 2, SIDEWALK_Y, z + away * 30)];
+    p.path = [V(X(CURB_X + 0.9), SIDEWALK_Y, z), V(X(CURB_X + 1.6 + Math.random() * 2), SIDEWALK_Y, z + away * 30)];
     p.onArrive = () => { p.gone = true; };
     this.walkers.push(p);
   }
@@ -263,6 +268,10 @@ export class BusPeople {
   enterCabin(p) {
     this.walkers.splice(this.walkers.indexOf(p), 1);
     this.cabin.updateWorldMatrix(true, false);
+    if (this.bend) {                                   // del espacio recto al mapa, y de ahí a la carrocería
+      p.root.rotation.y += this.bend.heading(-p.root.position.z);
+      this.bend.toWorld(p.root.position.x, p.root.position.y, p.root.position.z, p.root.position);
+    }
     this.cabin.worldToLocal(p.root.position);
     p.root.rotation.y -= this.cabin.parent?.rotation.y ?? 0;
     this.cabin.add(p.root);
@@ -370,8 +379,8 @@ export class BusPeople {
   }
 
   updateStop(stop, sim, dt) {
-    const b = sim.bus;
-    const near = Math.abs(stop.z + b.s) < VIEW && stop.z < -b.s + 70;
+    const S = sim.idaS ?? sim.bus.s;                  // 2.3 · posición en el recorrido dibujado (el taxi puede ir de vuelta)
+    const near = Math.abs(stop.z + S) < VIEW && (sim.dir < 0 || stop.z < -S + 70);
     const want = near ? Math.min(MAX_STOP, sim.waiting[stop.index]) : 0;
     // Quien llegó corriendo ya cuenta como uno que espera (runnerArrive) y no hay que dibujarlo dos veces
     const counted = stop.crowd.filter(p => !p.runner);
@@ -404,7 +413,8 @@ export class BusPeople {
     if (!near) return;
 
     // ¿El bus viene a detenerse aquí? Entonces se arriman a la solera y hacen fila junto a la puerta delantera
-    const coming = serving || (sim.stopIndex === stop.index && sim.bus.doors === "closed" && -b.s - stop.z < 45 && -b.s - stop.z > -4 && b.v < 9 && sim.waiting[stop.index] > 0);
+    const b = sim.bus;
+    const coming = serving || (!this.taxi && sim.stopIndex === stop.index && sim.bus.doors === "closed" && -b.s - stop.z < 45 && -b.s - stop.z > -4 && b.v < 9 && sim.waiting[stop.index] > 0);
     if (coming) {
       // La fila se forma una vez; los que llegan después (o el que llegó corriendo) se ponen al final
       stop.line = this.queueOrder(stop, sim);
@@ -468,7 +478,7 @@ export class BusPeople {
     while (this.onboard.length > want) this.leaveCabin(this.onboard.at(-1));
 
     // 1.20 · Peatones: caminan por su vereda y vuelven a aparecer adelante o atrás del bus
-    const zBus = -sim.bus.s;
+    const zBus = -sim.idaS;
     for (const p of this.peds) {
       p.root.position.z -= p.dir * p.speed * dt;
       if (p.root.position.z > zBus + 120) p.root.position.z -= 420;
@@ -487,12 +497,12 @@ export class BusPeople {
     }
     // Los que ya se fueron
     this.walkers = this.walkers.filter(p => {
-      if (!p.gone && Math.abs(p.root.position.z + sim.bus.s) < VIEW + 60) return true;
+      if (!p.gone && Math.abs(p.root.position.z + sim.idaS) < VIEW + 60) return true;
       this.scene.remove(p.root);
       return false;
     });
     this.cabin.updateWorldMatrix(true, false);
-    this.renderer.render(all.filter(p => !p.gone && !p.hidden));
+    this.renderer.render(all.filter(p => !p.gone && !p.hidden), this.bend ? (p) => p.local ? null : this.bend.bendMatrix(-p.root.position.z, this.bendM) : null);
   }
 
   move(p, dt) {

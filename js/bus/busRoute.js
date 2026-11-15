@@ -82,6 +82,8 @@ function reversed(r) {
     from: r.to, to: r.from,
     stops: r.stops.slice().reverse().map(st => ({ ...st, s: span - st.s })),
     lights: r.lights.slice().reverse().map(l => ({ ...l, s: span - l.s - 16 })),
+    // 2.3 · El trazado al revés: la misma calle, recorrida en el otro sentido
+    path: r.path?.slice().reverse().map(([e, n, c]) => [e, n, span - c]),
   };
 }
 const BACK = new Map(BUS_ROUTES.map(r => [r.id, reversed(r)]));

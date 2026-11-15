@@ -143,7 +143,7 @@ class BusGame {
       <header class="bus-top">
         <div class="bus-brand">
           <span class="bus-badge${this.taxi ? " taxi" : ""}">${this.taxi ? "TAXI" : R.id}</span>
-          <div class="bus-route"><span class="bus-label">${this.taxi ? "TAXI · CONDUCIENDO · BETA" : this.ride ? "BUS RED · VIAJANDO" : "BUS RED · CONDUCIENDO · BETA"}</span><strong>${esc(R.name.toUpperCase())} · ${esc(R.from.toUpperCase())} → ${esc(R.to.toUpperCase())}</strong></div>
+          <div class="bus-route"><span class="bus-label">${this.taxi ? "TAXI · CONDUCIENDO · BETA" : this.ride ? "BUS RED · VIAJANDO" : "BUS RED · CONDUCIENDO · BETA"}</span><strong data-k="routeTitle">${esc(R.name.toUpperCase())} · ${esc(R.from.toUpperCase())} → ${esc(R.to.toUpperCase())}</strong></div>
         </div>
         <div class="bus-right">
           <div class="bus-pill"><span class="bus-label">CUENTA</span><strong data-k="bank">$0</strong><span class="bus-float" data-k="float"></span></div>
@@ -186,6 +186,7 @@ class BusGame {
         <span><kbd>L</kbd> limitador</span>
         <span><kbd>A</kbd><kbd>D</kbd> cambiar de pista</span>
         <span><kbd>Espacio</kbd> ${this.taxi ? "puerta (subir y bajar pasajero)" : "puertas"}</span>
+        ${this.taxi ? `<span><kbd>U</kbd> vuelta en U (en un cruce)</span>` : ""}
         <span><kbd>B</kbd> bocina</span>
         <span><kbd>C</kbd> cámara</span>
         <span><kbd>Esc</kbd> pausa</span>
@@ -205,6 +206,7 @@ class BusGame {
           <button data-t="horn">${ICON.horn}<span>Bocina</span></button>
           <button data-t="cam">${ICON.cam}<span>Cámara</span></button>
           <button data-t="limiter"><b class="bus-lim-ico">50</b><span>Limitador</span></button>
+          ${this.taxi ? `<button data-t="uturn"><svg viewBox="0 0 24 24"><path d="M8 20V9a5 5 0 0 1 10 0v6M14 12l4 4 4-4"/></svg><span>Vuelta</span></button>` : ""}
         </div>
         <div class="bus-touch-right">
           <button data-t="brake" class="bus-pedal brake"><i data-k="brkFill"></i><span>FRENO</span></button>
@@ -311,6 +313,7 @@ class BusGame {
         else if (t === "doors") this.sim.toggleDoors();
         else if (t === "cam") this.toggleCam();
         else if (t === "limiter") this.sim.toggleLimiter();
+        else if (t === "uturn") this.sim.uTurn?.();
       };
       const move = (e) => {
         if (!pedal || !btn.classList.contains("on")) return;
@@ -415,6 +418,7 @@ class BusGame {
     if (k === "a" || k === "arrowleft") return this.sim.changeLane(1);
     if (k === "d" || k === "arrowright") return this.sim.changeLane(-1);
     if (k === " " || k === "e") return this.sim.toggleDoors();
+    if (k === "u" && this.taxi) return this.sim.uTurn();
     if (k === "c") return this.toggleCam();
     if (k === "l") return this.sim.toggleLimiter();
     this.keys.add(k);
@@ -679,6 +683,13 @@ class BusGame {
   taxiEvent(e) {
     switch (e.type) {
       case "fareHail": this.audio.bell(); return true;
+      case "uturn": {
+        this.audio.blinker();
+        this.camPos = null;
+        const R = this.sim.route;
+        this.el.routeTitle.textContent = `${R.name.toUpperCase()} · ${R.from.toUpperCase()} → ${R.to.toUpperCase()}`;
+        return true;
+      }
       case "fareBoarding": case "farePaying": case "fareDest": return true;
       case "fareBoard": this.audio.door(false); return true;
       case "fareLost": this.audio.fault(); return true;
@@ -703,14 +714,17 @@ class BusGame {
     el.bell.classList.add("hidden");
     el.meter.textContent = f?.phase === "ride" ? formatCLP(f.meter) : "libre";
     el.meter.parentElement.classList.toggle("on", f?.phase === "ride");
-    el.stripBus.style.left = `${Math.max(0, Math.min(100, this.stripPct(b.s)))}%`;
+    // Esquema de la calle (siempre en el sentido de la ida): el taxi, su sentido y el punto de la carrera
+    el.stripBus.style.left = `${Math.max(0, Math.min(100, this.stripPct(sim.idaS)))}%`;
+    el.stripBus.classList.toggle("back", sim.dir < 0);
     el.stripPin.hidden = !t;
-    if (t) { el.stripPin.style.left = `${Math.max(0, Math.min(100, this.stripPct(t.s)))}%`; el.stripPin.classList.toggle("dest", t.kind === "dest"); }
+    if (t) { el.stripPin.style.left = `${Math.max(0, Math.min(100, this.stripPct(t.ws)))}%`; el.stripPin.classList.toggle("dest", t.kind === "dest"); }
     el.nextLabel.textContent = t?.kind === "pickup" ? "PASAJERO ESPERANDO" : t?.kind === "dest" ? "DESTINO" : "CARRERA";
     if (t) {
       const d = t.s - b.s;
       el.stopName.textContent = t.name;
-      el.stopDist.textContent = Math.abs(d) <= 7 ? "aquí" : d > 1000 ? `${(d / 1000).toFixed(1).replace(".", ",")} km` : d > 0 ? `${Math.round(d)} m` : `te pasaste ${Math.round(-d)} m`;
+      const km = (m) => m > 1000 ? `${(m / 1000).toFixed(1).replace(".", ",")} km` : `${Math.round(m)} m`;
+      el.stopDist.textContent = t.across ? `vereda de enfrente · ${km(Math.abs(d))}` : Math.abs(d) <= t.win ? "aquí" : d > 0 ? km(d) : `atrás · ${km(-d)} · da la vuelta`;
     } else {
       el.stopName.textContent = f?.phase === "done" ? "Cierra la puerta" : "Buscando pasajeros…";
       el.stopDist.textContent = "";
@@ -725,15 +739,15 @@ class BusGame {
     // Guía para detenerse a la altura de la persona o del destino (o ante un semáforo en rojo)
     const pred = sim.stopPrediction();
     const pct = (e) => `${50 + Math.max(-50, Math.min(50, e / 9 * 50))}%`;
-    const near = t && t.s - b.s < 70 && t.s - b.s > -14 && b.doors === "closed";
+    const near = t && !t.across && t.s - b.s < 70 && t.s - b.s > -14 && b.doors === "closed";
     const red = !near && L && L.state !== "green" && L.d > 0.5 && L.d < 60 && b.v > 0.5;
     el.guide.classList.toggle("hidden", !near && !red);
     el.guide.classList.toggle("light", !!red);
     if (near) {
       const err = b.s - t.s;
       const curb = Math.abs(b.x - LANES[0]) < 1.0;
-      el.guideText.textContent = !curb ? "Acércate a la vereda (pista de la derecha)" : err < -7 ? `${t.kind === "pickup" ? "La persona" : "El destino"} en ${Math.round(-err)} m` : err > 7 ? `Te pasaste ${err.toFixed(0)} m` : "¡Aquí! Detente";
-      el.guide.classList.toggle("ok", Math.abs(err) <= 7 && curb && b.v < 0.3);
+      el.guideText.textContent = !curb ? "Acércate a la vereda (pista de la derecha)" : err < -t.win ? `${t.kind === "pickup" ? "La persona" : "El destino"} en ${Math.round(-err)} m` : err > t.win ? `Te pasaste ${err.toFixed(0)} m` : "¡Aquí! Detente";
+      el.guide.classList.toggle("ok", Math.abs(err) <= t.win && curb && b.v < 0.3);
       el.guideMark.style.left = pct(err * 9 / 14);
       const pe = pred != null ? err + pred : null;
       el.guidePred.style.display = pe != null && pe < 30 ? "" : "none";
@@ -762,7 +776,17 @@ class BusGame {
     if (b.doors !== "closed") return `Cierra la puerta (${K.doors}) para poder avanzar`;
     if (!t) return b.v < 0.5 ? `Acelera con ${K.gas} y busca a quien haga señas` : "Atento a la vereda: alguien te va a hacer señas";
     const d = t.s - b.s, curb = Math.abs(b.x - LANES[0]) < 1.0;
-    if (Math.abs(d) <= 7 && b.v < 0.3 && curb) return `Abre la puerta (${K.doors})`;
+    if (t.across || t.behind) {
+      // Hay que dar la vuelta: en el próximo cruce, desde la pista junto al bandejón
+      const U = this.touch ? "Vuelta" : "U", left = this.touch ? "◀" : "A";
+      const L = sim.route.lights.find(l => l.s + 8 > b.s - 13);
+      const atCross = L && Math.abs(b.s - (L.s + 8)) < 13;
+      if (b.lane !== LANES.length - 1) return `${t.across ? "Está en la vereda de enfrente" : "Quedó para atrás"}: pásate a la pista de la izquierda (${left}) para dar la vuelta en U en el cruce`;
+      if (atCross && b.v < 5.5) return `Ahora: da la vuelta en U (${U})`;
+      if (L) return `Frena en el cruce que viene (${Math.max(0, Math.round(L.s + 8 - b.s))} m) y da la vuelta en U (${U})`;
+      return `Al final de la calle, detente y da la vuelta en U (${U})`;
+    }
+    if (Math.abs(d) <= t.win && b.v < 0.3 && curb) return `Abre la puerta (${K.doors})`;
     if (d < 160 && !curb) return `Pásate a la pista de la derecha (${K.right}) para ${t.kind === "pickup" ? "recogerlo" : "dejarlo"} junto a la vereda`;
     const L = sim.nextLight(70);
     if (L && L.state === "red" && L.d > 0) return "Semáforo en rojo: detente antes de la línea blanca";

@@ -86,6 +86,35 @@ function chainage(path, stops) {
   });
 }
 
+/**
+ * 2.3 · Trazado del tramo para dibujar la calle con sus giros: puntos [este, norte, s] en metros (relativos al
+ * primer punto; s = distancia del recorrido en ese punto), desde un poco antes del primer paradero hasta un poco
+ * después del último, simplificado (Douglas-Peucker, 2,5 m).
+ */
+function pathOf(path, s0, len) {
+  const cum = [0];
+  for (let i = 1; i < path.length; i++) cum.push(cum[i - 1] + dist(path[i - 1], path[i]));
+  const a = s0 - 320, b = s0 + len + 480;
+  const idx = [];
+  for (let i = 0; i < path.length; i++) if (cum[i] >= a && cum[i] <= b) idx.push(i);
+  if (idx.length < 2) return null;
+  const lat0 = path[idx[0]][0], lon0 = path[idx[0]][1], k = Math.PI / 180, R = 6371000;
+  const pts = idx.map(i => [(path[i][1] - lon0) * k * Math.cos(lat0 * k) * R, (path[i][0] - lat0) * k * R, cum[i] - s0]);
+  const keep = new Array(pts.length).fill(false);
+  keep[0] = keep[pts.length - 1] = true;
+  const dp = (i, j) => {
+    let md = 0, mi = -1;
+    const [x1, y1] = pts[i], [x2, y2] = pts[j], L = Math.hypot(x2 - x1, y2 - y1) || 1;
+    for (let m = i + 1; m < j; m++) {
+      const d = Math.abs((x2 - x1) * (y1 - pts[m][1]) - (x1 - pts[m][0]) * (y2 - y1)) / L;
+      if (d > md) { md = d; mi = m; }
+    }
+    if (md > 2.5) { keep[mi] = true; dp(i, mi); dp(mi, j); }
+  };
+  dp(0, pts.length - 1);
+  return pts.filter((_, i) => keep[i]).map(([x, y, c]) => [Math.round(x * 10) / 10, Math.round(y * 10) / 10, Math.round(c)]);
+}
+
 function fetchService(cod) {
   const out = execFileSync("curl", ["-sS", "-m", "30", `https://www.red.cl/restservice_v2/rest/conocerecorrido?codsint=${cod}`], { encoding: "utf8", maxBuffer: 1 << 26 });
   return JSON.parse(out);
@@ -150,19 +179,23 @@ function build({ cod, color }) {
   win.forEach(p => { if (p.eje) ejes[p.eje] = (ejes[p.eje] ?? 0) + 1; });
   const eje = Object.entries(ejes).sort((x, y) => y[1] - x[1])[0]?.[0] ?? "";
   const first = routeStops[0], last = routeStops.at(-1);
+  const path = pathOf(ida.path, s0, last.s + 140);
   return {
     id: cod, name: title(eje).replace(/^Avenida /, "Av. ") || cod, color,
     from: first.name, to: last.name,
     destino: ida.destino, origen: d.regreso?.destino ?? "", operador: d.negocio?.nombre ?? "",
-    stops: routeStops, lights, length: last.s + 140,
+    stops: routeStops, lights, length: last.s + 140, path,
   };
 }
 
 /** Un recorrido en forma legible: un paradero o semáforo por línea. */
 function fmt(r) {
-  const { stops, lights, ...head } = r;
+  const { stops, lights, path, ...head } = r;
   const one = (o) => "      " + JSON.stringify(o);
-  return `  {\n    ...${JSON.stringify(head)},\n    stops: [\n${stops.map(one).join(",\n")},\n    ],\n    lights: [\n${lights.map(one).join(",\n")},\n    ],\n  }`;
+  // El trazado va en pocas líneas (es largo): 12 puntos por línea
+  const rows = [];
+  for (let i = 0; i < (path?.length ?? 0); i += 12) rows.push("      " + path.slice(i, i + 12).map(p => JSON.stringify(p)).join(","));
+  return `  {\n    ...${JSON.stringify(head)},\n    stops: [\n${stops.map(one).join(",\n")},\n    ],\n    lights: [\n${lights.map(one).join(",\n")},\n    ],\n    path: [\n${rows.join(",\n")},\n    ],\n  }`;
 }
 
 const routes = SERVICES.map(build).filter(Boolean);
@@ -175,6 +208,7 @@ if (process.argv.includes("--ver")) {
    Recorridos reales de buses Red, tomados de la API pública de red.cl el ${today}
    con \`node tools/recorridos-red.mjs\`. De cada servicio es un tramo jugable
    (sentido ida) por estaciones de Metro; s = metros por el trazado real.
+   path: el trazado del tramo [este, norte, s] en metros (2.3: la calle dobla como el recorrido real).
    ========================================================================== */
 
 export const RED_ROUTES = [

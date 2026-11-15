@@ -127,6 +127,11 @@ export class BusSim {
 
   /** Hora del día (segundos). */
   get time() { return this.clockStart + this.elapsed; }
+  /* 2.3 · Sentido respecto del recorrido dibujado (el taxi puede dar la vuelta, taxiSim.js): el bus va siempre «de ida» */
+  get dir() { return 1; }
+  get idaS() { return this.bus.s; }
+  toIdaS(s) { return s; }
+  toIdaX(x) { return x; }
   get nextStop() { return this.route.stops[this.stopIndex] ?? null; }
 
   initialWaiting(i) {

@@ -126,6 +126,7 @@ export function createSkeleton() {
   };
 }
 
+const BENT = new THREE.Matrix4();
 export class PeopleRenderer {
   constructor(scene, capacity) {
     const mk = (geo, rough, n) => {
@@ -141,16 +142,18 @@ export class PeopleRenderer {
     this.hair = mk(new THREE.SphereGeometry(1, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.55), 0.9, capacity);
   }
 
-  render(people) {
+  /** @param {(p:object) => THREE.Matrix4|null} [bend] 2.3 · matriz extra por persona (la calle del bus que dobla) */
+  render(people, bend = null) {
     const meshes = { box: this.box, head: this.head, hair: this.hair };
     const n = { box: 0, head: 0, hair: 0 };
     for (const p of people) {
       if (p.hidden) continue;
       p.root.updateWorldMatrix(false, true);
+      const B = bend?.(p);
       for (const part of p.mesh.parts) {
         const m = meshes[part.kind], i = n[part.kind];
         if (i >= m.instanceMatrix.count) continue;
-        m.setMatrixAt(i, part.obj.matrixWorld);
+        m.setMatrixAt(i, B ? BENT.multiplyMatrices(B, part.obj.matrixWorld) : part.obj.matrixWorld);
         m.setColorAt(i, part.color);
         n[part.kind]++;
       }
