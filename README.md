@@ -139,6 +139,8 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **Nada se pierde**: el saldo, las licencias, la tienda y el progreso siguen guardados igual en el navegador. El APK
   mantiene su paquete (`cl.metrosim.app`), así que se actualiza encima del anterior. La sala multijugador no cambió
   (`NET_LEVEL` igual): se puede jugar entre RedMoviSim y MetroSim 1.13.
+- **1.14.1**: imágenes para anunciar el mantenimiento en redes sociales en `post-mantenimiento/` (post cuadrado,
+  historia vertical y versión horizontal). Se regeneran con `node generar.js plantilla.html` desde esa carpeta.
 
 ## Versión 1.13 · MicroSim: conductor de bus (beta)
 
