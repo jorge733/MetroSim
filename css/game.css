@@ -1,0 +1,79 @@
+/* ==========================================================================
+   RedMoviSim 2.0 · game.css — pantalla de juego
+   Menú de la partida (Esc o botón Menú), paneles unificados y ajustes del
+   HUD con el sistema de diseño de ui.css.
+   ========================================================================== */
+
+/* ---------- Paneles del HUD sobre el 3D: mismo vidrio y radio ---------- */
+.hud-brand, .hud-clock, .sound-button, .selector-hud, .driver-hud, .passenger-hud,
+.controls-help, .score-pill, .bank-pill, .mission-tracker, .message, .hud-menu-button {
+  border-radius: 14px;
+  background: #0d1117d9;
+  border-color: #ffffff1a;
+}
+.mode-pill { border-radius: 999px; }
+
+/* Los botones sueltos de antes (Volver, Finalizar turno, Controles) viven ahora en el Menú */
+#backButton, #endShiftButton, .help-chip { display: none !important; }
+
+/* ---------- Botón Menú (barra superior) ---------- */
+.hud-menu-button {
+  pointer-events: auto;
+  display: inline-flex; align-items: center; gap: 8px; height: 52px; padding: 0 16px;
+  border: 1px solid #ffffff1a; color: var(--text); font: 600 15px/1 var(--f-body); cursor: pointer;
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); box-shadow: 0 8px 28px #0006;
+  transition: background .15s, border-color .15s;
+}
+.hud-menu-button:hover { background: #1a2029ee; border-color: #ffffff33; }
+.hud-menu-button .ico { width: 20px; height: 20px; }
+body.touch-mode .hud-menu-button { display: none; }
+@media (max-width: 900px), (max-height: 520px) {
+  .hud-menu-button { height: 40px; padding: 0 12px; }
+  .hud-menu-button span { display: none; }
+}
+
+/* ---------- Paneles (boletería, local, misiones, tarifas, confirmación, menú) ---------- */
+.ticket-panel { background: #05070acc; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.ticket-card {
+  gap: 12px; padding: 22px; border-radius: 18px;
+  border: 1px solid var(--panel-border); border-top: 1px solid #ffffff26;
+  background: linear-gradient(180deg, #161b23, var(--surface));
+  box-shadow: 0 30px 80px #000c;
+  animation: panelIn .22s var(--ease);
+}
+@keyframes panelIn { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: none; } }
+.ticket-head-text strong { font-size: 26px; }
+.ticket-close { width: 40px; height: 40px; border-radius: 50%; border-color: var(--panel-border); }
+.ticket-close .ico { width: 18px; height: 18px; }
+.ticket-actions { gap: 10px; }
+.ticket-actions .go-button, .ticket-actions .ghost-button { flex: 1; }
+
+/* ---------- Menú de la partida ---------- */
+.game-menu { z-index: 30; }
+.game-menu-card { width: min(94vw, 420px); }
+.game-menu-list { display: grid; gap: 6px; }
+.game-menu-resume { min-height: 52px; font-size: 17px; border-radius: 12px; margin-bottom: 6px; }
+.game-menu-resume .ico { fill: currentColor; }
+.game-menu-item {
+  display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; align-items: center; gap: 14px;
+  min-height: 50px; padding: 0 14px; border-radius: 12px; border: 1px solid transparent;
+  background: #ffffff08; color: var(--text); font-size: 15px; text-align: left; cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.game-menu-item:hover, .game-menu-item:focus-visible { background: #ffffff12; border-color: #ffffff1f; }
+.game-menu-item .ico { width: 20px; height: 20px; color: var(--muted); }
+.game-menu-item b { font-weight: 600; color: var(--muted); }
+body.touch-mode .game-menu-item kbd { display: none; }
+.game-menu-exit { display: grid; gap: 8px; padding-top: 12px; border-top: 1px solid var(--hair); }
+.game-menu-exit .ghost-button { width: 100%; min-height: 48px; }
+.game-menu-exit [data-act="end"] { border-color: #ff4d4d55; color: #ffb0b0; }
+.game-menu-exit [data-act="end"]:hover { background: #ff4d4d1a; }
+.game-menu-note { font-size: 12.5px; line-height: 1.45; color: var(--muted); text-align: center; }
+.game-menu[data-who="walker"] .only-driver, .game-menu[data-who="driver"] .only-walker { display: none; }
+@media (max-height: 560px) {
+  .game-menu-card { padding: 14px 16px; gap: 8px; }
+  .game-menu-list { grid-template-columns: 1fr 1fr; }
+  .game-menu-resume { grid-column: 1 / -1; min-height: 44px; margin: 0; }
+  .game-menu-item { min-height: 42px; }
+  .game-menu-item kbd { display: none; }
+}

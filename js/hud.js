@@ -80,7 +80,7 @@ export class Hud {
     document.documentElement.style.setProperty("--line", LINE.color);
     document.documentElement.style.setProperty("--on-line", textOn(LINE.color));
     this.setText($("hudLineBadge"), RAIL_LINES[LINE.id]?.sign ?? LINE.id);
-    this.setText($("hudLineLabel"), isRail(LINE.id) ? `${RAIL_LINES[LINE.id].name.toUpperCase()} · EFE · ${RAIL_LINES[LINE.id].route}` : `METRO DE SANTIAGO · ${LINE.name}`);
+    this.setText($("hudLineLabel"), isRail(LINE.id) ? `${RAIL_LINES[LINE.id].name.toUpperCase()} · EFE` : `METRO · ${LINE.name}`);
     this.setText($("hudLineRoute"), `${STATIONS[0].name} ⇄ ${STATIONS.at(-1).name}`);
     this.stripDots?.forEach(d => d.remove());
     this.stripIdx = undefined;
@@ -118,7 +118,7 @@ export class Hud {
 
   setMode(mode) {
     const driver = mode === "driver";
-    this.setText(this.el.modeLabel, driver ? "CONDUCTOR" : "PASAJERO A PIE");
+    this.setText(this.el.modeLabel, driver ? "CONDUCIENDO" : "VIAJANDO");
     this.el.cardPill.classList.toggle("hidden", driver);
     this.el.scorePill.classList.toggle("hidden", !driver);
     this.el.tracker.classList.toggle("hidden", driver);

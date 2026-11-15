@@ -168,6 +168,12 @@ piezas que el resto del juego, así la calle se ve y se comporta como el Metro a
   la partida (Metro, Tren Nos, Tren Rancagua o Bus Red al mismo nivel, línea o recorrido, sentido y clima plegable)
   con un botón grande para jugar. **Seguir donde quedaste** repite lo último que se jugó. La hora, la tarifa y la
   Tienda quedan en una barra arriba. Se ve con `?probar`.
+- **1.20.8 · Menú de la partida (avance de la 2.0):** **Esc** o el botón **Menú** (arriba a la derecha) abre un menú
+  con Seguir jugando, Controles, Sonido, Tarifas, Tienda, Misiones (a pie), Reiniciar el servicio y **Finalizar turno
+  y cobrar** (en un solo toque, ya no hay que pulsar dos veces) o **Volver a la portada**. Reemplaza los botones
+  sueltos de antes (Volver, Finalizar turno y Controles); en el celular se abre desde el menú táctil. Arriba a la
+  izquierda dice el medio y la línea («Metro · Línea 3», «Tren Nos · EFE») y si estás conduciendo o viajando. Todos
+  los paneles (boletería, locales, misiones, tarifas, confirmaciones) tienen la misma forma, sin la franja naranja.
 
 ## Versión 1.19 · Pasajeros realistas en el bus
 

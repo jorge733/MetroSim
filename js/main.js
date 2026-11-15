@@ -564,6 +564,12 @@ $("endShiftButton").addEventListener("click", requestEndShift);
 $("shopButton").addEventListener("click", () => openStore());
 $("soundButton").addEventListener("click", toggleSound);
 $("helpChip").addEventListener("click", () => hud.toggleHelp());
+$("menuButton").addEventListener("click", (ev) => { ev.currentTarget.blur(); openGameMenu(); });
+$("gameMenu").addEventListener("click", (ev) => {
+  if (ev.target === ev.currentTarget) return closeGameMenu();
+  const act = ev.target.closest("[data-act]")?.dataset.act;
+  if (act) gameMenuAction(act);
+});
 window.addEventListener("keydown", onKeyDown);
 window.addEventListener("keyup", onKeyUp);
 window.addEventListener("resize", onResize);
@@ -867,7 +873,7 @@ async function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = 
 
   // Controles táctiles (celular / tablet): cada botón equivale a su tecla
   if (wantsTouch()) {
-    game.touch = new TouchControls({ mode, parent: gameScreen, canvas: renderer.domElement, press: pressKey, walker: game.walker, context: touchContext, onMenu: requestMenu });
+    game.touch = new TouchControls({ mode, parent: gameScreen, canvas: renderer.domElement, press: pressKey, walker: game.walker, context: touchContext, onMenu: openGameMenu });
   }
   loadingScreen.classList.add("hidden");
   gameScreen.classList.remove("hidden");
@@ -926,6 +932,8 @@ function stopGame({ keepFullscreen = false } = {}) {
   game = null;
   confirmOpen = false;
   $("confirmPanel").classList.add("hidden");
+  gameMenuOpen = false;
+  $("gameMenu").classList.add("hidden");
   $("driverJobButton").classList.add("hidden");
   hud.hideSummary();
   gameScreen.classList.add("hidden");
@@ -1163,6 +1171,7 @@ function onKeyDown(event) {
   const key = event.key.toLowerCase();
   if (["arrowup", "arrowdown", "arrowleft", "arrowright", " ", "pageup", "pagedown"].includes(key)) event.preventDefault();
   if (hud.summaryOpen) return;
+  if (gameMenuOpen) { if (key === "escape") closeGameMenu(); return; }
   if (confirmOpen) { if (key === "escape") closeConfirm(false); else if (key === "enter") closeConfirm(true); return; }
   if (riderPanelOpen()) return;
   if (fareInfoOpen()) { if (key === "escape" || key === "enter") closeFareInfo(); return; }
@@ -1175,6 +1184,7 @@ function onKeyDown(event) {
   if (key === "k" && !game.transition) return openStore({ tab: game.walker ? "album" : "driver" });
   if (key === "h") return hud.toggleHelp();
   if (cabScreens.open && (key === "escape" || key === "p")) return setCabScreens(false);
+  if (key === "escape") return openGameMenu();
   if (key === "p" && game.player && !game.walker) return setCabScreens(true);
 
   if (game.walker) {
@@ -2453,6 +2463,46 @@ function touchContext() {
    ========================================================================== */
 
 let confirmOpen = false;
+
+/* ---------- 2.0 · Menú de la partida (Esc o botón Menú) ---------- */
+let gameMenuOpen = false, gameMenuWasFrozen = false;
+function openGameMenu() {
+  if (!game || gameMenuOpen || game.warming) return;
+  gameMenuOpen = true;
+  const w = game.walker;
+  gameMenuWasFrozen = !!w?.frozen;
+  if (w) { w.frozen = true; w.keys.clear(); }
+  if (document.pointerLockElement) document.exitPointerLock?.();
+  const menu = $("gameMenu");
+  menu.dataset.who = w ? "walker" : "driver";
+  $("gameMenuKicker").textContent = w ? "VIAJANDO" : game.net ? `CONDUCIENDO · SALA ${game.net.code}` : "CONDUCIENDO";
+  $("gameMenuSound").textContent = muted ? "desactivado" : "activado";
+  menu.querySelector('[data-act="restart"]').hidden = !!game.net;
+  $("gameMenuNote").textContent = w
+    ? "Tu cuenta, tu bip! y tus misiones quedan guardadas en este dispositivo."
+    : "El tren sigue en marcha mientras ves el menú. Al finalizar el turno ves tu informe y cobras el sueldo.";
+  menu.classList.remove("hidden");
+  menu.querySelector(".game-menu-resume").focus();
+}
+function closeGameMenu() {
+  if (!gameMenuOpen) return;
+  gameMenuOpen = false;
+  $("gameMenu").classList.add("hidden");
+  const w = game?.walker;
+  if (w && !gameMenuWasFrozen) { w.frozen = false; w.keys.clear(); }
+}
+function gameMenuAction(act) {
+  if (act === "sound") { toggleSound(); $("gameMenuSound").textContent = muted ? "desactivado" : "activado"; return; }
+  closeGameMenu();
+  if (!game) return;
+  if (act === "help") hud.toggleHelp();
+  else if (act === "fares") showFares();
+  else if (act === "store") openStore({ tab: game.walker ? "album" : "driver" });
+  else if (act === "missions" && game.walker) openMissionBoard();
+  else if (act === "restart" && !game.net) restartGame();
+  else if (act === "end") { game.endShiftAsk = performance.now(); requestEndShift(); }   // ya se confirmó en el menú
+  else if (act === "home") stopGame();
+}
 
 function requestMenu() {
   if (!game?.walker) return stopGame();

@@ -338,7 +338,7 @@ export class TouchControls {
   /**
    * @param {() => object} [opts.context]  qué acciones tienen sentido ahora:
    *   conductor { vigilance, cab } · pasajero { use, sit, seated, hold, holding }
-   * @param {() => void} [opts.onMenu]      volver al menú principal (pasajero, con confirmación)
+   * @param {() => void} [opts.onMenu]      abre el menú de la partida (2.0)
    */
   constructor({ mode, parent, canvas, press, walker = null, context = () => ({}), onMenu = null }) {
     injectCss();
@@ -455,7 +455,7 @@ export class TouchControls {
       ["📯 Bocina", () => this.press("b")],
       ["👁 Vista", () => this.press("v")],
       ["🛒 Tienda", () => this.press("k")],
-      ["🏁 Finalizar turno", () => this.press("f")],
+      ["☰ Menú · finalizar turno", () => this.onMenu?.()],
     ]);
   }
 
@@ -684,7 +684,7 @@ export class TouchControls {
     this.root.append(this.ghost, this.stick, actions);
     this.buildMenu([
       ["🛒 Tienda", () => this.press("k")],
-      ["← Menú principal", () => this.onMenu?.()],
+      ["☰ Menú · volver a la portada", () => this.onMenu?.()],
     ]);
 
     // Joystick (mitad izquierda) y mirada (mitad derecha) sobre el lienzo 3D
