@@ -148,6 +148,8 @@ piezas que el resto del juego, así la calle se ve y se comporta como el Metro a
   Tren Rancagua), y «Fin del recorrido» antes del último. Con lluvia suena el agua.
 - **Arreglo: el bus a veces no se veía.** Si un cuadro duraba 0 s (pasa seguido con el primero), la aceleración del bus
   quedaba en «no es un número» y el bus desaparecía de la pantalla el resto del recorrido. Ahora ese cuadro se salta.
+- **1.20.1 · Imágenes del post «Ya está en marcha»** (`post-mejoras/`): post cuadrado, historia y portada horizontal
+  para redes sociales, generadas con `node generar.js plantilla.html` desde esa carpeta.
 
 ## Versión 1.19 · Pasajeros realistas en el bus
 
