@@ -120,7 +120,8 @@ import { joinDriverRoom } from "./net/netClient.js";
 import { cleanRoomCode, localNetwork, NET_LEVEL } from "./net/transport.js";
 import { startPoint } from "./net/replica.js";
 import { setupFareInfo, openFareInfo, closeFareInfo, fareInfoOpen, tickFareInfo } from "./fareInfo.js";
-import { riderFare, riderSpecial, riderAsked, riderCategory } from "./rider.js";
+import { riderFare, riderSpecial, riderAsked, riderCategory, riderBusFare } from "./rider.js";
+import { quoteStage, commitStage, loadTrip, saveTrip, fareModeOfLine, minutesLeft, payWith } from "./trip.js";
 import { setupRiderPanel, openRiderPanel, closeRiderPanel, riderPanelOpen } from "./riderPanel.js";
 import { startBusGame } from "./bus/busGame.js";
 import { busTripsFrom, BUS_ROUTES, busRouteById } from "./bus/busRoute.js";
@@ -1804,23 +1805,42 @@ function onWalkerEvent(type, data) {
 
 /** Cobro del pasaje al entrar por un torniquete. */
 function validateFare() {
-  const band = riderFare(game.clock);              // 1.10: la tarifa TNE o de adulto mayor, si le corresponde
   const gate = game.world.nearestGate(game.walker.pos);
-  const r = payTrip(band.price, "metro");              // 1.15: desde el bus antes de 2 horas es transbordo
+  const mode = fareModeOfLine(LINE.id);
+  // 2.5 · Pago Ágil: tarjeta bancaria sin contacto en Metro y Tren Nos (siempre tarifa adulto, sin integración)
+  if (payWith() === "banco" && mode !== "ran") {
+    const band = fareBandAt(game.clock);
+    const r = bank.charge(band.price, `${mode === "nos" ? "Tren Nos" : "Metro"} · pago sin contacto · ${band.label.toLowerCase()}`);
+    if (r.ok) {
+      game.audio.bip();
+      if (gate) game.world.flashValidator(gate, true);
+      game.ride.fare = band;
+      hud.showMessage(`Pago sin contacto · ${band.label} ${formatCLP(band.price)} · ${BANK_NAME} ${bank.maskedNumber} · saldo ${bank.label}`, "ok", 3000);
+      return { ok: true };
+    }
+    game.audio.deny();
+    if (gate) game.world.flashValidator(gate, false);
+    hud.showMessage(`Tarjeta rechazada: tu cuenta tiene ${bank.label} y el pasaje es ${formatCLP(band.price)} · haz un turno de Conductor o paga con la bip! (Tarifas)`, "alert", 5000);
+    return { ok: false };
+  }
+  const band = riderFare(game.clock);              // 1.10: la tarifa TNE o de adulto mayor, si le corresponde
+  const r = payTrip(band.price, mode);             // 2.5: tarifa integrada (paga la diferencia en el transbordo)
   hud.setCard(card);
   if (r.ok) {
     game.audio.bip();
     if (gate) game.world.flashValidator(gate, true);
-    game.ride.fare = band;
-    hud.showMessage(r.transfer ? `bip! · Transbordo desde el bus · $0 · saldo ${formatCLP(card.balance)}`
-      : `bip! · ${band.label}${band.card ? ` ${band.card}` : ""} ${formatCLP(band.price)} · saldo ${formatCLP(card.balance)}`, "ok", 2500);
+    game.ride.fare = r.transfer ? { ...band, price: r.charge } : band;
+    hud.showMessage(r.transfer
+      ? `bip! · Transbordo desde ${r.from} · ${r.charge ? `pagas la diferencia ${formatCLP(r.charge)}` : "$0"} · saldo ${formatCLP(card.balance)}`
+      : `bip! · ${band.label}${band.card ? ` ${band.card}` : ""} ${formatCLP(band.price)} · saldo ${formatCLP(card.balance)}${r.why ? ` · no es transbordo: ${r.why}` : ""}`, "ok", r.why ? 4500 : 2500);
     return { ok: true };
   }
   game.audio.deny();
   if (gate) game.world.flashValidator(gate, false);
+  const need = r.charge ?? band.price;
   hud.showMessage(r.reason === "nocard"
-    ? "No tienes tarjeta bip!: cómprala en la boletería (a la izquierda) con tu tarjeta de débito"
-    : `Saldo bip! insuficiente (${formatCLP(card.balance)}) · pasaje ${formatCLP(band.price)} · carga en la boletería o en un tótem${bank.balance < 1000 ? " · tu cuenta está baja: haz un turno de Conductor" : ""}`, "alert", 5000);
+    ? `No tienes tarjeta bip!: cómprala en la boletería (a la izquierda) con tu tarjeta de débito${mode !== "ran" ? ", o paga con tu tarjeta bancaria sin contacto (Tarifas › Pagar con)" : ""}`
+    : `Saldo bip! insuficiente (${formatCLP(card.balance)}) · pasaje ${formatCLP(need)} · carga en la boletería o en un tótem${bank.balance < 1000 ? " · tu cuenta está baja: haz un turno de Conductor" : ""}`, "alert", 5000);
   return { ok: false };
 }
 
@@ -2040,18 +2060,17 @@ function arriveByTransfer(st) {
    1.15 · Todo conectado: el pasajero toma el bus en el paradero de la calle
    ========================================================================== */
 
-/* Transbordo (como en Santiago): pagado un pasaje, en las 2 horas siguientes hay hasta 2 transbordos
-   entre bus y Metro (o Metro y bus) sin volver a pagar (se paga la diferencia, que en el juego es 0). */
-let lastFare = null;          // { at: Date.now(), mode: "metro" | "bus", left }
-function payTrip(price, mode) {
-  if (lastFare && lastFare.mode !== mode && lastFare.left > 0 && Date.now() - lastFare.at < 2 * 3600e3) {
-    lastFare.left--;
-    lastFare.mode = mode;
-    return { ok: true, transfer: true };
-  }
-  const r = card.pay(price);
-  if (r.ok) lastFare = { at: Date.now(), mode, left: 2 };
-  return r;
+/* 2.5 · Tarifa integrada (trip.js): hasta 2 transbordos en 120 min desde el primer bip!, pagando solo la
+   diferencia; una etapa en Metro y una en Tren Nos por viaje, sin repetir recorrido de bus. El viaje se guarda. */
+let fareTrip = loadTrip();
+function payTrip(price, mode, route = null) {
+  const stage = { mode, route, price, now: Date.now() };
+  const q = quoteStage(fareTrip, stage);
+  const r = card.pay(q.charge);
+  if (!r.ok) return { ...r, charge: q.charge };
+  fareTrip = commitStage(fareTrip, q, stage);
+  saveTrip(fareTrip);
+  return { ok: true, ...q };
 }
 
 let busStopPanel = null;
@@ -2069,9 +2088,11 @@ function openBusStop(st) {
   walker.frozen = true;
   walker.keys.clear();
   if (document.pointerLockElement) document.exitPointerLock?.();
-  const band = riderFare(game.clock);
-  const transfer = lastFare && lastFare.mode !== "bus" && lastFare.left > 0 && Date.now() - lastFare.at < 2 * 3600e3;
-  const fareText = transfer ? "transbordo desde el Metro: $0" : `pasaje ${band.label.toLowerCase()} ${formatCLP(band.price)} con tu bip!`;
+  const band = riderBusFare();
+  const now = Date.now();
+  const quotes = trips.map(t => quoteStage(fareTrip, { mode: "bus", route: t.route.id, price: band.price, now }));
+  const transfer = quotes.some(q => q.transfer), q0 = quotes.find(q => q.transfer) || quotes[0];
+  const fareText = transfer ? `transbordo: ${q0.charge ? `pagas la diferencia ${formatCLP(q0.charge)}` : "$0"}` : `pasaje ${formatCLP(band.price)} (${band.label}, a toda hora) con tu bip!`;
   const el = document.createElement("div");
   el.className = "bus-stop-panel";
   el.innerHTML = `<div class="bus-card" role="dialog" aria-label="Paradero">
@@ -2081,7 +2102,7 @@ function openBusStop(st) {
       const next = t.route.stops.slice(t.from + 1, t.from + 4).map(s => s.name).join(", ");
       return `<button class="bus-stop-dir" data-i="${i}"><b><i style="background:${t.route.color}">${t.route.id}</i>hacia ${t.route.to}</b><small>Próximas paradas: ${next}${t.route.stops.length - t.from > 4 ? "…" : ""}</small></button>`;
     }).join("")}</div>
-    <p>${transfer ? "Pagaste un pasaje hace menos de 2 horas: este viaje es un <b>transbordo</b> y no se cobra." : `Al subir se cobra el ${fareText}. Si después tomas el Metro antes de 2 horas, es transbordo y no pagas de nuevo.`} Saldo bip!: ${card.label}.</p>
+    <p>${transfer ? `Tu viaje empezó hace menos de 2 horas (te quedan ${minutesLeft(fareTrip, now)} min): es un <b>transbordo</b> · ${fareText}.` : `Al subir se cobra el ${fareText}${q0.why ? ` · no es transbordo: ${q0.why}` : ""}. Si después tomas el Metro antes de 2 horas, es transbordo y pagas solo la diferencia.`} El bus no acepta tarjetas bancarias. Saldo bip!: ${card.label}.</p>
     <button class="bus-btn" data-close>Seguir a pie</button>
   </div>`;
   el.addEventListener("click", (ev) => {
@@ -2094,18 +2115,18 @@ function openBusStop(st) {
 }
 
 function boardBus(trip, st) {
-  const band = riderFare(game.clock);
-  const r = payTrip(band.price, "bus");
+  const band = riderBusFare();
+  const r = payTrip(band.price, "bus", trip.route.id);
   hud.setCard(card);
   if (!r.ok) {
     game.audio.deny();
     closeBusStop();
     return hud.showMessage(r.reason === "nocard"
       ? "Necesitas una tarjeta bip! para subir al bus: cómprala en la boletería de la estación"
-      : `Saldo bip! insuficiente (${card.label}) · pasaje ${formatCLP(band.price)} · carga en la boletería o en un tótem`, "alert", 5000);
+      : `Saldo bip! insuficiente (${card.label}) · pasaje ${formatCLP(r.charge ?? band.price)} · carga en la boletería o en un tótem`, "alert", 5000);
   }
   game.audio.bip();
-  const fareText = r.transfer ? "transbordo $0" : `bip! ${formatCLP(band.price)} · saldo ${card.label}`;
+  const fareText = r.transfer ? `transbordo ${r.charge ? `· diferencia ${formatCLP(r.charge)}` : "$0"} · saldo ${card.label}` : `bip! ${formatCLP(band.price)} · saldo ${card.label}`;
   busStopPanel?.remove();
   busStopPanel = null;
   const fromLine = LINE.id;

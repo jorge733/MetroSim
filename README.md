@@ -124,6 +124,29 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **Salir por los torniquetes es gratis**: solo se cobra el pasaje al pasar hacia la zona pagada (antes, al terminar
   de cruzar el torniquete de salida se cobraba un pasaje).
 
+## Versión 2.5 · Tarifa integrada como en Santiago y pago con tarjeta bancaria
+
+Revisión de todo el sistema contra el transporte público real (noviembre de 2026). La red (Metro L1 a L6 con las
+extensiones de la L2 a Hospital El Pino y de la L3 a Plaza Quilicura, Tren Nos y Tren Rancagua), las tarifas por tramo
+($895 punta, $815 valle, $735 baja, vigentes desde el 22-02-2026) y el horario (lun a vie 06:00–23:00, sábado
+06:30–23:00, domingo y festivos 07:30–23:00) ya coincidían. La Línea 7 (fines de 2028) y el tren Santiago–Batuco
+(2029–2031) siguen en obras, así que todavía no se agregan. Lo que faltaba era cómo se cobra:
+
+- **Bus Red a $795 a toda hora** (antes cobraba la tarifa del Metro según la hora). La TNE paga $260 en el bus; la
+  TAM es solo de Metro, así que en el bus se paga la tarifa adulto.
+- **Tarifa integrada de verdad** (`js/trip.js`): un viaje tiene hasta **3 etapas (2 transbordos) en 120 minutos**
+  desde el primer bip! y en cada transbordo **se paga solo la diferencia** (bus $795 → Metro en punta: $100;
+  Metro → bus: $0). Una sola etapa en Metro y una en Tren Nos por viaje (si sales del Metro y vuelves a entrar, es un
+  pasaje nuevo) y **no se puede repetir un recorrido de bus**. El Tren Rancagua no está integrado. El viaje se guarda,
+  así que sigue vigente aunque cambies de modo de juego o recargues. El paradero y el torniquete dicen cuánto pagas y,
+  si no es transbordo, por qué.
+- **Pago con tarjeta bancaria (Pago Ágil)**, como desde el 13-02-2026: en Tarifas › *Pagar en el torniquete del Metro
+  con* se elige **Tarjeta bip!** o **Tarjeta bancaria**. Con la bancaria se acerca el débito del Banco Andino al
+  torniquete del Metro o del Tren Nos y se cobra de la cuenta la tarifa adulto del tramo (sin TNE ni TAM y sin
+  transbordo); en el bus se sigue pagando con bip!.
+- El panel de **Tarifas** muestra el bus, las reglas del transbordo y cuántos minutos le quedan a tu viaje integrado.
+- `node tools/probar-tarifa.mjs` prueba las reglas sin navegador.
+
 ## Versión 2.4 · La calle se ve más real
 
 Nuevo `js/render/realism.js`, que usan la calle del bus y del taxi, la calle de la estación (modo Viajar) y el Metro

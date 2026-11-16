@@ -10,6 +10,7 @@
 import { FARES, SERVICE_HOURS, DAY_TYPE_LABEL, fareBandAt, inService, formatCLP } from "./config.js";
 import { riderSpecial, riderCategory, riderProfile, ageOf } from "./rider.js";
 import { openRiderPanel } from "./riderPanel.js";
+import { payWith, setPayWith, loadTrip, minutesLeft, TRIP_MAX_STAGES } from "./trip.js";
 
 const DAYS = ["laboral", "sabado", "domingo"];
 const DAY_TAB = { laboral: "Lun a vie", sabado: "Sábado", domingo: "Dom y festivos" };
@@ -175,9 +176,10 @@ function render() {
 
   const mine = riderCategory();
   $("fareInfoSpecial").replaceChildren(...[
-    [`Estudiante · TNE`, FARES.special.estudiante.price, mine === "estudiante"],
-    [`Adulto mayor · TAM (mujeres desde 60, hombres desde 65)`, FARES.special.mayor.price, mine === "mayor"],
-    [`Adulto mayor · bip! Adulto Mayor (con buses)`, FARES.seniorBipPrice, false],
+    [`Bus Red · adulto, a toda hora`, FARES.bus.price, false],
+    [`Estudiante · TNE (Metro, Tren Nos y bus)`, FARES.special.estudiante.price, mine === "estudiante"],
+    [`Adulto mayor · TAM Metro (mujeres desde 60, hombres desde 65)`, FARES.special.mayor.price, mine === "mayor"],
+    [`Adulto mayor · bip! Adulto Mayor (bus, Metro y Tren Nos)`, FARES.seniorBipPrice, false],
   ].map(([label, price, cur]) => {
     const row = document.createElement("div");
     row.className = "fare-row" + (cur ? " current" : "");
@@ -187,13 +189,32 @@ function render() {
     return row;
   }));
 
+  // 2.5 · Medio de pago en el torniquete: bip! o tarjeta bancaria sin contacto (Pago Ágil)
+  const pay = payWith();
+  $("fareInfoPay").replaceChildren(...[["bip", "Tarjeta bip!"], ["banco", "Tarjeta bancaria"]].map(([id, label]) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.setAttribute("role", "radio");
+    b.setAttribute("aria-checked", String(id === pay));
+    b.className = id === pay ? "selected" : "";
+    b.textContent = label;
+    b.addEventListener("click", () => { setPayWith(id); render(); state?.onChange?.(); });
+    return b;
+  }));
+  $("fareInfoPayNote").textContent = pay === "banco"
+    ? "Acercas tu débito al torniquete del Metro o del Tren Nos y se cobra de tu cuenta la tarifa adulto del tramo. Sin TNE ni TAM y sin transbordo con el bus (allí se paga con bip!)."
+    : "La bip! integra bus, Metro y Tren Nos: en el transbordo pagas solo la diferencia.";
+
+  const trip = loadTrip(), left = minutesLeft(trip, Date.now());
   const [so, sc] = SERVICE_HOURS[shown];
   $("fareInfoNotes").replaceChildren(...[
     `Horario de ${DAY_TYPE_LABEL[shown].toLowerCase()}: de ${hhmm(so)} a ${hhmm(sc)}.`,
     shown === "laboral" ? "Las horas punta y baja solo rigen de lunes a viernes no festivos." : `${shown === "sabado" ? "Los sábados" : "Los domingos y festivos"} se cobra hora valle todo el día: no hay punta ni baja.`,
     "Tarifas adulto con tarjeta bip! vigentes desde el 22 de febrero de 2026 (metro.cl).",
     "El pasaje se cobra al pasar el torniquete, según la hora de entrada. Las combinaciones entre líneas no se vuelven a cobrar.",
-  ].map(t => { const li = document.createElement("li"); li.textContent = t; return li; }));
+    "Transbordos con bip!: hasta 2 en 120 minutos desde el primer bip!, pagando solo la diferencia (bus $795 → Metro en punta: $100). La TAM es solo de Metro: en el bus se paga la tarifa adulto. Una sola vez Metro y una vez Tren Nos por viaje, y sin repetir un recorrido de bus. El Tren Rancagua se paga aparte.",
+    left ? `Tu viaje integrado sigue vigente ${left} min más (llevas ${trip.stages.length} de ${TRIP_MAX_STAGES} etapas).` : "",
+  ].filter(Boolean).map(t => { const li = document.createElement("li"); li.textContent = t; return li; }));
 }
 
 /** Engancha los botones del panel (una vez). */

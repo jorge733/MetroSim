@@ -26,7 +26,7 @@
    y curva de demanda horaria de un día real de Santiago.
    ========================================================================== */
 
-export const VERSION = "2.4.1";
+export const VERSION = "2.5";
 
 /* ---------- Colores oficiales de las líneas ---------- */
 export const LINE_COLORS = {
@@ -204,6 +204,8 @@ export const FARES = {
     estudiante: { id: "tne", label: "Tarifa estudiante", card: "TNE", price: 260 },
     mayor:      { id: "mayor", label: "Tarifa adulto mayor", card: "TAM", price: 260 },
   },
+  // 2.5 · Bus Red: tarifa plana a toda hora (adulto). Los transbordos pagan la diferencia (trip.js)
+  bus: { id: "bus", label: "Bus Red", price: 795 },
   seniorBipPrice: 390,                 // bip! Adulto Mayor: permite viajes integrados con buses (en el juego, solo Metro: conviene la TAM)
 };
 

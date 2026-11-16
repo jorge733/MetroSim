@@ -71,3 +71,11 @@ export const riderSpecial = (p = profile) => FARES.special[categoryOf(p)] || nul
 export function riderFare(clockSeconds, dayType = CONFIG.dayType) {
   return riderSpecial() || fareBandAt(clockSeconds, dayType);
 }
+
+/**
+ * 2.5 · Lo que paga el jugador al subir a un bus Red: $795 a toda hora, o la TNE.
+ * La TAM es solo de Metro: en el bus se paga la tarifa general (la intermodal es la bip! Adulto Mayor).
+ */
+export function riderBusFare() {
+  return categoryOf() === "estudiante" ? FARES.special.estudiante : FARES.bus;
+}
