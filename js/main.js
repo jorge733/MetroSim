@@ -2354,9 +2354,10 @@ function missionGuide() {
       if (g.dist != null && g.dist < 2.6) { g.here = true; g.hint = "¡Aquí es! Pulsa E"; }
     } else if (step.kind === "photo" && plan.landmark) {
       g.target = `📷 ${plan.landmark.name}`;
-      toward(o.x - STREET.walkHalf - 3, o.z);
-      g.hint = "Al frente, cruzando la avenida · E para sacar la foto";
-      if (w.pos.x - o.x < -3 && Math.abs(w.pos.z - o.z) < (game.city.landmark?.halfZ ?? 10) + 6) { g.here = true; g.hint = "¡Aquí es! Pulsa E para sacar la foto"; }
+      const spot = game.city.landmarkGoal();
+      toward(o.x + spot.x, o.z + spot.z);
+      g.hint = game.city.real ? "En la vereda, frente al edificio · E para sacar la foto" : "Al frente, cruzando la avenida · E para sacar la foto";
+      if (game.city.atLandmark(w.pos.x - o.x, w.pos.z - o.z)) { g.here = true; g.hint = "¡Aquí es! Pulsa E para sacar la foto"; }
     } else {
       g.target = target.name;
       g.here = true;

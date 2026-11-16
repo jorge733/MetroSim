@@ -18,6 +18,7 @@
    ========================================================================== */
 
 import { landmarkFor } from "./catalog.js";
+import { REAL_STREETS } from "./realStreets.js";
 
 export const STREET = {
   originX: 1500,              // x del mundo donde se dibuja la calle
@@ -169,7 +170,16 @@ export function streetPlan(station) {
   const k = SHOPS.kiosko;
   shops.push({ kind: "kiosko", label: k.label, icon: k.icon, color: k.color, name: pick(k.names), items: k.items, x: KIOSK.x, z: KIOSK.z, door: { x: KIOSK.x - 1.9, z: KIOSK.z }, stand: true });
 
-  const plan = { landmark: landmarkFor(station), shops, seed: Math.floor(rnd() * 1e9) };
+  // 2.6 · Calle real (OpenStreetMap): los locales van en fachadas reales de la vereda del Metro (o en puestos)
+  const real = REAL_STREETS[station.name];
+  if (real) {
+    shops.forEach((sh, i) => {
+      const r = sh.stand ? { ...real.kiosk, stand: 1 } : real.shops[i];
+      if (!r) return;
+      Object.assign(sh, { x: r.x, z: r.z, door: { x: r.door[0], z: r.door[1] }, stand: !!r.stand, face: r.a ?? -Math.PI / 2, w: r.w || 0 });
+    });
+  }
+  const plan = { landmark: landmarkFor(station), shops, seed: Math.floor(rnd() * 1e9), real: !!real };
   cache.set(station.name, plan);
   return { ...plan, station };
 }

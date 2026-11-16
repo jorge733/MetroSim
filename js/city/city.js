@@ -33,6 +33,8 @@ import { cityMaterials, genericBuilding, signMaterial, facingPlane, streetLamp, 
 import { markCity } from "../render/trackLift.js";
 import { SkyDome, SunShadow, sunDirection, lampPool } from "../render/realism.js";
 import { BUS_METRO_STOPS, busRoutesAt } from "../bus/busRoute.js";
+import { REAL_STREETS, OSM_ATTRIBUTION } from "./realStreets.js";      // 2.6 · calles reales (OpenStreetMap)
+import { RealStreet, sampleLane } from "./realCity.js";
 
 /** 1.15 · Paradero de la calle (local): aquí se toma el bus del recorrido si pasa por esta estación. */
 const BUS_STOP = { x: STREET.roadHalf + 1.5, z: 34 };
@@ -178,15 +180,33 @@ export class City {
     this.scene.add(g);
     this.blocks = [];                       // rectángulos no transitables (coordenadas locales)
     this.walkRects = [{ x0: -S.walkHalf + 0.35, x1: S.walkHalf - 0.35, z0: -S.halfLen, z1: S.halfLen }];
+    const realData = REAL_STREETS[station.name];
+    this.real = realData ? new RealStreet(realData) : null;
+    this.busStopAt = BUS_STOP;
 
-    this.buildGround(g, M);
-    this.buildAccess(g, M);
-    this.buildEastSide(g, M, rnd, night);
-    this.buildWestSide(g, M, rnd, night);
-    this.buildFurniture(g, M, rnd);
-    this.buildBackdrop(g, M, rnd, night);
-    this.buildVehicles(g, rnd);
-    this.buildPedestrians(g, rnd);
+    if (this.real) {
+      // 2.6 · La calle real: edificios, calzadas, árboles y semáforos de OpenStreetMap
+      const R = realData.radius - 15;
+      this.walkRects = [{ x0: S.access.x - R, x1: S.access.x + R, z0: S.access.mouthZ - R, z1: S.access.mouthZ + R }];
+      this.real.build(g, M, { night, access: S.access, landmarkColor: this.plan.landmark?.color });
+      this.buildAccess(g, M);
+      this.buildRealShops(g, M);
+      this.buildRealLandmark(g, M);
+      const b = realData.busStop;
+      this.busStopAt = { x: b.x, z: b.z };
+      this.buildBusStop(g, M, b.x - 1.4, b.z);
+      this.buildRealVehicles(g, rnd);
+      this.buildPedestrians(g, rnd);
+    } else {
+      this.buildGround(g, M);
+      this.buildAccess(g, M);
+      this.buildEastSide(g, M, rnd, night);
+      this.buildWestSide(g, M, rnd, night);
+      this.buildFurniture(g, M, rnd);
+      this.buildBackdrop(g, M, rnd, night);
+      this.buildVehicles(g, rnd);
+      this.buildPedestrians(g, rnd);
+    }
 
     // Luz del día: hemisférica + sol (solo existen mientras hay calle)
     this.hemi = new THREE.HemisphereLight(0xcfe4ff, 0x4a4238, 1);
@@ -269,6 +289,7 @@ export class City {
   setTime(clock) {
     this.sky = skyAt(clock);
     this.sunDir = sunDirection(clock, this.sunDir);
+    this.real?.toLocal(this.sunDir);        // 2.6 · en la calle real la avenida no va de norte a sur: el sol se gira con ella
     this.applySky();
   }
 
@@ -395,13 +416,13 @@ export class City {
   }
 
   /** Fachada de un local: vidriera iluminada, puerta, toldo de color y letrero con su nombre. */
-  buildShopFront(g, M, shop) {
-    const fx = S.walkHalf - 0.04, z = shop.z;
-    facingPlane(g, 12, 3.2, M.shopGlow, fx, 1.9, z, -1);
+  buildShopFront(g, M, shop, { fx = S.walkHalf - 0.04, z = shop.z, w = 12 } = {}) {
+    const k = w / 12;
+    facingPlane(g, 12 * k, 3.2, M.shopGlow, fx, 1.9, z, -1);
     facingPlane(g, 2, 2.6, M.darkGlass, fx - 0.02, 1.4, z, -1);
-    const awn = addBox(g, 1.6, 0.12, 12.4, std(new THREE.Color(shop.color), { rough: 0.8 }), fx - 0.8, 3.75, z);
+    const awn = addBox(g, 1.6, 0.12, 12.4 * k, std(new THREE.Color(shop.color), { rough: 0.8 }), fx - 0.8, 3.75, z);
     awn.rotation.z = -0.25;
-    facingPlane(g, 11, 1.25, signMaterial(shop.name.toUpperCase(), { bg: shop.color, font: "800 76px Arial" }), fx - 0.03, 4.6, z, -1);
+    facingPlane(g, 11 * k, 1.25, signMaterial(shop.name.toUpperCase(), { bg: shop.color, font: "800 76px Arial" }), fx - 0.03, 4.6, z, -1);
     if (shop.kind === "banco") {
       facingPlane(g, 1, 1.6, glow(0x2a7fd4), fx - 0.05, 1.5, z + 3.5, -1);    // cajero automático
     }
@@ -461,8 +482,12 @@ export class City {
     if (!this.landmark) {
       for (let z = -78; z <= 78; z += 24) { tree(g, M, -S.roadHalf - 1.3, z + 12, 0.9); this.blocks.push({ x0: -S.roadHalf - 1.8, x1: -S.roadHalf - 0.8, z0: z + 11.5, z1: z + 12.5 }); }
     }
-    // Paradero de micro
-    const pz = 34;
+    this.buildBusStop(g, M, S.roadHalf, 34);
+  }
+
+  /** Paradero de micro junto a la solera cx (x local), en z = pz. */
+  buildBusStop(g, M, cx, pz) {
+    const S = { roadHalf: cx };
     addBox(g, 1.6, 0.08, 5, std(0x2b6cb0, { transparent: true, opacity: 0.75 }), S.roadHalf + 1.4, 2.6, pz);
     addBox(g, 0.08, 2.6, 5, std(0x9fc6e0, { transparent: true, opacity: 0.35 }), S.roadHalf + 2.2, 1.3, pz);
     bench(g, M, S.roadHalf + 1.7, pz, Math.PI / 2);
@@ -494,6 +519,86 @@ export class City {
     }
   }
 
+  /* ---------------------------------------------------------------------
+     2.6 · Calle real
+     --------------------------------------------------------------------- */
+
+  /** Locales del plan en fachadas reales (o puestos en la vereda, si no hay fachada cerca). */
+  buildRealShops(g, M) {
+    for (const shop of this.plan.shops) {
+      if (shop.stand) { this.buildKiosk(g, M, shop); continue; }
+      const grp = new THREE.Group();
+      grp.position.set(shop.x, 0, shop.z);
+      grp.rotation.y = shop.face + Math.PI / 2;     // el −X del grupo mira a la calle (como la vereda este del juego)
+      g.add(grp);
+      this.buildShopFront(grp, M, shop, { fx: -0.05, z: 0, w: Math.max(5, shop.w || 11) });
+    }
+  }
+
+  /** El hito es un edificio real: se marca con su placa y la foto se saca desde la vereda de enfrente. */
+  buildRealLandmark(g, M) {
+    const lm = this.plan.landmark, d = this.real.d.landmark;
+    if (!lm || !d) { this.landmark = null; return; }
+    this.landmark = { ...lm, halfZ: 10, plaza: 0, spot: { x: d.spot[0], z: d.spot[1] } };
+    const plate = new THREE.Mesh(new THREE.PlaneGeometry(6.5, 0.9), signMaterial(lm.sign || lm.name.toUpperCase(), { bg: "#2b2620", fg: "#e9dcc0", font: "700 72px Georgia" }));
+    plate.position.set(d.wall[0] + Math.sin(d.a) * 0.08, 6.2, d.wall[1] + Math.cos(d.a) * 0.08);
+    plate.rotation.y = d.a;
+    g.add(plate);
+  }
+
+  buildRealVehicles(g, rnd) {
+    this.vehicles = [];
+    this.paths = this.real.lanePaths();
+    // Primero las calles más cercanas al acceso (la avenida); las lejanas llevan menos autos
+    const near = (path) => Math.min(...path.pts.map(([x, z]) => Math.hypot(x - S.access.x, z - S.access.z)));
+    const order = this.paths.map(path => ({ path, d: near(path) - (path.kind === "primary" ? 40 : 0) })).sort((a, b) => a.d - b.d);
+    let budget = 46;
+    for (const { path, d } of order) {
+      const n = Math.min(d < 60 ? 6 : 2, Math.floor(path.len / 40));
+      for (let k = 0; k < n && budget > 0; k++, budget--) {
+        const bus = path.bus ? rnd() < 0.55 : path.kind === "primary" && rnd() < 0.08;
+        const { mesh, len } = this.vehicleMesh(bus, rnd, 1);
+        g.add(mesh);
+        const vmax = bus ? 9.5 : path.kind === "primary" ? 11 + rnd() * 3 : 7 + rnd() * 2;
+        this.vehicles.push({ mesh, path, s: ((k + rnd() * 0.6) * path.len) / n, v: vmax, vmax, len });
+      }
+    }
+    this.sigT = 0;
+  }
+
+  /** Autos y buses por las calles reales: frenan ante el de adelante, el jugador y la luz roja. */
+  updateRealVehicles(dt, lx, lz) {
+    this.sigT += dt;
+    this.real.updateSignals(this.sigT);
+    for (const c of this.vehicles) {
+      const p = sampleLane(c.path, c.s);
+      let gap = Infinity;
+      for (const o of this.vehicles) {
+        if (o === c || o.path !== c.path) continue;
+        const d = o.s - c.s - (o.len + c.len) / 2;
+        if (d > 0 && d < gap) gap = d;
+      }
+      for (const sg of c.path.sig) {
+        const ds = sg.s - c.s - c.len / 2;
+        if (ds < -0.5 || ds > 45) continue;
+        const st = this.real.signalState(sg.axis, this.sigT);
+        if (st === "r" || (st === "y" && ds > 8)) gap = Math.min(gap, ds - 1.5);
+      }
+      const rx = lx - p.x, rz = lz - p.z, along = rx * p.dx + rz * p.dz, lat = Math.abs(rx * p.dz - rz * p.dx);
+      if (lat < 1.6 && along > 0 && along < 30) gap = Math.min(gap, along - c.len / 2);
+      const target = gap < 2.5 ? 0 : gap < 16 ? c.vmax * (gap - 2.5) / 13.5 : c.vmax;
+      c.v += THREE.MathUtils.clamp(target - c.v, -6 * dt, 2.5 * dt);
+      c.v = Math.max(0, c.v);
+      c.s += c.v * dt;
+      if (c.s > c.path.len) c.s -= c.path.len;
+      const q = sampleLane(c.path, c.s);
+      const after = (lx - q.x) * q.dx + (lz - q.z) * q.dz;
+      if (this.sound && lat < 18 && Math.sign(along) !== Math.sign(after) && c.v > 2) this.sound("pass", { bus: c.len > 6, speed: c.v, lateral: lat });
+      c.mesh.position.set(q.x, 0.1, q.z);
+      c.mesh.rotation.y = q.yaw;
+    }
+  }
+
   /** La avenida sigue más allá de la cuadra (decorado, no transitable). */
   buildBackdrop(g, M, rnd, night) {
     for (const s of [-1, 1]) {
@@ -510,13 +615,26 @@ export class City {
 
   buildVehicles(g, rnd) {
     this.vehicles = [];
-    const colors = [0xd8d8d8, 0x1d1f22, 0x9b1c1c, 0x2c4f8a, 0x8a8f96, 0xf1f1ee, 0x2f6b3a, 0xc9a227];
-    const wheelGeo = new THREE.CylinderGeometry(0.34, 0.34, 0.25, 10);
-    const wheelMat = std(0x111111);
-    const glass = std(0x22303d, { metal: 0.5, rough: 0.2 });
     for (let i = 0; i < 12; i++) {
       const lane = LANES[i % 4];
       const bus = i % 5 === 2;
+      const { mesh: v, len: L } = this.vehicleMesh(bus, rnd, lane.dir);
+      const z = -300 + (i * 600) / 12 + rnd() * 20;
+      v.position.set(lane.x, 0, z);
+      g.add(v);
+      const vmax = bus ? 9 : 11 + rnd() * 4;
+      this.vehicles.push({ mesh: v, lane, z, v: vmax, vmax, len: L });
+    }
+  }
+
+  /** Auto o micro (Red: blanca con franja roja); el frente mira a +Z·dir. */
+  vehicleMesh(bus, rnd, dir = 1) {
+    const colors = [0xd8d8d8, 0x1d1f22, 0x9b1c1c, 0x2c4f8a, 0x8a8f96, 0xf1f1ee, 0x2f6b3a, 0xc9a227];
+    const wheelGeo = this._wheelGeo ??= new THREE.CylinderGeometry(0.34, 0.34, 0.25, 10);
+    const wheelMat = this._wheelMat ??= std(0x111111);
+    const glass = this._carGlass ??= std(0x22303d, { metal: 0.5, rough: 0.2 });
+    const lane = { dir };
+    {
       const v = new THREE.Group();
       const L = bus ? 12 : 4.3, W = bus ? 2.5 : 1.8, H = bus ? 3.1 : 1.45;
       const bodyColor = bus ? 0xd9d9d9 : colors[Math.floor(rnd() * colors.length)];
@@ -534,11 +652,7 @@ export class City {
       // Faros delanteros y luces traseras
       addBox(v, W * 0.8, 0.15, 0.05, glow(0xfff6d8), 0, bus ? 0.8 : 0.8, L / 2 * lane.dir);
       addBox(v, W * 0.8, 0.15, 0.05, glow(0xb01010), 0, bus ? 0.8 : 0.8, -L / 2 * lane.dir);
-      const z = -300 + (i * 600) / 12 + rnd() * 20;
-      v.position.set(lane.x, 0, z);
-      g.add(v);
-      const vmax = bus ? 9 : 11 + rnd() * 4;
-      this.vehicles.push({ mesh: v, lane, z, v: vmax, vmax, len: L });
+      return { mesh: v, len: L };
     }
   }
 
@@ -566,7 +680,7 @@ export class City {
     const shoeMat = std(0x141414);
     const rand = (a) => a[Math.floor(rnd() * a.length)];
 
-    for (let i = 0; i < 18; i++) {
+    for (let i = 0; i < (this.real ? 26 : 18); i++) {
       const p = new THREE.Group();
       const s = 0.9 + rnd() * 0.2;                           // estatura
       const body = new THREE.Group();
@@ -596,12 +710,23 @@ export class City {
 
   /** ¿Puede pisar un peatón el punto local (lx, lz)? (veredas y explanada, sin obstáculos) */
   pedFree(lx, lz, margin = 0.35) {
+    if (this.real) {                                        // 2.6 · calle real: veredas y plazas, sin calzadas ni edificios
+      if (Math.hypot(lx - S.access.x, lz - S.access.z) > 75 || this.real.onRoad(lx, lz, -0.3) || !this.real.free(lx, lz, margin)) return false;
+      return !this.blocks.some(b => lx > b.x0 - margin && lx < b.x1 + margin && lz > b.z0 - margin && lz < b.z1 + margin);
+    }
     if (Math.abs(lx) < S.roadHalf + 0.3) return false;      // no se baja a la calzada
     if (!this.walkRects.some(r => lx >= r.x0 && lx <= r.x1 && lz >= r.z0 && lz <= r.z1)) return false;
     return !this.blocks.some(b => lx > b.x0 - margin && lx < b.x1 + margin && lz > b.z0 - margin && lz < b.z1 + margin);
   }
 
   randomSidewalkPoint(side, rnd = Math.random) {
+    if (this.real) {
+      for (let k = 0; k < 40; k++) {
+        const x = S.access.x + (rnd() - 0.5) * 120, z = S.access.z + (rnd() - 0.5) * 120;
+        if (this.pedFree(x, z, 0.5)) return { x, z };
+      }
+      return { x: S.spawn.x, z: S.spawn.z + 4 };
+    }
     for (let k = 0; k < 30; k++) {
       const x = side * (S.roadHalf + 0.9 + rnd() * (S.walkHalf - S.roadHalf - 1.6));
       const z = (rnd() - 0.5) * 2 * (S.halfLen - 3);
@@ -613,11 +738,11 @@ export class City {
   /** Próximo destino: un punto de la vereda, la puerta de un local o el acceso al Metro. */
   pickPedTarget(p) {
     const r = this.pedRnd();
-    if (p.side > 0 && r < 0.35) {
+    if ((this.real || p.side > 0) && r < 0.35) {
       const shop = this.plan.shops[Math.floor(this.pedRnd() * this.plan.shops.length)];
       return { x: shop.door.x - 0.2, z: shop.door.z + (this.pedRnd() - 0.5), wait: 2 + this.pedRnd() * 5 };
     }
-    if (p.side > 0 && r < 0.45) return { x: S.access.x, z: S.access.z + S.access.mouthZ + 1.2, wait: 1 + this.pedRnd() * 2 };
+    if ((this.real || p.side > 0) && r < 0.45) return { x: S.access.x, z: S.access.z + S.access.mouthZ + 1.2, wait: 1 + this.pedRnd() * 2 };
     const pt = this.randomSidewalkPoint(p.side, this.pedRnd);
     return { ...pt, wait: this.pedRnd() < 0.4 ? 1 + this.pedRnd() * 4 : 0 };
   }
@@ -707,7 +832,8 @@ export class City {
     }
 
     // Vehículos: frenan ante el jugador y ante el de adelante
-    for (const c of this.vehicles) {
+    if (this.real) this.updateRealVehicles(dt, lx, lz);
+    else for (const c of this.vehicles) {
       const dir = c.lane.dir;
       let gap = Infinity;
       if (Math.abs(lx - c.lane.x) < 1.7) {
@@ -757,12 +883,14 @@ export class City {
     const { lx, lz } = this.local(wx, wz);
     if (!this.walkRects.some(r => lx >= r.x0 && lx <= r.x1 && lz >= r.z0 && lz <= r.z1)) return false;
     if (this.walkers?.some(p => Math.hypot(p.x - lx, p.z - lz) < 0.45)) return false;   // no se atraviesa a los peatones
+    if (this.real && !this.real.free(lx, lz)) return false;                              // 2.6 · edificios, árboles y postes reales
     return !this.blocks.some(b => lx > b.x0 - 0.25 && lx < b.x1 + 0.25 && lz > b.z0 - 0.25 && lz < b.z1 + 0.25);
   }
 
   /** Altura del suelo (vereda o calzada), en coordenadas del mundo. */
   floorAt(wx) {
     const { lx } = this.local(wx, this.origin.z);
+    if (this.real) return this.origin.y + 0.1;              // 2.6 · la calle real se dibuja pareja (soleras pintadas)
     return this.origin.y + (Math.abs(lx) > S.roadHalf ? 0.1 : 0);
   }
 
@@ -776,14 +904,14 @@ export class City {
     const { lx, lz } = this.local(wpos.x, wpos.z);
     const a = S.access;
     if (Math.hypot(lx - a.x, lz - (a.z + a.mouthZ + 0.8)) < 2.4) return { kind: "access" };
-    if (Math.abs(lx - BUS_STOP.x) < 2.6 && Math.abs(lz - BUS_STOP.z) < 4.5) return { kind: "busstop", served: !!this.busStop };
+    if (Math.abs(lx - this.busStopAt.x) < 2.6 && Math.abs(lz - this.busStopAt.z) < 4.5) return { kind: "busstop", served: !!this.busStop };
     let best = null, bd = 2.6;
     for (const shop of this.plan.shops) {
       const d = Math.hypot(lx - shop.door.x, lz - shop.door.z);
       if (d < bd) { bd = d; best = shop; }
     }
     if (best) return { kind: "shop", shop: best };
-    if (this.landmark && lx < -3 && Math.abs(lz) < this.landmark.halfZ + 6) return { kind: "landmark", landmark: this.landmark };
+    if (this.landmark && this.atLandmark(lx, lz)) return { kind: "landmark", landmark: this.landmark };
     return null;
   }
 
@@ -794,12 +922,25 @@ export class City {
     return Math.abs(lx - a.x) < a.halfX - 0.3 && lz < a.z + a.mouthZ - 0.2 && lz > a.z + a.mouthZ - 1.6;
   }
 
+  /** Dónde se saca la foto del hito (local). */
+  landmarkGoal() {
+    return this.landmark?.spot || { x: -S.walkHalf - 3, z: 0 };
+  }
+
+  /** ¿Está el jugador (local) donde se saca la foto del hito? */
+  atLandmark(lx, lz) {
+    if (!this.landmark) return false;
+    if (this.landmark.spot) return Math.hypot(lx - this.landmark.spot.x, lz - this.landmark.spot.z) < 6;
+    return lx < -3 && Math.abs(lz) < this.landmark.halfZ + 6;
+  }
+
   hint(wpos) {
     const n = this.nearest(wpos);
     if (n?.kind === "access") return `E (o camina hacia la escalera) · bajar a la estación ${this.station.name}`;
     if (n?.kind === "shop") return n.shop.kind === "banco" ? "E · usar el cajero automático (saldo y movimientos)" : `E · entrar a ${n.shop.name} (${n.shop.label.toLowerCase()})`;
     if (n?.kind === "landmark") return `E · sacar una foto de ${n.landmark.name}`;
     if (n?.kind === "busstop") return n.served ? `E · paradero (${busRoutesAt(this.station?.name).map(r => r.id).join(", ")}): tomar el bus` : "Paradero: por aquí no pasa ninguno de los recorridos del juego";
+    if (this.real) return `Calle real de ${this.station.name} (${OSM_ATTRIBUTION})${this.landmark ? ` · ${this.landmark.name}` : ""} · J misiones`;
     return this.landmark
       ? `Calle de ${this.station.name} · enfrente: ${this.landmark.name} · locales en la vereda del Metro · J misiones`
       : `Calle de ${this.station.name} · locales en la vereda del Metro · J misiones`;

@@ -124,6 +124,34 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **Salir por los torniquetes es gratis**: solo se cobra el pasaje al pasar hacia la zona pagada (antes, al terminar
   de cruzar el torniquete de salida se cobraba un pasaje).
 
+## Versión 2.6 · La calle real de Universidad de Chile (OpenStreetMap)
+
+Primera estación con la **calle tal como es**: al salir del Metro en **Universidad de Chile** (L1 y L3) se está en la
+Alameda de verdad, sacada de **OpenStreetMap** (© colaboradores de OpenStreetMap, licencia ODbL). Es la prueba antes de
+pasar el resto de la red.
+
+- **Se sale por el acceso real** (E · Arturo Prat, en la vereda sur), frente a la **Casa Central de la Universidad de
+  Chile**, con la placa en su fachada; la foto del hito se saca en la vereda, delante del edificio.
+- **Los edificios con su planta y su altura**: unos 200 alrededor (La Moneda, la Iglesia de San Francisco, la Bolsa de
+  Comercio, el Club de La Unión…). La altura sale de OSM (`height` o `building:levels`) o, para los conocidos que no la
+  tienen, de una tabla; los demás llevan una estimación que siempre es la misma. Los antiguos tienen pisos más altos.
+- **Las calles con su ancho real**: la Alameda con sus dos calzadas de 4 a 5 pistas y el bandejón, y las que la
+  cruzan, con soleras, líneas de pista, eje amarillo en las de doble sentido, **pasos de cebra donde están** y
+  **semáforos donde están**, que cambian de luz (la Alameda y las transversales se turnan).
+- **Árboles, faroles y el paradero** en sus lugares reales; **autos y buses Red** recorren las calles reales en su
+  sentido y **paran en rojo** (y ante el jugador).
+- **Los locales del juego** van sobre fachadas reales de la vereda del Metro y, donde no hay (la cuadra de la Casa
+  Central), como **puestos en la vereda ancha**, como en la Alameda. Las misiones y la brújula los encuentran igual.
+- **El sol** sale por donde corresponde: la calle real gira con la avenida y el cielo se gira con ella.
+- **Cómo se hace** (`tools/calles-osm.mjs`): descarga la zona de la API oficial de OSM, la pasa a metros en las
+  coordenadas de la calle del juego (la avenida a lo largo de Z y el acceso real justo sobre la escalera de salida de la
+  estación) y deja `js/city/realStreets.js` (~140 KB). `js/city/realCity.js` la dibuja (una malla por material e
+  instancias, para el celular) y responde dónde hay edificios, calzadas u obstáculos. Las demás estaciones siguen con
+  su calle de siempre. Para agregar otra estación basta sumarla a la lista del script (su acceso, la avenida y el hito)
+  y volver a correrlo.
+- Lo que todavía no es real: las fachadas (las ventanas son genéricas; OSM no tiene fotos) y los locales (nombres del
+  juego, no los de la cuadra).
+
 ## Versión 2.5 · Tarifa integrada como en Santiago y pago con tarjeta bancaria
 
 Revisión de todo el sistema contra el transporte público real (noviembre de 2026). La red (Metro L1 a L6 con las
