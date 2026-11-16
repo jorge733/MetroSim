@@ -142,8 +142,10 @@ extensiones de la L2 a Hospital El Pino y de la L3 a Plaza Quilicura, Tren Nos y
   si no es transbordo, por qué.
 - **Pago con tarjeta bancaria (Pago Ágil)**, como desde el 13-02-2026: en Tarifas › *Pagar en el torniquete del Metro
   con* se elige **Tarjeta bip!** o **Tarjeta bancaria**. Con la bancaria se acerca el débito del Banco Andino al
-  torniquete del Metro o del Tren Nos y se cobra de la cuenta la tarifa adulto del tramo (sin TNE ni TAM y sin
+  torniquete del Metro y se cobra de la cuenta la tarifa adulto del tramo (sin TNE ni TAM y sin
   transbordo); en el bus se sigue pagando con bip!.
+- **2.5.1** · La tarjeta bancaria sirve **solo en el Metro** (en Tren Nos y Tren Rancagua se paga con bip!) y post
+  «Paga con tu débito del Banco Andino» para redes sociales (`post-debito/`: cuadrado, historia y horizontal).
 - El panel de **Tarifas** muestra el bus, las reglas del transbordo y cuántos minutos le quedan a tu viaje integrado.
 - `node tools/probar-tarifa.mjs` prueba las reglas sin navegador.
 

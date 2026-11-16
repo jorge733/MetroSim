@@ -1807,10 +1807,11 @@ function onWalkerEvent(type, data) {
 function validateFare() {
   const gate = game.world.nearestGate(game.walker.pos);
   const mode = fareModeOfLine(LINE.id);
-  // 2.5 · Pago Ágil: tarjeta bancaria sin contacto en Metro y Tren Nos (siempre tarifa adulto, sin integración)
-  if (payWith() === "banco" && mode !== "ran") {
+  // 2.5 · Pago Ágil: tarjeta bancaria sin contacto (siempre tarifa adulto, sin integración).
+  // 2.5.1 · De momento solo en el Metro: en Tren Nos y Tren Rancagua se paga con la bip!
+  if (payWith() === "banco" && mode === "metro") {
     const band = fareBandAt(game.clock);
-    const r = bank.charge(band.price, `${mode === "nos" ? "Tren Nos" : "Metro"} · pago sin contacto · ${band.label.toLowerCase()}`);
+    const r = bank.charge(band.price, `Metro · pago sin contacto · ${band.label.toLowerCase()}`);
     if (r.ok) {
       game.audio.bip();
       if (gate) game.world.flashValidator(gate, true);
@@ -1839,7 +1840,7 @@ function validateFare() {
   if (gate) game.world.flashValidator(gate, false);
   const need = r.charge ?? band.price;
   hud.showMessage(r.reason === "nocard"
-    ? `No tienes tarjeta bip!: cómprala en la boletería (a la izquierda) con tu tarjeta de débito${mode !== "ran" ? ", o paga con tu tarjeta bancaria sin contacto (Tarifas › Pagar con)" : ""}`
+    ? `No tienes tarjeta bip!: cómprala en la boletería (a la izquierda) con tu tarjeta de débito${mode === "metro" ? ", o paga con tu tarjeta bancaria sin contacto (Tarifas › Pagar con)" : " (en el tren se paga con bip!; la tarjeta bancaria sirve solo en el Metro)"}`
     : `Saldo bip! insuficiente (${formatCLP(card.balance)}) · pasaje ${formatCLP(need)} · carga en la boletería o en un tótem${bank.balance < 1000 ? " · tu cuenta está baja: haz un turno de Conductor" : ""}`, "alert", 5000);
   return { ok: false };
 }

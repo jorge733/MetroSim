@@ -202,7 +202,7 @@ function render() {
     return b;
   }));
   $("fareInfoPayNote").textContent = pay === "banco"
-    ? "Acercas tu débito al torniquete del Metro o del Tren Nos y se cobra de tu cuenta la tarifa adulto del tramo. Sin TNE ni TAM y sin transbordo con el bus (allí se paga con bip!)."
+    ? "Acercas tu débito al torniquete del Metro y se cobra de tu cuenta la tarifa adulto del tramo. De momento solo en el Metro: en el Tren Nos, el Tren Rancagua y el bus se paga con bip! (sin TNE ni TAM y sin transbordo). Si combinas el Metro con un tren, conviene pagar todo con bip!."
     : "La bip! integra bus, Metro y Tren Nos: en el transbordo pagas solo la diferencia.";
 
   const trip = loadTrip(), left = minutesLeft(trip, Date.now());

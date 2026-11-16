@@ -1,0 +1,76 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+*{margin:0;box-sizing:border-box}
+html,body{width:var(--w);height:var(--h);overflow:hidden}
+body{font-family:"DejaVu Sans","Liberation Sans",Arial,sans-serif;color:#fff;
+ background:radial-gradient(ellipse at 50% 30%,#26324a 0%,#111722 55%,#05070a 100%);position:relative;font-size:var(--u)}
+.wrap{position:absolute;inset:0;display:flex;flex-direction:var(--dir);align-items:center;justify-content:center;text-align:center;padding:0 var(--pad);gap:var(--gap)}
+.col{display:flex;flex-direction:column;align-items:center;gap:var(--cg)}
+.top{display:flex;align-items:center;gap:.7em}
+.logo{width:3.6em}
+.badge{background:#d7262e;padding:.4em 1.1em;border-radius:999px;font-weight:800;letter-spacing:.08em}
+h1{font-size:2.75em;font-weight:900;line-height:1.04;letter-spacing:-.02em}
+h1 em{font-style:normal;color:#f4b400}
+h1 small{display:block;margin-top:.3em;font-size:.4em;font-weight:800;letter-spacing:.02em;color:#ff8a90}
+/* Tarjeta de débito del Banco Andino (banco del juego) */
+.card{position:relative;width:var(--cw);aspect-ratio:85.6/54;border-radius:calc(var(--cw) * .055);text-align:left;color:#fff;
+ background:linear-gradient(135deg,#0b5a4a 0%,#13856c 45%,#0a3d33 100%);box-shadow:0 0 0 .3em rgba(244,180,0,.35),0 1.2em 2.6em rgba(0,0,0,.6);overflow:hidden;font-size:calc(var(--cw) * .052);transform:rotate(-4deg);margin:.5em 0}
+.card::before{content:"";position:absolute;right:-18%;bottom:-48%;width:90%;aspect-ratio:1;background:
+ linear-gradient(135deg,transparent 48%,rgba(255,255,255,.10) 48% 60%,transparent 60%),linear-gradient(135deg,transparent 30%,rgba(255,255,255,.07) 30% 45%,transparent 45%);}
+.mount{position:absolute;right:6%;top:9%;width:24%}
+.bank{position:absolute;left:7%;top:9%;font-weight:900;font-size:1.15em;letter-spacing:.02em}
+.bank small{display:block;font-size:.55em;font-weight:700;opacity:.8;letter-spacing:.18em}
+.chip{position:absolute;left:7%;top:38%;width:14%;aspect-ratio:1.3;border-radius:.3em;background:linear-gradient(135deg,#f6d27a,#c99a2e);box-shadow:inset 0 0 0 .08em rgba(0,0,0,.25)}
+.nfc{position:absolute;left:24%;top:39%;width:8%}
+.num{position:absolute;left:7%;bottom:22%;font-weight:700;letter-spacing:.14em;font-size:1.05em}
+.deb{position:absolute;left:7%;bottom:8%;font-weight:900;letter-spacing:.2em;font-size:.8em;opacity:.9}
+.tap{position:absolute;right:6%;bottom:8%;background:#f4b400;color:#111722;font-weight:900;font-size:.7em;padding:.25em .7em;border-radius:999px;letter-spacing:.06em}
+p.lead{font-size:1.02em;line-height:1.35;color:#d6dbe6;max-width:var(--pw)}
+p.lead b{color:#fff}
+.rows{display:flex;flex-direction:column;gap:.45em;width:var(--pw)}
+.row{display:flex;align-items:center;gap:.7em;background:rgba(255,255,255,.07);border:2px solid rgba(255,255,255,.15);border-radius:.8em;padding:.5em .8em;text-align:left}
+.row.ok{border-color:#2fbf71;background:rgba(47,191,113,.14)}
+.ln{flex:none;min-width:2.6em;height:2.1em;padding:0 .5em;border-radius:.45em;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:.85em}
+.row .t{flex:1;font-weight:800;font-size:1.02em;line-height:1.15}
+.row .t small{display:block;font-weight:600;font-size:.74em;color:#b8c2d3;margin-top:.15em}
+.pay{flex:none;font-weight:900;font-size:.85em;padding:.35em .8em;border-radius:999px;white-space:nowrap}
+.pay.deb2{background:#2fbf71;color:#08210f}
+.pay.bip{background:#1d6fd8;color:#fff}
+.tip{width:var(--pw);display:flex;gap:.7em;align-items:center;text-align:left;background:#f4b400;color:#111722;border-radius:.8em;padding:.6em .9em;font-size:.92em;line-height:1.3;font-weight:700}
+.tip .i{flex:none;font-size:1.8em}
+.tip b{font-weight:900}
+.url{font-size:1.2em;color:#9fb0c8;letter-spacing:.04em;font-weight:800}
+.url span{color:#ff8a90}
+.land .col.r{gap:.55em}
+</style></head><body>
+<svg width="0" height="0" style="position:absolute"><defs>
+ <symbol id="logo" viewBox="0 0 200 130"><rect x="6" y="6" width="188" height="118" rx="30" fill="#d7262e"/>
+ <path d="M30 94H78L122 36H170" fill="none" stroke="#fff" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+ <path d="M100 18V112" fill="none" stroke="#ffd2d5" stroke-width="9" stroke-linecap="round" stroke-dasharray="0.1 17"/>
+ <circle cx="30" cy="94" r="10" fill="#fff"/><circle cx="170" cy="36" r="10" fill="#fff"/>
+ <circle cx="100" cy="65" r="17" fill="#fff"/><circle cx="100" cy="65" r="8" fill="#d7262e"/></symbol>
+</defs></svg>
+<div class="wrap">
+ <div class="col l">
+  <div class="top"><svg class="logo" viewBox="0 0 200 130"><use href="#logo"/></svg><div class="badge">NUEVO · v2.5</div></div>
+  <h1>Paga el Metro<br>con tu <em>débito</em><small>Banco Andino · sin contacto</small></h1>
+  <div class="card">
+   <div class="bank">Banco Andino<small>CUENTA CORRIENTE</small></div>
+   <svg class="mount" viewBox="0 0 60 30"><path d="M2 28L20 6l9 10 8-8 21 20z" fill="rgba(255,255,255,.85)"/><path d="M20 6l-5 6 5-2 3 3z" fill="#0b5a4a"/></svg>
+   <div class="chip"></div>
+   <svg class="nfc" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><path d="M6 8a6 6 0 0 1 0 8M10 5a10 10 0 0 1 0 14M14 2a14 14 0 0 1 0 20"/></svg>
+   <div class="num">•••• •••• •••• 4821</div>
+   <div class="deb">DÉBITO</div><div class="tap">ACÉRCALA</div>
+  </div>
+  <p class="lead">Acércala al torniquete:<br>el pasaje <b>se descuenta de tu cuenta del&nbsp;banco.</b></p>
+ </div>
+ <div class="col r">
+  <div class="rows">
+   <div class="row ok"><span class="ln" style="background:#e1251b">METRO</span><span class="t">Metro<small>Todas las líneas</small></span><span class="pay deb2">✓ Débito</span></div>
+   <div class="row"><span class="ln" style="background:#0f7f86">NOS</span><span class="t">Tren Nos<small>Aún sin débito</small></span><span class="pay bip">bip!</span></div>
+   <div class="row"><span class="ln" style="background:#d9731a">RCG</span><span class="t">Tren Rancagua<small>Aún sin débito</small></span><span class="pay bip">bip!</span></div>
+  </div>
+  <div class="tip"><span class="i">💡</span><span>¿Vas en Metro y combinas con Tren Nos o Rancagua? <b>Prefiere pagar con&nbsp;tu&nbsp;bip!</b></span></div>
+  <div class="url">redmovisim<span>.cl</span></div>
+ </div>
+</div>
+</body></html>
