@@ -155,8 +155,9 @@ const cache = new Map();
  * Plan de la calle de una estación.
  * @returns {{ station, landmark, shops: Array<{kind, label, icon, color, name, items, x, z, door:{x,z}, stand:boolean}> }}
  */
-export function streetPlan(station) {
-  if (cache.has(station.name)) return { ...cache.get(station.name), station };
+export function streetPlan(station, { real: useReal = true } = {}) {
+  const key = station.name + (useReal ? "" : "#siempre");   // 2.7 · la de siempre, mientras se descarga la real
+  if (cache.has(key)) return { ...cache.get(key), station };
   const rnd = seededRandom(station.name);
   const pick = (arr) => arr[Math.floor(rnd() * arr.length)];
   const optional = [...OPTIONAL].sort(() => rnd() - 0.5).slice(0, 2);
@@ -171,7 +172,7 @@ export function streetPlan(station) {
   shops.push({ kind: "kiosko", label: k.label, icon: k.icon, color: k.color, name: pick(k.names), items: k.items, x: KIOSK.x, z: KIOSK.z, door: { x: KIOSK.x - 1.9, z: KIOSK.z }, stand: true });
 
   // 2.6 · Calle real (OpenStreetMap): los locales van en fachadas reales de la vereda del Metro (o en puestos)
-  const real = REAL_STREETS[station.name];
+  const real = useReal ? REAL_STREETS[station.name] : null;
   if (real) {
     shops.forEach((sh, i) => {
       const r = sh.stand ? { ...real.kiosk, stand: 1 } : real.shops[i];
@@ -180,7 +181,7 @@ export function streetPlan(station) {
     });
   }
   const plan = { landmark: landmarkFor(station), shops, seed: Math.floor(rnd() * 1e9), real: !!real };
-  cache.set(station.name, plan);
+  cache.set(key, plan);
   return { ...plan, station };
 }
 

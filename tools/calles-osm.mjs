@@ -1,51 +1,76 @@
 /* ==========================================================================
-   RedMoviSim — 2.6 · tools/calles-osm.mjs
-   Genera js/city/realStreets.js: la CALLE REAL alrededor de un acceso del
-   Metro, a partir de OpenStreetMap (© colaboradores de OpenStreetMap, ODbL).
+   RedMoviSim — 2.6 / 2.7 · tools/calles-osm.mjs
+   Genera la CALLE REAL de cada estación a partir de OpenStreetMap
+   (© colaboradores de OpenStreetMap, ODbL):
+     · js/city/calles/<estación>.json   la calle (edificios, calzadas…), en decímetros
+     · js/city/realStreets.js           lo que el juego necesita sin cargarla
+                                        (locales, kiosko, paradero, hito, giro)
 
-   El juego no consulta OSM en vivo (tiene que andar sin conexión y en el APK):
-   este script toma una «foto» de los datos y la deja ya convertida a metros,
-   en las coordenadas locales de la calle del juego (city/plan.js · STREET):
+   El juego no consulta OSM en vivo (anda sin conexión y en el APK): esto es
+   una «foto». Todo queda en las coordenadas locales de la calle del juego
+   (city/plan.js · STREET): la avenida a lo largo de Z y el acceso elegido en
+   la vereda +X, donde el juego pone la boca de la escalera (x = 9,6, boca en
+   z = +3,2), así cae sobre la salida de la mezanina.
 
-     · la avenida de la estación queda a lo largo de Z y el acceso elegido,
-       en la vereda +X, justo donde el juego pone la boca de la escalera
-       (x = 9,6, la boca en z = +3,2), así sigue cayendo sobre la salida de
-       la mezanina;
-     · edificios con su planta real y su altura (height, building:levels o,
-       si OSM no la tiene, una estimación reproducible), techos/marquesinas,
-       calzadas con su ancho (lanes × 3,3 m o width), soleras, líneas de
-       pista, pasos de cebra, semáforos, árboles, pasto, faroles;
-     · pistas para los autos (siguen las calles reales, en su sentido) con
-       los semáforos que encuentran;
-     · dónde van los locales del juego (sobre fachadas reales de la vereda
-       del Metro), el kiosko, el paradero (uno real) y el hito para la foto.
+   Por estación, solo:
+     · el ACCESO: el acceso real más cercano donde la escalera cabe en la
+       vereda (se corre hasta 7 m si hace falta); en las estaciones de EFE,
+       un punto de la vereda junto a la estación;
+     · la AVENIDA: la calle más importante a menos de 45 m del acceso;
+     · el HITO (city/catalog.js) por su nombre en OSM (edificio, plaza,
+       parque o monumento); si no está cerca, la vereda de enfrente;
+     · edificios con su planta y altura (height, building:levels, la tabla
+       HEIGHTS o una estimación: casas de 1–2 pisos, o los pisos de los
+       vecinos que sí la tienen), calzadas con su ancho, soleras, pistas,
+       pasos de cebra, semáforos, árboles, pasto, faroles y las pistas de
+       los autos; los locales del juego sobre fachadas reales (o puestos).
 
-   Uso:   node tools/calles-osm.mjs              (descarga y escribe el archivo)
-          node tools/calles-osm.mjs --ver        (solo muestra el resumen)
-   Descarga con curl (respeta el proxy del sistema) de la API oficial de OSM
-   (api.openstreetmap.org/api/0.6/map.json), una zona chica por estación.
+   Uso:
+     1. curl -o /tmp/osm/Santiago.osm.pbf https://download.bbbike.org/osm/bbbike/Santiago/Santiago.osm.pbf
+     2. node tools/calles-osm.mjs --lista > /tmp/osm/estaciones.json
+     3. python3 tools/zonas-osm.py /tmp/osm/Santiago.osm.pbf /tmp/osm/estaciones.json /tmp/osm/zonas
+     4. node tools/calles-osm.mjs --zonas /tmp/osm/zonas      [--solo "NOMBRE"] [--ver]
    ========================================================================== */
 
-import { execFileSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 
-/** Estaciones con calle real. entrances: ids de nodos OSM, en orden de preferencia. */
-const STATIONS = [
-  {
-    name: "UNIVERSIDAD DE CHILE",
-    lat: -33.4441289, lon: -70.6506651,            // acceso E · Arturo Prat
-    entrances: [6257072288, 6257072287, 6257072284, 6257072285, 10723170893],
-    avenue: /Libertador Bernardo O'Higgins/,
+/** Ajustes a mano por estación (lo demás se calcula solo). prefer: accesos OSM preferidos. */
+const OVERRIDES = {
+  "UNIVERSIDAD DE CHILE": {
+    prefer: [6257072288],                          // acceso E · Arturo Prat
     landmark: { way: 25018684 },                   // Casa Central de la Universidad de Chile
-    radius: 230,
-    // Alturas conocidas (m) de edificios sin altura en OSM
-    heights: { 25018684: 17, 394238: 16, 114621538: 18, 12721099: 26, 24964144: 22, 11317315: 30, 11317398: 34,
-      157650982: 9, 11352836: 40, 40221637: 42, 40222168: 34 },
   },
-];
+};
+/** Alturas conocidas (m) de edificios que en OSM no la tienen (por id de way). */
+const HEIGHTS = { 25018684: 17, 394238: 16, 114621538: 18, 12721099: 26, 24964144: 22, 11317315: 30, 11317398: 34,
+  157650982: 9, 11352836: 40, 40221637: 42, 40222168: 34 };
+/** Cómo se llama en OSM el hito de cada estación (city/catalog.js). */
+const LANDMARK_RX = {
+  "ESTACIÓN CENTRAL": /Estaci[oó]n Central|Alameda/i,
+  "LOS HÉROES": /H[eé]roes de (la )?Concepci[oó]n|Los H[eé]roes/i,
+  "LA MONEDA": /Palacio de La Moneda/i,
+  "UNIVERSIDAD DE CHILE": /Casa Central Universidad de Chile/i,
+  "SANTA LUCÍA": /Cerro Santa Luc[ií]a|Santa Luc[ií]a/i,
+  "UNIVERSIDAD CATÓLICA": /Casa Central.*Cat[oó]lica|Pontificia Universidad Cat[oó]lica|Casa Central UC/i,
+  "BAQUEDANO": /Plaza Baquedano|Plaza Italia|Plaza de la Dignidad/i,
+  "TOBALABA": /Costanera Center|Gran Torre/i,
+  "ESCUELA MILITAR": /Escuela Militar/i,
+  "LOS DOMINICOS": /Los Dominicos|San Vicente Ferrer/i,
+  "FRANKLIN": /Persa B[ií]o ?B[ií]o|B[ií]o B[ií]o/i,
+  "PUENTE CAL Y CANTO": /Mercado Central/i,
+  "PLAZA DE ARMAS": /Catedral Metropolitana|Catedral de Santiago/i,
+  "PLAZA EGAÑA": /Mall Plaza Ega[ñn]a|Plaza Ega[ñn]a/i,
+  "BELLAVISTA DE LA FLORIDA": /Mall Plaza Vespucio|Plaza Vespucio/i,
+  "PLAZA DE PUENTE ALTO": /Plaza de (Armas de )?Puente Alto/i,
+  "BELLAS ARTES": /Museo Nacional de Bellas Artes|Bellas Artes/i,
+  "QUINTA NORMAL": /Quinta Normal/i,
+  "PLAZA DE MAIPÚ": /Templo Votivo|Santuario Nacional|Votivo de Maip[uú]/i,
+  "ESTADIO NACIONAL": /Estadio Nacional/i,
+};
 
 const ACCESS = { x: 9.6, z: 3.2 };                 // boca del acceso en la calle del juego
 const LANE_W = 3.3;
+const LOW = new Set(["house", "detached", "residential", "terrace", "semidetached_house", "bungalow", "farm", "static_caravan"]);
 const ROAD = new Set(["motorway", "trunk", "primary", "secondary", "tertiary", "unclassified", "residential",
   "living_street", "primary_link", "secondary_link", "tertiary_link", "service", "busway"]);
 const DRIVE = new Set(["trunk", "primary", "secondary", "tertiary", "unclassified", "residential", "primary_link", "secondary_link", "tertiary_link", "living_street"]);
@@ -53,14 +78,6 @@ const DEF_LANES = { trunk: 3, primary: 3, secondary: 2, tertiary: 2, unclassifie
 
 const args = process.argv.slice(2);
 const r1 = (v) => Math.round(v * 10) / 10;
-
-function fetchOSM(lat, lon, R) {
-  const dlat = R / 110574, dlon = R / (111320 * Math.cos(lat * Math.PI / 180));
-  const bbox = [lon - dlon, lat - dlat, lon + dlon, lat + dlat].map(v => v.toFixed(6)).join(",");
-  const url = `https://api.openstreetmap.org/api/0.6/map.json?bbox=${bbox}`;
-  const out = execFileSync("curl", ["-sS", "-m", "120", "-A", "RedMoviSim-tools/1.0 (+https://www.redmovisim.cl)", url], { maxBuffer: 1 << 28 });
-  return JSON.parse(out.toString());
-}
 
 /* ---------- geometría plana ---------- */
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1]];
@@ -110,6 +127,19 @@ function resample(pts, step) {
   if (pts.length) out.push(pts.at(-1));
   return out;
 }
+/** Douglas–Peucker: quita puntos que se apartan menos de tol metros de la recta. */
+function simplify(pts, tol) {
+  if (pts.length < 3) return pts;
+  const keep = new Uint8Array(pts.length); keep[0] = keep[pts.length - 1] = 1;
+  const stack = [[0, pts.length - 1]];
+  while (stack.length) {
+    const [i, j] = stack.pop();
+    let md = 0, mk = -1;
+    for (let k = i + 1; k < j; k++) { const c = closestOnSeg(pts[k], pts[i], pts[j]); const d = Math.hypot(pts[k][0] - c[0], pts[k][1] - c[1]); if (d > md) { md = d; mk = k; } }
+    if (md > tol) { keep[mk] = 1; stack.push([i, mk], [mk, j]); }
+  }
+  return pts.filter((_, k) => keep[k]);
+}
 const polyLen = (pts) => pts.reduce((s, p, i) => (i ? s + len(sub(p, pts[i - 1])) : 0), 0);
 /** Intersección del rayo p + t·d con el segmento ab: t o null. */
 function raySeg(p, d, a, b) {
@@ -120,33 +150,105 @@ function raySeg(p, d, a, b) {
 }
 function seeded(n) { let a = (n * 2654435761) >>> 0; return () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 
-function build(cfg) {
+const CLASS_RANK = { trunk: 0, primary: 0, secondary: 1, tertiary: 2, primary_link: 2, secondary_link: 2, unclassified: 3, residential: 3, living_street: 4, service: 6, busway: 2, motorway: 5 };
+const roadOk = (t) => ROAD.has(t.highway) && t.area !== "yes" && !t.tunnel && t.covered !== "yes" && !(+t.layer < 0) && t.indoor !== "yes" && !t.bridge
+  && !(t.highway === "service" && t.service && t.service !== "alley" && t.service !== "driveway");
+const roadWidth = (t) => +t.width || Math.max(3.2, (+t.lanes || DEF_LANES[t.highway] || 2) * (t.highway === "service" || t.highway === "living_street" ? 3.0 : LANE_W));
+
+/**
+ * Elige el acceso y la avenida: el primer acceso (real o, en las estaciones de tren, uno en la vereda junto a la
+ * estación) donde la escalera del juego cabe en la vereda sin pisar calzadas ni edificios.
+ */
+function chooseFrame(nodes, ways, cfg) {
+  const st = cfg.station, kx = 111320 * Math.cos(st.lat * Math.PI / 180), ky = 110574;
+  const EN = (n) => [(n.lon - st.lon) * kx, (n.lat - st.lat) * ky];
+  const roads = [], blds = [];
+  for (const w of ways.values()) {
+    const t = w.tags || {};
+    const pts = w.nodes.map(id => nodes.get(id)).filter(Boolean).map(EN);
+    if (pts.length < 2 || !pts.some(p => Math.hypot(p[0], p[1]) < 500)) continue;
+    if (roadOk(t)) roads.push({ id: w.id, pts, w: roadWidth(t), rank: CLASS_RANK[t.highway] ?? 5, key: t.name ? "n:" + t.name : "w:" + w.id, drive: DRIVE.has(t.highway) });
+    else if (t.building && !t["building:part"] && w.nodes[0] === w.nodes.at(-1) && t.building !== "roof" && !(+t.layer < 0)) blds.push(pts);
+  }
+  const cands = [];
+  for (const n of nodes.values()) {
+    if (n.tags?.railway !== "subway_entrance" && n.tags?.railway !== "train_station_entrance" && n.tags?.entrance !== "main" || !n.tags) continue;
+    if (n.tags.entrance === "main" && !n.tags.railway) continue;
+    const p = EN(n), d = Math.hypot(p[0], p[1]);
+    if (d < 320 && !cfg.synth) cands.push({ p, d: d - (cfg.prefer?.includes(n.id) ? 1000 : 0), name: n.tags.name || "", id: n.id });
+  }
+  cands.sort((a, b) => a.d - b.d);
+  // Además (o, en los trenes, en vez de los accesos): puntos de la vereda de las calles cercanas a la estación
+  {
+    const near = roads.filter(r => r.drive).map(r => {
+      let best = null;
+      for (let i = 0; i + 1 < r.pts.length; i++) { const c = closestOnSeg([0, 0], r.pts[i], r.pts[i + 1]); const d = Math.hypot(c[0], c[1]); if (!best || d < best.d) best = { d, c, dir: norm(sub(r.pts[i + 1], r.pts[i])) }; }
+      return { r, ...best };
+    }).filter(x => x.d < 220).sort((a, b) => a.d + a.r.rank * 15 - (b.d + b.r.rank * 15));
+    for (const x of near.slice(0, 6)) {
+      const nrm = [x.dir[1], -x.dir[0]], side = dot([-x.c[0], -x.c[1]], nrm) >= 0 ? 1 : -1;
+      for (const off of [3, 4.5, 6.5]) for (const sd of [side, -side]) for (const along of [0, 10, -10, 20, -20, 35, -35, 55, -55]) {
+        const q = [x.c[0] + nrm[0] * sd * (x.r.w / 2 + off) + x.dir[0] * along, x.c[1] + nrm[1] * sd * (x.r.w / 2 + off) + x.dir[1] * along];
+        cands.push({ p: q, d: Math.hypot(q[0], q[1]), name: "", id: null, synth: 1 });
+      }
+    }
+  }
+  const onRoad = (q, m = 0) => roads.some(r => distToPolyline(q, r.pts) < r.w / 2 - m);
+  const inB = (q) => blds.some(b => inPoly(q, b));
+  for (const c of cands) {
+    // Avenida: la calle más importante a menos de 45 m del acceso
+    let pick = null;
+    for (const r of roads) {
+      const d = distToPolyline(c.p, r.pts);
+      if (d > 45) continue;
+      const score = r.rank * 18 + d;
+      if (!pick || score < pick.score) pick = { score, key: r.key };
+    }
+    if (!pick) continue;
+    let best = null;
+    for (const r of roads.filter(q => q.key === pick.key)) for (let i = 0; i + 1 < r.pts.length; i++) {
+      const cc = closestOnSeg(c.p, r.pts[i], r.pts[i + 1]), d = Math.hypot(c.p[0] - cc[0], c.p[1] - cc[1]);
+      if (!best || d < best.d) best = { d, dir: norm(sub(r.pts[i + 1], r.pts[i])), c: cc };
+    }
+    let dir = best.dir;
+    if (dot(sub(c.p, best.c), [dir[1], -dir[0]]) < 0) dir = [-dir[0], -dir[1]];
+    const [de, dn] = dir;
+    // El punto de OSM es aproximado: se corre hasta 7 m (alejándose de la calzada o a lo largo) si ahí no cabe
+    const shifts = c.synth ? [[0, 0]] : [[0, 0], [1.5, 0], [3, 0], [0, 4], [0, -4], [3, 4], [3, -4], [5, 0], [1.5, 8], [1.5, -8], [7, 0], [5, 6], [5, -6]];
+    let found = null;
+    for (const [ox, oz] of shifts) {
+      const o = [c.p[0] + ox * dn + (-oz) * de, c.p[1] - ox * de + (-oz) * dn];
+      const toEN = (x, z) => { const u = x - ACCESS.x, v = -(z - ACCESS.z); return [o[0] + u * dn + v * de, o[1] - u * de + v * dn]; };
+      let ok = true;
+      for (let x = 8.1; x <= 11.1 && ok; x += 0.75) for (let z = -3.8; z <= 6; z += 0.9) {
+        const q = toEN(x, z);
+        if (inB(q) || onRoad(q, -0.3)) { ok = false; break; }
+      }
+      if (ok) { found = o; break; }
+    }
+    if (!found) continue;
+    if (Math.hypot(found[0], found[1]) > 330) continue;
+    const lat = st.lat + found[1] / ky, lon = st.lon + found[0] / kx;
+    return { lat, lon, dir, avenueKey: pick.key, name: c.name, synth: !!c.synth };
+  }
+  return null;
+}
+
+function build(data, cfg) {
   const R = cfg.radius;
-  const data = fetchOSM(cfg.lat, cfg.lon, R + 40);
   const nodes = new Map(), ways = new Map(), rels = [];
   for (const e of data.elements) {
     if (e.type === "node") nodes.set(e.id, e);
     else if (e.type === "way") ways.set(e.id, e);
     else rels.push(e);
   }
-  const ent = cfg.entrances.map(id => nodes.get(id)).find(Boolean);
-  if (!ent) throw new Error(`${cfg.name}: no está el acceso en los datos`);
-  const lat0 = ent.lat, lon0 = ent.lon, kx = 111320 * Math.cos(lat0 * Math.PI / 180), ky = 110574;
+  const frame = chooseFrame(nodes, ways, cfg);
+  if (!frame) return null;
+  const lat0 = frame.lat, lon0 = frame.lon, kx = 111320 * Math.cos(lat0 * Math.PI / 180), ky = 110574;
   const en = (n) => [(n.lon - lon0) * kx, (n.lat - lat0) * ky];
-
-  // Dirección de la avenida junto al acceso (en este/norte) y su sentido: el acceso queda a la DERECHA
-  const avWays = [...ways.values()].filter(w => cfg.avenue.test(w.tags?.name || "") && ROAD.has(w.tags?.highway));
-  let best = null;
-  for (const w of avWays) for (let i = 0; i + 1 < w.nodes.length; i++) {
-    const a = nodes.get(w.nodes[i]), b = nodes.get(w.nodes[i + 1]);
-    if (!a || !b) continue;
-    const pa = en(a), pb = en(b), c = closestOnSeg([0, 0], pa, pb), d = Math.hypot(c[0], c[1]);
-    if (!best || d < best.d) best = { d, dir: norm(sub(pb, pa)), c };
-  }
-  let dir = best.dir;
-  const right = (v) => [v[1], -v[0]];                       // derecha de quien avanza, en este/norte
-  if (dot([-best.c[0], -best.c[1]], right(dir)) < 0) dir = [-dir[0], -dir[1]];
-  const [de, dn] = dir;
+  const isAvenue = (w) => frame.avenueKey === (w.tags?.name ? "n:" + w.tags.name : "w:" + w.id);
+  const [de, dn] = frame.dir;
+  const ent = { tags: { name: frame.name || (frame.synth ? "vereda junto a la estación" : "") } };
   // este/norte → local (x a la derecha, −z adelante) con el acceso en la boca del juego
   const L = ([e, n]) => [e * dn - n * de + ACCESS.x, -(e * de + n * dn) + ACCESS.z];
   const P = (id) => { const n = nodes.get(id); return n ? L(en(n)) : null; };
@@ -157,16 +259,14 @@ function build(cfg) {
   const roads = [];
   for (const w of ways.values()) {
     const t = w.tags || {};
-    if (!ROAD.has(t.highway) || t.area === "yes") continue;
-    if (t.tunnel || t.covered === "yes" || +t.layer < 0 || t.indoor === "yes" || t.bridge) continue;
-    if (t.highway === "service" && t.service && t.service !== "alley" && t.service !== "driveway") continue;
+    if (!roadOk(t)) continue;
     const pts = wayPts(w);
     if (pts.length < 2 || !pts.some(p => near(p, 60))) continue;
     const lanes = +t.lanes || DEF_LANES[t.highway] || 2;
-    const width = +t.width || Math.max(3.2, lanes * (t.highway === "service" || t.highway === "living_street" ? 3.0 : LANE_W));
+    const width = roadWidth(t);
     const oneway = t.oneway === "yes" || t.oneway === "1" || t.junction === "roundabout";
     const rev = t.oneway === "-1";
-    roads.push({ id: w.id, pts: rev ? pts.reverse() : pts, nodes: rev ? [...w.nodes].reverse() : w.nodes, w: width, lanes, oneway: oneway || rev, hw: t.highway, name: t.name || "", bus: t.busway || t["lanes:bus"] ? 1 : 0, avenue: cfg.avenue.test(t.name || "") });
+    roads.push({ id: w.id, pts: rev ? pts.reverse() : pts, nodes: rev ? [...w.nodes].reverse() : w.nodes, w: width, lanes, oneway: oneway || rev, hw: t.highway, name: t.name || "", bus: t.busway || t["lanes:bus"] ? 1 : 0, avenue: isAvenue(w) });
   }
   /** ¿El punto cae sobre alguna calzada (salvo la indicada)? */
   const onRoad = (p, except = null, margin = 0.15) => roads.some(r => r !== except && distToPolyline(p, r.pts) < r.w / 2 - margin);
@@ -184,20 +284,36 @@ function build(cfg) {
       return;
     }
     if (["bridge", "construction", "ruins"].includes(t.building)) return;
-    let h = cfg.heights[id] || +String(t.height || "").replace(",", ".") || 0;
+    let h = HEIGHTS[id] || +String(t.height || "").replace(",", ".") || 0;
     const lv = +t["building:levels"];
     if (!h && lv) h = lv * 3.3 + 1.2;
     if (!h) {
-      const lvls = [3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 10, 10, 12, 12, 14, 16, 18, 22];
-      h = lvls[Math.floor(rnd() * lvls.length)] * 3.3 + 1.2;
-      if (["church", "chapel", "cathedral"].includes(t.building) || t.amenity === "place_of_worship") h = 16;
-      if (t.building === "garages" || t.building === "kiosk" || t.building === "shed") h = 4;
+      // Sin altura en OSM: según el tipo de edificio, los pisos de los vecinos que sí la tienen y el tamaño de la planta
+      const A = Math.abs(area(ring));
+      let lv;
+      if (LOW.has(t.building)) lv = 1 + (rnd() < 0.45 ? 1 : 0);
+      else if (["church", "chapel", "cathedral"].includes(t.building) || t.amenity === "place_of_worship") { h = 16; }
+      else if (["garages", "garage", "kiosk", "shed", "hut", "carport", "service"].includes(t.building)) h = 3.6;
+      else if (A < 120) lv = 1 + Math.floor(rnd() * 2);
+      else if (knownLevels.length >= 8) {
+        lv = knownLevels[Math.floor(rnd() * knownLevels.length)];
+        if (A < 250) lv = Math.min(lv, 4);
+      } else lv = A < 400 ? 1 + Math.floor(rnd() * 3) : 2 + Math.floor(rnd() * 3);
+      if (!h) h = lv * 3.3 + 1.2;
     }
     const levels = Math.max(1, Math.round((h - 1.2) / 3.3));
     const heritage = !!(t.heritage || t.historic || ["church", "civic", "government"].includes(t.building)) && levels <= 6;
     const style = heritage ? 1 : h > 45 && rnd() < 0.6 ? 2 : levels <= 3 ? 1 : 0;   // 0 oficinas · 1 clásico · 2 muro cortina
     buildings.push({ id, ring, h: r1(h), c: Math.floor(rnd() * palette), s: style, name: t.name || "" });
   };
+  // Pisos de los edificios de la zona que sí tienen altura en OSM (para estimar los que no)
+  const knownLevels = [];
+  for (const w of ways.values()) {
+    const t = w.tags || {};
+    if (!t.building || t["building:part"] || LOW.has(t.building)) continue;
+    const lv = +t["building:levels"] || (+String(t.height || "").replace(",", ".") - 1.2) / 3.3;
+    if (lv >= 1 && lv < 80 && wayPts(w).some(p => near(p, 150))) knownLevels.push(Math.round(lv));
+  }
   for (const w of ways.values()) {
     const t = w.tags || {};
     if (!t.building || t["building:part"] || t.location === "underground" || +t.layer < 0) continue;
@@ -362,7 +478,7 @@ function build(cfg) {
     for (let k = 0; k < Math.min(n, 4); k++) {
       const off = r.oneway ? r.w / 2 - (k + 0.5) * r.w / n : half - (k + 0.5) * half / n;
       const lp = offsetLine(pts, off);
-      lanes.push({ p: lp.flatMap(q => [r1(q[0]), r1(q[1])]), sig, kind: r.hw, bus: r.avenue && k === 0 ? 1 : 0 });
+      lanes.push({ pts: lp, sig, kind: r.hw, bus: r.avenue && k === 0 ? 1 : 0 });
     }
   }
 
@@ -428,22 +544,59 @@ function build(cfg) {
     : { x: r1(avenueRight(34) + 1.5), z: 34, real: 0 };
 
   let landmark = null;
-  const lmB = buildings.find(b => b.id === cfg.landmark?.way);
+  const centroid = (ring) => [ring.reduce((t, p) => t + p[0], 0) / ring.length, ring.reduce((t, p) => t + p[1], 0) / ring.length];
+  const dAcc = (p) => Math.hypot(p[0] - ACCESS.x, p[1] - ACCESS.z);
+  const freeSpot = (p, toward = [ACCESS.x, ACCESS.z]) => {   // se acerca al acceso hasta quedar en la vereda
+    const d = norm(sub(toward, p));
+    for (let k = 0; k <= 30; k++) {
+      const q = [p[0] + d[0] * k, p[1] + d[1] * k];
+      if (near(q, -15) && !inBuilding(q, 0.8) && !onRoad(q, null, -0.8)) return q;
+    }
+    return null;
+  };
+  const rx = cfg.landmarkRx;
+  const lmB = buildings.find(b => b.id === cfg.landmark?.way)
+    || (rx && buildings.filter(b => rx.test(b.name) && near(centroid(b.ring), -20)).sort((p, q) => dAcc(centroid(p.ring)) - dAcc(centroid(q.ring)))[0]);
   if (lmB) {
     // Punto del muro más cercano al acceso que mira a una calle; la foto se saca 5 m afuera
     let bestP = null;
     for (let i = 0; i < lmB.ring.length; i++) {
       const a = lmB.ring[i], c = lmB.ring[(i + 1) % lmB.ring.length];
       const m = [(a[0] + c[0]) / 2, (a[1] + c[1]) / 2], e = norm(sub(c, a)), nrm = [e[1], -e[0]];
-      if (len(sub(c, a)) < 8) continue;
+      if (len(sub(c, a)) < 6) continue;
       const spot = [m[0] + nrm[0] * 5, m[1] + nrm[1] * 5];
-      if (inBuilding(spot) || !near(spot, -10)) continue;
-      const d = len(sub(spot, [ACCESS.x, ACCESS.z]));
+      if (inBuilding(spot) || onRoad(spot) || !near(spot, -15)) continue;
+      const d = dAcc(spot);
       if (!bestP || d < bestP.d) bestP = { d, spot, wall: m, a: angOf(nrm) };
     }
-    const xs = lmB.ring.map(p => p[0]), zs = lmB.ring.map(p => p[1]);
-    if (bestP) landmark = { spot: bestP.spot.map(r1), wall: bestP.wall.map(r1), a: +bestP.a.toFixed(3), box: [Math.min(...xs), Math.min(...zs), Math.max(...xs), Math.max(...zs)].map(r1), id: lmB.id };
-    lmB.lm = 1;
+    if (bestP) { landmark = { spot: bestP.spot.map(r1), wall: bestP.wall.map(r1), a: +bestP.a.toFixed(3), via: "edificio" }; lmB.lm = 1; }
+  }
+  if (!landmark && rx) {
+    // Plaza, parque o monumento: el punto de su borde (o el monumento) más cercano al acceso
+    let best = null;
+    const consider = (p, via) => { const q = freeSpot(p); if (q && (!best || dAcc(q) < best.d)) best = { d: dAcc(q), q, via }; };
+    for (const w of ways.values()) {
+      if (!rx.test(w.tags?.name || "") || w.tags?.building || w.tags?.highway) continue;
+      const ring = wayPts(w);
+      let nb = null;
+      for (const p of resample(ring, 2)) if (!nb || dAcc(p) < dAcc(nb)) nb = p;
+      if (nb) consider(nb, "lugar");
+    }
+    for (const n of nodes.values()) if (n.tags && rx.test(n.tags.name || "") && !n.tags.railway && !n.tags.highway) consider(L(en(n)), "punto");
+    if (best) landmark = { spot: best.q.map(r1), via: best.via };
+  }
+  if (!landmark && rx) {
+    // No está cerca en OSM: la foto se saca en la vereda de enfrente, cruzando la avenida (como en la calle de siempre)
+    for (const z of [0, 8, -8, 16, -16, 30, -30]) {
+      let left = Infinity;
+      for (const r of roads.filter(q => q.avenue)) for (let i = 0; i + 1 < r.pts.length; i++) {
+        const [a2, b2] = [r.pts[i], r.pts[i + 1]];
+        if ((a2[1] - z) * (b2[1] - z) > 0 || a2[1] === b2[1]) continue;
+        left = Math.min(left, a2[0] + (b2[0] - a2[0]) * (z - a2[1]) / (b2[1] - a2[1]) - r.w / 2);
+      }
+      const q = [left - 4, z];
+      if (left < Infinity && !inBuilding(q, 0.8) && !onRoad(q, null, -0.8)) { landmark = { spot: q.map(r1), via: "enfrente" }; break; }
+    }
   }
 
   // Árboles que estorban la boca del acceso, el tótem, puertas o el paradero
@@ -453,32 +606,68 @@ function build(cfg) {
   for (let i = 0; i < trees.length; i += 2) if (freeOk(trees[i], trees[i + 1])) treesOk.push(trees[i], trees[i + 1]);
   const lampsOk = lamps.filter(l => freeOk(l[0], l[1]));
 
-  const flat = (pts) => pts.flatMap(p => [r1(p[0]), r1(p[1])]);
-  const out = {
-    entrance: ent.tags?.name || "", radius: R, rot: [+dn.toFixed(5), +de.toFixed(5)],
-    buildings: buildings.map(b => [b.h, b.c, b.s, b.lm ? 1 : 0, ...flat(b.ring)]),
-    roofs: roofs.map(r => [r.y, ...flat(r.ring)]),
-    roads: roads.map(r => [r1(r.w), r.hw === "service" ? 1 : 0, ...flat(r.pts)]),
-    curbs: curbs.map(flat), dashes: dashes.map(([a, b]) => [r1(a[0]), r1(a[1]), r1(b[0]), r1(b[1])]).flat(), center: center.map(flat),
-    crossings, signals, lamps: lampsOk, trees: treesOk, grass: grass.map(flat), lanes,
-    shops, kiosk, busStop, landmark,
+  const q = (v) => Math.round(v * 10);                     // decímetros enteros: archivos más chicos
+  const enc = (pts) => pts.flatMap(p => [q(p[0]), q(p[1])]);
+  const geo = {
+    b: buildings.map(b => [q(b.h), b.c, b.s, b.lm ? 1 : 0, ...enc(simplify(b.ring, 0.05))]),
+    rf: roofs.map(r => [q(r.y), ...enc(r.ring)]),
+    rd: roads.map(r => [q(r.w), r.hw === "service" ? 1 : 0, ...enc(r.pts)]),
+    cb: curbs.map(c => enc(simplify(c, 0.08))).filter(c => c.length >= 4),
+    ds: dashes.flatMap(([a2, b2]) => [q(a2[0]), q(a2[1]), q(b2[0]), q(b2[1])]),
+    ce: center.map(c => enc(simplify(c, 0.08))).filter(c => c.length >= 4),
+    cr: crossings.map(([x, z, a2, w]) => [q(x), q(z), Math.round(a2 * 1000), q(w)]),
+    sg: signals.map(([x, z, a2, ax]) => [q(x), q(z), Math.round(a2 * 1000), ax]),
+    lp: lampsOk.map(([x, z, a2]) => [q(x), q(z), Math.round(a2 * 1000)]),
+    tr: treesOk.map(q),
+    gr: grass.map(r => enc(simplify(r, 0.1))),
+    ln: lanes.map(l => ({ p: enc(simplify(l.pts, 0.1)), s: l.sig.map(q), k: l.kind, b: l.bus })),
   };
-  const st = { edificios: buildings.length, techos: roofs.length, calles: roads.length, árboles: treesOk.length / 2, semáforos: signals.length, cruces: crossings.length, pistas: lanes.length, faroles: lampsOk.length, acceso: out.entrance, locales: shops.map(s => s.stand ? "puesto" : "fachada").join(","), paradero: busStop.real ? "real" : "estimado", hito: !!landmark };
+  const meta = { e: ent.tags?.name || "", r: R, rot: [+dn.toFixed(5), +de.toFixed(5)], shops, kiosk, busStop, landmark };
+  const st = { edificios: buildings.length, calles: roads.length, árboles: treesOk.length / 2, semáforos: signals.length, pistas: lanes.length, acceso: meta.e || "(vereda)", locales: shops.filter(s => !s.stand).length + "/6 en fachada", hito: landmark?.via || "-" };
+  const out = { meta, geo };
   return { out, st };
 }
 
-const result = {};
-for (const cfg of STATIONS) {
-  const { out, st } = build(cfg);
-  result[cfg.name] = out;
-  console.log(cfg.name, st);
+const argOf = (k) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : null; };
+if (args.includes("--lista")) {
+  // Lista de estaciones del juego (para tools/zonas-osm.py)
+  const { LINES } = await import("../js/engine/network.js");
+  const out = {};
+  for (const l of LINES) for (const s of l.stations) (out[s.name] ??= []).push(l.id);
+  console.log(JSON.stringify(out));
+  process.exit(0);
 }
-if (!args.includes("--ver")) {
+const zonas = argOf("--zonas");
+if (!zonas) { console.error("Uso: node tools/calles-osm.mjs --zonas <dir de tools/zonas-osm.py> [--solo NOMBRE] [--ver]"); process.exit(1); }
+const { readFileSync, mkdirSync, readdirSync, unlinkSync } = await import("node:fs");
+const indice = JSON.parse(readFileSync(`${zonas}/indice.json`, "utf8"));
+const solo = argOf("--solo");
+const meta = {};
+const dir = new URL("../js/city/calles/", import.meta.url);
+if (!args.includes("--ver")) mkdirSync(dir, { recursive: true });
+let total = 0;
+for (const z of indice) {
+  if (solo && z.name !== solo) continue;
+  const data = JSON.parse(readFileSync(`${zonas}/${z.slug}.json`, "utf8"));
+  const cfg = { name: z.name, station: z.station, radius: 200, ...(OVERRIDES[z.name] || {}), landmarkRx: LANDMARK_RX[z.name] || null };
+  if (z.lines.every(l => l === "NOS" || l === "RAN")) cfg.synth = true;   // estaciones de EFE: sin accesos del Metro
+  const r = build(data, cfg);
+  if (!r) { console.log(z.name, "· sin acceso donde quepa la escalera: queda con su calle de siempre"); continue; }
+  const body = JSON.stringify(r.out.geo);
+  total += body.length;
+  meta[z.name] = { f: z.slug, ...r.out.meta };
+  console.log(z.name, `${(body.length / 1024).toFixed(0)} KB`, JSON.stringify(r.st));
+  if (!args.includes("--ver")) writeFileSync(new URL(`${z.slug}.json`, dir), body);
+}
+console.log(`${Object.keys(meta).length} calles · ${(total / 1024 / 1024).toFixed(1)} MB en js/city/calles/`);
+if (!args.includes("--ver") && !solo) {
+  for (const f of readdirSync(dir)) if (!Object.values(meta).some(m => `${m.f}.json` === f)) unlinkSync(new URL(f, dir));
   const body = `/* Generado por tools/calles-osm.mjs (${new Date().toISOString().slice(0, 10)}) — no editar a mano.
    Datos © colaboradores de OpenStreetMap (www.openstreetmap.org/copyright), licencia ODbL.
-   Coordenadas locales de la calle del juego (metros, ver city/plan.js · STREET). */
+   Lo que el juego necesita saber de cada calle real sin cargarla (locales, paradero, hito); la calle
+   misma (edificios, calzadas…) está en js/city/calles/<f>.json y la carga city/streetData.js. */
 export const OSM_ATTRIBUTION = "© colaboradores de OpenStreetMap";
-export const REAL_STREETS = ${JSON.stringify(result)};
+export const REAL_STREETS = ${JSON.stringify(meta)};
 `;
   writeFileSync(new URL("../js/city/realStreets.js", import.meta.url), body);
   console.log(`js/city/realStreets.js · ${(body.length / 1024).toFixed(0)} KB`);

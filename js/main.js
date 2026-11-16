@@ -108,6 +108,7 @@ import { Inventory, souvenirId, SOUVENIR_PRICE, ALBUM_REWARD, LICENSES, FREE_LIN
 import { openShopUI } from "./shopUI.js";
 import { trainLiveryMaterials } from "./train.js";
 import { City } from "./city/city.js";
+import { loadRealStreet, prefetchStreets } from "./city/streetData.js";   // 2.7 · calles reales de OpenStreetMap
 import { STREET, streetPlan } from "./city/plan.js";
 import { Tutorial, tutorialDone } from "./tutorial.js";
 import { installTrackLift, setTrackLiftLine, updateTrackLift, pitchCamera } from "./render/trackLift.js";
@@ -862,6 +863,14 @@ async function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = 
     // Luz de la luminaria del túnel más cercana: barre el coche al pasar (el pasajero la ve por las ventanas)
     game.passLight = new THREE.PointLight(0xffd7a3, 0, 9, 1.4);
     scene.add(game.passLight);
+    // 2.7 · La calle real de la estación (si tiene) se descarga antes de aparecer en ella; las de la línea, después
+    if (!opts.transferFrom) {
+      setLoading(0.97, "Armando la calle");
+      await loadRealStreet(STATIONS[stationIndex].name);
+      if (!game) return;
+    }
+    const lineStreets = STATIONS.map(st => st.name);
+    setTimeout(() => prefetchStreets([...lineStreets.slice(stationIndex), ...lineStreets.slice(0, stationIndex).reverse()]), 4000);
     if (opts.transferFrom) arriveByTransfer(STATIONS[stationIndex], opts.transferFrom);   // llega por el pasillo de combinación
     else goToStreet(STATIONS[stationIndex]);     // la partida empieza en la calle
     game.missions.ensure(missionCtx());
@@ -1999,6 +2008,7 @@ function updateOutdoor(walker) {
   if (walker.space === "street") f = 1;
   else if (walker.space === "world") {
     const st = walker.stationAt(walker.pos.z);
+    if (st) loadRealStreet(st.name);                 // 2.7 · ya en la estación: que su calle real esté lista al salir
     const dz = st ? walker.pos.z - st.z : -1e9;
     if (st && dz > CONFIG.mezzanine.gateZ && walker.pos.y > CONFIG.mezzanine.y - 0.3) {
       if (city.station !== st) city.load(st, game.clock);

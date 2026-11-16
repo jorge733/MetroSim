@@ -34,6 +34,7 @@ import { markCity } from "../render/trackLift.js";
 import { SkyDome, SunShadow, sunDirection, lampPool } from "../render/realism.js";
 import { BUS_METRO_STOPS, busRoutesAt } from "../bus/busRoute.js";
 import { REAL_STREETS, OSM_ATTRIBUTION } from "./realStreets.js";      // 2.6 · calles reales (OpenStreetMap)
+import { realStreetData, loadRealStreet } from "./streetData.js";      // 2.7 · se cargan cuando hacen falta
 import { RealStreet, sampleLane } from "./realCity.js";
 
 /** 1.15 · Paradero de la calle (local): aquí se toma el bus del recorrido si pasa por esta estación. */
@@ -168,7 +169,16 @@ export class City {
     if (this.station === station && this.group) { this.setTime(clock); return; }
     this.unload();
     this.station = station;
-    this.plan = streetPlan(station);
+    this.lastClock = clock;
+    // 2.7 · La calle real se descarga aparte: si todavía no llegó, se arma la de siempre y se cambia apenas llegue
+    // (mientras el pasajero siga bajo tierra)
+    const realData = realStreetData(station.name);
+    if (REAL_STREETS[station.name] && !realData) {
+      loadRealStreet(station.name).then(ok => {
+        if (ok && this.station === station && !this.real && (this.outdoor || 0) < 0.05) { this.unload(); this.load(station, this.lastClock); }
+      });
+    }
+    this.plan = streetPlan(station, { real: !!realData });
     this.sky = skyAt(clock);
     const night = this.sky.night;
     const M = this.M = cityMaterials(night);
@@ -180,7 +190,6 @@ export class City {
     this.scene.add(g);
     this.blocks = [];                       // rectángulos no transitables (coordenadas locales)
     this.walkRects = [{ x0: -S.walkHalf + 0.35, x1: S.walkHalf - 0.35, z0: -S.halfLen, z1: S.halfLen }];
-    const realData = REAL_STREETS[station.name];
     this.real = realData ? new RealStreet(realData) : null;
     this.busStopAt = BUS_STOP;
 
@@ -287,6 +296,7 @@ export class City {
 
   /** Ajusta el cielo y el sol a la hora del juego. */
   setTime(clock) {
+    this.lastClock = clock;
     this.sky = skyAt(clock);
     this.sunDir = sunDirection(clock, this.sunDir);
     this.real?.toLocal(this.sunDir);        // 2.6 · en la calle real la avenida no va de norte a sur: el sol se gira con ella
@@ -540,6 +550,7 @@ export class City {
     const lm = this.plan.landmark, d = this.real.d.landmark;
     if (!lm || !d) { this.landmark = null; return; }
     this.landmark = { ...lm, halfZ: 10, plaza: 0, spot: { x: d.spot[0], z: d.spot[1] } };
+    if (!d.wall) return;                            // plaza, parque o al frente: sin placa
     const plate = new THREE.Mesh(new THREE.PlaneGeometry(6.5, 0.9), signMaterial(lm.sign || lm.name.toUpperCase(), { bg: "#2b2620", fg: "#e9dcc0", font: "700 72px Georgia" }));
     plate.position.set(d.wall[0] + Math.sin(d.a) * 0.08, 6.2, d.wall[1] + Math.cos(d.a) * 0.08);
     plate.rotation.y = d.a;

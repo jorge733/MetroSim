@@ -124,6 +124,30 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **Salir por los torniquetes es gratis**: solo se cobra el pasaje al pasar hacia la zona pagada (antes, al terminar
   de cruzar el torniquete de salida se cobraba un pasaje).
 
+## Versión 2.7 · Todas las calles son reales
+
+Después de la prueba en Universidad de Chile, **las 133 estaciones del extracto de OpenStreetMap de Santiago tienen su
+calle real**: Metro L1 a L6, el Tren Nos y el Tren Rancagua hasta Nos (© colaboradores de OpenStreetMap, ODbL). Las 8 del
+Tren Rancagua al sur de Nos (Buin Zoo a Rancagua) quedan fuera del extracto y siguen con su calle de siempre.
+
+- **Se sale por un acceso real** de la estación (el más cercano donde cabe la escalera en la vereda; si el punto de OSM
+  queda pegado a la calzada o dentro de un edificio, se corre unos metros). En las estaciones de EFE, que no tienen
+  accesos del Metro, se sale a la vereda junto a la estación.
+- **La avenida de cada estación** es la calle más importante junto al acceso (la Alameda, Providencia, Vicuña Mackenna,
+  Gran Avenida, Pajaritos…), y la calle gira con ella (el sol también).
+- **Los hitos** se buscan por su nombre en OSM: edificios (La Moneda, la Catedral, Costanera Center, el Estadio Nacional,
+  Mall Plaza Egaña…) con su placa, o plazas, parques y monumentos (Plaza Baquedano, el Cerro Santa Lucía, la Quinta
+  Normal, la Plaza de Puente Alto…), donde se saca la foto. Si el hito queda lejos del acceso, la foto se saca en la vereda de enfrente.
+- **Alturas más creíbles donde OSM no las tiene**: las casas tienen 1 o 2 pisos y los demás edificios copian los pisos
+  de los vecinos que sí los tienen en OSM (en el centro, torres; en los barrios, edificios bajos). Si no hay vecinos con
+  pisos, se decide por el tamaño de la planta.
+- **Cada calle se carga cuando hace falta** (`js/city/streetData.js`): son archivos de 15 a 70 KB (4,5 MB en total) en
+  `js/city/calles/`. La partida baja la de su estación antes de empezar, las de su línea en segundo plano y la de cada
+  estación a la que entras; si alguna no alcanzó a llegar, se ve la calle de siempre y se cambia sola mientras sigues
+  bajo tierra. La PWA las guarda para jugar sin conexión.
+- **Cómo se generan**: `tools/zonas-osm.py` recorta del extracto de BBBike (un solo archivo, sin cargar la API de OSM)
+  una zona por estación, y `tools/calles-osm.mjs --zonas` arma las calles (los pasos están en el encabezado del script).
+
 ## Versión 2.6 · La calle real de Universidad de Chile (OpenStreetMap)
 
 Primera estación con la **calle tal como es**: al salir del Metro en **Universidad de Chile** (L1 y L3) se está en la
