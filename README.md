@@ -147,6 +147,8 @@ Tren Rancagua al sur de Nos (Buin Zoo a Rancagua) quedan fuera del extracto y si
   bajo tierra. La PWA las guarda para jugar sin conexión.
 - **Cómo se generan**: `tools/zonas-osm.py` recorta del extracto de BBBike (un solo archivo, sin cargar la API de OSM)
   una zona por estación, y `tools/calles-osm.mjs --zonas` arma las calles (los pasos están en el encabezado del script).
+- **2.7.1** · Post «Las calles son reales» para redes sociales (`post-calles/`: antes y ahora en Universidad de Chile, con
+  el celular en horizontal y el crédito de OpenStreetMap; cuadrado, historia y horizontal, con `node generar.js plantilla.html`).
 
 ## Versión 2.6 · La calle real de Universidad de Chile (OpenStreetMap)
 
