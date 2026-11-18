@@ -124,6 +124,30 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **Salir por los torniquetes es gratis**: solo se cobra el pasaje al pasar hacia la zona pagada (antes, al terminar
   de cruzar el torniquete de salida se cobraba un pasaje).
 
+## Versión 2.13 · RedMoviSim te escucha: sugerencias y comentarios
+
+Nuevo `js/sugerencias.js`: un formulario para que los jugadores nos cuenten ideas, errores y lo que les gusta.
+
+- **Dónde está:** botón **Opinar** en la barra de la portada, el enlace *«RedMoviSim escucha a sus jugadores»* en el pie
+  y **Sugerencias y comentarios** en el menú de la partida (Esc). Desde la partida el tema se elige solo (Metro, tren,
+  viajar o multijugador) y se adjunta dónde estabas (p. ej. *Conduciendo · Línea 1*).
+- **El formulario:** qué nos quieres contar (*Sugerencia*, *Algo falla*, *Comentario* o *Felicitar*), sobre qué parte
+  del juego, el mensaje (10 a 2.000 caracteres), una nota opcional de 1 a 5 estrellas y un correo opcional si quieres
+  respuesta (con la sesión iniciada aparece el tuyo).
+- **No hace falta cuenta.** Se envían también la versión del juego y el tipo de dispositivo, para poder revisar los errores.
+- **Sin internet** el mensaje queda guardado en el dispositivo y se envía solo cuando vuelve la conexión; si cierras la
+  ventana a medio escribir, el borrador se conserva.
+- Los mensajes van a la tabla `sugerencias` de Supabase (`supabase/sugerencias.sql`), con reglas que **solo dejan
+  enviar**: nadie puede leerlos desde el juego; se revisan en el panel de Supabase.
+- **Aviso por correo:** cada mensaje nuevo llega por correo al equipo (Edge Function `supabase/functions/aviso-sugerencia`,
+  que lo manda con Resend). Si el jugador dejó su correo, basta con **Responder** para contestarle. El correo de destino
+  no está en el código: es el secreto `AVISO_DESTINO` de Supabase. Para activarlo:
+  1. Ejecutar `supabase/sugerencias.sql` en el SQL Editor.
+  2. Publicar la función: `supabase functions deploy aviso-sugerencia --no-verify-jwt`.
+  3. En *Edge Functions → Secrets*: `RESEND_API_KEY`, `AVISO_DESTINO` (tu correo) y `AVISO_TOKEN` (una clave inventada).
+  4. En *Database → Webhooks*, uno nuevo para la tabla `sugerencias`, evento **Insert**, tipo *Supabase Edge Function*
+     `aviso-sugerencia`, con la cabecera `x-aviso-token` igual a `AVISO_TOKEN`.
+
 ## Versión 2.12 · Tienda renovada
 
 La **Tienda RedMovi** (`js/shopUI.js`) ahora ayuda a decidir en qué gastar y a juntar para lo que falta:

@@ -69,7 +69,7 @@ let session = ls.json(K_SESION);           // {access_token, refresh_token, expi
 const listeners = new Set();
 const emit = () => listeners.forEach(fn => { try { fn(state()); } catch { /* nada */ } });
 
-async function api(path, { method = "GET", body, auth = false, headers = {}, keepalive = false, timeout = 12000 } = {}) {
+export async function api(path, { method = "GET", body, auth = false, headers = {}, keepalive = false, timeout = 12000 } = {}) {
   const h = { apikey: SUPABASE_KEY, ...headers };
   if (body !== undefined) h["Content-Type"] = "application/json";
   if (auth) {

@@ -168,3 +168,45 @@ button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-v
   .account-who { padding: 8px 12px; }
   .account-card .account-main, .account-card .ticket-actions button { min-height: 40px; }
 }
+
+/* ---------- 2.13 · Sugerencias y comentarios («RedMoviSim te escucha») ---------- */
+.feedback-panel { position: fixed; z-index: 80; }
+.feedback-card { width: min(94vw, 520px); max-height: min(92vh, 860px); overflow-y: auto; overscroll-behavior: contain; }
+.feedback-body, .feedback-form { display: grid; gap: 14px; }
+.feedback-field { display: grid; gap: 8px; min-width: 0; }
+.feedback-field i, .feedback-form .small-label i { font-style: normal; text-transform: none; letter-spacing: 0; color: var(--dim); }
+.feedback-tipos { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.feedback-tipos button { padding: 6px 8px; }
+.feedback-form textarea {
+  width: 100%; min-height: 120px; padding: 12px 14px; border-radius: 10px; resize: vertical;
+  border: 1px solid var(--panel-border); background: var(--surface); color: var(--text); font: 15px/1.45 var(--f-body);
+}
+.feedback-form textarea:hover { border-color: #ffffff33; }
+.feedback-form textarea:focus, .feedback-form input:focus, .feedback-form select:focus { outline: 2px solid var(--brand); outline-offset: 1px; }
+.feedback-count { justify-self: end; margin-top: -2px; font: 500 12px/1 var(--f-data); color: var(--muted); }
+.feedback-count.short { color: var(--dim); }
+.feedback-stars { display: flex; align-items: center; gap: 4px; }
+.feedback-stars button { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 10px; background: transparent; color: #ffffff33; cursor: pointer; }
+.feedback-stars button:hover { background: #ffffff0a; color: #ffd36a99; }
+.feedback-stars button .ico { width: 26px; height: 26px; }
+.feedback-stars button.on { color: #ffc247; }
+.feedback-stars button.on .ico { fill: currentColor; }
+.feedback-stars-label { margin-left: 8px; font-size: 13.5px; color: var(--muted); }
+.feedback-hp { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+.feedback-done { display: grid; justify-items: center; gap: 10px; padding: 8px 0 4px; text-align: center; }
+.feedback-done b { font-size: 18px; }
+.feedback-done-ico { display: grid; place-items: center; width: 60px; height: 60px; border-radius: 50%; background: #3ad37f22; color: var(--ok); }
+.feedback-done-ico .ico { width: 32px; height: 32px; }
+.feedback-panel.busy .account-main { opacity: .55; pointer-events: none; }
+.home-feedback { margin-bottom: 4px; font-size: 13px; font-weight: 500; flex-wrap: wrap; column-gap: 6px; }
+.home-feedback b { color: var(--brand-hi); font-weight: 600; }
+@media (max-width: 560px) {
+  .feedback-tipos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-height: 480px) {
+  .feedback-body, .feedback-form { gap: 9px; }
+  .feedback-card .account-fine, .feedback-body > .account-lead { display: none; }
+  .feedback-form textarea { min-height: 72px; }
+  .feedback-tipos button span { display: none; }
+  .feedback-stars button { width: 34px; height: 34px; }
+}

@@ -127,6 +127,7 @@ import { setupRiderPanel, openRiderPanel, closeRiderPanel, riderPanelOpen } from
 import { startBusGame } from "./bus/busGame.js";
 import { busTripsFrom, BUS_ROUTES, busRouteById } from "./bus/busRoute.js";
 import { setupAccountButton, openAccount, closeAccount, accountOpen, state as accountState } from "./cuenta.js";
+import { setupFeedbackButtons, openFeedback, closeFeedback, feedbackOpen } from "./sugerencias.js";
 
 // La vía en 3D sigue las pendientes reales: se engancha antes de compilar ningún material
 installTrackLift();
@@ -153,6 +154,7 @@ const directionSelect = $("startDirection");
 // App instalable: service worker (sin conexión) y botón "Instalar MetroSim"
 setupPWA($("installButton"));
 setupAccountButton($("accountButton"));
+setupFeedbackButtons($("feedbackButton"), $("feedbackFoot"));
 // Modo Creador (?creador): todo desbloqueado y gratis para el creador del juego
 setupCreator($("creatorBadge"));
 const wait = (ms) => new Promise(r => setTimeout(r, ms));
@@ -1104,6 +1106,7 @@ window.addEventListener("popstate", () => {
   const shopClose = document.querySelector(".shop-overlay .shop-close");
   if (shopClose) shopClose.click();
   else if (accountOpen()) closeAccount();
+  else if (feedbackOpen()) closeFeedback();
   else if (confirmOpen) closeConfirm(false);
   else if (riderPanelOpen()) closeRiderPanel();
   else if (fareInfoOpen()) closeFareInfo();
@@ -1264,7 +1267,7 @@ function toggleSound() {
 
 function onKeyDown(event) {
   if (busStopPanel) { if (event.key === "Escape") closeBusStop(); return; }
-  if (!game || game.warming || accountOpen()) return;
+  if (!game || game.warming || accountOpen() || feedbackOpen()) return;
   const key = event.key.toLowerCase();
   if (["arrowup", "arrowdown", "arrowleft", "arrowright", " ", "pageup", "pagedown"].includes(key)) event.preventDefault();
   if (hud.summaryOpen) return;
@@ -2625,6 +2628,13 @@ function gameMenuAction(act) {
   else if (act === "end") { game.endShiftAsk = performance.now(); requestEndShift(); }   // ya se confirmó en el menú
   else if (act === "home") stopGame();
   else if (act === "account") openAccount();
+  else if (act === "feedback") {
+    const w = !!game.walker, train = ["NOS", "RAN"].includes(LINE.id);
+    openFeedback({
+      tema: game.net ? "multijugador" : w ? "viajar" : train ? "tren" : "metro",
+      contexto: `${w ? "Viajando" : "Conduciendo"} · ${lineLabel(LINE.id)}${game.net ? " · multijugador" : ""}`,
+    });
+  }
 }
 
 function requestMenu() {
