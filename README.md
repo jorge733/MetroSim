@@ -139,6 +139,9 @@ trenes de los dos motores quedan a ~1 m (mediana).
   línea (sin los títulos «Cuenta» y «Hora»), los botones de acción quedan solo con su ícono, las flechas y los pedales son
   más chicos, el tablero y la consola van juntos en la franja de abajo, y la guía para detenerse en el paradero o el
   semáforo aparece arriba, bajo el esquema del recorrido, en vez de en medio de la calle.
+- **2.10.2** · Guion de locución pendiente (`docs/guion-locucion-pendiente.pdf`): todas las frases que todavía dice la voz
+  sintetizada y se pueden grabar (bienvenida, estaciones de los trenes Nos y Rancagua, combinaciones y avisos), con el
+  nombre de archivo de cada una.
 
 ## Versión 2.9 · Más recorridos de bus
 
