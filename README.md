@@ -135,6 +135,10 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **Taxímetro**: en el taxi, la carrera lleva el aparato del taxímetro, con «LIBRE» en verde y el monto en números rojos
   durante el viaje.
 - En el celular el tablero se achica para caber bajo la fila de botones.
+- **2.10.1** · Interfaz del bus y el taxi optimizada para el celular: se ve mucha más calle. La barra de arriba es de una
+  línea (sin los títulos «Cuenta» y «Hora»), los botones de acción quedan solo con su ícono, las flechas y los pedales son
+  más chicos, el tablero y la consola van juntos en la franja de abajo, y la guía para detenerse en el paradero o el
+  semáforo aparece arriba, bajo el esquema del recorrido, en vez de en medio de la calle.
 
 ## Versión 2.9 · Más recorridos de bus
 

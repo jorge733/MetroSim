@@ -259,11 +259,11 @@ class BusGame {
           <button data-t="right" aria-label="Pista a la derecha">${ICON.right}</button>
         </div>
         <div class="bus-touch-mid">
-          <button data-t="doors">${ICON.doors}<span>${this.taxi ? "Puerta" : "Puertas"}</span></button>
-          <button data-t="horn">${ICON.horn}<span>Bocina</span></button>
-          <button data-t="cam">${ICON.cam}<span>Cámara</span></button>
-          <button data-t="limiter"><b class="bus-lim-ico">50</b><span>Limitador</span></button>
-          ${this.taxi ? `<button data-t="uturn"><svg viewBox="0 0 24 24"><path d="M8 20V9a5 5 0 0 1 10 0v6M14 12l4 4 4-4"/></svg><span>Vuelta</span></button>` : ""}
+          <button data-t="doors" aria-label="${this.taxi ? "Puerta" : "Puertas"}">${ICON.doors}<span>${this.taxi ? "Puerta" : "Puertas"}</span></button>
+          <button data-t="horn" aria-label="Bocina">${ICON.horn}<span>Bocina</span></button>
+          <button data-t="cam" aria-label="Cámara">${ICON.cam}<span>Cámara</span></button>
+          <button data-t="limiter" aria-label="Limitador"><b class="bus-lim-ico">50</b><span>Limitador</span></button>
+          ${this.taxi ? `<button data-t="uturn" aria-label="Vuelta en U"><svg viewBox="0 0 24 24"><path d="M8 20V9a5 5 0 0 1 10 0v6M14 12l4 4 4-4"/></svg><span>Vuelta</span></button>` : ""}
         </div>
         <div class="bus-touch-right">
           <button data-t="brake" class="bus-pedal brake"><i data-k="brkFill"></i><span>FRENO</span></button>
