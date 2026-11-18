@@ -32,6 +32,23 @@ const SERVICES = [
   { cod: "107", color: "#0f9d58" },   // Departamental · Cerrillos, Pedrero
   { cod: "211", color: "#f2a900" },   // Gran Avenida · La Cisterna, El Bosque
   { cod: "506", color: "#0093b3" },   // Maipú ⇄ Peñalolén por la Alameda
+  // 2.9 · Más recorridos, por otras calles de la ciudad
+  { cod: "104", color: "#0f9d58" },   // Av. Los Leones · Providencia ⇄ Ñuñoa
+  { cod: "113", color: "#0f9d58" },   // Lord Cochrane · Rondizzoni, Toesca
+  { cod: "201", color: "#f2a900" },   // Gran Avenida · Departamental ⇄ La Cisterna
+  { cod: "203", color: "#f2a900" },   // Av. Recoleta · Cerro Blanco, Patronato
+  { cod: "302", color: "#d7262e" },   // Manuel Rodríguez · Santa Ana ⇄ Rondizzoni
+  { cod: "303", color: "#d7262e" },   // Balmaceda · Santa Ana, Centro
+  { cod: "412", color: "#d7262e" },   // Alameda poniente · Pajaritos ⇄ Universidad de Chile
+  { cod: "430", color: "#d7262e" },   // Av. Apoquindo · Tobalaba ⇄ Manquehue
+  { cod: "503", color: "#0093b3" },   // Nueva Providencia · Salvador ⇄ Cristóbal Colón
+  { cod: "505", color: "#0093b3" },   // Compañía · Gruta de Lourdes ⇄ Plaza de Armas
+  { cod: "507", color: "#0093b3" },   // Av. Matta · Estación Central ⇄ Matta
+  { cod: "517", color: "#0093b3" },   // Av. Providencia · Salvador ⇄ Pedro de Valdivia
+  { cod: "518", color: "#0093b3" },   // Av. Francisco Bilbao · La Moneda ⇄ Inés de Suárez
+  { cod: "712", color: "#7b4fa0" },   // Américo Vespucio · Macul ⇄ Los Presidentes
+  { cod: "C02", color: "#e8731a" },   // Av. Apoquindo · Los Dominicos ⇄ Escuela Militar
+  { cod: "F01", color: "#c2185b" },   // Concha y Toro · Puente Alto
 ];
 
 const MIN_STOPS = 10, MAX_STOPS = 13, MIN_LEN = 3500, MAX_LEN = 6500;
@@ -181,7 +198,7 @@ function build({ cod, color }) {
   const first = routeStops[0], last = routeStops.at(-1);
   const path = pathOf(ida.path, s0, last.s + 140);
   return {
-    id: cod, name: title(eje).replace(/^Avenida /, "Av. ") || cod, color,
+    id: cod, name: title(eje).replace(/^Avenida /, "Av. ").replace(/^((?:Gran )?Av\. )([a-z])/, (m, a, b) => a + b.toUpperCase()) || cod, color,
     from: first.name, to: last.name,
     destino: ida.destino, origen: d.regreso?.destino ?? "", operador: d.negocio?.nombre ?? "",
     stops: routeStops, lights, length: last.s + 140, path,

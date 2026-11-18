@@ -124,6 +124,17 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **Salir por los torniquetes es gratis**: solo se cobra el pasaje al pasar hacia la zona pagada (antes, al terminar
   de cruzar el torniquete de salida se cobraba un pasaje).
 
+## Versión 2.9 · Más recorridos de bus
+
+- **16 recorridos nuevos de Red** (24 en total, más el A01 de práctica), por calles nuevas de la ciudad: 104 (Los Leones),
+  113 (Lord Cochrane), 201 (Gran Avenida), 203 (Recoleta), 302 (Manuel Rodríguez), 303, 412 (Alameda poniente, desde
+  Pajaritos), 430 (Apoquindo), 503 (Nueva Providencia), 505 (Compañía), 507 (Av. Matta), 517 (Providencia), 518 (Bilbao),
+  712 (Vespucio sur), C02 (Apoquindo a Los Dominicos) y F01 (Concha y Toro en Puente Alto). Como los anteriores, salen de la
+  API pública de red.cl con `node tools/recorridos-red.mjs` y también se pueden tomar de pasajero desde sus estaciones.
+- **El recorrido se elige como la línea del Metro**: en vez de una lista desplegable, cada recorrido es un botón con su
+  número y su color, y al lado aparece su ficha (de dónde a dónde va, el esquema de sus paraderos con los que están junto
+  al Metro, cuántos paraderos tiene, su largo y hacia dónde va el servicio). Igual para elegir la calle del taxi.
+
 ## Versión 2.8 · La radio del taxi
 
 - **El taxi tiene radio**: 14 emisoras de Santiago **en vivo** (Imagina, Concierto, Futuro, Pudahuel, ADN, Cooperativa,

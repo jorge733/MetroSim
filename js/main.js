@@ -191,22 +191,63 @@ function selectVehicle(v, { fromLine = false } = {}) {
 }
 vehicleButtons.forEach(b => b.addEventListener("click", () => { selectVehicle(b.dataset.vehicle); selectMode("driver"); }));
 
-/* 1.18 · Bus: qué recorrido manejar (el A01 de práctica o un tramo real de Red, de js/bus/redRoutes.js) */
+/* 1.18 · Bus: qué recorrido manejar (el A01 de práctica o un tramo real de Red, de js/bus/redRoutes.js)
+   2.9 · Se elige con botones y una ficha del recorrido, igual que las líneas al conducir el Metro */
 const busRouteSelect = $("busRouteSelect");
-busRouteSelect.innerHTML = BUS_ROUTES.map(r => `<option value="${r.id}">${r.id} · ${r.practice ? "Práctica · " : ""}${r.from} → ${r.to} (${(r.length / 1000).toFixed(1)} km)</option>`).join("");
+busRouteSelect.innerHTML = BUS_ROUTES.map(r => `<option value="${r.id}">${r.id}</option>`).join("");
 busRouteSelect.value = busRouteById(loadSetting("metrosim.busRoute") || "A01").id;
+const busRouteChips = BUS_ROUTES.map(r => {
+  const chip = document.createElement("button");
+  chip.type = "button";
+  chip.className = "line-chip bus-chip";
+  chip.setAttribute("role", "radio");
+  chip.style.setProperty("--c", r.color);
+  chip.style.setProperty("--on-c", textOn(r.color));
+  chip.dataset.route = r.id;
+  chip.textContent = r.id;
+  chip.title = `${r.id} · ${r.practice ? "Práctica · " : ""}${r.name}: ${r.from} → ${r.to}`;
+  chip.setAttribute("aria-label", chip.title);
+  chip.addEventListener("click", () => selectBusRoute(r.id));
+  $("busRouteChips").append(chip);
+  return chip;
+});
+function selectBusRoute(id) {
+  busRouteSelect.value = busRouteById(id).id;
+  saveSetting("metrosim.busRoute", busRouteSelect.value);
+  renderBusRouteInfo();
+}
+const kmText = (m) => `${(m / 1000).toFixed(1).replace(".", ",")} km`;
 function renderBusRouteInfo() {
-  const r = busRouteById(busRouteSelect.value);
-  if (driverVehicle === "taxi") {
-    $("busRouteInfo").textContent = `Taxi por ${r.name} (${(r.length / 1000).toFixed(1).replace(".", ",")} km de calle): recoge a quien haga señas en la vereda y llévalo a su destino. Cobras lo que marca el taxímetro y, si el viaje es suave, propina.`;
+  const r = busRouteById(busRouteSelect.value), st = r.stops, first = st[0], last = st.at(-1);
+  busRouteChips.forEach(c => c.setAttribute("aria-checked", String(c.dataset.route === r.id)));
+  const card = $("busCard");
+  card.style.setProperty("--line", r.color);
+  card.style.setProperty("--on-line", textOn(r.color));
+  const taxi = driverVehicle === "taxi";
+  $("busCardBadge").textContent = taxi ? r.name : `${r.real ? "Red" : "Práctica"} · ${r.id}`;
+  $("busCardRoute").textContent = `${first.name} ⇄ ${last.name}`;
+  $("busCardFirst").textContent = first.name;
+  $("busCardLast").textContent = last.name;
+  $("busCardStops").textContent = st.length;
+  $("busCardLength").textContent = kmText(r.length);
+  $("busCardMetro").textContent = st.filter(s => s.metro).length;
+  const map = $("busCardMap"), span = last.s - first.s || 1;
+  map.querySelectorAll("i").forEach(d => d.remove());
+  for (const s of st) {
+    const dot = document.createElement("i");
+    if (s.metro) dot.className = "combo";
+    dot.style.left = `${((s.s - first.s) / span) * 100}%`;
+    dot.title = s.name + (s.hint ? ` · ${s.hint}` : "");
+    map.append(dot);
+  }
+  if (taxi) {
+    $("busRouteInfo").textContent = `Taxi por ${r.name} (${kmText(r.length)} de calle): recoge a quien haga señas en la vereda y llévalo a su destino. Cobras lo que marca el taxímetro y, si el viaje es suave, propina.`;
     return;
   }
-  const metros = r.stops.filter(s => s.metro).length;
   $("busRouteInfo").textContent = r.practice
     ? "Recorrido de práctica A01 (ficticio) por la Alameda, de Estación Central a Plaza Baquedano."
-    : `Tramo real del ${r.id} de Red por ${r.name} (hacia ${r.destino}${r.operador ? `, ${r.operador}` : ""}): ${r.stops.length} paraderos, ${metros} junto al Metro.`;
+    : `Tramo real del ${r.id} de Red por ${r.name}, hacia ${r.destino}${r.operador ? ` (${r.operador})` : ""}.`;
 }
-busRouteSelect.addEventListener("change", () => { saveSetting("metrosim.busRoute", busRouteSelect.value); renderBusRouteInfo(); });
 renderBusRouteInfo();
 
 const lineChips = LINES.map(l => {

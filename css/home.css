@@ -151,6 +151,8 @@
 .line-chip:hover { background: var(--raise); transform: translateY(-1px); }
 .line-chip[aria-checked="true"] { background: var(--c); color: var(--on-c); border-color: transparent; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--c); }
 .line-chip[aria-checked="true"]::after { display: none; }
+.bus-chips { grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); }
+.bus-chip { font-size: 17px; }
 
 /* Clima (plegable) */
 .setup-more { border-radius: 12px; border: 1px solid var(--panel-border); background: #ffffff05; }
