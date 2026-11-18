@@ -62,3 +62,10 @@ Línea 1 completa (38 archivos, voz propia): las 6 frases generales,
 `combinacion-linea-2` a `combinacion-linea-6` y `estacion-1-<estación>`
 de San Pablo a Los Dominicos. Los nombres de estación llevan el número de
 línea delante (`estacion-1-baquedano`, `estacion-3-plaza-de-armas`…).
+
+Líneas 1 a 6 completas, y desde la 2.11.2 también el Tren Nos y el Tren
+Rancagua (`estacion-NOS-<estación>`, `estacion-RAN-<estación>`, con
+`combinacion-linea-NOS` y `combinacion-linea-RAN`, que dicen «combinación a
+Tren Nos / Tren Rancagua») y cuatro avisos de la operación: `aviso-detencion-breve`,
+`aviso-reanuda`, `aviso-retiro` y `aviso-no-admite`. Los avisos de detención
+con motivo (`aviso-detencion`) siguen con voz sintetizada a propósito.

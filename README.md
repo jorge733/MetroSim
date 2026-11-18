@@ -142,6 +142,11 @@ Nuevo `js/cuenta.js`: cuenta **opcional**, sin contraseña. En la portada (botó
 **2.11.1** · En la ventana de la cuenta el correo ya no se corta en medio de la palabra. Post «Tu partida te sigue»
 (`post-cuenta/`) para presentar la cuenta en redes sociales.
 
+**2.11.2** · Voces grabadas en el Tren Nos y el Tren Rancagua (sus 21 estaciones y las combinaciones «a Tren Nos» y
+«a Tren Rancagua», que ahora completan también los anuncios de Estación Central, Lo Valledor y Pedro Aguirre Cerda) y en
+cuatro avisos de la operación: detención momentánea, reanudación, retiro del servicio y tren que no admite pasajeros. Las
+detenciones con motivo siguen con la voz sintetizada.
+
 ## Versión 2.10 · Un tablero de verdad en el bus y el taxi
 
 - **Velocímetro de aguja**: el panel de abajo a la izquierda ahora es el tablero del vehículo, con un velocímetro de
