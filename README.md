@@ -124,6 +124,22 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **Salir por los torniquetes es gratis**: solo se cobra el pasaje al pasar hacia la zona pagada (antes, al terminar
   de cruzar el torniquete de salida se cobraba un pasaje).
 
+## Versión 2.12 · Tienda renovada
+
+La **Tienda RedMovi** (`js/shopUI.js`) ahora ayuda a decidir en qué gastar y a juntar para lo que falta:
+
+- **Progreso:** cada pestaña muestra cuánto tienes (p. ej. *Conductor 3/14*) y arriba se ve el total de la tienda completada.
+- **Tu próxima meta:** al comienzo de Conductor y de Mi depto aparece lo más barato que aún no tienes, cuánto te falta y
+  unas cuántas estaciones bien servidas equivale; si ya te alcanza para algo, lo dice.
+- **Ahorro por artículo:** lo que todavía no puedes pagar muestra una barra con lo que llevas juntado.
+- **Compras caras con confirmación:** desde $20.000 el botón pide un segundo toque («¿Confirmar?») y avisa con cuánto
+  quedarías, para no gastar por error en el celular.
+- **Contratos con números:** cada contrato muestra cuánto pasa a pagar una estación perfecta y el bono de nota S.
+- **Ocultar lo que ya tengo** (se recuerda en el dispositivo), muebles ordenados por precio con lo que cuesta amoblar el
+  depto entero, y en la Colección cuánto falta para completar cada línea.
+- La compra recién hecha se ilumina, el saldo destella y el aviso cuenta qué puedes hacer ahora (licencia lista para
+  conducir, librea para el próximo servicio…). Con teclado, **1 · 2 · 3** cambian de pestaña.
+
 ## Versión 2.11 · Tu cuenta: inicia sesión con tu correo y sigue en cualquier dispositivo
 
 Nuevo `js/cuenta.js`: cuenta **opcional**, sin contraseña. En la portada (botón **Entrar**) o en el menú de la partida

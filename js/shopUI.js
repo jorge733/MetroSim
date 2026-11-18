@@ -2,16 +2,34 @@
    MetroSim — shopUI.js
    Panel de la TIENDA REDMOVI (DOM): pestañas Conductor · Mi depto · Colección.
    El catálogo y lo comprado están en shop.js; aquí solo se muestra y se
-   compra. Se abre desde la pantalla de inicio o con la tecla K en el juego.
+   compra. Se abre desde la pantalla de inicio o con la tecla K en el juego
+   (1·2·3 cambian de pestaña).
    ========================================================================== */
 
 import { formatCLP, lineLabel } from "./config.js";
 import { icon } from "./icons.js";
 import { LINES } from "./engine/network.js";
+import { WAGE, shiftBonus } from "./economy.js";
 import { LICENSES, LIVERIES, CONTRACTS, HOME, FURNITURE, SOUVENIR_PRICE, ALBUM_REWARD, souvenirId } from "./shop.js";
 
 const hex = (n) => "#" + n.toString(16).padStart(6, "0");
 const lineTitle = (l) => lineLabel(l.id);
+
+/** Compras desde este precio piden confirmación (un segundo toque) para no gastar por error. */
+const CONFIRM_FROM = 20000;
+/** Preferencia del jugador: ocultar lo que ya compró (solo comodidad de este dispositivo). */
+const HIDE_KEY = "metrosim.shopHideOwned";
+const loadHide = () => { try { return localStorage.getItem(HIDE_KEY) === "1"; } catch { return false; } };
+const saveHide = (v) => { try { localStorage.setItem(HIDE_KEY, v ? "1" : "0"); } catch { /* sin almacenamiento */ } };
+
+/** Sueldo aproximado de una estación bien servida (para estimar cuánto falta conduciendo). */
+const stationEstimate = (mult) => (WAGE.base + WAGE.perfect / 2 + 40 * WAGE.perPoint) * mult;
+
+/** Lo que se vende en cada pestaña (los recuerdos se compran en la calle, no aquí). */
+const tabItems = (tab, inv) =>
+  tab === "driver" ? [...CONTRACTS, ...LIVERIES.filter(l => l.price > 0), ...LICENSES]
+  : tab === "home" ? [HOME, ...(inv.has(HOME.id) ? FURNITURE : [])]
+  : [];
 
 /**
  * Abre la tienda.
@@ -37,16 +55,21 @@ export function openShopUI(o) {
         <button class="shop-close" aria-label="Cerrar">${icon("close")}</button>
       </header>
       <nav class="shop-tabs">
-        <button data-tab="driver">${icon("train")} Conductor</button>
-        <button data-tab="home">${icon("home")} Mi depto</button>
-        <button data-tab="album">${icon("ticket")} Colección</button>
+        <button data-tab="driver">${icon("train")} Conductor <small></small></button>
+        <button data-tab="home">${icon("home")} Mi depto <small></small></button>
+        <button data-tab="album">${icon("ticket")} Colección <small></small></button>
       </nav>
+      <div class="shop-progress"><span></span><div class="album-bar"><i></i></div><label><input type="checkbox"> Ocultar lo que ya tengo</label></div>
       <p class="shop-notice hidden"></p>
       <div class="shop-body"></div>
     </div>`;
   document.body.append(root);
   const $ = (s) => root.querySelector(s);
   const body = $(".shop-body");
+  let hideOwned = loadHide(), justBought = null, confirming = null, confirmTimer = 0;
+  const hideBox = $(".shop-progress input");
+  hideBox.checked = hideOwned;
+  hideBox.onchange = () => { hideOwned = hideBox.checked; saveHide(hideOwned); render(); };
 
   const notice = (text, level = "info") => {
     const n = $(".shop-notice");
@@ -56,21 +79,52 @@ export function openShopUI(o) {
   if (o.notice) notice(o.notice, "warn");
 
   const buy = (item) => {
+    // Lo caro pide un segundo toque: el primero deja el botón en «¿Confirmar?» por unos segundos
+    if (item.price >= CONFIRM_FROM && bank.canPay(item.price) && confirming !== item.id) {
+      confirming = item.id;
+      clearTimeout(confirmTimer);
+      confirmTimer = setTimeout(() => { confirming = null; render(); }, 4000);
+      notice(`Toca de nuevo para comprar ${item.name} por ${formatCLP(item.price)}. Te quedarían ${formatCLP(Math.max(0, bank.balance - item.price))}.`, "info");
+      render();
+      return;
+    }
+    confirming = null;
+    clearTimeout(confirmTimer);
     const r = inv.buy(item, bank);
-    notice(r.text, r.ok ? "ok" : "warn");
-    if (r.ok) o.onBought?.(item);
+    notice(r.text + (r.ok ? afterBuyTip(item) : ""), r.ok ? "ok" : "warn");
+    if (r.ok) {
+      justBought = item.id;
+      o.onBought?.(item);
+      const bal = $(".shop-balance b");
+      bal.classList.remove("flash"); void bal.offsetWidth; bal.classList.add("flash");
+    }
     render();
+    justBought = null;
   };
+
+  /** Consejo tras comprar: qué se puede hacer ahora con lo comprado. */
+  const afterBuyTip = (item) =>
+    item.kind === "license" ? ` Ya puedes elegir ${lineLabel(item.lineId)} al conducir.`
+    : item.kind === "livery" ? " Tu tren la estrena en el próximo servicio."
+    : item.kind === "contract" ? ` Desde ahora ganas ×${item.mult.toFixed(2).replace(".", ",")}.`
+    : item.kind === "home" ? " Ahora puedes amoblarlo mueble a mueble."
+    : "";
 
   /** Tarjeta de un artículo con su botón. */
   const card = (item, { owned, extra = null, action = null, actionLabel = null, disabled = false, preview = null }) => {
     const el = document.createElement("div");
-    el.className = "shop-item" + (owned ? " owned" : "");
+    el.className = "shop-item" + (owned ? " owned" : "") + (justBought === item.id ? " just-bought" : "");
     el.innerHTML = `<div class="shop-item-icon"></div><div class="shop-item-text"><b></b><p></p></div><div class="shop-item-buy"></div>`;
     const icon = el.querySelector(".shop-item-icon");
     if (preview) icon.append(preview); else icon.textContent = item.icon;
     el.querySelector("b").textContent = item.name;
     el.querySelector("p").textContent = item.desc;
+    if (item.note) {
+      const n = document.createElement("p");
+      n.className = "shop-item-note";
+      n.textContent = item.note;
+      el.querySelector(".shop-item-text").append(n);
+    }
     const side = el.querySelector(".shop-item-buy");
     if (extra) side.append(extra);
     const btn = document.createElement("button");
@@ -93,6 +147,18 @@ export function openShopUI(o) {
         short.textContent = `faltan ${formatCLP(item.price - bank.balance)}`;
         btn.append(short);
         btn.title = "Gana dinero conduciendo para comprarlo";
+        // Cuánto llevas juntado para este artículo
+        const bar = document.createElement("div");
+        bar.className = "shop-save-bar";
+        bar.innerHTML = "<i></i>";
+        bar.firstChild.style.width = `${Math.min(100, (bank.balance / item.price) * 100)}%`;
+        el.querySelector(".shop-item-text").append(bar);
+      } else if (confirming === item.id) {
+        btn.classList.add("confirm");
+        btn.firstChild.textContent = "¿Confirmar?";
+        const sm = document.createElement("small");
+        sm.textContent = formatCLP(item.price);
+        btn.append(sm);
       }
       btn.disabled = disabled;
       btn.onclick = () => buy(item);
@@ -100,6 +166,33 @@ export function openShopUI(o) {
     side.append(btn);
     return el;
   };
+
+  /** «Tu próxima meta»: lo más barato que aún no tienes en esta pestaña y cuánto te falta. */
+  const goal = (items) => {
+    const open = items.filter(i => !inv.has(i.id) && !(i.requires && !inv.has(i.requires)) && !(i.kind === "furniture" && !inv.has(HOME.id)))
+      .sort((a, b) => a.price - b.price);
+    if (!open.length) return null;
+    const ready = open.filter(i => bank.canPay(i.price)), next = open.find(i => !bank.canPay(i.price));
+    const el = document.createElement("div");
+    el.className = "shop-goal";
+    if (ready.length) {
+      const best = ready.at(-1);                         // lo mejor que ya te alcanza
+      el.classList.add("ready");
+      el.innerHTML = `${icon("coins")}<div><b></b><p></p></div>`;
+      el.querySelector("b").textContent = ready.length === 1 ? `Ya te alcanza para ${best.name}` : `Ya te alcanza para ${ready.length} cosas`;
+      el.querySelector("p").textContent = ready.length === 1 ? `Cuesta ${formatCLP(best.price)}.` : `La más cara: ${best.name} (${formatCLP(best.price)}).`;
+      return el;
+    }
+    const missing = next.price - bank.balance, stations = Math.max(1, Math.ceil(missing / stationEstimate(inv.wageMultiplier)));
+    el.innerHTML = `${icon("target")}<div><b></b><p></p><div class="shop-save-bar"><i></i></div></div>`;
+    el.querySelector("b").textContent = `Tu próxima meta: ${next.name}`;
+    el.querySelector("p").textContent = `Te faltan ${formatCLP(missing)} · unas ${stations} ${stations === 1 ? "estación" : "estaciones"} bien servidas en el modo Conductor.`;
+    el.querySelector("i").style.width = `${Math.min(100, (bank.balance / next.price) * 100)}%`;
+    return el;
+  };
+
+  /** Agrega la tarjeta salvo que el jugador oculte lo que ya tiene. */
+  const push = (out, item, opts) => { if (!(hideOwned && opts.owned)) out.push(card(item, opts)); };
 
   const section = (title, sub) => {
     const h = document.createElement("div");
@@ -112,14 +205,16 @@ export function openShopUI(o) {
 
   /* ----- Pestaña Conductor ----- */
   const renderDriver = () => {
-    const out = [];
+    const out = [goal(tabItems("driver", inv))].filter(Boolean);
     out.push(section("Contratos", `Suben tu sueldo de conductor para siempre. Ahora ganas ×${inv.wageMultiplier.toFixed(2).replace(".", ",")}.`));
     for (const c of CONTRACTS) {
-      out.push(card(c, { owned: inv.has(c.id), disabled: !!c.requires && !inv.has(c.requires) }));
+      const note = `Estación perfecta ${formatCLP(WAGE.base + WAGE.perfect)} → ${formatCLP(Math.round((WAGE.base + WAGE.perfect) * c.mult / 10) * 10)} · bono S ${formatCLP(shiftBonus("S"))} → ${formatCLP(shiftBonus("S", c.mult))}`;
+      push(out, { ...c, note }, { owned: inv.has(c.id), disabled: !!c.requires && !inv.has(c.requires) });
     }
     out.push(section("Libreas de tu tren", "Elige los colores de tu tren en el modo Conductor."));
     for (const l of LIVERIES) {
       const owned = inv.has(l.id), using = inv.livery === l.id;
+      if (hideOwned && owned && !using) continue;
       out.push(card(l, {
         owned, preview: trainPreview(l),
         action: owned ? (using ? () => {} : () => { inv.equip(l.id); notice(`Librea ${l.name} lista para tu próximo servicio.`, "ok"); render(); }) : null,
@@ -132,7 +227,7 @@ export function openShopUI(o) {
       badge.className = "line-dot";
       badge.style.background = lic.color;
       badge.textContent = lic.lineId;
-      out.push(card(lic, { owned: inv.has(lic.id), preview: badge }));
+      push(out, lic, { owned: inv.has(lic.id), preview: badge });
     }
     return out;
   };
@@ -147,24 +242,29 @@ export function openShopUI(o) {
       return out;
     }
     const { have, total } = inv.furnished;
-    out.push(section(HOME.name, have === total ? "🏆 ¡Depto completamente amoblado!" : `Amoblado: ${have} de ${total} muebles.`));
+    const left = FURNITURE.filter(f => !inv.has(f.id)).reduce((t, f) => t + f.price, 0);
+    out.push(section(HOME.name, have === total ? "🏆 ¡Depto completamente amoblado!" : `Amoblado: ${have} de ${total} muebles · amoblarlo entero cuesta ${formatCLP(left)} más.`));
     out.push(drawRoom(inv, false));
-    for (const f of FURNITURE) out.push(card(f, { owned: inv.has(f.id) }));
+    const g = goal(FURNITURE);
+    if (g) out.push(g);
+    for (const f of [...FURNITURE].sort((a, b) => inv.has(a.id) - inv.has(b.id) || a.price - b.price)) push(out, f, { owned: inv.has(f.id) });
     return out;
   };
 
   /* ----- Pestaña Colección ----- */
   const renderAlbum = () => {
-    const out = [section("Álbum de recuerdos", `Un recuerdo por estación (${formatCLP(SOUVENIR_PRICE)}), a la venta solo en el kiosko de su calle (modo Pasajero). Completa una línea y ganas ${formatCLP(ALBUM_REWARD)}.`)];
+    const done = LINES.filter(l => { const a = inv.album(l); return a.have === a.total; }).length;
+    const out = [section("Álbum de recuerdos", `Un recuerdo por estación (${formatCLP(SOUVENIR_PRICE)}), a la venta solo en el kiosko de su calle (modo Pasajero). Completa una línea y ganas ${formatCLP(ALBUM_REWARD)}. Llevas ${done} de ${LINES.length} líneas completas.`)];
     for (const line of LINES) {
       const { have, total } = inv.album(line);
+      if (hideOwned && have === total) continue;
       const row = document.createElement("div");
       row.className = "album-line";
       row.innerHTML = `<div class="album-head"><span class="line-dot"></span><b></b><span class="album-count"></span></div><div class="album-bar"><i></i></div><ul></ul>`;
       const dot = row.querySelector(".line-dot");
       dot.style.background = line.color; dot.textContent = line.id;
       row.querySelector("b").textContent = lineTitle(line);
-      row.querySelector(".album-count").textContent = have === total ? "🏆 completo" : `${have}/${total}`;
+      row.querySelector(".album-count").textContent = have === total ? "🏆 completo" : `${have}/${total} · faltan ${formatCLP((total - have) * SOUVENIR_PRICE)}`;
       const bar = row.querySelector(".album-bar i");
       bar.style.width = `${(have / total) * 100}%`;
       bar.style.background = line.color;
@@ -180,15 +280,39 @@ export function openShopUI(o) {
     return out;
   };
 
+  /** Lo que tienes / lo que hay, por pestaña. */
+  const counts = () => {
+    const owned = (list) => list.filter(i => inv.has(i.id)).length;
+    const shopDriver = [...CONTRACTS, ...LIVERIES.filter(l => l.price > 0), ...LICENSES];
+    const shopHome = [HOME, ...FURNITURE];
+    const sv = LINES.reduce((a, l) => { const x = inv.album(l); return { have: a.have + x.have, total: a.total + x.total }; }, { have: 0, total: 0 });
+    return {
+      driver: { have: owned(shopDriver), total: shopDriver.length },
+      home: { have: owned(shopHome), total: shopHome.length },
+      album: sv,
+    };
+  };
+
   const render = () => {
     $(".shop-balance b").textContent = bank.label;
-    root.querySelectorAll(".shop-tabs button").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+    const c = counts();
+    root.querySelectorAll(".shop-tabs button").forEach(b => {
+      b.classList.toggle("active", b.dataset.tab === tab);
+      const n = c[b.dataset.tab];
+      b.querySelector("small").textContent = `${n.have}/${n.total}`;
+      b.classList.toggle("complete", n.have === n.total);
+    });
+    // Promedio de las tres pestañas (si no, los 164 recuerdos pesarían casi todo)
+    const pct = Math.round(Object.values(c).reduce((t, n) => t + n.have / n.total, 0) / 3 * 100);
+    $(".shop-progress span").textContent = `Tienda completada: ${pct} %`;
+    $(".shop-progress i").style.width = `${pct}%`;
     body.replaceChildren(...(tab === "home" ? renderHome() : tab === "album" ? renderAlbum() : renderDriver()));
   };
   root.querySelectorAll(".shop-tabs button").forEach(b => b.onclick = () => { tab = b.dataset.tab; $(".shop-notice").className = "shop-notice hidden"; render(); body.scrollTop = 0; });
   render();
 
   const close = () => {
+    clearTimeout(confirmTimer);
     window.removeEventListener("keydown", onKey, true);
     root.remove();
     o.onClose?.();
@@ -196,6 +320,10 @@ export function openShopUI(o) {
   const onKey = (ev) => {
     const k = ev.key.toLowerCase();
     if (k === "escape" || k === "k") { ev.preventDefault(); close(); }
+    else if (["1", "2", "3"].includes(k) && !ev.target.closest?.("input, textarea")) {       // 1·2·3 cambian de pestaña
+      ev.preventDefault();
+      root.querySelectorAll(".shop-tabs button")[Number(k) - 1].click();
+    }
     ev.stopPropagation();                         // el juego no recibe teclas con la tienda abierta
   };
   window.addEventListener("keydown", onKey, true);

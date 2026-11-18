@@ -1064,6 +1064,35 @@ body.touch-mode .help-chip { display: none !important; }
 .shop-item-buy .go-button.poor:hover { border-color: var(--warn); }
 .shop-item-buy button:disabled { cursor: default; opacity: .6; }
 .train-preview { width: 64px; height: 26px; }
+/* 2.12 · Tienda renovada: progreso, metas de ahorro, confirmación y compra recién hecha */
+.shop-tabs button small { padding: 1px 6px; border-radius: 99px; background: #ffffff12; font: 600 10.5px/1.4 var(--f-data); color: var(--muted); font-variant-numeric: tabular-nums; }
+.shop-tabs button.complete small { background: #34d17c26; color: var(--ok); }
+.shop-progress { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 8px 18px 0; font-size: 12px; color: var(--muted); }
+.shop-progress span { font-variant-numeric: tabular-nums; }
+.shop-progress .album-bar { flex: 1 1 120px; margin: 0; }
+.shop-progress .album-bar i { background: var(--warn); transition: width .4s; }
+.shop-progress label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.shop-progress input { accent-color: var(--warn); margin: 0; }
+.shop-goal { display: flex; align-items: center; gap: 12px; margin: 12px 0 4px; padding: 10px 14px; border-radius: var(--radius); background: #ffc2470f; border: 1px solid #ffc24740; }
+.shop-goal > .ico { width: 26px; height: 26px; min-width: 26px; color: var(--warn); }
+.shop-goal > div { flex: 1; min-width: 0; }
+.shop-goal b { font-size: 14px; }
+.shop-goal p { margin: 2px 0 0; font-size: 12px; color: var(--muted); }
+.shop-goal.ready { background: #34d17c10; border-color: #34d17c55; }
+.shop-goal.ready > .ico { color: var(--ok); }
+.shop-save-bar { height: 4px; margin-top: 6px; border-radius: 2px; background: #ffffff14; overflow: hidden; }
+.shop-save-bar i { display: block; height: 100%; background: var(--warn); }
+.shop-item-note { font-size: 12px !important; font-weight: 600; color: var(--warn) !important; }
+.shop-item-buy .go-button.confirm { display: grid; gap: 2px; background: var(--ok); color: #06140c; animation: shop-pulse 1s ease-in-out infinite; }
+.shop-item-buy .go-button.confirm small { font: 500 10.5px/1 var(--f-data); }
+.shop-item.just-bought { animation: shop-bought .9s ease-out; }
+.shop-balance b.flash { animation: shop-flash .8s ease-out; }
+@keyframes shop-pulse { 50% { box-shadow: 0 0 0 4px #34d17c40; } }
+@keyframes shop-bought { from { background: #34d17c40; transform: scale(1.02); } }
+@keyframes shop-flash { from { color: var(--warn); transform: scale(1.15); } }
+@media (prefers-reduced-motion: reduce) {
+  .shop-item-buy .go-button.confirm, .shop-item.just-bought, .shop-balance b.flash { animation: none; }
+}
 .line-dot { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; color: #fff; font: 800 12px/1 Arial, sans-serif; }
 .home-room { display: block; width: 100%; height: auto; margin: 4px 0 10px; border-radius: 12px; }
 .album-line { padding: 10px; margin-bottom: 8px; border-radius: 12px; background: #ffffff08; }
@@ -1114,6 +1143,8 @@ body.touch-mode :focus, body.touch-mode :focus-visible { outline: none; }
   .shop-head h2 { margin: 0; font-size: 18px; }
   .shop-tabs { padding: 0 14px; }
   .shop-tabs button { padding-block: 4px 6px; }
+  .shop-progress { padding: 4px 14px 0; }
+  .shop-goal { margin-top: 8px; padding: 6px 12px; }
   .shop-item { padding: 6px 10px; }
   .shop-body { padding: 4px 14px 14px; }
 }
