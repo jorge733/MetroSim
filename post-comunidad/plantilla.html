@@ -1,0 +1,52 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+*{margin:0;box-sizing:border-box}
+html,body{width:var(--w);height:var(--h);overflow:hidden}
+body{font-family:"DejaVu Sans","Liberation Sans",Arial,sans-serif;color:#fff;
+ background:radial-gradient(ellipse at 50% 30%,#26324a 0%,#111722 55%,#05070a 100%);position:relative}
+.wrap{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 70px;gap:var(--gap)}
+.top{display:flex;flex-direction:column;align-items:center;gap:var(--gap)}
+.logo{width:var(--logo);display:var(--logod,block)}
+.badge{display:inline-flex;align-items:center;gap:14px;background:#d7262e;padding:10px 28px;border-radius:999px;font-weight:800;font-size:var(--badge);letter-spacing:.08em}
+h1{font-size:var(--h1);font-weight:900;line-height:1;letter-spacing:-.02em}
+h1 em{font-style:normal;color:#f4b400;display:block;font-size:.5em;letter-spacing:.05em;margin-top:14px}
+.chat{display:flex;flex-direction:column;gap:var(--cgap);width:var(--cw)}
+.b{position:relative;padding:var(--cpad);border-radius:26px;font-size:var(--bub);font-weight:700;line-height:1.25;text-align:left;white-space:nowrap}
+.b.l{align-self:flex-start;background:#2b3852;border-bottom-left-radius:6px}
+.b.r{align-self:flex-end;background:#00965e;border-bottom-right-radius:6px}
+.b.y{align-self:flex-start;background:#f4b400;color:#111722;border-bottom-left-radius:6px}
+.b.typing{align-self:flex-end;background:#2b3852;border-bottom-right-radius:6px;letter-spacing:.25em;color:#9fb0c8}
+p{font-size:var(--p);line-height:1.35;color:#d6dbe6;max-width:900px}
+p b{color:#fff}
+.board{font-family:"DejaVu Sans Mono",monospace;background:#000;border:3px solid #333;border-radius:10px;padding:12px 26px;color:#ffb000;font-size:var(--board);letter-spacing:.08em;text-shadow:0 0 8px #ff9000;white-space:nowrap}
+.url{font-size:var(--url);color:#9fb0c8;letter-spacing:.04em;font-weight:700}
+/* horizontal: texto a la izquierda, conversación a la derecha */
+body.h .wrap{flex-direction:row;gap:60px;padding:0 60px}
+body.h .top{align-items:flex-start;text-align:left;flex:1}
+body.h .top h1 em{margin-top:10px}
+body.h p{text-align:left}
+</style></head><body>
+<div class="wrap">
+ <div class="top">
+  <svg class="logo" viewBox="0 0 200 130"><rect x="6" y="6" width="188" height="118" rx="30" fill="#d7262e"/>
+  <path d="M30 94H78L122 36H170" fill="none" stroke="#fff" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M100 18V112" fill="none" stroke="#ffd2d5" stroke-width="9" stroke-linecap="round" stroke-dasharray="0.1 17"/>
+  <circle cx="30" cy="94" r="10" fill="#fff"/><circle cx="170" cy="36" r="10" fill="#fff"/>
+  <circle cx="100" cy="65" r="17" fill="#fff"/><circle cx="100" cy="65" r="8" fill="#d7262e"/></svg>
+  <div class="badge">🚇 RedMoviSim</div>
+  <h1>Queremos<br>escucharte<em>¿QUÉ LE AGREGARÍAS?</em></h1>
+  <p class="hp">RedMoviSim lo construimos <b>entre todos</b>.<br>Cuéntanos qué te gusta, qué falla<br class="br">y qué te gustaría ver.</p>
+  <div class="board hb">PRÓXIMA ESTACIÓN: TU IDEA</div>
+  <div class="url hu">redmovisim.cl</div>
+ </div>
+ <div class="chat">
+  <div class="b l">💡 ¿Y si agregan la Línea 7?</div>
+  <div class="b r">🚌 ¡Quiero manejar más recorridos!</div>
+  <div class="b y">🐛 Encontré un error en…</div>
+  <div class="b l">⭐ Lo que más me gusta es…</div>
+  <div class="b typing">• • •</div>
+ </div>
+ <p class="vp" style="white-space:nowrap">Déjanos tus <b>sugerencias y comentarios</b> 👇<br>Leemos todos y los mejores llegan al juego.</p>
+ <div class="board vb">PRÓXIMA ESTACIÓN: TU IDEA</div>
+ <div class="url vu">redmovisim.cl</div>
+</div>
+</body></html>

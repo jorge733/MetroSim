@@ -152,6 +152,9 @@ Tren Rancagua al sur de Nos (Buin Zoo a Rancagua) quedan fuera del extracto y si
 - **2.7.2** · Post «Juega con tus amigos» para presentar el modo multijugador (`post-multijugador/`: el Centro de Control
   en el PC con el tren de una conductora seleccionado y su cabina en un celular en horizontal recibiendo la orden por radio;
   cuadrado, historia y horizontal, con `node generar.js plantilla.html`).
+- **2.7.3** · Post «Queremos escucharte» para pedirle a la comunidad sugerencias y comentarios (`post-comunidad/`:
+  burbujas de chat con ideas de ejemplo y el letrero «Próxima estación: tu idea»; cuadrado, historia y horizontal, con
+  `node generar.js plantilla.html`).
 
 ## Versión 2.6 · La calle real de Universidad de Chile (OpenStreetMap)
 
