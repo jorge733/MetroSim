@@ -153,6 +153,8 @@
 .line-chip[aria-checked="true"]::after { display: none; }
 .bus-chips { grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); }
 .bus-chip { font-size: 17px; }
+.bus-chips.taxi-chips { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.taxi-chips .bus-chip { padding: 0 10px 6px; font-size: 15px; line-height: 1.1; }
 
 /* Clima (plegable) */
 .setup-more { border-radius: 12px; border: 1px solid var(--panel-border); background: #ffffff05; }

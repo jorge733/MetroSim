@@ -133,7 +133,9 @@ trenes de los dos motores quedan a ~1 m (mediana).
   API pública de red.cl con `node tools/recorridos-red.mjs` y también se pueden tomar de pasajero desde sus estaciones.
 - **El recorrido se elige como la línea del Metro**: en vez de una lista desplegable, cada recorrido es un botón con su
   número y su color, y al lado aparece su ficha (de dónde a dónde va, el esquema de sus paraderos con los que están junto
-  al Metro, cuántos paraderos tiene, su largo y hacia dónde va el servicio). Igual para elegir la calle del taxi.
+  al Metro, cuántos paraderos tiene, su largo y hacia dónde va el servicio).
+- **2.9.1** · El taxi ya no muestra los recorridos del bus: se elige la **calle** (Alameda, Apoquindo, Providencia, Gran
+  Avenida…), una vez cada una, con botones amarillos y su ficha (largo, semáforos y estaciones de Metro por las que pasa).
 
 ## Versión 2.8 · La radio del taxi
 

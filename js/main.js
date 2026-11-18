@@ -192,56 +192,79 @@ function selectVehicle(v, { fromLine = false } = {}) {
 vehicleButtons.forEach(b => b.addEventListener("click", () => { selectVehicle(b.dataset.vehicle); selectMode("driver"); }));
 
 /* 1.18 · Bus: qué recorrido manejar (el A01 de práctica o un tramo real de Red, de js/bus/redRoutes.js)
-   2.9 · Se elige con botones y una ficha del recorrido, igual que las líneas al conducir el Metro */
+   2.9 · Se elige con botones y una ficha del recorrido, igual que las líneas al conducir el Metro.
+   2.9.1 · El taxi no elige recorridos de bus sino calles: una por nombre (el tramo más largo de esa calle). */
 const busRouteSelect = $("busRouteSelect");
 busRouteSelect.innerHTML = BUS_ROUTES.map(r => `<option value="${r.id}">${r.id}</option>`).join("");
-busRouteSelect.value = busRouteById(loadSetting("metrosim.busRoute") || "A01").id;
-const busRouteChips = BUS_ROUTES.map(r => {
-  const chip = document.createElement("button");
-  chip.type = "button";
-  chip.className = "line-chip bus-chip";
-  chip.setAttribute("role", "radio");
-  chip.style.setProperty("--c", r.color);
-  chip.style.setProperty("--on-c", textOn(r.color));
-  chip.dataset.route = r.id;
-  chip.textContent = r.id;
-  chip.title = `${r.id} · ${r.practice ? "Práctica · " : ""}${r.name}: ${r.from} → ${r.to}`;
-  chip.setAttribute("aria-label", chip.title);
-  chip.addEventListener("click", () => selectBusRoute(r.id));
-  $("busRouteChips").append(chip);
-  return chip;
-});
+const TAXI_YELLOW = "#f2c200";
+const streetName = (r) => r.name.replace(/^Gran Av\.$/, "Gran Avenida");
+const TAXI_STREETS = [...BUS_ROUTES.filter(r => r.real).reduce((m, r) => {
+  const k = streetName(r), cur = m.get(k);
+  if (!cur || r.length > cur.length) m.set(k, r);
+  return m;
+}, new Map()).values()].sort((x, y) => streetName(x).replace(/^Av\. /, "").localeCompare(streetName(y).replace(/^Av\. /, ""), "es"));
+const taxiStreetOf = (id) => { const r = busRouteById(id); return TAXI_STREETS.find(t => streetName(t) === streetName(r)) ?? TAXI_STREETS[0]; };
+let busRouteChips = [], chipsFor = null;
+/** Los botones: números de recorrido para el bus, nombres de calle para el taxi. */
+function renderBusChips() {
+  const taxi = driverVehicle === "taxi";
+  if (chipsFor === taxi) return;
+  chipsFor = taxi;
+  busRouteSelect.value = taxi ? taxiStreetOf(loadSetting("metrosim.taxiStreet") || "210").id : busRouteById(loadSetting("metrosim.busRoute") || "A01").id;
+  const box = $("busRouteChips");
+  box.classList.toggle("taxi-chips", taxi);
+  box.replaceChildren();
+  busRouteChips = (taxi ? TAXI_STREETS : BUS_ROUTES).map(r => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "line-chip bus-chip";
+    chip.setAttribute("role", "radio");
+    const c = taxi ? TAXI_YELLOW : r.color;
+    chip.style.setProperty("--c", c);
+    chip.style.setProperty("--on-c", textOn(c));
+    chip.dataset.route = r.id;
+    chip.textContent = taxi ? streetName(r) : r.id;
+    chip.title = taxi ? `${streetName(r)}: ${r.from} ⇄ ${r.to}` : `${r.id} · ${r.practice ? "Práctica · " : ""}${r.name}: ${r.from} → ${r.to}`;
+    chip.setAttribute("aria-label", chip.title);
+    chip.addEventListener("click", () => selectBusRoute(r.id));
+    box.append(chip);
+    return chip;
+  });
+}
 function selectBusRoute(id) {
   busRouteSelect.value = busRouteById(id).id;
-  saveSetting("metrosim.busRoute", busRouteSelect.value);
+  saveSetting(driverVehicle === "taxi" ? "metrosim.taxiStreet" : "metrosim.busRoute", busRouteSelect.value);
   renderBusRouteInfo();
 }
 const kmText = (m) => `${(m / 1000).toFixed(1).replace(".", ",")} km`;
 function renderBusRouteInfo() {
+  renderBusChips();
   const r = busRouteById(busRouteSelect.value), st = r.stops, first = st[0], last = st.at(-1);
   busRouteChips.forEach(c => c.setAttribute("aria-checked", String(c.dataset.route === r.id)));
   const card = $("busCard");
-  card.style.setProperty("--line", r.color);
-  card.style.setProperty("--on-line", textOn(r.color));
   const taxi = driverVehicle === "taxi";
-  $("busCardBadge").textContent = taxi ? r.name : `${r.real ? "Red" : "Práctica"} · ${r.id}`;
-  $("busCardRoute").textContent = `${first.name} ⇄ ${last.name}`;
+  card.style.setProperty("--line", taxi ? TAXI_YELLOW : r.color);
+  card.style.setProperty("--on-line", textOn(taxi ? TAXI_YELLOW : r.color));
+  $("busCardBadge").textContent = taxi ? "Taxi" : `${r.real ? "Red" : "Práctica"} · ${r.id}`;
+  $("busCardRoute").textContent = taxi ? streetName(r) : `${first.name} ⇄ ${last.name}`;
+  $("busCardStopsLabel").textContent = taxi ? "Semáforos" : "Paraderos";
   $("busCardFirst").textContent = first.name;
   $("busCardLast").textContent = last.name;
-  $("busCardStops").textContent = st.length;
+  $("busCardStops").textContent = taxi ? r.lights.length : st.length;
   $("busCardLength").textContent = kmText(r.length);
   $("busCardMetro").textContent = st.filter(s => s.metro).length;
   const map = $("busCardMap"), span = last.s - first.s || 1;
   map.querySelectorAll("i").forEach(d => d.remove());
   for (const s of st) {
     const dot = document.createElement("i");
+    if (taxi && !s.metro) continue;                     // el taxi no tiene paraderos: solo las estaciones de Metro
     if (s.metro) dot.className = "combo";
     dot.style.left = `${((s.s - first.s) / span) * 100}%`;
     dot.title = s.name + (s.hint ? ` · ${s.hint}` : "");
     map.append(dot);
   }
   if (taxi) {
-    $("busRouteInfo").textContent = `Taxi por ${r.name} (${kmText(r.length)} de calle): recoge a quien haga señas en la vereda y llévalo a su destino. Cobras lo que marca el taxímetro y, si el viaje es suave, propina.`;
+    $("busRouteInfo").textContent = `Taxi por ${streetName(r)} (${kmText(r.length)} de calle, de ${first.name} a ${last.name}): recoge a quien haga señas en la vereda y llévalo a su destino. Cobras lo que marca el taxímetro y, si el viaje es suave, propina.`;
     return;
   }
   $("busRouteInfo").textContent = r.practice
@@ -361,7 +384,7 @@ function renderResume() {
   let text = MODE_TITLES[last];
   if (last === "driver") {
     if (driverVehicle === "bus") text += ` · Bus ${busRouteById(busRouteSelect.value).id}`;
-    else if (driverVehicle === "taxi") text += ` · Taxi por ${busRouteById(busRouteSelect.value).name}`;
+    else if (driverVehicle === "taxi") text += ` · Taxi por ${streetName(busRouteById(busRouteSelect.value))}`;
     else text += ` · ${lineLabel(driverLineSelect.value)} · ${directionSelect.selectedOptions[0]?.textContent.split(" · ")[1] || ""}`;
   } else if (last === "passenger") text += ` · desde ${stationSelect.selectedOptions[0]?.textContent.trim().replace(/\s+\(.*$/, "") || ""}`;
   $("homeResumeText").textContent = text;
