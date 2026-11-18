@@ -124,6 +124,20 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **Salir por los torniquetes es gratis**: solo se cobra el pasaje al pasar hacia la zona pagada (antes, al terminar
   de cruzar el torniquete de salida se cobraba un pasaje).
 
+## Versión 2.8 · La radio del taxi
+
+- **El taxi tiene radio**: 14 emisoras de Santiago **en vivo** (Imagina, Concierto, Futuro, Pudahuel, ADN, Cooperativa,
+  Rock & Pop, Beethoven, FM Dos, Bío-Bío, Play FM, Corazón, Los 40 y Sonar), ordenadas como en el dial.
+- **Cómo se usa**: el botón **Radio** arriba a la derecha abre el panel con el dial, el botón para encender y apagar,
+  el volumen y la lista de emisoras. En el PC, **R** enciende y apaga, y **,** y **.** cambian de emisora. En el celular el
+  panel queda al lado de los pedales, así que puedes seguir manejando con la radio abierta.
+- Cada radio suena desde su propia transmisión pública por internet, directo desde su servidor: el juego no guarda
+  ni retransmite nada. **Necesita conexión**; sin internet, la radio muestra «sin señal». Al cambiar de emisora se oye
+  el ruido de la sintonía.
+- El botón de sonido del juego (o **M**) también silencia la radio. El juego recuerda en este dispositivo si la dejaste
+  encendida, en qué emisora y con qué volumen.
+- Las emisoras están en `js/bus/taxiRadio.js`: si una radio cambia su transmisión, basta corregir su dirección ahí.
+
 ## Versión 2.7 · Todas las calles son reales
 
 Después de la prueba en Universidad de Chile, **las 133 estaciones del extracto de OpenStreetMap de Santiago tienen su

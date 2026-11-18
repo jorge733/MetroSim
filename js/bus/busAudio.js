@@ -111,6 +111,22 @@ export class BusAudio {
     this.roadGain.gain.setTargetAtTime(Math.min(0.16, v * 0.011), t, 0.3);
   }
 
+  /** 2.8 · Radio del taxi: el ruido corto de la sintonía al cambiar de emisora. */
+  radioStatic() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const n = this.ctx.createBufferSource();
+    n.buffer = this.staticBuf ??= this.makeNoise(0.5);
+    const f = this.ctx.createBiquadFilter();
+    f.type = "bandpass"; f.frequency.value = 2400; f.Q.value = 0.6;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.09, t + 0.03);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
+    n.connect(f).connect(g).connect(this.master);
+    n.start(t); n.stop(t + 0.5);
+  }
+
   horn(on) {
     if (!this.ctx) return;
     this.hornGain.gain.setTargetAtTime(on ? 0.12 : 0, this.ctx.currentTime, 0.02);

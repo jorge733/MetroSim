@@ -15,6 +15,7 @@
 
    Mandos: W/↑ acelerar · S/↓ frenar · A/← y D/→ cambiar de pista ·
    Espacio puertas · B bocina · C cámara · M sonido · Esc pausa.
+   Taxi: U vuelta en U · R radio · , y . cambian de emisora.
    ========================================================================== */
 
 import * as THREE from "three";
@@ -25,6 +26,7 @@ import { BusSim, BUS_CAPACITY } from "./busSim.js";
 import { TaxiSim, TAXI_FARE } from "./taxiSim.js";
 import { BusWorld } from "./busWorld.js";
 import { BusAudio } from "./busAudio.js";
+import { TaxiRadio, RADIO_STATIONS } from "./taxiRadio.js";
 import { demandAt, dayTypeOf, formatCLP, lineLabel, isRail } from "../config.js";
 import { WEATHER, weatherLabel, weatherDemandFactor } from "../engine/weather.js";
 import { linesAtStation } from "../engine/network.js";
@@ -47,6 +49,11 @@ const ICON = {
   sound: '<svg viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4zM16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/></svg>',
   mute: '<svg viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4zM22 9l-6 6M16 9l6 6"/></svg>',
   menu: '<svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>',
+  radio: '<svg viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="12" rx="2"/><path d="M7 8l10-5"/><circle cx="15.5" cy="14" r="2.5"/><path d="M6.5 12.5h4M6.5 15.5h4"/></svg>',
+  power: '<svg viewBox="0 0 24 24"><path d="M12 3v9M6.3 7a8 8 0 1 0 11.4 0"/></svg>',
+  prev: '<svg viewBox="0 0 24 24"><path d="M11 6l-7 6 7 6zM20 6l-7 6 7 6z"/></svg>',
+  next: '<svg viewBox="0 0 24 24"><path d="M13 6l7 6-7 6zM4 6l7 6-7 6z"/></svg>',
+  close: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>',
 };
 
 /**
@@ -75,6 +82,15 @@ class BusGame {
     this.audio = new BusAudio();
     this.audio.muted = muted;
     this.audio.start({ rain: WEATHER.rain });
+    /* 2.8 · La radio del taxi: emisoras de Santiago en vivo (taxiRadio.js) */
+    if (this.taxi) {
+      this.radio = new TaxiRadio({
+        onChange: () => this.renderRadio(),
+        onTune: () => this.audio.radioStatic(),
+        onError: (st) => this.toast(`${st.fm} ${st.name}: sin señal. La radio necesita internet; prueba otra emisora`, "warn", 4200),
+      });
+      this.radio.setMuted(muted);
+    }
     this.camMode = ride ? "seat" : "chase";
     this.paused = false;
     this.keys = new Set();
@@ -102,6 +118,7 @@ class BusGame {
     addEventListener("blur", this.onBlur);
 
     this.newRun();
+    this.radio?.resume();
     this.last = performance.now();
     this.raf = requestAnimationFrame((t) => this.loop(t));
   }
@@ -149,11 +166,13 @@ class BusGame {
           <div class="bus-pill"><span class="bus-label">CUENTA</span><strong data-k="bank">$0</strong><span class="bus-float" data-k="float"></span></div>
           <div class="bus-pill"><span class="bus-label">HORA</span><strong data-k="clock">--:--</strong></div>
           <div class="bus-pill bus-weather"><span class="bus-label">CLIMA</span><strong>${esc(weatherLabel())}</strong></div>
+          ${this.taxi ? `<button class="bus-pill taxi-radio-btn" data-k="radioBtn" aria-label="Radio" title="Radio (R enciende · , y . cambian de emisora)">${ICON.radio}<span class="taxi-radio-btn-text"><span class="bus-label">RADIO</span><strong data-k="radioNow">Apagada</strong></span></button>` : ""}
           <button class="bus-icon-btn" data-k="sound" aria-label="Sonido">${ICON.sound}</button>
           <button class="bus-icon-btn bus-menu-btn" data-k="menu" aria-label="Pausa y menú" title="Menú (Esc)">${ICON.menu}<span>Menú</span></button>
         </div>
       </header>
       <div class="bus-strip" data-k="strip"></div>
+      ${this.taxi ? this.radioPanelHtml() : ""}
       <div class="bus-bell hidden" data-k="bell">PARADA SOLICITADA</div>
       <div class="bus-toast hidden" data-k="toast"></div>
       <div class="bus-guide hidden" data-k="guide"><span data-k="guideText"></span><div class="bus-guide-bar"><i data-k="guideMark"></i><u data-k="guidePred"></u><b></b></div><small data-k="guideSub"></small></div>
@@ -186,7 +205,7 @@ class BusGame {
         <span><kbd>L</kbd> limitador</span>
         <span><kbd>A</kbd><kbd>D</kbd> cambiar de pista</span>
         <span><kbd>Espacio</kbd> ${this.taxi ? "puerta (subir y bajar pasajero)" : "puertas"}</span>
-        ${this.taxi ? `<span><kbd>U</kbd> vuelta en U (en un cruce)</span>` : ""}
+        ${this.taxi ? `<span><kbd>U</kbd> vuelta en U (en un cruce)</span><span><kbd>R</kbd> radio · <kbd>,</kbd><kbd>.</kbd> emisora</span>` : ""}
         <span><kbd>B</kbd> bocina</span>
         <span><kbd>C</kbd> cámara</span>
         <span><kbd>Esc</kbd> pausa</span>
@@ -257,6 +276,7 @@ class BusGame {
     this.root.classList.add("bus-keys-on");
     this.keysTimer = setTimeout(() => { this.root.classList.remove("bus-keys-on"); syncMenu(); }, 12000);
     syncMenu();
+    if (this.taxi) this.bindRadio();
     this.bindTouch();
     this.root.querySelectorAll("[data-r]").forEach(btn => btn.addEventListener("click", (e) => {
       e.currentTarget.blur();
@@ -353,6 +373,71 @@ class BusGame {
     this.stripPct = pct;
   }
 
+  /* ----------------------------- 2.8 · Radio del taxi ----------------------------- */
+  radioPanelHtml() {
+    return `
+      <div class="taxi-radio hidden" data-k="radioPanel" role="dialog" aria-label="Radio del taxi">
+        <header class="taxi-radio-head">
+          <span class="bus-label">RADIO · EN VIVO</span>
+          <button class="taxi-radio-x" data-k="radioClose" aria-label="Cerrar la radio">${ICON.close}</button>
+        </header>
+        <div class="taxi-radio-lcd">
+          <button class="taxi-radio-round" data-k="radioPrev" aria-label="Emisora anterior">${ICON.prev}</button>
+          <div class="taxi-radio-dial"><strong data-k="radioFm">—</strong><span data-k="radioName">Apagada</span><small data-k="radioState"></small></div>
+          <button class="taxi-radio-round" data-k="radioNext" aria-label="Emisora siguiente">${ICON.next}</button>
+        </div>
+        <div class="taxi-radio-row">
+          <button class="taxi-radio-power" data-k="radioPower">${ICON.power}<span data-k="radioPowerText">Encender</span></button>
+          <label class="taxi-radio-vol">${ICON.sound}<input type="range" min="0" max="100" step="5" data-k="radioVol" aria-label="Volumen de la radio"></label>
+        </div>
+        <div class="taxi-radio-list" data-k="radioList">
+          ${RADIO_STATIONS.map((st, i) => `<button data-st="${i}"><b>${st.fm}</b><span>${esc(st.name)}</span><small>${esc(st.genre)}</small></button>`).join("")}
+        </div>
+        <p class="taxi-radio-note">Cada radio suena en vivo desde su propia transmisión por internet.</p>
+      </div>`;
+  }
+
+  bindRadio() {
+    const el = this.el, r = this.radio;
+    const tap = (node, fn) => node.addEventListener("click", (e) => { e.currentTarget.blur(); fn(e); });
+    tap(el.radioBtn, () => this.toggleRadioPanel());
+    tap(el.radioClose, () => this.toggleRadioPanel(false));
+    tap(el.radioPower, () => r.power());
+    tap(el.radioPrev, () => r.next(-1));
+    tap(el.radioNext, () => r.next(1));
+    el.radioList.querySelectorAll("[data-st]").forEach(b => tap(b, () => r.select(+b.dataset.st)));
+    el.radioVol.value = Math.round(r.volume * 100);
+    el.radioVol.addEventListener("input", () => r.setVolume(el.radioVol.value / 100));
+    el.radioVol.addEventListener("change", () => el.radioVol.blur());
+    // Tocar fuera del panel lo cierra (sin perder el toque: los pedales siguen funcionando)
+    this.root.addEventListener("pointerdown", (e) => {
+      if (el.radioPanel.classList.contains("hidden")) return;
+      if (!el.radioPanel.contains(e.target) && !el.radioBtn.contains(e.target)) this.toggleRadioPanel(false);
+    }, true);
+    this.renderRadio();
+  }
+
+  toggleRadioPanel(open = this.el.radioPanel.classList.contains("hidden")) {
+    this.el.radioPanel.classList.toggle("hidden", !open);
+    this.el.radioBtn.classList.toggle("open", open);
+  }
+
+  renderRadio() {
+    const r = this.radio, el = this.el;
+    if (!r || !el?.radioBtn) return;
+    const st = r.station;
+    const state = { off: "", tuning: "Sintonizando…", playing: st.genre, nosignal: "Sin señal · revisa tu conexión" }[r.status];
+    el.radioBtn.classList.toggle("on", r.on);
+    el.radioNow.textContent = !r.on ? "Apagada" : r.status === "nosignal" ? `${st.fm} · sin señal` : r.status === "tuning" ? `${st.fm} · …` : `${st.fm} ${st.name}`;
+    el.radioFm.textContent = r.on ? st.fm : "— —";
+    el.radioName.textContent = r.on ? st.name : "Apagada";
+    el.radioState.textContent = state;
+    el.radioPanel.dataset.status = r.status;
+    el.radioPowerText.textContent = r.on ? "Apagar" : "Encender";
+    el.radioPower.classList.toggle("on", r.on);
+    el.radioList.querySelectorAll("[data-st]").forEach(b => b.classList.toggle("on", r.on && +b.dataset.st === r.index));
+  }
+
   toast(text, level = "info", ms = 3200) {
     const t = this.el.toast;
     t.textContent = text;
@@ -374,6 +459,7 @@ class BusGame {
   toggleMute() {
     const m = !this.audio.muted;
     this.audio.setMuted(m);
+    this.radio?.setMuted(m);
     this.el.sound.innerHTML = m ? ICON.mute : ICON.sound;
     this.onMuteChange?.(m);
     this.syncMenu?.();
@@ -419,6 +505,8 @@ class BusGame {
     if (k === "d" || k === "arrowright") return this.sim.changeLane(-1);
     if (k === " " || k === "e") return this.sim.toggleDoors();
     if (k === "u" && this.taxi) return this.sim.uTurn();
+    if (this.radio && k === "r") return this.radio.power();
+    if (this.radio && (k === "," || k === ".")) return this.radio.next(k === "," ? -1 : 1);
     if (k === "c") return this.toggleCam();
     if (k === "l") return this.sim.toggleLimiter();
     this.keys.add(k);
@@ -896,6 +984,7 @@ class BusGame {
     removeEventListener("resize", this.onResize);
     removeEventListener("blur", this.onBlur);
     this.audio.stop();
+    this.radio?.destroy();
     this.world?.dispose();
     this.renderer.dispose();
     this.root.remove();
