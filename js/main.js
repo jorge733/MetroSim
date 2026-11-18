@@ -197,7 +197,12 @@ vehicleButtons.forEach(b => b.addEventListener("click", () => { selectVehicle(b.
 const busRouteSelect = $("busRouteSelect");
 busRouteSelect.innerHTML = BUS_ROUTES.map(r => `<option value="${r.id}">${r.id}</option>`).join("");
 const TAXI_YELLOW = "#f2c200";
-const streetName = (r) => r.name.replace(/^Gran Av\.$/, "Gran Avenida");
+/* 2.9.2 · Calles con dos tramos lejos uno del otro: se separan con el sector (los de la Alameda se cruzan y van juntos) */
+const TAXI_SECTOR = { "211": "La Granja", "712": "Macul", "507": "Estación Central", "506": "Ñuñoa", "430": "El Golf", "C02": "Los Dominicos" };
+const streetName = (r) => {
+  const name = r.name.replace(/^Gran Av\.$/, "Gran Avenida"), sector = TAXI_SECTOR[r.id];
+  return sector ? `${name.replace(/^Av\. (?=Américo)/, "")} · ${sector}` : name;
+};
 const TAXI_STREETS = [...BUS_ROUTES.filter(r => r.real).reduce((m, r) => {
   const k = streetName(r), cur = m.get(k);
   if (!cur || r.length > cur.length) m.set(k, r);
@@ -223,7 +228,10 @@ function renderBusChips() {
     chip.style.setProperty("--c", c);
     chip.style.setProperty("--on-c", textOn(c));
     chip.dataset.route = r.id;
-    chip.textContent = taxi ? streetName(r) : r.id;
+    if (taxi) {
+      const [street, sector] = streetName(r).split(" · ");
+      chip.innerHTML = sector ? `${street}<small>${sector}</small>` : street;
+    } else chip.textContent = r.id;
     chip.title = taxi ? `${streetName(r)}: ${r.from} ⇄ ${r.to}` : `${r.id} · ${r.practice ? "Práctica · " : ""}${r.name}: ${r.from} → ${r.to}`;
     chip.setAttribute("aria-label", chip.title);
     chip.addEventListener("click", () => selectBusRoute(r.id));

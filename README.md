@@ -136,6 +136,8 @@ trenes de los dos motores quedan a ~1 m (mediana).
   al Metro, cuántos paraderos tiene, su largo y hacia dónde va el servicio).
 - **2.9.1** · El taxi ya no muestra los recorridos del bus: se elige la **calle** (Alameda, Apoquindo, Providencia, Gran
   Avenida…), una vez cada una, con botones amarillos y su ficha (largo, semáforos y estaciones de Metro por las que pasa).
+- **2.9.2** · Las calles del taxi con dos tramos lejos uno del otro se eligen por separado, con el sector: Américo Vespucio
+  (La Granja y Macul), Av. Apoquindo (El Golf y Los Dominicos) y Av. Matta (Estación Central y Ñuñoa).
 
 ## Versión 2.8 · La radio del taxi
 
