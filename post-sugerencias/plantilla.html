@@ -38,6 +38,26 @@ body.h .txt{grid-area:txt;align-items:flex-start;align-self:end}
 body.h .foot{grid-area:foot;align-items:flex-start;align-self:start}
 body.h .devices{grid-area:dev;align-self:center}
 body.h .chips{justify-content:flex-start}
+
+/* Versión clara: fondo cálido, textos oscuros y las pantallas del juego resaltan encima */
+body{color:#111722;background:radial-gradient(ellipse at 50% 25%,#ffffff 0%,#fff3e6 45%,#ffd9d2 100%)}
+body::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 12% 88%,rgba(244,180,0,.28),transparent 40%),radial-gradient(circle at 90% 10%,rgba(215,38,46,.16),transparent 38%)}
+.wrap{z-index:1}
+h1{color:#111722}
+.badge{color:#fff;box-shadow:0 6px 18px rgba(215,38,46,.3)}
+h1 em{color:#d7262e}
+h1 small{color:#5a6472}
+.monitor .scr{border-color:#111722;box-shadow:0 24px 60px rgba(17,23,34,.35)}
+.monitor .neck{background:linear-gradient(#2a3346,#111722)}
+.monitor .base{background:#111722}
+.phone{border-color:#111722;box-shadow:0 0 0 calc(var(--dw) * .006) #d7262e,-14px 22px 60px rgba(17,23,34,.4)}
+.tag{background:#f4b400;border-color:#f4b400;color:#111722;box-shadow:0 6px 18px rgba(17,23,34,.25)}
+.cloud{background:#d7262e;box-shadow:0 0 0 calc(var(--dw) * .014) rgba(215,38,46,.22),0 14px 40px rgba(17,23,34,.3)}
+.cloud svg path{stroke:#fff}
+.chip{background:#fff;border-color:rgba(17,23,34,.12);color:#111722;box-shadow:0 4px 14px rgba(17,23,34,.08)}
+.bar{background:#111722;color:#fff;box-shadow:0 0 0 8px rgba(244,180,0,.45),0 14px 40px rgba(17,23,34,.3)}
+.bar svg{stroke:#fff}
+.bar b span{color:#ff5a62}
 </style></head><body>
 <div class="wrap">
  <div class="txt">
@@ -60,7 +80,7 @@ body.h .chips{justify-content:flex-start}
   <span class="chip">💡 Ideas</span><span class="chip">🐞 Errores</span><span class="chip">💬 Comentarios</span>
   <span class="chip">⭐ Tu nota</span><span class="chip">📩 Leemos cada mensaje</span>
  </div>
- <div class="bar"><svg viewBox="0 0 24 24" fill="none" stroke="#111722" stroke-width="2.6" stroke-linecap="round"><circle cx="10" cy="10" r="7"/><path d="M15.5 15.5L21 21"/></svg><b>redmovisim<span>.cl</span></b></div>
+ <div class="bar"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"><circle cx="10" cy="10" r="7"/><path d="M15.5 15.5L21 21"/></svg><b>redmovisim<span>.cl</span></b></div>
  </div>
 </div>
 </body></html>

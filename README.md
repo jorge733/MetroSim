@@ -153,6 +153,8 @@ capturas del formulario en PC y en el celular acostado, y el texto listo en `tex
 
 **2.13.2** · El post suma la medida vertical de Instagram (`post-vertical.png`, 1080×1350), la que más ocupa en el feed.
 
+**2.13.3** · El post pasa a una versión clara (fondo cálido, títulos oscuros y rojos) y las capturas muestran la portada detrás de la ventana, sin el velo oscuro.
+
 ## Versión 2.12 · Tienda renovada
 
 La **Tienda RedMovi** (`js/shopUI.js`) ahora ayuda a decidir en qué gastar y a juntar para lo que falta:
