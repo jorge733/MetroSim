@@ -142,6 +142,8 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **2.10.2** · Guion de locución pendiente (`docs/guion-locucion-pendiente.pdf`): todas las frases que todavía dice la voz
   sintetizada y se pueden grabar (bienvenida, estaciones de los trenes Nos y Rancagua, combinaciones y avisos), con el
   nombre de archivo de cada una.
+- **2.10.3** · Post de presentación del juego para Facebook (`post-presentacion/`): imágenes en las tres medidas y el texto
+  del post (`texto.txt`).
 
 ## Versión 2.9 · Más recorridos de bus
 
