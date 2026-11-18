@@ -54,6 +54,10 @@ const ICON = {
   prev: '<svg viewBox="0 0 24 24"><path d="M11 6l-7 6 7 6zM20 6l-7 6 7 6z"/></svg>',
   next: '<svg viewBox="0 0 24 24"><path d="M13 6l7 6-7 6zM4 6l7 6-7 6z"/></svg>',
   close: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+  // 2.10 · Luces testigo del tablero (símbolos como los de un tablero real)
+  tDoors: '<svg viewBox="0 0 24 24"><path d="M4 4h16v16H4zM12 4v16"/><path d="M9 12H6m0 0 1.5-1.5M6 12l1.5 1.5M15 12h3m0 0-1.5-1.5M18 12l-1.5 1.5"/></svg>',
+  tBrake: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="6"/><path d="M12 9v3.5M12 15h.01M4.5 6.5a9 9 0 0 0 0 11M19.5 6.5a9 9 0 0 1 0 11"/></svg>',
+  tLim: '<svg viewBox="0 0 24 24"><path d="M4.5 16a8 8 0 1 1 15 0"/><path d="M12 13l3.5-4M8 20h8"/></svg>',
 };
 
 /**
@@ -62,6 +66,27 @@ const ICON = {
  *          onMuteChange:(m:boolean)=>void, onExit:()=>void}} o
  * @returns {{requestExit:()=>void, destroy:()=>void}}
  */
+/* 2.10 · Velocímetro de aguja, como el del tablero: 0 a 80 km/h en 240°, con la zona roja desde la velocidad máxima */
+const GAUGE_MAX = 80;
+const gaugeAngle = (kmh, max) => -120 + 240 * Math.max(0, Math.min(kmh, max)) / max;
+function gaugeSvg(max, limit) {
+  const pt = (a, r) => { const t = (a - 90) * Math.PI / 180; return [60 + r * Math.cos(t), 60 + r * Math.sin(t)].map(n => n.toFixed(2)); };
+  const arc = (a0, a1, r) => { const [x0, y0] = pt(a0, r), [x1, y1] = pt(a1, r); return `M${x0} ${y0}A${r} ${r} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${x1} ${y1}`; };
+  let ticks = "";
+  for (let v = 0; v <= max; v += 5) {
+    const a = gaugeAngle(v, max), major = v % 20 === 0, [x0, y0] = pt(a, major ? 43 : 46), [x1, y1] = pt(a, 51);
+    ticks += `<line x1="${x0}" y1="${y0}" x2="${x1}" y2="${y1}" class="${major ? "maj" : ""}"/>`;
+    if (major) { const [tx, ty] = pt(a, 34); ticks += `<text x="${tx}" y="${ty}">${v}</text>`; }
+  }
+  return `<svg class="bus-gauge-svg" viewBox="0 0 120 120" aria-hidden="true">
+    <path class="track" d="${arc(-120, 120, 51)}"/>
+    <path class="red" d="${arc(gaugeAngle(limit, max), 120, 51)}"/>
+    <g class="ticks">${ticks}</g>
+    <g data-k="needle" transform="rotate(-120 60 60)"><path class="needle" d="M58.6 62 L60 13 L61.4 62 Z"/></g>
+    <circle class="hub" cx="60" cy="60" r="5"/>
+  </svg>`;
+}
+
 export function startBusGame(o) {
   const game = new BusGame(o);
   return { requestExit: () => game.requestExit(), destroy: () => game.destroy(), get sim() { return game.sim; }, get debug() { return game; } };
@@ -178,13 +203,25 @@ class BusGame {
       <div class="bus-guide hidden" data-k="guide"><span data-k="guideText"></span><div class="bus-guide-bar"><i data-k="guideMark"></i><u data-k="guidePred"></u><b></b></div><small data-k="guideSub"></small></div>
       <div class="bus-lead hidden" data-k="lead"><span class="bus-label">AUTO ADELANTE</span><strong data-k="leadGap">—</strong></div>
       <footer class="bus-bottom">
-        <div class="bus-panel bus-speed">
-          <div class="bus-speed-num"><strong data-k="speed">0</strong><span class="bus-label">KM/H</span></div>
-          <div class="bus-limit" data-k="limit" title="Limitador (L)">${Math.round(R.speedLimit * 3.6)}<small>LIM</small></div>
+        <div class="bus-panel bus-speed bus-cluster">
+          <div class="bus-gauge">${gaugeSvg(GAUGE_MAX, R.speedLimit * 3.6)}
+            <div class="bus-speed-num"><strong data-k="speed">0</strong><span class="bus-label">KM/H</span></div>
+          </div>
+          <div class="bus-cluster-side">
+            <div class="bus-limit" data-k="limit" title="Limitador (L)">${Math.round(R.speedLimit * 3.6)}<small>LIM</small></div>
+            <div class="bus-tells">
+              <i data-k="tDoors" title="${this.taxi ? "Puerta abierta" : "Puertas abiertas"}">${ICON.tDoors}</i>
+              <i data-k="tBrake" class="brk" title="Frenando">${ICON.tBrake}</i>
+              <i data-k="tLim" class="lim" title="Limitador">${ICON.tLim}</i>
+            </div>
+          </div>
           <div class="bus-pedals"><span class="bus-label">ACEL</span><i><b data-k="thr"></b></i><span class="bus-label">FRENO</span><i class="brk"><b data-k="brk"></b></i></div>
         </div>
-        <div class="bus-panel bus-next">
-          <span class="bus-label" data-k="nextLabel">${this.taxi ? "CARRERA" : "PRÓXIMO PARADERO"}</span>
+        <div class="bus-panel bus-next${this.taxi ? " taxi" : ""}">
+          <div class="bus-next-head">
+            <span class="bus-label" data-k="nextLabel">${this.taxi ? "CARRERA" : "PRÓXIMO PARADERO"}</span>
+            ${this.taxi ? `<span class="taxi-meter" title="Taxímetro"><small>TAXÍMETRO</small><b data-k="meter">—</b></span>` : `<span class="bus-next-badge" style="--c:${R.color}">${esc(R.id)}</span>`}
+          </div>
           <strong data-k="stopName">—</strong>
           <div class="bus-next-row">
             <span data-k="stopDist">—</span>
@@ -192,7 +229,7 @@ class BusGame {
             <span data-k="delay" class="bus-delay">—</span>
           </div>
           <div class="bus-next-row bus-next-sub">
-            ${this.taxi ? `<span class="taxi-meter">Taxímetro <b data-k="meter">—</b></span>` : `<span>A bordo <b data-k="onboard">0</b>/${BUS_CAPACITY}</span>`}
+            ${this.taxi ? "" : `<span>A bordo <b data-k="onboard">0</b>/${BUS_CAPACITY}</span>`}
             <span data-k="doors">Puertas cerradas</span>
             <span data-k="light"></span>
           </div>
@@ -696,6 +733,11 @@ class BusGame {
     el.brk.style.width = `${b.brake * 100}%`;
     if (el.thrFill) { el.thrFill.style.height = `${b.throttle * 100}%`; el.brkFill.style.height = `${b.brake * 100}%`; }
     el.limit.classList.toggle("on", sim.limiter);
+    // 2.10 · Aguja del velocímetro y luces testigo del tablero
+    el.needle.setAttribute("transform", `rotate(${gaugeAngle(b.v * 3.6, GAUGE_MAX)} 60 60)`);
+    el.tDoors.classList.toggle("lit", b.doors !== "closed");
+    el.tBrake.classList.toggle("lit", b.brake > 0.05);
+    el.tLim.classList.toggle("lit", !!sim.limiter);
     this.root.querySelector('[data-t="limiter"]')?.classList.toggle("lit", sim.limiter);
     // Distancia al auto de adelante (solo si está cerca)
     const lead = !this.ride && sim.lead && sim.lead.gap < 45 && b.v > 1 ? sim.lead : null;

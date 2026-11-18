@@ -124,6 +124,18 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **Salir por los torniquetes es gratis**: solo se cobra el pasaje al pasar hacia la zona pagada (antes, al terminar
   de cruzar el torniquete de salida se cobraba un pasaje).
 
+## Versión 2.10 · Un tablero de verdad en el bus y el taxi
+
+- **Velocímetro de aguja**: el panel de abajo a la izquierda ahora es el tablero del vehículo, con un velocímetro de
+  0 a 80 km/h, la zona roja desde la velocidad máxima de la calle y los km/h en número al centro, junto al letrero de
+  velocidad máxima (que se marca en verde con el limitador).
+- **Luces testigo** como las de un tablero real: puertas abiertas (amarilla), freno (roja) y limitador (verde).
+- **Consola del conductor**: el próximo paradero se ve en una pantalla con el número del recorrido y los datos en
+  casillas (distancia, gente esperando, si vas a la hora, pasajeros a bordo y puertas).
+- **Taxímetro**: en el taxi, la carrera lleva el aparato del taxímetro, con «LIBRE» en verde y el monto en números rojos
+  durante el viaje.
+- En el celular el tablero se achica para caber bajo la fila de botones.
+
 ## Versión 2.9 · Más recorridos de bus
 
 - **16 recorridos nuevos de Red** (24 en total, más el A01 de práctica), por calles nuevas de la ciudad: 104 (Los Leones),

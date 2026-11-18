@@ -36,9 +36,57 @@
 /* Consola de abajo */
 .bus-bottom { gap: 12px; }
 .bus-panel { padding: 14px 16px; }
-.bus-speed-num strong { font-size: 48px; }
 .bus-next { width: min(460px, 52vw); }
 .bus-next strong { font-size: 26px; }
+
+/* 2.10 · Tablero: velocímetro de aguja con luces testigo, como el del bus o el taxi */
+.bus-cluster {
+  grid-template-columns: auto auto; gap: 6px 12px; padding: 12px 14px 12px 12px; border-radius: 22px;
+  background: radial-gradient(120% 90% at 35% 30%, #1b222b 0%, #0b0f14 70%); border: 1px solid #ffffff1f;
+  box-shadow: inset 0 1px 0 #ffffff14, inset 0 -6px 14px #0009, 0 8px 24px #0007;
+}
+.bus-gauge { position: relative; width: 132px; height: 132px; border-radius: 50%; background: radial-gradient(circle at 50% 45%, #10161d 0 58%, #070a0e 72%); box-shadow: inset 0 0 0 2px #2a323c, inset 0 0 0 5px #0a0d11, inset 0 3px 10px #000c; }
+.bus-gauge-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.bus-gauge-svg .track { fill: none; stroke: #ffffff12; stroke-width: 3; }
+.bus-gauge-svg .red { fill: none; stroke: #ff3b30; stroke-width: 3; opacity: .85; }
+.bus-gauge-svg .ticks line { stroke: #c7d0da; stroke-width: 1; stroke-linecap: round; }
+.bus-gauge-svg .ticks line.maj { stroke: #fff; stroke-width: 2; }
+.bus-gauge-svg text { fill: #e8edf2; font: 600 10px var(--f-data); text-anchor: middle; dominant-baseline: central; }
+.bus-gauge-svg .needle { fill: #ff4b2b; filter: drop-shadow(0 0 3px #ff4b2b99); }
+.bus-gauge-svg .hub { fill: #1d242c; stroke: #3a434d; stroke-width: 1.5; }
+.bus-gauge .bus-speed-num { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); gap: 1px; }
+.bus-gauge .bus-speed-num strong { font: 700 21px/1 var(--f-data); color: #f2f6fa; text-shadow: 0 0 6px #5cc8ff44; }
+.bus-gauge .bus-speed-num .bus-label { font-size: 8px; }
+.bus-speed-num.over strong { color: var(--emergency); text-shadow: 0 0 8px #ff4d4d88; }
+.bus-cluster-side { display: grid; justify-items: center; align-content: center; gap: 18px; }
+.bus-tells { display: grid; grid-template-columns: repeat(3, 22px); gap: 5px; }
+.bus-tells i { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 5px; background: #05080b; box-shadow: inset 0 0 0 1px #ffffff12; color: #ffffff1f; transition: color .12s, box-shadow .12s; }
+.bus-tells svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.bus-tells i.lit { color: #ffb21e; box-shadow: inset 0 0 0 1px #ffb21e55, 0 0 8px #ffb21e55; }
+.bus-tells i.brk.lit { color: #ff4636; box-shadow: inset 0 0 0 1px #ff463655, 0 0 8px #ff463655; }
+.bus-tells i.lim.lit { color: #34d17c; box-shadow: inset 0 0 0 1px #34d17c55, 0 0 8px #34d17c55; }
+.bus-cluster .bus-pedals { padding: 0 4px; }
+
+/* 2.10 · Consola del conductor: pantalla con el próximo paradero (o la carrera del taxi) */
+.bus-next {
+  position: relative; border-radius: 16px; padding: 12px 16px 12px;
+  background: linear-gradient(180deg, #0d141c 0%, #081017 100%); border: 1px solid #ffffff1f;
+  box-shadow: inset 0 0 0 4px #05080b, inset 0 0 0 5px #ffffff0d, inset 0 10px 30px #5cc8ff0a, 0 8px 24px #0007;
+}
+.bus-next::after { content: ""; position: absolute; inset: 5px; border-radius: 11px; pointer-events: none; background: repeating-linear-gradient(0deg, #ffffff05 0 1px, transparent 1px 3px); }
+.bus-next-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-bottom: 5px; border-bottom: 1px solid #ffffff12; }
+.bus-next-head .bus-label { color: #8fd3ff; }
+.bus-next-badge { padding: 2px 8px; border-radius: 5px; background: var(--c); color: #fff; font: 700 12px/1.3 var(--f-data); letter-spacing: .4px; }
+.bus-next-row > span:empty { display: none; }
+.bus-next-row > span:not(:empty) { padding: 2px 8px; border-radius: 6px; background: #ffffff0a; box-shadow: inset 0 0 0 1px #ffffff0d; font-family: var(--f-data); font-size: 12.5px; }
+.bus-next-sub > span:not(:empty) { font-family: var(--f-body); font-size: 12.5px; }
+.bus-next .bus-hint { padding-top: 6px; border-top: 1px dashed #ffffff14; }
+.bus-next .bus-hint:empty { display: none; }
+/* Taxímetro: el aparato con números rojos (verde «LIBRE» cuando no hay carrera) */
+.bus-next .taxi-meter { display: inline-flex; align-items: baseline; gap: 8px; padding: 3px 10px; border-radius: 6px; background: #020303; box-shadow: inset 0 0 0 1px #ffffff1a, inset 0 2px 6px #000; }
+.bus-next .taxi-meter small { font: 700 8.5px/1 var(--f-data); letter-spacing: .8px; color: #7d8792; }
+.bus-next .taxi-meter b { font: 700 17px/1.1 var(--f-data); letter-spacing: 1px; color: #3dff8b; text-transform: uppercase; text-shadow: 0 0 8px #3dff8b66; }
+.bus-next .taxi-meter.on b { color: #ff3b2b; text-shadow: 0 0 8px #ff3b2b88; }
 .bus-guide { padding: 10px 14px; }
 .bus-guide-bar i { background: var(--brand); }
 
@@ -130,3 +178,31 @@
 .taxi-radio-list button.on { border-color: #f2c200; background: #f2c2001a; }
 .taxi-radio-list button.on b { color: #f2c200; }
 .taxi-radio-note { font-size: 11px; line-height: 1.4; color: var(--muted); }
+
+/* 2.10 · Tablero en pantallas chicas y en el celular */
+@media (max-width: 900px), (max-height: 520px) {
+  .bus-gauge { width: 104px; height: 104px; }
+  .bus-gauge .bus-speed-num { bottom: 10px; }
+  .bus-gauge .bus-speed-num strong { font-size: 17px; }
+  .bus-cluster-side { gap: 12px; }
+}
+/* En el celular el tablero queda bajo la fila de botones (Puertas, Limitador…): no más de ~78 px de alto */
+.bus-touch-mode .bus-cluster { padding: 4px 8px 4px 4px; gap: 4px 8px; border-radius: 16px; }
+.bus-touch-mode .bus-gauge { width: 70px; height: 70px; }
+.bus-touch-mode .bus-gauge-svg text { font-size: 12px; }
+.bus-touch-mode .bus-gauge .bus-speed-num { bottom: 5px; }
+.bus-touch-mode .bus-gauge .bus-speed-num strong { font-size: 13px; }
+.bus-touch-mode .bus-gauge .bus-speed-num .bus-label { display: none; }
+.bus-touch-mode .bus-cluster-side { gap: 6px; }
+.bus-touch-mode .bus-limit { width: 32px; height: 32px; font-size: 12px; }
+.bus-touch-mode .bus-next-row { gap: 4px 6px; }
+.bus-touch-mode .bus-next-row > span:not(:empty) { padding: 1px 6px; font-size: 11px; }
+.bus-touch-mode .bus-next .bus-hint { padding-top: 4px; font-size: 12px; }
+.bus-touch-mode .bus-guide { bottom: 186px; }
+.bus-touch-mode .bus-tells { grid-template-columns: repeat(3, 18px); gap: 3px; }
+.bus-touch-mode .bus-tells i { width: 18px; height: 18px; }
+.bus-touch-mode .bus-tells svg { width: 13px; height: 13px; }
+.bus-touch-mode .bus-next { padding: 8px 12px; }
+.bus-touch-mode .bus-next::after { inset: 4px; }
+.bus-touch-mode .bus-next-head { padding-bottom: 3px; }
+.bus-touch-mode .bus-next .taxi-meter b { font-size: 14px; }
