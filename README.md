@@ -124,6 +124,21 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **Salir por los torniquetes es gratis**: solo se cobra el pasaje al pasar hacia la zona pagada (antes, al terminar
   de cruzar el torniquete de salida se cobraba un pasaje).
 
+## Versión 2.11 · Tu cuenta: inicia sesión con tu correo y sigue en cualquier dispositivo
+
+Nuevo `js/cuenta.js`: cuenta **opcional**, sin contraseña. En la portada (botón **Entrar**) o en el menú de la partida
+(**Guardar en la nube**) escribes tu correo, te llega un **código de 6 dígitos** y con eso entras.
+
+- **La partida en la nube:** tu cuenta, la tarjeta bip!, las compras de la tienda, las misiones, los récords, el civismo,
+  los tutoriales y tu perfil se guardan solos mientras juegas (cada 20 s si hubo cambios y al cerrar el juego). Las
+  preferencias del dispositivo (sonido, línea elegida, clima, modo creador) no se suben.
+- **Otro dispositivo:** entras con el mismo correo y se baja tu partida. Si el dispositivo y la nube tienen avances
+  distintos, el juego te pregunta con cuál quedarte (en la portada, nunca en medio de un viaje).
+- **Sin internet** se juega igual y lo pendiente se sube cuando vuelve la conexión. Sin cuenta, todo sigue como antes.
+- **Tu cuenta:** cerrar sesión (el avance queda en el dispositivo) y **borrar la cuenta** con su partida de la nube.
+- Usa Supabase (correo con código y una tabla `partidas` con reglas que solo dejan a cada jugador leer y cambiar la suya);
+  los correos salen desde `no-reply@redmovisim.cl` con Resend.
+
 ## Versión 2.10 · Un tablero de verdad en el bus y el taxi
 
 - **Velocímetro de aguja**: el panel de abajo a la izquierda ahora es el tablero del vehículo, con un velocímetro de

@@ -94,7 +94,7 @@
       <div class="home-brand">
         <img class="home-logo" src="logo.svg" alt="">
         <h1>Red<span>Movi</span>Sim</h1>
-        <span class="start-ver">v2.10.4</span>
+        <span class="start-ver">v2.11</span>
       </div>
       <div class="home-bar-tools">
         <button class="home-clock" id="clockNow" type="button" aria-live="polite" title="Ver las tarifas según el horario">
@@ -107,6 +107,7 @@
           <span class="home-wallet-label">Tienda</span>
           <strong id="startBank" class="shop-balance-mini"></strong>
         </button>
+        <button id="accountButton" class="home-icon-btn account-launch" type="button" title="Inicia sesión para guardar tu partida en la nube"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><span>Entrar</span></button>
         <button id="installButton" class="home-icon-btn install-launch" hidden title="Instalar la app"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg><span>Instalar app</span></button>
         <button id="creatorBadge" class="home-icon-btn creator-launch" hidden title="Todo desbloqueado y gratis · toca para desactivar"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/></svg><span>Creador</span></button>
       </div>
@@ -565,6 +566,7 @@
           <button class="game-menu-item" data-act="sound"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4zM16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/></svg><span>Sonido · <b id="gameMenuSound">activado</b></span><kbd>M</kbd></button>
           <button class="game-menu-item" data-act="fares"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>Tarifas según el horario</span></button>
           <button class="game-menu-item" data-act="store"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16l-1.5 13h-13zM9 7V5a3 3 0 0 1 6 0v2"/></svg><span>Tienda RedMovi</span><kbd>K</kbd></button>
+          <button class="game-menu-item" data-act="account"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><span id="gameMenuAccount">Guardar en la nube</span></button>
           <button class="game-menu-item only-walker" data-act="missions"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg><span>Misiones</span><kbd>J</kbd></button>
           <button class="game-menu-item only-driver" data-act="restart"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5"/></svg><span>Reiniciar el servicio</span><kbd>R</kbd></button>
         </div>

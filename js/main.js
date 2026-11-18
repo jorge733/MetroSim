@@ -126,6 +126,7 @@ import { quoteStage, commitStage, loadTrip, saveTrip, fareModeOfLine, minutesLef
 import { setupRiderPanel, openRiderPanel, closeRiderPanel, riderPanelOpen } from "./riderPanel.js";
 import { startBusGame } from "./bus/busGame.js";
 import { busTripsFrom, BUS_ROUTES, busRouteById } from "./bus/busRoute.js";
+import { setupAccountButton, openAccount, closeAccount, accountOpen, state as accountState } from "./cuenta.js";
 
 // La vía en 3D sigue las pendientes reales: se engancha antes de compilar ningún material
 installTrackLift();
@@ -151,6 +152,7 @@ const directionSelect = $("startDirection");
 // La introducción de bienvenida la arranca boot.js apenas abre la página (1.8.3)
 // App instalable: service worker (sin conexión) y botón "Instalar MetroSim"
 setupPWA($("installButton"));
+setupAccountButton($("accountButton"));
 // Modo Creador (?creador): todo desbloqueado y gratis para el creador del juego
 setupCreator($("creatorBadge"));
 const wait = (ms) => new Promise(r => setTimeout(r, ms));
@@ -1101,6 +1103,7 @@ window.addEventListener("popstate", () => {
   // Primero cierra la ventana que esté abierta (tienda, boletería, local, misiones) y se sigue jugando
   const shopClose = document.querySelector(".shop-overlay .shop-close");
   if (shopClose) shopClose.click();
+  else if (accountOpen()) closeAccount();
   else if (confirmOpen) closeConfirm(false);
   else if (riderPanelOpen()) closeRiderPanel();
   else if (fareInfoOpen()) closeFareInfo();
@@ -1261,7 +1264,7 @@ function toggleSound() {
 
 function onKeyDown(event) {
   if (busStopPanel) { if (event.key === "Escape") closeBusStop(); return; }
-  if (!game || game.warming) return;
+  if (!game || game.warming || accountOpen()) return;
   const key = event.key.toLowerCase();
   if (["arrowup", "arrowdown", "arrowleft", "arrowright", " ", "pageup", "pagedown"].includes(key)) event.preventDefault();
   if (hud.summaryOpen) return;
@@ -2595,8 +2598,10 @@ function openGameMenu() {
   $("gameMenuKicker").textContent = w ? "VIAJANDO" : game.net ? `CONDUCIENDO · SALA ${game.net.code}` : "CONDUCIENDO";
   $("gameMenuSound").textContent = muted ? "desactivado" : "activado";
   menu.querySelector('[data-act="restart"]').hidden = !!game.net;
+  const acc = accountState();
+  $("gameMenuAccount").textContent = acc.signedIn ? "Mi cuenta · guardado en la nube" : "Guardar en la nube";
   $("gameMenuNote").textContent = w
-    ? "Tu cuenta, tu bip! y tus misiones quedan guardadas en este dispositivo."
+    ? (acc.signedIn ? "Tu cuenta, tu bip! y tus misiones se guardan en la nube." : "Tu cuenta, tu bip! y tus misiones quedan guardadas en este dispositivo.")
     : "El tren sigue en marcha mientras ves el menú. Al finalizar el turno ves tu informe y cobras el sueldo.";
   menu.classList.remove("hidden");
   menu.querySelector(".game-menu-resume").focus();
@@ -2619,6 +2624,7 @@ function gameMenuAction(act) {
   else if (act === "restart" && !game.net) restartGame();
   else if (act === "end") { game.endShiftAsk = performance.now(); requestEndShift(); }   // ya se confirmó en el menú
   else if (act === "home") stopGame();
+  else if (act === "account") openAccount();
 }
 
 function requestMenu() {

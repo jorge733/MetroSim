@@ -8,6 +8,7 @@
 
 import { playIntro } from "./intro.js";
 import { ACTIVA, saltarMantencion, mostrarMantencion } from "./mantencion.js";
+import { syncAtBoot } from "./cuenta.js";
 
 /** El sonido silenciado se guarda en el navegador (lo cambia main.js con la tecla M). */
 const isMuted = () => { try { return localStorage.getItem("metrosim.muted") === "1"; } catch { return false; } };
@@ -16,7 +17,8 @@ const isMuted = () => { try { return localStorage.getItem("metrosim.muted") === 
 if (ACTIVA && !saltarMantencion()) {
   mostrarMantencion();
 } else {
-  const game = import("./main.js");
+  // 2.11 · Con sesión iniciada, primero se trae la partida de la nube (mientras corre la intro, máx. 4 s)
+  const game = syncAtBoot().then(() => import("./main.js"));
   playIntro({ isMuted, menuReady: game });
   game.catch(err => console.error("RedMoviSim no pudo cargar el juego:", err));
 }
