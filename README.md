@@ -148,6 +148,9 @@ Nuevo `js/sugerencias.js`: un formulario para que los jugadores nos cuenten idea
   4. En *Database → Webhooks*, uno nuevo para la tabla `sugerencias`, evento **Insert**, tipo *Supabase Edge Function*
      `aviso-sugerencia`, con la cabecera `x-aviso-token` igual a `AVISO_TOKEN`.
 
+**2.13.1** · Post para Instagram «RedMoviSim te escucha» (`post-sugerencias/`: cuadrado, historia y horizontal, con
+capturas del formulario en PC y en el celular acostado, y el texto listo en `texto.txt`).
+
 ## Versión 2.12 · Tienda renovada
 
 La **Tienda RedMovi** (`js/shopUI.js`) ahora ayuda a decidir en qué gastar y a juntar para lo que falta:
