@@ -15,7 +15,7 @@
 
    Mandos: W/↑ acelerar · S/↓ frenar · A/← y D/→ cambiar de pista ·
    Espacio puertas · B bocina · C cámara · M sonido · Esc pausa.
-   Taxi: U vuelta en U · R radio · , y . cambian de emisora.
+   R radio · , y . cambian de emisora · Taxi: U vuelta en U.
    ========================================================================== */
 
 import * as THREE from "three";
@@ -82,8 +82,8 @@ class BusGame {
     this.audio = new BusAudio();
     this.audio.muted = muted;
     this.audio.start({ rain: WEATHER.rain });
-    /* 2.8 · La radio del taxi: emisoras de Santiago en vivo (taxiRadio.js) */
-    if (this.taxi) {
+    /* 2.8 · La radio: emisoras de Santiago en vivo (taxiRadio.js) · 2.8.1 · también al conducir el bus (no al viajar de pasajero) */
+    if (!this.ride) {
       this.radio = new TaxiRadio({
         onChange: () => this.renderRadio(),
         onTune: () => this.audio.radioStatic(),
@@ -166,13 +166,13 @@ class BusGame {
           <div class="bus-pill"><span class="bus-label">CUENTA</span><strong data-k="bank">$0</strong><span class="bus-float" data-k="float"></span></div>
           <div class="bus-pill"><span class="bus-label">HORA</span><strong data-k="clock">--:--</strong></div>
           <div class="bus-pill bus-weather"><span class="bus-label">CLIMA</span><strong>${esc(weatherLabel())}</strong></div>
-          ${this.taxi ? `<button class="bus-pill taxi-radio-btn" data-k="radioBtn" aria-label="Radio" title="Radio (R enciende · , y . cambian de emisora)">${ICON.radio}<span class="taxi-radio-btn-text"><span class="bus-label">RADIO</span><strong data-k="radioNow">Apagada</strong></span></button>` : ""}
+          ${this.radio ? `<button class="bus-pill taxi-radio-btn" data-k="radioBtn" aria-label="Radio" title="Radio (R enciende · , y . cambian de emisora)">${ICON.radio}<span class="taxi-radio-btn-text"><span class="bus-label">RADIO</span><strong data-k="radioNow">Apagada</strong></span></button>` : ""}
           <button class="bus-icon-btn" data-k="sound" aria-label="Sonido">${ICON.sound}</button>
           <button class="bus-icon-btn bus-menu-btn" data-k="menu" aria-label="Pausa y menú" title="Menú (Esc)">${ICON.menu}<span>Menú</span></button>
         </div>
       </header>
       <div class="bus-strip" data-k="strip"></div>
-      ${this.taxi ? this.radioPanelHtml() : ""}
+      ${this.radio ? this.radioPanelHtml() : ""}
       <div class="bus-bell hidden" data-k="bell">PARADA SOLICITADA</div>
       <div class="bus-toast hidden" data-k="toast"></div>
       <div class="bus-guide hidden" data-k="guide"><span data-k="guideText"></span><div class="bus-guide-bar"><i data-k="guideMark"></i><u data-k="guidePred"></u><b></b></div><small data-k="guideSub"></small></div>
@@ -205,7 +205,8 @@ class BusGame {
         <span><kbd>L</kbd> limitador</span>
         <span><kbd>A</kbd><kbd>D</kbd> cambiar de pista</span>
         <span><kbd>Espacio</kbd> ${this.taxi ? "puerta (subir y bajar pasajero)" : "puertas"}</span>
-        ${this.taxi ? `<span><kbd>U</kbd> vuelta en U (en un cruce)</span><span><kbd>R</kbd> radio · <kbd>,</kbd><kbd>.</kbd> emisora</span>` : ""}
+        ${this.taxi ? `<span><kbd>U</kbd> vuelta en U (en un cruce)</span>` : ""}
+        <span><kbd>R</kbd> radio · <kbd>,</kbd><kbd>.</kbd> emisora</span>
         <span><kbd>B</kbd> bocina</span>
         <span><kbd>C</kbd> cámara</span>
         <span><kbd>Esc</kbd> pausa</span>
@@ -276,7 +277,7 @@ class BusGame {
     this.root.classList.add("bus-keys-on");
     this.keysTimer = setTimeout(() => { this.root.classList.remove("bus-keys-on"); syncMenu(); }, 12000);
     syncMenu();
-    if (this.taxi) this.bindRadio();
+    if (this.radio) this.bindRadio();
     this.bindTouch();
     this.root.querySelectorAll("[data-r]").forEach(btn => btn.addEventListener("click", (e) => {
       e.currentTarget.blur();
@@ -373,10 +374,10 @@ class BusGame {
     this.stripPct = pct;
   }
 
-  /* ----------------------------- 2.8 · Radio del taxi ----------------------------- */
+  /* ----------------------------- 2.8 · Radio (taxi y, desde 2.8.1, bus) ----------------------------- */
   radioPanelHtml() {
     return `
-      <div class="taxi-radio hidden" data-k="radioPanel" role="dialog" aria-label="Radio del taxi">
+      <div class="taxi-radio hidden" data-k="radioPanel" role="dialog" aria-label="Radio">
         <header class="taxi-radio-head">
           <span class="bus-label">RADIO · EN VIVO</span>
           <button class="taxi-radio-x" data-k="radioClose" aria-label="Cerrar la radio">${ICON.close}</button>

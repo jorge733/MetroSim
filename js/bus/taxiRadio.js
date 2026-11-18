@@ -1,6 +1,7 @@
 /* ==========================================================================
    MetroSim — 2.8 · bus/taxiRadio.js
-   La radio del taxi: emisoras reales de Santiago EN VIVO, por internet.
+   La radio del taxi y (2.8.1) del bus: emisoras reales de Santiago EN VIVO,
+   por internet. No está al viajar de pasajero (la radio es del conductor).
 
    Cada emisora suena desde la transmisión pública que la propia radio
    ofrece en su sitio (el juego no guarda ni retransmite nada: el

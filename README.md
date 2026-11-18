@@ -137,6 +137,8 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - El botón de sonido del juego (o **M**) también silencia la radio. El juego recuerda en este dispositivo si la dejaste
   encendida, en qué emisora y con qué volumen.
 - Las emisoras están en `js/bus/taxiRadio.js`: si una radio cambia su transmisión, basta corregir su dirección ahí.
+- **2.8.1** · La radio también está al **conducir el bus** (el mismo botón Radio, las mismas teclas y la misma emisora
+  que dejaste en el taxi). Al viajar de pasajero no está: la radio es del conductor.
 
 ## Versión 2.7 · Todas las calles son reales
 

@@ -81,7 +81,7 @@
 .taxi-meter.on b { color: #ff6b5b; text-shadow: 0 0 8px #ff3b3055; }
 .bus-strip-bus.taxi.back { box-shadow: 0 0 0 2px #111, 0 0 0 4px #3ad37f99, 0 2px 6px #0008; }
 
-/* ---------- 2.8 · Radio del taxi (emisoras de Santiago en vivo) ---------- */
+/* ---------- 2.8 · Radio del taxi y (2.8.1) del bus: emisoras de Santiago en vivo ---------- */
 .taxi-radio-btn { display: inline-flex; align-items: center; gap: 10px; height: 52px; padding: 0 14px 0 12px; color: var(--text); cursor: pointer; text-align: left; font: inherit; transition: background .15s, border-color .15s; }
 .taxi-radio-btn:hover, .taxi-radio-btn.open { background: #1a2029ee; border-color: #ffffff33; }
 .taxi-radio-btn > svg, .taxi-radio svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
