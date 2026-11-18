@@ -117,9 +117,16 @@ function createWorldMaterials() {
     stair: std(0x9ea3a6, { rough: 0.6 }),
     stairNose: std(0xf2c230, { rough: 0.6 }),
     balustrade: std(0x9fd3ef, { metal: 0.1, rough: 0.05, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide }),
-    gateCabinet: std(0xb9c0c6, { metal: 0.7, rough: 0.3 }),
-    gateTop: std(0x1c2024, { rough: 0.5 }),
-    gateFlap: std(0xbfe3f5, { metal: 0.1, rough: 0.05, transparent: true, opacity: 0.45, side: THREE.DoubleSide }),
+    gateCabinet: std(0xffffff, { map: toTexture(brushedSteelCanvas(), 1, 1), metal: 0.85, rough: 0.32 }),
+    gateTop: std(0x1c2024, { rough: 0.45, metal: 0.2 }),
+    gatePlinth: std(0x2a2e33, { rough: 0.7, metal: 0.3 }),
+    gateSeam: std(0x5b6269, { metal: 0.6, rough: 0.5 }),
+    gateArm: std(0xe4e8ec, { metal: 0.95, rough: 0.12 }),
+    gateHub: std(0x3a4047, { metal: 0.8, rough: 0.3 }),
+    gateReader: std(0x16191d, { rough: 0.4, metal: 0.3 }),
+    gateScreen: glow(0x0f3550),
+    gateGo: glow(0xffffff, { map: toTexture(gateSignCanvas(true)) }),
+    gateStop: glow(0xffffff, { map: toTexture(gateSignCanvas(false)) }),
     validator: glow(0x37d67a),
     kiosk: std(0x3a4148, { metal: 0.4, rough: 0.5 }),
     kioskScreen: glow(0x2a74ff),
@@ -181,6 +188,31 @@ function addBounce(mat, amount) {
 }
 
 /* ---------- Texturas de la mezanina ---------- */
+/** Acero inoxidable cepillado (vetas verticales) para los gabinetes de los torniquetes. */
+function brushedSteelCanvas() {
+  const c = makeCanvas(128, 128), g = c.getContext("2d");
+  g.fillStyle = "#b4bbc1"; g.fillRect(0, 0, 128, 128);
+  for (let i = 0; i < 260; i++) {
+    const v = 150 + Math.floor(Math.random() * 70);
+    g.fillStyle = `rgba(${v},${v + 4},${v + 8},0.35)`;
+    g.fillRect(Math.random() * 128, 0, 0.6 + Math.random(), 128);
+  }
+  return c;
+}
+
+/** Pictograma del torniquete: flecha verde (habilitado) o aspa roja (rechazo). */
+function gateSignCanvas(ok) {
+  const c = makeCanvas(64, 64), g = c.getContext("2d");
+  g.fillStyle = "#07090b"; g.fillRect(0, 0, 64, 64);
+  g.lineCap = "round"; g.lineJoin = "round"; g.lineWidth = 9;
+  g.strokeStyle = g.fillStyle = ok ? "#3dff7a" : "#ff3030";
+  g.beginPath();
+  if (ok) { g.moveTo(32, 52); g.lineTo(32, 16); g.moveTo(17, 30); g.lineTo(32, 14); g.lineTo(47, 30); }
+  else { g.moveTo(17, 17); g.lineTo(47, 47); g.moveTo(47, 17); g.lineTo(17, 47); }
+  g.stroke();
+  return c;
+}
+
 function escalatorStepsCanvas() {
   const c = makeCanvas(64, 64), g = c.getContext("2d");
   g.fillStyle = "#4a4f54"; g.fillRect(0, 0, 64, 64);
@@ -334,7 +366,7 @@ export class World {
   }
 
   /**
-   * Torniquetes: se abren cuando alguien pasa por ellos.
+   * Torniquetes de trípode: giran cuando alguien pasa por ellos.
    * @param {Array<THREE.Vector3>} agents posiciones (mundo) de jugador y viajeros en la mezanina
    * @returns {Array} pasos abiertos este fotograma (para el sonido "bip")
    */
@@ -342,17 +374,25 @@ export class World {
     const opened = [];
     for (const gate of this.gates) {
       if (Math.abs(gate.z - cameraZ) > 120) continue;
-      const near = agents.some(a => Math.abs(a.y - MZ.y) < 1 && Math.abs(a.x - gate.x) < 0.4 && Math.abs(a.z - gate.z) < 1.1);
+      const who = agents.find(a => Math.abs(a.y - MZ.y) < 1 && Math.abs(a.x - gate.x) < 0.4 && Math.abs(a.z - gate.z) < 1.1);
       if (gate.flashT > 0) {
         gate.flashT -= dt;
+        const red = gate.flashT > 0 && gate.flashColor === 0xff2a2a;
         gate.validator.setHex(gate.flashT > 0 ? gate.flashColor : 0x37d67a);
+        gate.go.visible = !red; gate.stop.visible = red;
       }
-      const target = near && !gate.locked ? 1 : 0;
-      if (target === 1 && gate.open < 0.05) opened.push(gate);
-      gate.open += Math.sign(target - gate.open) * Math.min(Math.abs(target - gate.open), dt * 5);
-      const a = gate.open * Math.PI / 2;
-      gate.flaps[0].rotation.y = a;
-      gate.flaps[1].rotation.y = -a;
+      // El trípode gira un tercio de vuelta por persona (en el sentido en que camina):
+      // a medio giro deja el paso libre y, al alejarse, termina el tercio; por su simetría
+      // un tercio de vuelta equivale a volver a cero.
+      if (who && gate.turn < 0.05) {
+        opened.push(gate);
+        gate.dir = who.z > gate.z ? -1 : 1;
+      }
+      const goal = who ? 0.5 : gate.turn > 0.2 ? 1 : 0;
+      gate.turn += Math.sign(goal - gate.turn) * Math.min(Math.abs(goal - gate.turn), dt * 2.6);
+      if (gate.turn >= 1) gate.turn = 0;
+      gate.open = gate.turn;
+      gate.rotor.rotation.y = gate.dir * gate.turn * 2 * Math.PI / 3;
     }
     return opened;
   }
@@ -896,26 +936,32 @@ function buildMezzanine(group, M, st, nameMat, gates) {
   [[-wx, firstEdge - 0.3], [lastEdge + 0.3, wx]].forEach(([x0, x1]) => {
     addBoxSpan(group, (x0 + x1) / 2, x1 - x0, y, y + 1.1, zg - 0.03, zg + 0.03, M.balustrade);
   });
+  // Gabinetes de acero inoxidable con extremos redondeados, entre los pasos
   const cabinetEdges = [firstEdge - 0.3, ...gx.flatMap(g => [g - gh, g + gh]), lastEdge + 0.3];
-  for (let i = 0; i < cabinetEdges.length; i += 2) {
-    const x0 = cabinetEdges[i], x1 = cabinetEdges[i + 1];
-    addBoxSpan(group, (x0 + x1) / 2, x1 - x0, y, y + 1.0, zg - 0.6, zg + 0.6, M.gateCabinet);
-    addBoxSpan(group, (x0 + x1) / 2, x1 - x0 + 0.02, y + 1.0, y + 1.04, zg - 0.62, zg + 0.62, M.gateTop);
-  }
-  // Aletas de cada paso (se abren al pasar)
+  for (let i = 0; i < cabinetEdges.length; i += 2) gateCabinet(group, M, cabinetEdges[i], cabinetEdges[i + 1], y, zg);
+  // Cada paso: trípode giratorio, validador bip! y pictogramas, en el gabinete a la
+  // derecha de quien entra desde la calle (lado -x del paso)
   gx.forEach(g => {
-    const flaps = [-1, 1].map(s => {
-      const pivot = new THREE.Group();
-      pivot.position.set(g + s * gh, y + 0.55, zg);
-      const flap = addBox(pivot, gh, 0.7, 0.02, M.gateFlap, -s * gh / 2, 0, 0);
-      flap.userData.s = s;
-      group.add(pivot);
-      return pivot;
-    });
-    // Validador bip! propio de cada paso (destella verde o rojo)
+    const ex = g - gh;                               // cara del gabinete que da al paso
+    const rotor = buildTripod(group, M, ex, y + 0.86, zg);
+    // Validador bip!: atril inclinado hacia quien llega, con lector que destella y pantallita
     const vMat = glow(0x37d67a);
-    addBoxSpan(group, g + gh + 0.12, 0.16, y + 1.04, y + 1.1, zg + 0.3, zg + 0.5, vMat);
-    gates.push({ x: g, z: zg, flaps, open: 0, station: st, validator: vMat.color, flashT: 0 });
+    const lectern = new THREE.Group();
+    lectern.position.set(ex - 0.13, y + 1.03, zg + 0.24);
+    lectern.rotation.x = 0.38;
+    addBox(lectern, 0.2, 0.07, 0.24, M.gateReader);
+    const pad = addPlane(lectern, 0.13, 0.1, vMat, 0, 0.0355, 0.03);
+    pad.rotation.x = -Math.PI / 2;
+    const screen = addPlane(lectern, 0.13, 0.05, M.gateScreen, 0, 0.0355, -0.075);
+    screen.rotation.x = -Math.PI / 2;
+    group.add(lectern);
+    // Pictogramas de paso en ambas puntas (en la de la calle se vuelve aspa roja si rechaza)
+    const r = (ex - cabinetEdges[cabinetEdges.indexOf(ex) - 1]) / 2, cx = ex - r, zEnd = 0.4 + r + 0.012;
+    const go = addPlane(group, 0.11, 0.11, M.gateGo, cx, y + 0.8, zg + zEnd, 0);
+    const stop = addPlane(group, 0.11, 0.11, M.gateStop, cx, y + 0.8, zg + zEnd, 0);
+    stop.visible = false;
+    addPlane(group, 0.11, 0.11, M.gateGo, cx, y + 0.8, zg - zEnd, Math.PI);
+    gates.push({ x: g, z: zg, rotor, turn: 0, dir: -1, open: 0, station: st, validator: vMat.color, flashT: 0, go, stop });
   });
 
   // Cartel de orientación sobre los torniquetes (mirando a quien entra de la calle)
@@ -930,6 +976,65 @@ function buildMezzanine(group, M, st, nameMat, gates) {
   [[-wx, -ex], [ex, wx]].forEach(([x0, x1]) => addBoxSpan(group, (x0 + x1) / 2, x1 - x0, y, top, zb, zb + 0.3, M.portal));
   addBoxSpan(group, 0, ex * 2, y + 2.7, top, zb, zb + 0.3, M.portal);
   addPlane(group, ex * 2 + 0.4, 0.3, M.exitStreet, 0, y + 2.95, zb - 0.01, Math.PI);
+}
+
+/** Gabinete de torniquete entre x0 y x1: zócalo, cuerpo de acero con puntas redondeadas, tapa oscura y juntas. */
+function gateCabinet(group, M, x0, x1, y, zg) {
+  const w = x1 - x0, cx = (x0 + x1) / 2, r = w / 2, L = 0.4;
+  const cyl = (rad, h, yc, zc, mat) => {
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(rad, rad, h, 20), mat);
+    m.position.set(cx, yc, zc);
+    group.add(m);
+  };
+  addBoxSpan(group, cx, w - 0.04, y, y + 0.07, zg - L, zg + L, M.gatePlinth);
+  addBoxSpan(group, cx, w, y + 0.07, y + 0.96, zg - L, zg + L, M.gateCabinet);
+  addBoxSpan(group, cx, w + 0.03, y + 0.96, y + 1.0, zg - L, zg + L, M.gateTop);
+  [-1, 1].forEach(s => {
+    cyl(r - 0.02, 0.07, y + 0.035, zg + s * L, M.gatePlinth);
+    cyl(r, 0.89, y + 0.515, zg + s * L, M.gateCabinet);
+    cyl(r + 0.015, 0.04, y + 0.98, zg + s * L, M.gateTop);
+    // Juntas verticales de las tapas de servicio en ambas caras
+    [x0 - 0.003, x1 + 0.003].forEach(x => addBoxSpan(group, x, 0.006, y + 0.12, y + 0.9, zg + s * 0.18 - 0.004, zg + s * 0.18 + 0.004, M.gateSeam));
+  });
+  // Franja inferior de la cerradura de mantención
+  [x0 - 0.003, x1 + 0.003].forEach(x => addBoxSpan(group, x, 0.006, y + 0.5, y + 0.53, zg - 0.03, zg + 0.03, M.gateSeam));
+}
+
+/**
+ * Trípode giratorio montado en la cara x = ex de un gabinete: eje inclinado 45° hacia el paso
+ * y tres brazos en cono, uno horizontal que cierra el paso y dos colgando. Devuelve el rotor.
+ */
+function buildTripod(group, M, ex, yh, zg) {
+  const axis = new THREE.Vector3(1, -1, 0).normalize();
+  const mount = new THREE.Group();
+  mount.position.set(ex, yh, zg);
+  mount.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), axis);
+  // Carcasa del cabezal (sale del gabinete) y tapa del eje
+  const head = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.09, 0.1, 20), M.gateCabinet);
+  head.position.y = 0.01;
+  mount.add(head);
+  const rotor = new THREE.Group();
+  mount.add(rotor);
+  const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.06, 20), M.gateHub);
+  hub.position.y = 0.08;
+  rotor.add(hub);
+  // Dirección local del brazo que debe quedar horizontal atravesando el paso (+x del mundo)
+  const d0 = new THREE.Vector3(1, 0, 0).applyQuaternion(mount.quaternion.clone().invert());
+  const th0 = Math.atan2(d0.z, d0.x), cone = Math.acos(d0.y), LEN = 0.47;
+  const armGeo = new THREE.CylinderGeometry(0.016, 0.016, LEN, 12), capGeo = new THREE.SphereGeometry(0.022, 12, 8);
+  for (let k = 0; k < 3; k++) {
+    const th = th0 + k * 2 * Math.PI / 3;
+    const dir = new THREE.Vector3(Math.sin(cone) * Math.cos(th), Math.cos(cone), Math.sin(cone) * Math.sin(th));
+    const arm = new THREE.Mesh(armGeo, M.gateArm);
+    arm.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+    arm.position.copy(dir).multiplyScalar(LEN / 2).add(new THREE.Vector3(0, 0.08, 0));
+    rotor.add(arm);
+    const cap = new THREE.Mesh(capGeo, M.gateHub);
+    cap.position.copy(dir).multiplyScalar(LEN).add(new THREE.Vector3(0, 0.08, 0));
+    rotor.add(cap);
+  }
+  group.add(mount);
+  return rotor;
 }
 
 /** Boletería: cabina con ventanilla, mostrador, lector, tablero de tarifas y fila con postes. */

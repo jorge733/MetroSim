@@ -144,6 +144,10 @@ trenes de los dos motores quedan a ~1 m (mediana).
   nombre de archivo de cada una.
 - **2.10.3** · Post de presentación del juego para Facebook (`post-presentacion/`): imágenes en las tres medidas y el texto
   del post (`texto.txt`).
+- **2.10.4** · Torniquetes más realistas: de trípode, como los del Metro de Santiago. Gabinetes de acero inoxidable
+  cepillado con puntas redondeadas, zócalo, tapa oscura y juntas de servicio; tres brazos de acero en cono que giran un
+  tercio de vuelta por persona, en el sentido en que camina; validador bip! en atril inclinado con pantallita, y
+  pictogramas de paso (flecha verde que se vuelve aspa roja si la tarjeta se rechaza).
 
 ## Versión 2.9 · Más recorridos de bus
 
