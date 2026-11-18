@@ -169,6 +169,12 @@ export class BusWorld {
     const seenGeo = new Set(), M = new THREE.Matrix4(), W = new THREE.Matrix4(), B = new THREE.Matrix4(), ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
     const v = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
     const lights = [];
+    // 2.9.3 · Una geometría compartida por varias mallas (p. ej. las luces del semáforo) se dobla una vez por malla:
+    // cada una parte de una copia SIN doblar (antes se clonaba la ya doblada y las luces quedaban lejos, sin verse)
+    const pristine = new Map();
+    const uses = new Map();
+    for (const root of objs) root.traverse(o => { if (o.isMesh && !o.isInstancedMesh) uses.set(o.geometry, (uses.get(o.geometry) ?? 0) + 1); });
+    for (const [geo, n] of uses) if (n > 1) pristine.set(geo, geo.clone());
     for (const root of objs) {
       root.updateMatrixWorld(true);
       root.traverse(o => {
@@ -185,7 +191,7 @@ export class BusWorld {
           o.instanceMatrix.needsUpdate = true;
           o.frustumCulled = false;
         } else if (o.isMesh) {
-          if (seenGeo.has(o.geometry)) o.geometry = o.geometry.clone();
+          if (seenGeo.has(o.geometry)) o.geometry = pristine.get(o.geometry).clone();
           seenGeo.add(o.geometry);
           const geo = o.geometry;
           geo.applyMatrix4(o.matrixWorld);
@@ -338,9 +344,8 @@ export class BusWorld {
     const txt = canvasTexture(256, 512, (g, w, h) => {
       g.clearRect(0, 0, w, h);
       g.fillStyle = "#f0efe8"; g.font = "800 120px Barlow Condensed, Arial Narrow, Arial"; g.textAlign = "center";
-      g.save(); g.translate(w / 2, h / 2); g.rotate(Math.PI); g.translate(-w / 2, -h / 2);
-      g.fillText("SOLO", w / 2, h * 0.38); g.fillText("BUS", w / 2, h * 0.78);
-      g.restore();
+      // 2.9.3 · Al derecho para quien se acerca: «SOLO» más cerca y «BUS» más adelante (antes se veía de cabeza)
+      g.fillText("BUS", w / 2, h * 0.38); g.fillText("SOLO", w / 2, h * 0.78);
     });
     const decalMat = new THREE.MeshStandardMaterial({ map: txt, transparent: true, roughness: 0.7, depthWrite: false });
     const marks = [];
@@ -505,7 +510,7 @@ export class BusWorld {
       const tex = signTexture([L.street], { w: 512, h: 112, bg: "#1f6b3a", font: "700 60px Barlow, Arial" });
       const plate = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 0.57), new THREE.MeshStandardMaterial({ map: tex, side: THREE.DoubleSide, roughness: 0.6 }));
       plate.position.set(CURB_X + 0.7, 3.4, -(L.s + 2.0));
-      plate.rotation.y = Math.PI / 2;
+      plate.rotation.y = -Math.PI / 2;                   // 2.9.3 · de cara a la calzada (antes se leía al revés)
       s.add(plate);
     }
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0)), v = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1);
@@ -537,13 +542,13 @@ export class BusWorld {
       const tex = signTexture(["PARADERO", st.name], { w: 512, h: 220, bg: "#0f3d7a", font: "800 50px Barlow Condensed, Arial Narrow, Arial" });
       const panel = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 0.86), new THREE.MeshStandardMaterial({ map: tex, side: THREE.DoubleSide, roughness: 0.5, emissive: new THREE.Color("#ffffff"), emissiveMap: tex, emissiveIntensity: this.night ? 0.7 : 0.12 }));
       panel.position.set(CURB_X + 2.6, 3.3, zc);
-      panel.rotation.y = Math.PI / 2;
+      panel.rotation.y = -Math.PI / 2;
       g.add(panel);
       // Señal de parada en la marca (aquí debe quedar la puerta delantera)
       box(g, 0.08, 2.8, 0.08, post, CURB_X + 0.5, 1.4, 0);
       const plate = new THREE.Mesh(new THREE.CircleGeometry(0.42, 24), new THREE.MeshStandardMaterial({ map: signTexture(["BUS"], { w: 128, h: 128, bg: "#0f3d7a", font: "800 54px Barlow Condensed, Arial Narrow, Arial" }), side: THREE.DoubleSide }));
       plate.position.set(CURB_X + 0.5, 2.85, 0);
-      plate.rotation.y = Math.PI / 2;
+      plate.rotation.y = -Math.PI / 2;
       g.add(plate);
       // Cajón amarillo pintado en la pista: zona del paradero
       const zone = [[0, 0.3, 0.25, 0], [0, 0.3, 0.25, BUS_LENGTH + 2], [-1.55, 0.25, BUS_LENGTH + 2, (BUS_LENGTH + 2) / 2], [1.55, 0.25, BUS_LENGTH + 2, (BUS_LENGTH + 2) / 2]];
@@ -979,7 +984,7 @@ export class BusWorld {
       const st = lightState(sg.light, sim.time);
       if (st === sg.state) continue;
       sg.state = st;
-      for (const k of ["red", "amber", "green"]) sg.mats[k].emissiveIntensity = k === st ? 2.6 : 0.05;
+      for (const k of ["red", "amber", "green"]) sg.mats[k].emissiveIntensity = k === st ? 1.3 : 0.05;     // 2.9.3 · menos brillo: con más, el rojo se veía salmón
     }
     // Pasajeros: en los paraderos, subiendo, a bordo y bajando (busPeople.js)
     g.updateMatrixWorld();

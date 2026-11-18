@@ -138,6 +138,10 @@ trenes de los dos motores quedan a ~1 m (mediana).
   Avenida…), una vez cada una, con botones amarillos y su ficha (largo, semáforos y estaciones de Metro por las que pasa).
 - **2.9.2** · Las calles del taxi con dos tramos lejos uno del otro se eligen por separado, con el sector: Américo Vespucio
   (La Granja y Macul), Av. Apoquindo (El Golf y Los Dominicos) y Av. Matta (Estación Central y Ñuñoa).
+- **2.9.3** · Arreglos en la calle del bus y el taxi: **se ven las luces de los semáforos** (en los recorridos reales, al
+  doblar la calle según el trazado, las luces quedaban fuera de su lugar); los letreros con el nombre de la calle y los
+  paneles de los paraderos miran a la calzada y **ya no se leen al revés**; el «SOLO BUS» de la pista está al derecho; y el
+  letrero de arriba del taxi muestra el sector de la calle (p. ej. «Av. Matta · Ñuñoa»).
 
 ## Versión 2.8 · La radio del taxi
 

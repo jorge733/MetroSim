@@ -1041,12 +1041,14 @@ function stopGame({ keepFullscreen = false } = {}) {
 
 /* 1.13 · Conductor de bus (beta, antes «MicroSim»): el modo bus tiene su propia pantalla y su propio ciclo (js/bus/) */
 let bus = null;
+/** 2.9.3 · Al taxi se le pasa la calle con su sector (p. ej. «Av. Matta · Ñuñoa») para el letrero de arriba y los avisos. */
+const taxiRoute = (r, taxi) => taxi ? { ...r, name: streetName(r) } : r;
 function startBus({ ride = null, taxi = false } = {}) {
   if (bus) return;
   startScreen.classList.add("hidden");
   if (wantsTouch()) enterMobileFullscreen();       // dentro del gesto del usuario
   bus = startBusGame({
-    bank, muted, touch: wantsTouch(), ride, taxi, route: ride ? null : busRouteById(busRouteSelect.value),
+    bank, muted, touch: wantsTouch(), ride, taxi, route: ride ? null : taxiRoute(busRouteById(busRouteSelect.value), taxi),
     onMuteChange: (m) => { muted = m; saveSetting("metrosim.muted", m ? "1" : "0"); hud.setSound(!m); },
     onExit: () => {
       bus = null;
