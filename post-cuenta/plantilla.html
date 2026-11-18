@@ -1,0 +1,66 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+*{margin:0;box-sizing:border-box}
+html,body{width:var(--w);height:var(--h);overflow:hidden}
+body{font-family:"DejaVu Sans","Liberation Sans",Arial,sans-serif;color:#fff;
+ background:radial-gradient(ellipse at 50% 30%,#26324a 0%,#111722 55%,#05070a 100%);position:relative}
+.wrap{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 50px;gap:var(--gap)}
+.txt,.foot{display:flex;flex-direction:column;align-items:center;gap:var(--gap)}
+.top{display:flex;align-items:center;gap:18px}
+.logo{width:var(--logo)}
+.badge{display:inline-flex;align-items:center;background:#d7262e;padding:10px 28px;border-radius:999px;font-weight:800;font-size:var(--badge);letter-spacing:.08em;white-space:nowrap}
+h1{font-size:var(--h1);font-weight:900;line-height:1.02;letter-spacing:-.02em}
+h1 em{font-style:normal;color:#f4b400}
+h1 small{display:block;white-space:nowrap;margin-top:.3em;font-size:.4em;font-weight:800;letter-spacing:.03em;color:#ff8a90}
+/* PC atrás a la izquierda, celular acostado adelante a la derecha y la nube entre los dos */
+.devices{position:relative;width:var(--dw);height:calc(var(--dw) * .7)}
+.monitor{position:absolute;left:0;top:0;width:80%}
+.monitor .scr{background:#000;border:calc(var(--dw) * .014) solid #1b2230;border-radius:calc(var(--dw) * .018);overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.monitor .scr{aspect-ratio:16/9}
+.monitor img{display:block;width:100%;height:100%;object-fit:cover;transform:scale(1.55);transform-origin:50% 52%}
+.monitor .neck{width:14%;height:calc(var(--dw) * .05);margin:0 auto;background:linear-gradient(#2a3346,#151b26)}
+.monitor .base{width:34%;height:calc(var(--dw) * .014);margin:0 auto;border-radius:6px;background:#2a3346}
+.phone{position:absolute;right:0;bottom:0;width:56%;aspect-ratio:844/390;background:#000;border:calc(var(--dw) * .011) solid #1b2230;border-radius:calc(var(--dw) * .035);overflow:hidden;box-shadow:0 0 0 calc(var(--dw) * .005) rgba(215,38,46,.7),-14px 22px 60px rgba(0,0,0,.8)}
+.phone img{display:block;width:100%;height:100%;object-fit:cover}
+.tag{position:absolute;font-weight:800;font-size:var(--tag);background:#111722;border:3px solid #f4b400;color:#f4b400;padding:6px 18px;border-radius:999px;letter-spacing:.06em;white-space:nowrap}
+.tag.pc{left:3%;top:4%}.tag.cel{right:3%;bottom:calc(var(--dw) * .26 + 4%)}
+.cloud{position:absolute;right:4%;top:2%;width:calc(var(--dw) * .19);height:calc(var(--dw) * .19);display:grid;place-items:center;border-radius:50%;
+ background:#fff;box-shadow:0 0 0 calc(var(--dw) * .012) rgba(244,180,0,.4),0 14px 40px rgba(0,0,0,.55)}
+.cloud svg{width:66%;height:66%}
+.chips{display:flex;flex-wrap:wrap;justify-content:center;gap:var(--cgap);max-width:var(--cw)}
+.chip{background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.18);border-radius:999px;padding:var(--cpad);font-size:var(--p);font-weight:700;color:#e8ecf3;white-space:nowrap}
+.bar{display:flex;align-items:center;gap:20px;background:#fff;color:#111722;border-radius:999px;padding:var(--bpad);box-shadow:0 0 0 8px rgba(244,180,0,.35),0 14px 40px rgba(0,0,0,.5)}
+.bar svg{width:var(--url);height:var(--url)}
+.bar b{font-size:var(--url);font-weight:900;letter-spacing:.01em}
+.bar b span{color:#d7262e}
+/* Horizontal: texto a la izquierda, pantallas a la derecha */
+body.h .wrap{display:grid;grid-template-columns:1fr var(--dw);grid-template-areas:"txt dev" "foot dev";align-content:center;column-gap:40px;row-gap:24px;text-align:left}
+body.h .txt{grid-area:txt;align-items:flex-start;align-self:end}
+body.h .foot{grid-area:foot;align-items:flex-start;align-self:start}
+body.h .devices{grid-area:dev;align-self:center}
+body.h .chips{justify-content:flex-start}
+</style></head><body>
+<div class="wrap">
+ <div class="txt">
+ <div class="top">
+ <svg class="logo" viewBox="0 0 200 130"><rect x="6" y="6" width="188" height="118" rx="30" fill="#d7262e"/>
+ <path d="M30 94H78L122 36H170" fill="none" stroke="#fff" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+ <path d="M100 18V112" fill="none" stroke="#ffd2d5" stroke-width="9" stroke-linecap="round" stroke-dasharray="0.1 17"/>
+ <circle cx="30" cy="94" r="10" fill="#fff"/><circle cx="170" cy="36" r="10" fill="#fff"/>
+ <circle cx="100" cy="65" r="17" fill="#fff"/><circle cx="100" cy="65" r="8" fill="#d7262e"/></svg>
+ <div class="badge">NUEVO · TU CUENTA</div></div>
+ <h1>Tu partida<br>te <em>sigue</em><small>Del PC al celular, con tu correo</small></h1>
+ </div>
+ <div class="devices">
+  <div class="monitor"><div class="scr"><img src="cap-pc.png"></div><div class="neck"></div><div class="base"></div></div><div class="tag pc">PC</div>
+  <div class="cloud"><svg viewBox="0 0 24 24" fill="none" stroke="#111722" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18h10a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.1 9.5 4.3 4.3 0 0 0 7 18z"/><path d="M12 15.5v-5M9.8 12.6 12 10.4l2.2 2.2" stroke="#d7262e"/></svg></div>
+  <div class="phone"><img src="cap-cel.png"></div><div class="tag cel">CELULAR</div>
+ </div>
+ <div class="foot">
+ <div class="chips">
+  <span class="chip">📧 Solo tu correo</span><span class="chip">🔢 Código de 6 dígitos</span>
+  <span class="chip">🔒 Sin contraseña</span><span class="chip">☁️ Se guarda sola</span>
+ </div>
+ <div class="bar"><svg viewBox="0 0 24 24" fill="none" stroke="#111722" stroke-width="2.6" stroke-linecap="round"><circle cx="10" cy="10" r="7"/><path d="M15.5 15.5L21 21"/></svg><b>redmovisim<span>.cl</span></b></div>
+ </div>
+</div>
+</body></html>

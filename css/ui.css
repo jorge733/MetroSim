@@ -140,7 +140,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-v
 .account-avatar { display: grid; place-items: center; flex: none; width: 44px; height: 44px; border-radius: 50%; background: var(--brand-soft); color: var(--brand-hi); }
 .account-avatar .ico { width: 22px; height: 22px; }
 .account-lead { margin: 0; font-size: 14.5px; line-height: 1.5; color: #c9d2dc; }
-.account-lead b { color: var(--text); word-break: break-all; }
+.account-lead b { color: var(--text); overflow-wrap: break-word; }
 .account-fine { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--muted); }
 .account-form { display: grid; gap: 12px; }
 .account-form input { width: 100%; }
@@ -152,7 +152,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-v
 .link-button.danger { justify-self: start; color: #ff8a8a; }
 .go-button.danger { background: #c62828; box-shadow: none; }
 .account-who { display: grid; gap: 4px; padding: 12px 14px; border-radius: 12px; background: var(--raise); }
-.account-who b { font-size: 16px; word-break: break-all; }
+.account-who b { font-size: 16px; overflow-wrap: break-word; }
 .account-sync { display: flex; align-items: center; gap: 10px; font-size: 13.5px; color: #c9d2dc; }
 .account-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 4px #3ad37f26; }
 .account-sync.warn .account-dot { background: var(--warn); box-shadow: 0 0 0 4px #ffc24726; }

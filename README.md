@@ -139,6 +139,9 @@ Nuevo `js/cuenta.js`: cuenta **opcional**, sin contraseña. En la portada (botó
 - Usa Supabase (correo con código y una tabla `partidas` con reglas que solo dejan a cada jugador leer y cambiar la suya);
   los correos salen desde `no-reply@redmovisim.cl` con Resend.
 
+**2.11.1** · En la ventana de la cuenta el correo ya no se corta en medio de la palabra. Post «Tu partida te sigue»
+(`post-cuenta/`) para presentar la cuenta en redes sociales.
+
 ## Versión 2.10 · Un tablero de verdad en el bus y el taxi
 
 - **Velocímetro de aguja**: el panel de abajo a la izquierda ahora es el tablero del vehículo, con un velocímetro de
