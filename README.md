@@ -139,6 +139,9 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - Las emisoras están en `js/bus/taxiRadio.js`: si una radio cambia su transmisión, basta corregir su dirección ahí.
 - **2.8.1** · La radio también está al **conducir el bus** (el mismo botón Radio, las mismas teclas y la misma emisora
   que dejaste en el taxi). Al viajar de pasajero no está: la radio es del conductor.
+- **2.8.2** · Post «Pon la radio mientras manejas» para anunciar la radio (`post-radio/`: el taxi en Cooperativa y el
+  bus en Futuro, cada uno en un celular en horizontal con el panel de la radio abierto; cuadrado, historia y horizontal,
+  con `node generar.js plantilla.html`).
 
 ## Versión 2.7 · Todas las calles son reales
 

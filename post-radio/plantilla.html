@@ -1,0 +1,67 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+*{margin:0;box-sizing:border-box}
+html,body{width:var(--w);height:var(--h);overflow:hidden}
+body{font-family:"DejaVu Sans","Liberation Sans",Arial,sans-serif;color:#fff;
+ background:radial-gradient(ellipse at 50% 30%,#26324a 0%,#111722 55%,#05070a 100%);position:relative}
+.wrap{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 50px;gap:var(--gap)}
+.top{display:flex;align-items:center;gap:18px}
+.logo{width:var(--logo)}
+.badge{display:inline-flex;align-items:center;background:#d7262e;padding:10px 28px;border-radius:999px;font-weight:800;font-size:var(--badge);letter-spacing:.08em}
+h1{font-size:var(--h1);font-weight:900;line-height:1.02;letter-spacing:-.02em}
+.br{display:var(--br)}
+h1 em{font-style:normal;color:#f4b400}
+h1 small{display:block;margin-top:.3em;font-size:.4em;font-weight:800;letter-spacing:.03em;color:#ff8a90}
+/* Dos celulares acostados: el taxi atrás a la derecha, el bus adelante a la izquierda */
+.devices{position:relative;width:var(--dw);height:calc(var(--dw) * .52);margin-top:calc(var(--tag) * .9)}
+.ph{position:absolute}
+.ph.taxi{right:0;top:0;width:78%}
+.ph.bus{left:0;bottom:0;width:50%;z-index:2}
+.phone{width:100%;aspect-ratio:844/390;background:#000;border:calc(var(--dw) * .012) solid #1b2230;border-radius:calc(var(--dw) * .03);overflow:hidden;box-shadow:-14px 22px 60px rgba(0,0,0,.75)}
+.taxi .phone{box-shadow:0 0 0 calc(var(--dw) * .006) rgba(244,180,0,.6),-14px 22px 60px rgba(0,0,0,.75)}
+.bus .phone{box-shadow:0 0 0 calc(var(--dw) * .006) rgba(215,38,46,.75),14px 22px 60px rgba(0,0,0,.85)}
+.phone img{display:block;width:100%;height:100%;object-fit:cover}
+.tag{position:absolute;font-weight:900;font-size:var(--tag);padding:6px 18px;border-radius:999px;letter-spacing:.06em;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+.tag.t{right:6%;top:0;transform:translateY(-55%);background:#f4b400;color:#111722}
+.tag.b{left:6%;bottom:0;transform:translateY(55%);background:#d7262e;color:#fff}
+.devices{margin-bottom:calc(var(--tag) * .9)}
+/* Ondas de radio junto al título */
+.waves{display:inline-block;width:.7em;height:.7em;vertical-align:-.04em;margin-left:.08em}
+.txt,.foot{display:flex;flex-direction:column;align-items:center;gap:var(--gap)}
+/* Horizontal: texto a la izquierda, pantallas a la derecha */
+body.h .wrap{display:grid;grid-template-columns:1fr var(--dw);grid-template-areas:"txt dev" "foot dev";align-content:center;column-gap:44px;row-gap:26px;padding:0 50px;text-align:left}
+body.h .txt{grid-area:txt;align-items:flex-start;align-self:end}
+body.h .foot{grid-area:foot;align-items:flex-start;align-self:start}
+body.h .devices{grid-area:dev;align-self:center}
+body.h .chips{justify-content:flex-start}
+body.h h1 small{font-size:.36em;white-space:nowrap}
+.chips{display:flex;flex-wrap:wrap;justify-content:center;gap:var(--cgap);max-width:var(--cw)}
+.chip{background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.18);border-radius:999px;padding:var(--cpad);font-size:var(--p);font-weight:700;color:#e8ecf3;white-space:nowrap}
+.bar{display:flex;align-items:center;gap:20px;background:#fff;color:#111722;border-radius:999px;padding:var(--bpad);box-shadow:0 0 0 8px rgba(244,180,0,.35),0 14px 40px rgba(0,0,0,.5)}
+.bar svg{width:var(--url);height:var(--url)}
+.bar b{font-size:var(--url);font-weight:900;letter-spacing:.01em}
+.bar b span{color:#d7262e}
+</style></head><body>
+<div class="wrap">
+ <div class="txt">
+ <div class="top">
+ <svg class="logo" viewBox="0 0 200 130"><rect x="6" y="6" width="188" height="118" rx="30" fill="#d7262e"/>
+ <path d="M30 94H78L122 36H170" fill="none" stroke="#fff" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+ <path d="M100 18V112" fill="none" stroke="#ffd2d5" stroke-width="9" stroke-linecap="round" stroke-dasharray="0.1 17"/>
+ <circle cx="30" cy="94" r="10" fill="#fff"/><circle cx="170" cy="36" r="10" fill="#fff"/>
+ <circle cx="100" cy="65" r="17" fill="#fff"/><circle cx="100" cy="65" r="8" fill="#d7262e"/></svg>
+ <div class="badge">NUEVO · RADIO EN VIVO</div></div>
+ <h1>Pon la <em>radio</em><svg class="waves" viewBox="0 0 24 24" fill="none" stroke="#f4b400" stroke-width="2.6" stroke-linecap="round"><path d="M4 9a10 10 0 0 1 0 6M8.5 6.5a14 14 0 0 1 0 11"/></svg><br>mientras <br class="br">manejas<br><small>En el taxi y en el bus</small></h1>
+ </div>
+ <div class="devices">
+  <div class="ph taxi"><div class="phone"><img src="cap-taxi.png"></div><div class="tag t">🚕 TAXI</div></div>
+  <div class="ph bus"><div class="phone"><img src="cap-bus.png"></div><div class="tag b">🚌 BUS</div></div>
+ </div>
+ <div class="foot">
+ <div class="chips">
+  <span class="chip">📻 14 emisoras de Santiago</span><span class="chip">🔴 En vivo, como en el auto</span>
+  <span class="chip">🎚️ Dial y volumen</span><span class="chip">🆓 Gratis y sin cuenta</span>
+ </div>
+ <div class="bar"><svg viewBox="0 0 24 24" fill="none" stroke="#111722" stroke-width="2.6" stroke-linecap="round"><circle cx="10" cy="10" r="7"/><path d="M15.5 15.5L21 21"/></svg><b>redmovisim<span>.cl</span></b></div>
+ </div>
+</div>
+</body></html>
