@@ -147,6 +147,9 @@ Nuevo `js/cuenta.js`: cuenta **opcional**, sin contraseña. En la portada (botó
 cuatro avisos de la operación: detención momentánea, reanudación, retiro del servicio y tren que no admite pasajeros. Las
 detenciones con motivo siguen con la voz sintetizada.
 
+**2.11.3** · La portada muestra la cuenta de Instagram **@redmovisim**: un botón en la barra superior (en el celular
+queda solo el ícono) y un enlace en el pie, junto al aviso de proyecto independiente.
+
 ## Versión 2.10 · Un tablero de verdad en el bus y el taxi
 
 - **Velocímetro de aguja**: el panel de abajo a la izquierda ahora es el tablero del vehículo, con un velocímetro de
