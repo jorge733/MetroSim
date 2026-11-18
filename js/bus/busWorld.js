@@ -502,6 +502,11 @@ export class BusWorld {
       stop.rotation.x = -Math.PI / 2;
       stop.position.set((CURB_X + MEDIAN_X) / 2, 0.016, -L.s);
       s.add(stop);
+      // 2.9.4 · y la de la vuelta, al otro lado del cruce (junto a su semáforo)
+      const stopBack = new THREE.Mesh(new THREE.PlaneGeometry(MEDIAN_FAR - ROAD_FAR, 0.5), white);
+      stopBack.rotation.x = -Math.PI / 2;
+      stopBack.position.set((ROAD_FAR + MEDIAN_FAR) / 2, 0.016, -(L.s + 16));
+      s.add(stopBack);
       for (let x = ROAD_FAR + 0.6; x < CURB_X - 0.3; x += 1.1) {
         if (x > MEDIAN_FAR && x < MEDIAN_X) continue;
         zebra.push([x, -(L.s + 2.6)]);
@@ -568,24 +573,30 @@ export class BusWorld {
     const housing = std("#1a1c1e", { roughness: 0.6 });
     const lampGeo = new THREE.CircleGeometry(0.15, 16);
     this.signals = this.route.lights.map(L => {
-      const g = new THREE.Group();
-      g.position.set(0, 0, -L.s);
-      s.add(g);
-      box(g, 0.18, 6.2, 0.18, pole, CURB_X + 0.5, 3.1, 0);
-      box(g, CURB_X + 0.5 - LANES[1] + 0.6, 0.14, 0.14, pole, (CURB_X + 0.5 + LANES[1] - 0.6) / 2, 6.0, 0);
       const mats = {};
-      const head = (x, y) => {
-        box(g, 0.42, 1.15, 0.3, housing, x, y, 0);
-        [["red", "#ff2d22", 0.36], ["amber", "#ffb21e", 0], ["green", "#2cff7a", -0.36]].forEach(([k, c, dy]) => {
-          mats[k] ??= new THREE.MeshStandardMaterial({ color: "#222", emissive: new THREE.Color(c), emissiveIntensity: 0.05 });
-          const lamp = new THREE.Mesh(lampGeo, mats[k]);
-          lamp.position.set(x, y + dy, 0.16);
-          g.add(lamp);
-        });
-      };
-      head(LANES[1], 5.3);
-      head(LANES[0] - 0.6, 5.3);
-      head(CURB_X + 0.5, 2.9);
+      /* 2.9.4 · El mismo semáforo también para el otro sentido (taxi tras una vuelta en U, autos de la vuelta): espejado al
+         otro lado del bandejón (x → MIRROR_X − x, como en taxiSim), con su línea de detención al otro lado del cruce
+         (L.s + 16, donde la pone el recorrido al revés) y mirando hacia la vuelta. Mismas luces: cambian juntas. */
+      for (const back of [false, true]) {
+        const g = new THREE.Group();
+        g.position.set(back ? MIRROR_X : 0, 0, -(back ? L.s + 16 : L.s));
+        if (back) g.rotation.y = Math.PI;               // el espacio del grupo queda como el de la ida, girado
+        s.add(g);
+        box(g, 0.18, 6.2, 0.18, pole, CURB_X + 0.5, 3.1, 0);
+        box(g, CURB_X + 0.5 - LANES[1] + 0.6, 0.14, 0.14, pole, (CURB_X + 0.5 + LANES[1] - 0.6) / 2, 6.0, 0);
+        const head = (x, y) => {
+          box(g, 0.42, 1.15, 0.3, housing, x, y, 0);
+          [["red", "#ff2d22", 0.36], ["amber", "#ffb21e", 0], ["green", "#2cff7a", -0.36]].forEach(([k, c, dy]) => {
+            mats[k] ??= new THREE.MeshStandardMaterial({ color: "#222", emissive: new THREE.Color(c), emissiveIntensity: 0.05 });
+            const lamp = new THREE.Mesh(lampGeo, mats[k]);
+            lamp.position.set(x, y + dy, 0.16);
+            g.add(lamp);
+          });
+        };
+        head(LANES[1], 5.3);
+        head(LANES[0] - 0.6, 5.3);
+        head(CURB_X + 0.5, 2.9);
+      }
       return { light: L, mats, state: null };
     });
   }

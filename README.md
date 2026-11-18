@@ -142,6 +142,8 @@ trenes de los dos motores quedan a ~1 m (mediana).
   doblar la calle según el trazado, las luces quedaban fuera de su lugar); los letreros con el nombre de la calle y los
   paneles de los paraderos miran a la calzada y **ya no se leen al revés**; el «SOLO BUS» de la pista está al derecho; y el
   letrero de arriba del taxi muestra el sector de la calle (p. ej. «Av. Matta · Ñuñoa»).
+- **2.9.4** · Los semáforos también tienen luces hacia el otro sentido (al otro lado del bandejón, con su línea de
+  detención): después de una vuelta en U con el taxi se ven igual que en la ida, y cambian al mismo tiempo.
 
 ## Versión 2.8 · La radio del taxi
 
