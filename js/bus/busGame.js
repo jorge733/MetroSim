@@ -143,7 +143,7 @@ class BusGame {
       <header class="bus-top">
         <div class="bus-brand">
           <span class="bus-badge${this.taxi ? " taxi" : ""}">${this.taxi ? "TAXI" : R.id}</span>
-          <div class="bus-route"><span class="bus-label">${this.taxi ? "TAXI · CONDUCIENDO · BETA" : this.ride ? "BUS RED · VIAJANDO" : "BUS RED · CONDUCIENDO · BETA"}</span><strong data-k="routeTitle">${esc(R.name.toUpperCase())} · ${esc(R.from.toUpperCase())} → ${esc(R.to.toUpperCase())}</strong></div>
+          <div class="bus-route"><span class="bus-label">${this.taxi ? "TAXI · CONDUCIENDO" : this.ride ? "BUS RED · VIAJANDO" : "BUS RED · CONDUCIENDO"}</span><strong data-k="routeTitle">${esc(R.name.toUpperCase())} · ${esc(R.from.toUpperCase())} → ${esc(R.to.toUpperCase())}</strong></div>
         </div>
         <div class="bus-right">
           <div class="bus-pill"><span class="bus-label">CUENTA</span><strong data-k="bank">$0</strong><span class="bus-float" data-k="float"></span></div>

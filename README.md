@@ -155,6 +155,8 @@ Tren Rancagua al sur de Nos (Buin Zoo a Rancagua) quedan fuera del extracto y si
 - **2.7.3** · Post «Queremos escucharte» para pedirle a la comunidad sugerencias y comentarios (`post-comunidad/`:
   burbujas de chat con ideas de ejemplo y el letrero «Próxima estación: tu idea»; cuadrado, historia y horizontal, con
   `node generar.js plantilla.html`).
+- **2.7.4** · El bus y el taxi dejan de ser beta: se quita la etiqueta «beta» de la portada (Conducir › Bus Red y Taxi)
+  y del letrero mientras se maneja.
 
 ## Versión 2.6 · La calle real de Universidad de Chile (OpenStreetMap)
 

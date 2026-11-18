@@ -28,7 +28,7 @@ sin instalar nada (y se puede instalar como app en el celular).
   freno regenerativo, señales, pendientes y horarios reales—. Gana puntos por puntualidad y suavidad.
 - 🧍 **Pasajero**: parte en la calle de cualquier estación, baja al andén, espera el tren y viaja
   entre la gente. Si el tren va lleno, te toca esperar el siguiente.
-- 🚌 **Conductor de bus** (beta): maneja por la Alameda con pista Solo Bus, semáforos, autos y paraderos.
+- 🚌 **Conductor de bus**: maneja por la Alameda con pista Solo Bus, semáforos, autos y paraderos.
 - 🖥️ **Centro de Control**: vigila la red en un esquema, retiene trenes, activa la regulación
   y responde a incidentes (puertas obstruidas, fallas de señal, restricciones de velocidad).
 - 🗺️ Las 7 líneas: 1, 2, 3, 4, 4A, 5 y 6, con combinaciones, demanda por hora del día y hora real local.
