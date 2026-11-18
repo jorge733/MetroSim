@@ -152,6 +152,8 @@ queda solo el ícono) y un enlace en el pie, junto al aviso de proyecto independ
 
 **2.11.4** · En la portada, la tarjeta **Conducir** suma la etiqueta **Taxi** junto a Metro, Tren y Bus.
 
+**2.11.5** · El texto de la tarjeta **Conducir** también nombra el taxi y sus carreras.
+
 ## Versión 2.10 · Un tablero de verdad en el bus y el taxi
 
 - **Velocímetro de aguja**: el panel de abajo a la izquierda ahora es el tablero del vehículo, con un velocímetro de
