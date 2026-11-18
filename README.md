@@ -151,6 +151,8 @@ Nuevo `js/sugerencias.js`: un formulario para que los jugadores nos cuenten idea
 **2.13.1** · Post para Instagram «RedMoviSim te escucha» (`post-sugerencias/`: cuadrado, historia y horizontal, con
 capturas del formulario en PC y en el celular acostado, y el texto listo en `texto.txt`).
 
+**2.13.2** · El post suma la medida vertical de Instagram (`post-vertical.png`, 1080×1350), la que más ocupa en el feed.
+
 ## Versión 2.12 · Tienda renovada
 
 La **Tienda RedMovi** (`js/shopUI.js`) ahora ayuda a decidir en qué gastar y a juntar para lo que falta:
