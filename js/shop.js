@@ -16,7 +16,7 @@
    La interfaz está en shopUI.js.
    ========================================================================== */
 
-import { LINES } from "./engine/network.js";
+import { LINES, lineById } from "./engine/network.js";
 import { formatCLP, lineLabel, lineArticle } from "./config.js";
 import { isCreator } from "./creator.js";
 
@@ -27,7 +27,7 @@ export const FREE_LINE = "3";
 
 /** Licencias de conductor: una por línea (salvo la gratuita). */
 const LICENSE_PRICE = { "1": 30000, "2": 20000, "4": 25000, "4A": 12000, "5": 25000, "6": 15000, "NOS": 18000, "RAN": 25000 };
-export const LICENSES = LINES.filter(l => l.id !== FREE_LINE).map(l => ({
+export const LICENSES = LINES.filter(l => l.id !== FREE_LINE && !l.bonus).map(l => ({
   id: `license-${l.id}`, lineId: l.id, kind: "license", icon: "🪪",
   name: `Licencia ${lineLabel(l.id)}`,
   desc: `Habilita el modo Conductor en ${lineArticle(l.id)} ${lineLabel(l.id)} (${l.stations[0].short} ⇄ ${l.stations.at(-1).short}, ${l.stations.length} estaciones).`,
@@ -118,7 +118,7 @@ export class Inventory {
   get currentLivery() { return LIVERIES.find(l => l.id === this.livery) || LIVERIES[0]; }
 
   /** ¿Puede conducir esta línea? */
-  canDrive(lineId) { return lineId === FREE_LINE || this.has(`license-${lineId}`); }
+  canDrive(lineId) { return lineId === FREE_LINE || !!lineById(lineId)?.bonus || this.has(`license-${lineId}`); }   // 2.18 · la bonus es gratis
 
   /** Multiplicador de sueldo según el mejor contrato. */
   get wageMultiplier() {

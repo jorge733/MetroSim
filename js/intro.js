@@ -21,7 +21,7 @@
    El módulo crea su propio HTML y CSS para no tocar el resto de la interfaz.
    ========================================================================== */
 
-import { LINES } from "./engine/network.js";
+import { SANTIAGO_LINES as LINES } from "./engine/network.js";   // 2.18 · la intro muestra la red de Santiago
 import { LANDMARKS } from "./city/catalog.js";
 import { waitForSpanishVoice } from "./audio.js";
 import { VERSION, LINE_COLORS, isRail, RAIL_LINES } from "./config.js";

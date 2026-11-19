@@ -70,7 +70,7 @@ import * as THREE from "three";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { CONFIG, STATIONS, LINE, NOTCH_INDEX, FARES, lineTag, lineLabel, lineArticle, isRail, lineSign, spokenName, fareBandAt, formatCLP, demandAt, dayTypeOf, inService, SERVICE_HOURS, DAY_TYPE_LABEL } from "./config.js";
 import { ROUTES, ROUTE_A, ROUTE_B, routeForSide, oppositeRoute, setActiveLine } from "./engine/route.js";
-import { LINES, lineById } from "./engine/network.js";
+import { LINES, SANTIAGO_LINES, lineById } from "./engine/network.js";
 import { BipCard } from "./card.js";
 import { PHRASES } from "./announcements.js";
 import { setupPWA } from "./pwa.js";
@@ -171,13 +171,13 @@ for (const sel of [driverLineSelect, paxLineSelect]) {
 }
 /* 1.15 · Modo Conductor: primero se elige QUÉ conducir (tren del Metro, Tren Nos, Tren Rancagua de EFE o bus de la Red).
    Los trenes de EFE son líneas más de la red (botones NOS y RCG); el bus tiene su propio modo (js/bus/). */
-const VEHICLE_LINE = { nos: "NOS", efe: "RAN" };                       // vehículo → línea que conduce
+const VEHICLE_LINE = { nos: "NOS", efe: "RAN", valpo: "MER" };       // 2.18 · valpo: el Metro Valparaíso (bonus)                       // vehículo → línea que conduce
 const vehicleOfLine = (id) => Object.keys(VEHICLE_LINE).find(v => VEHICLE_LINE[v] === id) || "metro";
 const driverCard = document.querySelector('.mode-card[data-card="driver"]');
 const vehicleButtons = [...document.querySelectorAll("#vehicleSeg [data-vehicle]")];
 let driverVehicle = loadSetting("metrosim.mode") === "bus" ? "bus" : (loadSetting("metrosim.vehicle") || vehicleOfLine(savedLine));
 function selectVehicle(v, { fromLine = false } = {}) {
-  driverVehicle = ["metro", "nos", "efe", "bus", "taxi"].includes(v) ? v : "metro";
+  driverVehicle = ["metro", "nos", "efe", "valpo", "bus", "taxi"].includes(v) ? v : "metro";
   const road = driverVehicle === "bus" || driverVehicle === "taxi";      // 2.2 · bus y taxi van por la calle
   startScreen.dataset.homeRoad = road ? "1" : "0";
   saveSetting("metrosim.vehicle", driverVehicle);
@@ -365,6 +365,8 @@ const MODE_TITLES = { driver: "Conducir", passenger: "Viajar", control: "Centro 
 function selectMode(mode) {
   modeCards.forEach(c => c.classList.toggle("selected", c.dataset.card === mode));
   startScreen.dataset.homeMode = mode;
+  // 2.18 · El Metro Valparaíso (bonus) solo se conduce o se supervisa: como pasajero se vuelve a una línea de Santiago
+  if (mode !== "driver" && lineById(driverLineSelect.value)?.bonus) selectLine(lineById(loadSetting("metrosim.metroLine")) ? loadSetting("metrosim.metroLine") : "3");
   $("setupTitle").textContent = MODE_TITLES[mode] || "";
   saveSetting("metrosim.mode", mode);
 }
@@ -2029,7 +2031,7 @@ function report(list) {
  */
 function celebrateLine() {
   const line = LINES.find(l => l.id === LINE.id) || LINE;
-  const grand = LINES.every(l => l.id === line.id || lineMastered(l.id));
+  const grand = SANTIAGO_LINES.every(l => l.id === line.id || lineMastered(l.id));   // 2.18 · sin la bonus de Valparaíso
   bank.deposit(MASTERY_REWARD, `Libreta de misiones completa · ${line.name}`);
   if (grand) bank.deposit(GRAND_REWARD, "Gran Maestro del Metro de Santiago");
   hud.setBank(bank);
@@ -2043,7 +2045,7 @@ function celebrateLine() {
     : `Estimados pasajeros: Metro de Santiago felicita a nuestro nuevo Pasajero Ilustre de${isRail(line.id) ? "l" : " la"} ${lineLabel(line.id)}. ¡Muchas gracias por viajar con nosotros!`), 4200);
   celebrate({
     line, completed: game.missions.completed, reward: MASTERY_REWARD, grand, grandReward: GRAND_REWARD,
-    lines: LINES, isMastered: (id) => id === line.id || lineMastered(id),
+    lines: SANTIAGO_LINES, isMastered: (id) => id === line.id || lineMastered(id),
     onClose: () => { if (game?.walker) { game.walker.frozen = false; game.walker.keys.clear(); } },
   });
 }
@@ -2706,7 +2708,7 @@ function gameMenuAction(act) {
   else if (act === "home") stopGame();
   else if (act === "account") openAccount();
   else if (act === "feedback") {
-    const w = !!game.walker, train = ["NOS", "RAN"].includes(LINE.id);
+    const w = !!game.walker, train = isRail(LINE.id);
     openFeedback({
       tema: game.net ? "multijugador" : w ? "viajar" : train ? "tren" : "metro",
       contexto: `${w ? "Viajando" : "Conduciendo"} · ${lineLabel(LINE.id)}${game.net ? " · multijugador" : ""}`,

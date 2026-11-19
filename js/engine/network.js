@@ -54,7 +54,8 @@ function buildStations(data, lineId) {
 
 /** Crea una línea. Los sentidos se llaman <id>A / <id>B (la L3 conserva A / B). */
 function makeLine({ id, name, data, speedLimits = () => [], scheduleOffset = 0, description,
-  peakHeadway = 200, demand = 1, centers = [], terrain = [520, 560], deep = {}, sections = [], express = null }) {
+  peakHeadway = 200, demand = 1, centers = [], terrain = [520, 560], deep = {}, sections = [], express = null,
+  city = "santiago", bonus = false }) {
   const stations = buildStations(data, id);
   // Importancia de cada estación: la indicada, o según combinaciones y terminales
   stations.forEach(s => {
@@ -74,10 +75,11 @@ function makeLine({ id, name, data, speedLimits = () => [], scheduleOffset = 0, 
     stations,
     speedLimits: speedLimits(stations),
     routeIds: id === "3" ? ["A", "B"] : [`${id}A`, `${id}B`],
-    tripPrefix: id === "NOS" || id === "RAN" ? [id, `${id}V`] : [`L${id}`, `L${id}V`],
+    tripPrefix: id === "NOS" || id === "RAN" || id === "MER" ? [id, `${id}V`] : [`L${id}`, `L${id}V`],
     signalPrefix: id === "3" ? ["1", "2"] : [`${id}1`, `${id}2`],
     scheduleOffset,                    // desfase de su malla respecto a la de referencia
     peakHeadway, demand, centers, terrain, deep, sections, express,
+    city, bonus,                       // 2.18 · ciudad de la línea y si es una línea bonus (fuera de la red de Santiago)
   };
 }
 
@@ -372,8 +374,52 @@ export const RAN = makeLine({
   ],
 });
 
-/** Todas las líneas de la red, en el orden de la pantalla principal. */
-export const LINES = [L1, L2, L3, L4, L4A, L5, L6, NOS, RAN];
+
+/* ---------- 2.18 · Bonus: Metro Valparaíso (Merval, de EFE): Puerto → Limache ----------
+   Lo pidió un jugador en Reddit. Es otra ciudad: no combina con la red de Santiago (las
+   combinaciones se buscan solo entre líneas de la misma ciudad, así su «Hospital» no se
+   confunde con el del Tren Rancagua). Va por la costa de Valparaíso y Viña del Mar y sube
+   al interior por Quilpué y Villa Alemana hasta Limache (~43 km, 20 estaciones). En Viña del
+   Mar va bajo tierra de Miramar a Chorrillos (el soterramiento de 2005); el resto va al aire
+   libre (se simula como trinchera, como los otros trenes de EFE). Mismas simplificaciones que
+   el Tren Nos (5 coches, 80 km/h). Estaciones reales; distancias aproximadas. */
+export const MER = makeLine({
+  id: "MER", name: "METRO VALPARAÍSO", scheduleOffset: 120, peakHeadway: 360, demand: 0.45, terrain: [5, 90],
+  city: "valparaiso", bonus: true,
+  centers: ["PUERTO", "BELLAVISTA", "VIÑA DEL MAR", "QUILPUÉ"],
+  description: "Bonus: el tren de EFE de Valparaíso, por la costa hasta Viña del Mar y al interior hasta Limache. Bajo tierra en Viña.",
+  sections: [
+    { from: "PUERTO", to: "RECREO", type: "trinchera" },
+    { from: "EL SALTO", to: "LIMACHE", type: "trinchera" },
+  ],
+  data: [
+    { name: "PUERTO",          short: "PUERTO",         gap: 0 },
+    { name: "BELLAVISTA",      short: "BELLAVISTA",     gap: 900 },
+    { name: "FRANCIA",         short: "FRANCIA",        gap: 950 },
+    { name: "BARÓN",           short: "BARÓN",          gap: 1150 },
+    { name: "PORTALES",        short: "PORTALES",       gap: 1500 },
+    { name: "RECREO",          short: "RECREO",         gap: 1800 },
+    { name: "MIRAMAR",         short: "MIRAMAR",        gap: 1400 },
+    { name: "VIÑA DEL MAR",    short: "VIÑA DEL MAR",   gap: 1000 },
+    { name: "HOSPITAL",        short: "HOSPITAL",       gap: 900 },
+    { name: "CHORRILLOS",      short: "CHORRILLOS",     gap: 1000 },
+    { name: "EL SALTO",        short: "EL SALTO",       gap: 2400 },
+    { name: "QUILPUÉ",         short: "QUILPUÉ",        gap: 6500 },
+    { name: "EL SOL",          short: "EL SOL",         gap: 1500 },
+    { name: "EL BELLOTO",      short: "EL BELLOTO",     gap: 1800 },
+    { name: "LAS AMÉRICAS",    short: "LAS AMÉRICAS",   gap: 1500 },
+    { name: "LA CONCEPCIÓN",   short: "CONCEPCIÓN",     gap: 1200 },
+    { name: "VILLA ALEMANA",   short: "VILLA ALEMANA",  gap: 1200 },
+    { name: "SARGENTO ALDEA",  short: "SGTO. ALDEA",    gap: 1300 },
+    { name: "PEÑABLANCA",      short: "PEÑABLANCA",     gap: 1800 },
+    { name: "LIMACHE",         short: "LIMACHE",        gap: 13200 },
+  ],
+});
+
+/** Todas las líneas de la red, en el orden de la pantalla principal (la bonus de Valparaíso al final). */
+export const LINES = [L1, L2, L3, L4, L4A, L5, L6, NOS, RAN, MER];
+/** 2.18 · Las líneas de Santiago (sin la bonus de Valparaíso): el mapa, el álbum, el Gran Maestro y «Toda la red». */
+export const SANTIAGO_LINES = LINES.filter(l => !l.bonus);
 
 /** Línea por id ("1", "4A"...). */
 export const lineById = (id) => LINES.find(l => l.id === String(id)) || null;
@@ -385,6 +431,7 @@ export const lineById = (id) => LINES.find(l => l.id === String(id)) || null;
 export const TRANSFERS = [];
 for (let i = 0; i < LINES.length; i++) {
   for (let j = i + 1; j < LINES.length; j++) {
+    if (LINES[i].city !== LINES[j].city) continue;           // 2.18 · Valparaíso no combina con Santiago
     for (const sa of LINES[i].stations) {
       const sb = LINES[j].stations.find(s => s.name === sa.name);
       if (sb) TRANSFERS.push({ name: sa.name, a: { line: LINES[i], station: sa }, b: { line: LINES[j], station: sb } });
@@ -402,4 +449,4 @@ export function transferOf(line, station, otherLine) {
 }
 
 /** 1.20 · Líneas (ids) que pasan por una estación, por su nombre ("LOS HÉROES" → ["1", "2"]). */
-export const linesAtStation = (name) => LINES.filter(l => l.stations.some(s => s.name === name)).map(l => l.id);
+export const linesAtStation = (name) => SANTIAGO_LINES.filter(l => l.stations.some(s => s.name === name)).map(l => l.id);

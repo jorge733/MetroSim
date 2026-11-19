@@ -111,6 +111,7 @@ export const LINE_FLEETS = {
   "6":  [["AS-2014", 1]],
   "NOS": [["XTRAPOLIS", 1]],
   "RAN": [["XTRAPOLIS", 1]],
+  "MER": [["XTRAPOLIS", 1]],          // 2.18 · Merval: X'Trapolis 100 de Alstom
 };
 
 /** Número 0..1 estable a partir de un texto (mismo servicio → mismo tren). */

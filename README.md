@@ -124,6 +124,20 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **Salir por los torniquetes es gratis**: solo se cobra el pasaje al pasar hacia la zona pagada (antes, al terminar
   de cruzar el torniquete de salida se cobraba un pasaje).
 
+## Versión 2.18 · Bonus: Metro Valparaíso
+
+Lo pidió **charming-choom** en Reddit («Metro metro metro metro. ¿Podrías hacer el de Valpo? Es corto y bonito»).
+
+- **Nueva línea bonus: Metro Valparaíso** (Merval, de EFE), de **Puerto a Limache**: 20 estaciones reales y ~43 km
+  (distancias aproximadas). Va por la costa de Valparaíso y Viña del Mar, **bajo tierra en Viña** (de Miramar a
+  Chorrillos, como el soterramiento real) y al aire libre por Quilpué y Villa Alemana hasta Limache. Trenes X'Trapolis,
+  color celeste propio del juego.
+- **Se conduce gratis**, sin licencia: en Conducir aparece el botón **Metro Valparaíso · Bonus**.
+- **Centro de Control**: nuevo turno **Metro Valparaíso · Bonus** para supervisar solo esta línea. «Toda la red» sigue
+  siendo la de Santiago.
+- Es otra ciudad: **no combina** con las líneas de Santiago (su estación Hospital no se confunde con la del Tren
+  Rancagua), no aparece en el modo Pasajero y no cuenta para el álbum ni para el Gran Maestro.
+
 ## Versión 2.17 · Se entra caminando a los locales
 
 - **Puertas automáticas de vidrio**: los locales de la calle (panadería, almacén, farmacia, cafetería, fuente de soda,

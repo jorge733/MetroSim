@@ -26,7 +26,7 @@
    y curva de demanda horaria de un día real de Santiago.
    ========================================================================== */
 
-export const VERSION = "2.17.2";
+export const VERSION = "2.18";
 
 /* ---------- Colores oficiales de las líneas ---------- */
 export const LINE_COLORS = {
@@ -34,12 +34,14 @@ export const LINE_COLORS = {
   "4A": "#3c86c6", "5": "#00965e", "6": "#9b26b6",
   "NOS": "#0f7f86",                 // Tren Nos (EFE): color propio del juego, no oficial
   "RAN": "#d9731a",                 // 1.16 · Tren Rancagua (EFE): color propio del juego, no oficial
+  "MER": "#00a3e0",                 // 2.18 · Metro Valparaíso (bonus): celeste como el mar, color propio del juego
 };
 
 /** 1.15 · Trenes de EFE que son líneas de la red (no son del Metro): nombre, nombre corto y sigla del botón. */
 export const RAIL_LINES = {
   NOS: { name: "Tren Nos", short: "Nos", sign: "NOS", route: "ESTACIÓN CENTRAL ⇄ NOS" },
   RAN: { name: "Tren Rancagua", short: "Rancagua", sign: "RCG", route: "ESTACIÓN CENTRAL ⇄ RANCAGUA" },
+  MER: { name: "Metro Valparaíso", short: "Valparaíso", sign: "MER", route: "PUERTO ⇄ LIMACHE" },   // 2.18 · bonus
 };
 /** ¿Es un tren de EFE (y no una línea del Metro)? */
 export const isRail = (id) => Object.hasOwn(RAIL_LINES, id);

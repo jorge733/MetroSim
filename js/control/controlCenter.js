@@ -45,6 +45,7 @@ import { AlarmDesk } from "./alarms.js";
 import { controlSteps } from "./controlTutorial.js";
 import { NetHost, MAX_DRIVERS } from "../net/netHost.js";
 import { localNetwork, NET_LEVEL } from "../net/transport.js";
+import { SANTIAGO_LINES } from "../engine/network.js";
 
 /** Color de cada estado de tren en el esquema. */
 const STATE_COLORS = {
@@ -61,7 +62,8 @@ const L = CONFIG.train.length;
 const SCOPES = [
   { id: "apprentice", name: "Aprendiz", lines: ["3"], title: "Línea 3", text: "Una sola línea y pocas alarmas. Ideal para empezar." },
   { id: "operator", name: "Operador", lines: ["1", "2", "3"], title: "Líneas 1, 2 y 3", text: "Tres líneas con combinaciones entre ellas." },
-  { id: "chief", name: "Jefe de turno", lines: null, title: "Toda la red", text: "Las 7 líneas del Metro y los trenes de EFE a la vez: muchas alarmas." },
+  { id: "chief", name: "Jefe de turno", lines: SANTIAGO_LINES.map(l => l.id), title: "Toda la red", text: "Las 7 líneas del Metro y los trenes de EFE a la vez: muchas alarmas." },
+  { id: "valpo", name: "Bonus", lines: ["MER"], title: "Metro Valparaíso", text: "La línea de Puerto a Limache, por la costa y el interior (bonus)." },   // 2.18
 ];
 const SPEEDS = [1, 2, 5, 10];
 /** Sueldo por alarma atendida y duración mínima (s simulados) del turno para el bono. */

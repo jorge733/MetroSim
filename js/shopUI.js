@@ -8,7 +8,7 @@
 
 import { formatCLP, lineLabel } from "./config.js";
 import { icon } from "./icons.js";
-import { LINES } from "./engine/network.js";
+import { SANTIAGO_LINES as LINES } from "./engine/network.js";   // 2.18 · el álbum es de Santiago (sin la bonus de Valparaíso)
 import { WAGE, shiftBonus } from "./economy.js";
 import { LICENSES, LIVERIES, CONTRACTS, HOME, FURNITURE, SOUVENIR_PRICE, ALBUM_REWARD, souvenirId } from "./shop.js";
 
