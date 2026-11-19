@@ -201,8 +201,12 @@ export class IncidentManager {
   startSignalFault(clock, unit = null) {
     const { route, z } = unit ? { route: unit.route, z: unit.sim.position - rand(500, 900) } : this.place(500, 1800);
     const sys = this.ls.signals.get(route.id);
-    const signal = sys?.nextAhead(z);
-    if (!signal || signal.fault) return;
+    // 2.15.4 · No se pone en rojo delante de un tren que ya no alcanza a frenar (se busca la siguiente)
+    const tooClose = (sig) => this.ls.trains.some(u => u.route === route && u.sim.position - sig.z > 0
+      && u.sim.position - sig.z < u.sim.speed ** 2 / 1.6 + 60);
+    let signal = sys?.nextAhead(z);
+    for (let k = 0; signal && tooClose(signal) && k < 4; k++) signal = sys.nextAhead(signal.z - 1);
+    if (!signal || signal.fault || tooClose(signal)) return;
     signal.fault = true;
     // En el Centro de Control la reparación tarda más: el PCC autoriza a cada tren a pasar
     const until = clock + (this.pcc ? rand(240, 420) : rand(40, 100));

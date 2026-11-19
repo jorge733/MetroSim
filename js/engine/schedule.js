@@ -221,16 +221,30 @@ export class Timetable {
     for (let t = anchor; t > from;) { t -= headwayAt(t, line); deps.unshift(t); }
     for (let t = anchor; t < to;) { t += headwayAt(t, line); deps.push(t); }
     // Ruta Expresa: en sus horarios los servicios alternan roja y verde
-    let k = 0;
-    this.trips = deps.map(d => makeTrip(route, d, expressActive(d, line) ? (k++ % 2 ? "verde" : "roja") : null));
-    // (dos salidas en el mismo minuto tendrían el mismo id: se distinguen con una letra)
-    const seen = new Map();
-    for (const t of this.trips) {
-      const n = seen.get(t.id) || 0;
-      seen.set(t.id, n + 1);
-      if (n) t.id += String.fromCharCode(96 + n);
-    }
+    this.k = 0;
+    this.seen = new Map();
+    this.trips = [];
+    this.add(deps);
     this.anchorTrip = this.trips.find(t => t.departure === anchor);
+  }
+
+  add(deps) {
+    const line = this.route.line;
+    for (const d of deps) {
+      const t = makeTrip(this.route, d, expressActive(d, line) ? (this.k++ % 2 ? "verde" : "roja") : null);
+      // (dos salidas en el mismo minuto tendrían el mismo id: se distinguen con una letra)
+      const n = this.seen.get(t.id) || 0;
+      this.seen.set(t.id, n + 1);
+      if (n) t.id += String.fromCharCode(96 + n);
+      this.trips.push(t);
+    }
+  }
+
+  /** 2.15.4 · Alarga la malla hasta `to` (antes se acababa 8 h después de empezar y la red quedaba sin trenes). */
+  extend(to) {
+    const line = this.route.line, deps = [];
+    for (let t = this.trips.at(-1).departure; t < to;) { t += headwayAt(t, line); deps.push(t); }
+    this.add(deps);
   }
 
   /** Servicios cuya entrada en servicio (salida de cocheras) cae en [t0, t1). */

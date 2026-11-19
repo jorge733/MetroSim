@@ -9,7 +9,7 @@ export const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
 /** Hora del día en formato HH:MM:SS a partir de segundos desde medianoche. */
 export function formatClock(seconds) {
-  const s = Math.floor(seconds) % 86400;
+  const s = ((Math.floor(seconds) % 86400) + 86400) % 86400;   // 2.15.4 · antes de medianoche daba «-1:-10:00»
   const hh = String(Math.floor(s / 3600)).padStart(2, "0");
   const mm = String(Math.floor((s % 3600) / 60)).padStart(2, "0");
   const ss = String(s % 60).padStart(2, "0");

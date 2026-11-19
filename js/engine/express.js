@@ -30,7 +30,7 @@ export const EXPRESS_LABEL = {
 /** ¿Funciona la Ruta Expresa a esta hora (s) en esta línea? */
 export function expressActive(clock, line, dayType = CONFIG.dayType) {
   if (!line?.express || dayType !== "laboral") return false;
-  const h = (clock / 3600) % 24;
+  const h = (((clock / 3600) % 24) + 24) % 24;
   return EXPRESS_HOURS.some(([a, b]) => h >= a && h < b);
 }
 

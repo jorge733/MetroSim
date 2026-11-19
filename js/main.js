@@ -1022,6 +1022,7 @@ function stopGame({ keepFullscreen = false } = {}) {
     const mats = Array.isArray(obj.material) ? obj.material : obj.material ? [obj.material] : [];
     mats.forEach(m => { m.map?.dispose(); m.dispose(); });
   });
+  game.renderer.forceContextLoss();       // 2.15.4 · libera el contexto WebGL (si no, se acumulan al cambiar de modo)
   game.renderer.dispose();
   gameContainer.replaceChildren();
   setCabScreens(false);
@@ -2191,7 +2192,9 @@ function openBusStop(st) {
     <h2>¿Hacia dónde vas?</h2>
     <div class="bus-stop-dirs">${trips.map((t, i) => {
       const next = t.route.stops.slice(t.from + 1, t.from + 4).map(s => s.name).join(", ");
-      return `<button class="bus-stop-dir" data-i="${i}"><b><i style="background:${t.route.color}">${t.route.id}</i>hacia ${t.route.to}</b><small>Próximas paradas: ${next}${t.route.stops.length - t.from > 4 ? "…" : ""}</small></button>`;
+      // 2.15.4 · El precio de cada recorrido (un recorrido ya usado en el viaje no es transbordo)
+      const q = quotes[i], price = q.transfer ? (q.charge ? `transbordo · pagas ${formatCLP(q.charge)}` : "transbordo · $0") : formatCLP(band.price);
+      return `<button class="bus-stop-dir" data-i="${i}"><b><i style="background:${t.route.color}">${t.route.id}</i>hacia ${t.route.to}</b><small>Próximas paradas: ${next}${t.route.stops.length - t.from > 4 ? "…" : ""} · ${price}</small></button>`;
     }).join("")}</div>
     <p>${transfer ? `Tu viaje empezó hace menos de 2 horas (te quedan ${minutesLeft(fareTrip, now)} min): es un <b>transbordo</b> · ${fareText}.` : `Al subir se cobra el ${fareText}${q0.why ? ` · no es transbordo: ${q0.why}` : ""}. Si después tomas el Metro antes de 2 horas, es transbordo y pagas solo la diferencia.`} El bus no acepta tarjetas bancarias. Saldo bip!: ${card.label}.</p>
     <button class="bus-btn" data-close>Seguir a pie</button>

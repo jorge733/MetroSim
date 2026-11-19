@@ -193,6 +193,7 @@ export class TrafficManager {
       const depotBusy = this.units.some(u => u.route === route && u.sim.position > route.first.stopZ + 40);
       if (depotBusy || this.turnbackComing(route)) continue;
       const tt = this.timetables.get(route.id);
+      if (tt.trips.at(-1).departure < clock + 2 * 3600) tt.extend(clock + 4 * 3600);   // 2.15.4 · turnos largos
       // Solo entran los servicios que aún llegan a tiempo (los que ya deberían haber salido no se lanzan con retraso)
       const due = tt.trips.find(t => !this.started.has(t.id) && clock >= t.departure - 150 && clock < t.departure + 30);
       if (due) this.createUnit(due);

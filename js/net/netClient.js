@@ -280,6 +280,12 @@ export class NetClient {
     const g = this.game;
     if (!g?.engine) return;
     g.engine.replica = false;                              // vuelven los incidentes propios
+    // 2.15.4 · Las fallas de señal y limitaciones que mandó el anfitrión ya no las termina nadie: se levantan
+    for (const ls of g.engine.lines.values()) {
+      for (const sys of ls.signals.values()) for (const s of sys.list ?? sys.signals ?? []) { s.fault = false; s.permit = null; }
+      for (const route of ls.routes) route.restrictions = route.restrictions.filter(z => !z.key);
+      for (const u of ls.trains) if (u.ato) u.ato.permit = null;
+    }
     for (const ls of g.engine.lines.values()) for (const u of [...ls.trains]) if (u.puppet) { u.puppet = false; handOverToAto(g.engine, u); }
     if (g.player) this.releaseHold(g.player);
     this.ui?.notify(`${text} · sigues conduciendo sin conexión`, "warn", 7000);

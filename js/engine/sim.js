@@ -427,6 +427,7 @@ export class AutoDriver {
     this.heldUntil = null;             // retención con duración: se libera sola a esta hora
     this.holdFor = null;               // …o tantos segundos desde que llegue a la próxima parada
     this.permit = null;                // señal averiada que el PCC le autoriza a rebasar (marcha a la vista)
+                                       // 2.15.4 · solo vale mientras siga averiada: reparada, manda su aspecto
     this.sightUntil = null;            // marcha a la vista hasta esta coordenada (final del cantón autorizado)
     this.doorFault = false;            // falla de puertas: cada parada tarda más (incidents.js, modo PCC)
     this.regulateUntil = null;         // regulación: no sale antes de esta hora
@@ -530,7 +531,7 @@ export class AutoDriver {
         if (this.held) break;
         const leave = this.outOfService && !this.evacuating ? this.arrivedAt + 6 : this.leaveTime();
         const sig = this.signals?.startingSignal(this.target);
-        if ((leave === null || clock >= leave) && (!sig || sig.aspect !== "red" || sig === this.permit)) {
+        if ((leave === null || clock >= leave) && (!sig || sig.aspect !== "red" || (sig === this.permit && sig.fault))) {
           const nextIdx = nextStopIndex(this.trip, this.targetIndex, last);
           this.onEvent("departing", { station: this.target, next: this.stations[nextIdx] });
           this.targetIndex = nextIdx;
@@ -581,8 +582,8 @@ export class AutoDriver {
     }
     const sig = this.signals?.nextAhead(sim.position);
     if (sig) {
-      if (sig === this.permit && sim.position - sig.z < 400) cruiseCap = ON_SIGHT_KMH / 3.6;
-      if (sig.aspect === "red" && sig.z > stopZ && sig !== this.permit) targetZ = Math.min(sig.z + CONFIG.signals.stopMargin, sim.position);
+      if (sig === this.permit && sig.fault && sim.position - sig.z < 400) cruiseCap = ON_SIGHT_KMH / 3.6;
+      if (sig.aspect === "red" && sig.z > stopZ && !(sig === this.permit && sig.fault)) targetZ = Math.min(sig.z + CONFIG.signals.stopMargin, sim.position);
       if (sig.aspect === "yellow" && sim.position - sig.z < 400) cruiseCap = Math.min(cruiseCap, 45 / 3.6);
     }
     if (this.brakeTarget === null || Math.abs(this.brakeTarget.z - targetZ) > 1) this.brakeTarget = { z: targetZ, braking: false };

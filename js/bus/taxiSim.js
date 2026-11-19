@@ -51,6 +51,7 @@ export class TaxiSim extends BusSim {
     // El taxi parte en la pista del medio, no en la Solo Bus
     this.bus.lane = this.bus.targetLane = 1;
     this.bus.x = LANES[1];
+    this.cars = this.cars.filter(c => Math.abs(c.s - this.bus.s) > 25);   // 2.15.4 · nadie encima del taxi al partir
     this.fare = null;             // carrera en curso: { phase: "pickup" | "ride" | "done", ... } (posiciones ws: de la ida)
     this.fareN = 0;
     this.taxi = { fares: 0, lost: 0, km: 0, earned: 0, tips: 0, uturns: 0 };

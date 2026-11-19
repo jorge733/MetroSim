@@ -331,10 +331,10 @@ export class BusWorld {
 
     // Terreno: un plano grande que acompaña al vehículo (la calle dobla encima)
     // 2.15.2 · No se dibuja donde las bocas del Metro marcaron el stencil (ACCESS_MASK): ahí se ve la escalera
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(3200, 3200), worldUV(std(this.night ? "#3a3c3a" : "#b9b7a4", { map: grassTexture(),
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(3200, 3200, 64, 64), worldUV(std(this.night ? "#3a3c3a" : "#b9b7a4", { map: grassTexture(),
       stencilWrite: true, stencilWriteMask: 0, stencilRef: 1, stencilFunc: THREE.NotEqualStencilFunc }), GRASS_TILE));
     ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -0.05;
+    ground.position.y = -0.3;            // 2.15.4 · más abajo y en cuadros: con triángulos de 3 km tapaba la calzada en algunas GPU
     s.add(ground);
     this.ground = ground;
   }
@@ -883,6 +883,15 @@ export class BusWorld {
   }
 
   /* ----------------------------- Autos ----------------------------- */
+  /** 2.15.4 · Libera un auto que salió de la calle (antes quedaban en la memoria de la GPU: +170 mallas por vuelta en U). */
+  disposeCar(g) {
+    g.traverse(o => {
+      if (!o.isMesh) return;
+      o.geometry.dispose();
+      if (o.material !== this.headMat) o.material.dispose();
+    });
+  }
+
   carMesh(car) {
     const g = new THREE.Group();
     const color = CAR_COLORS[car.tint % CAR_COLORS.length];
@@ -987,8 +996,8 @@ export class BusWorld {
     if (this.lastDir !== sim.dir) { this.lastDir = sim.dir; this.prevX = b.x; this.busYaw = 0; }
     this.place(g, sim.toIdaX(b.x), sim.idaS, (sim.len ?? BUS_LENGTH) * sim.dir, this.busYaw + flip);
     this.body.rotation.x = THREE.MathUtils.lerp(this.body.rotation.x, THREE.MathUtils.clamp(-b.accel * 0.006, -0.02, 0.02), Math.min(1, dt * 4));
-    for (const w of this.wheels) w.rotation.x -= (b.v * dt) / 0.5;
-    this.steering.rotation.z = THREE.MathUtils.lerp(this.steering.rotation.z, -yaw * 6 + this.path.curvature(b.s) * 25, Math.min(1, dt * 6));
+    for (const w of this.wheels) w.rotation.x -= (b.v * dt) / (this.taxi ? 0.32 : 0.5);     // 2.15.4 · radio de la rueda del taxi
+    this.steering.rotation.z = THREE.MathUtils.lerp(this.steering.rotation.z, -yaw * 6 + this.path.curvature(sim.idaS ?? b.s) * (sim.dir ?? 1) * 25, Math.min(1, dt * 6));
     // Puertas
     const open = b.doors === "open" ? 1 : b.doors === "opening" ? b.doorT / 1.1 : b.doors === "closing" ? 1 - b.doorT / 1.1 : 0;
     for (const leaf of this.doorLeaves) {
@@ -1010,7 +1019,7 @@ export class BusWorld {
       m.userData.tails.emissiveIntensity = car.braking || car.v < 0.3 ? 2.2 : this.night ? 0.9 : 0.3;
       seen.add(car.id);
     }
-    for (const [id, m] of this.carMeshes) if (!seen.has(id)) { this.scene.remove(m); this.carMeshes.delete(id); }
+    for (const [id, m] of this.carMeshes) if (!seen.has(id)) { this.scene.remove(m); this.disposeCar(m); this.carMeshes.delete(id); }
     // Autos de vuelta (decorado)
     const zBus = -b.s;
     for (const o of this.oncoming) {
@@ -1045,6 +1054,9 @@ export class BusWorld {
 
   dispose() {
     this.scene.environment?.dispose();
+    this.sun?.shadow?.dispose();                    // 2.15.4 · el mapa de sombras del sol (quedaba vivo en cada «Otro turno»)
+    this.scene.background?.dispose?.();
+    for (const m of this.carMeshes.values()) this.disposeCar(m);
     this.scene.traverse(obj => {
       obj.geometry?.dispose();
       const mats = Array.isArray(obj.material) ? obj.material : obj.material ? [obj.material] : [];

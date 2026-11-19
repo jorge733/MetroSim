@@ -137,6 +137,18 @@ trenes de los dos motores quedan a ~1 m (mediana).
 **2.16.1** · Post para Reddit que anuncia el juego (`post-reddit/texto.md`): títulos, texto en español para r/chile y
 r/santiago, versión en inglés para r/WebGames y r/indiegames, y consejos para publicar (reglas, flair, imágenes).
 
+**2.16.2** · Auditoría (bus, taxi y motor del Metro):
+- Bus y taxi: el pasto ya no tapa la calzada en algunas pantallas; el taxi ya no parte su turno con un choque; se
+  libera la memoria de los autos tras cada vuelta en U, del mapa de sombras en «Otro turno» y del contexto WebGL al
+  salir del modo; el pasajero puede bajarse en un terminal sin Metro (sale en la estación más cercana del recorrido);
+  el timbre tocado mientras se cierran las puertas vale para el paradero siguiente; el título del taxi se corrige en
+  el turno nuevo; cada recorrido del paradero muestra su propio precio (transbordo o pasaje).
+- Metro: el Centro de Control a ×10 ya no simula pasos de más (los trenes se adelantaban al reloj); la red ya no se
+  queda sin trenes 8 horas después de empezar; un permiso del PCC deja de valer cuando reparan la señal (un tren
+  automático pasaba la roja); las fallas de señal ya no aparecen en rojo delante de un tren que no alcanza a frenar;
+  al perder la conexión de la sala se levantan las fallas y limitaciones del anfitrión; las horas antes de
+  medianoche ya no salen negativas («-1:-10:00»).
+
 ## Versión 2.15 · Volante en el bus y el taxi (deshecho)
 
 La 2.15 probó manejar el bus y el taxi con volante (girar en las curvas y para cambiar de pista).

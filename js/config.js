@@ -26,7 +26,7 @@
    y curva de demanda horaria de un día real de Santiago.
    ========================================================================== */
 
-export const VERSION = "2.16.1";
+export const VERSION = "2.16.2";
 
 /* ---------- Colores oficiales de las líneas ---------- */
 export const LINE_COLORS = {
@@ -288,7 +288,7 @@ export const SERVICE_HOURS = {
 
 /** ¿Está abierto el Metro a esta hora (s)? */
 export function inService(clockSeconds, dayType = CONFIG.dayType) {
-  const h = (clockSeconds / 3600) % 24, [a, b] = SERVICE_HOURS[dayType] || SERVICE_HOURS.laboral;
+  const h = (((clockSeconds / 3600) % 24) + 24) % 24, [a, b] = SERVICE_HOURS[dayType] || SERVICE_HOURS.laboral;
   return h >= a && h < b;
 }
 
@@ -312,7 +312,7 @@ const NIGHT_DEMAND = 0.03;
 
 /** Demanda de viajeros según la hora (0..1) para el tipo de día vigente. */
 export function demandAt(clockSeconds, dayType = CONFIG.dayType) {
-  const h = (clockSeconds / 3600) % 24;
+  const h = (((clockSeconds / 3600) % 24) + 24) % 24;        // 2.15.4 · también antes de medianoche (horas negativas)
   const p = DEMAND_PROFILE[dayType] || DEMAND_PROFILE.laboral;
   if (h <= p[0][0] || h >= p.at(-1)[0]) return NIGHT_DEMAND;
   for (let i = 1; i < p.length; i++) {
@@ -330,7 +330,7 @@ export function demandAt(clockSeconds, dayType = CONFIG.dayType) {
  */
 export function flowPeriodAt(clockSeconds, dayType = CONFIG.dayType) {
   if (dayType !== "laboral") return "off";
-  const h = (clockSeconds / 3600) % 24;
+  const h = (((clockSeconds / 3600) % 24) + 24) % 24;        // 2.15.4 · también antes de medianoche (horas negativas)
   if (h >= 6 && h < 10) return "am";
   if (h >= 16.5 && h < 21) return "pm";
   return "off";

@@ -184,7 +184,7 @@ export class MetroEngine {
    * inicio de la partida), con pasos más largos.
    */
   runUntil(time, { step = 0.5, onStep } = {}) {
-    while (this.clock.time < time) {
+    while (this.clock.time < time - 1e-6) {       // 2.15.4 · sin el margen, el redondeo de 0,1 + 0,1… daba un paso de más
       this.commands.process();
       for (const l of this.lines.values()) l.update(step, this.clock.time);
       onStep?.(step, this.clock.time);

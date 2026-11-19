@@ -161,6 +161,9 @@ class BusGame {
     this.scene.add(this.camera);
     this.camPos = null;
     this.earned = 0;
+    this.bellLater = false;
+    const R0 = this.route;               // 2.15.4 · tras una vuelta en U el título quedaba al revés en el turno nuevo
+    if (this.el?.routeTitle) this.el.routeTitle.textContent = `${R0.name.toUpperCase()} · ${R0.from.toUpperCase()} → ${R0.to.toUpperCase()}`;
     this.renderStrip();
     this.el.summary.classList.add("hidden");
     this.el.pause.classList.add("hidden");
@@ -336,6 +339,13 @@ class BusGame {
     if (!this.ride || this.paused) return;
     const st = this.sim.nextStop;
     if (this.exitStop()) return this.toast("Las puertas están abiertas: bájate ahora («Bajarse aquí») o espera la próxima parada", "info");
+    // 2.15.4 · Con las puertas cerrándose el bus todavía está en este paradero: el timbre queda para el próximo
+    if (this.sim.serving && this.sim.bus.doors !== "closed") {
+      const nx = this.route.stops[this.sim.stopIndex + 1];
+      if (!nx) return this.toast("Es el fin del recorrido", "info", 2200);
+      this.bellLater = true;
+      return this.toast(`Parada solicitada: ${nx.name}`, "ok", 2600);
+    }
     if (this.sim.requestStop()) { this.wantOff = this.sim.stopIndex; this.toast(`Parada solicitada: ${st.name}`, "ok", 2600); }
     else this.toast(st ? `Ya está solicitada la parada ${st.name}` : "Es el fin del recorrido", "info", 2200);
   }
@@ -343,6 +353,16 @@ class BusGame {
     if (!this.ride || this.paused) return;
     const here = this.exitStop();
     if (!here) return this.toast(this.sim.bus.v > 0.3 ? "Espera que el bus se detenga y abra las puertas" : "Las puertas están cerradas: toca el timbre para bajarte en la próxima parada", "info");
+    // 2.15.4 · En el terminal sin Metro también se baja (antes el pasajero quedaba atrapado): sale en la calle de la
+    // estación de Metro más cercana del recorrido
+    if (!here.stop.metro && here.index === this.route.stops.length - 1) {
+      const near = this.route.stops.filter(s => s.metro).sort((a, b) => Math.abs(a.s - here.stop.s) - Math.abs(b.s - here.stop.s))[0];
+      if (near) {
+        const onArrive = this.ride.onArrive;
+        this.destroy();
+        return onArrive?.(near, this.route);
+      }
+    }
     if (!here.stop.metro) return this.toast(`En ${here.stop.name} no hay estación de Metro: bájate en un paradero con Metro (el juego te deja en su calle)`, "info", 4200);
     const onArrive = this.ride.onArrive;
     this.destroy();
@@ -576,6 +596,10 @@ class BusGame {
     if (!this.paused) {
       if (this.ride) autopilot(this.sim, dt, { hold: this.wantOff != null && this.wantOff === (this.sim.serving?.index ?? this.sim.stopHere()?.index) });
       this.sim.step(dt);
+      if (this.bellLater && !this.sim.serving && this.sim.bus.doors === "closed") {
+        this.bellLater = false;
+        if (this.sim.requestStop()) this.wantOff = this.sim.stopIndex;
+      }
     }
     this.handleEvents();
     this.world.update(this.sim, this.paused ? 0 : dt, now / 1000, this.camera.position);
@@ -1029,6 +1053,7 @@ class BusGame {
     this.audio.stop();
     this.radio?.destroy();
     this.world?.dispose();
+    this.renderer.forceContextLoss();     // 2.15.4 · si no, cada entrada al modo deja un contexto WebGL vivo
     this.renderer.dispose();
     this.root.remove();
   }
