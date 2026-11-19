@@ -1889,6 +1889,12 @@ function onWalkerEvent(type, data) {
     case "street":
       onStreetTarget(data);
       break;
+    case "enterShop":
+      enterShopDoor(data);
+      break;
+    case "leaveShop":
+      leaveShopDoor();
+      break;
   }
 }
 
@@ -2259,8 +2265,60 @@ function onStreetTarget(target) {
   if (target.kind === "access") return hud.showMessage("Camina hacia la escalera para bajar a la estación", "info");
   if (target.kind === "busstop") return target.served ? openBusStop(st)
     : hud.showMessage("Por este paradero no pasa ninguno de los recorridos del juego (A01, 210, 385, 401, 403, 109, 107, 211 y 506)", "info", 5500);
-  if (target.kind === "shop") return openShop(target.shop, st);
+  if (target.kind === "shop") return game.city.canEnter(target.shop) ? enterShopDoor(target.shop) : openShop(target.shop, st);
+  if (target.kind === "counter") return openShop(target.shop, st);
+  if (target.kind === "exit") return leaveShopDoor();
   if (target.kind === "landmark") return takePhoto(target.landmark, st);
+}
+
+/**
+ * 2.17 · Entrar a un local caminando: la puerta automática se abre, se cruza
+ * (un parpadeo) y se aparece adentro, con la campanilla y el saludo de quien
+ * atiende. Se compra en la caja del mesón.
+ */
+function enterShopDoor(shop) {
+  if (!game || game.shopDoor || game.city.inside) return;
+  const w = game.walker, city = game.city;
+  game.shopDoor = true;
+  w.frozen = true;
+  w.keys.clear();
+  city.holdDoor(shop, true);
+  const open = city.doors.find(d => d.shop === shop)?.open ?? 1;
+  setTimeout(() => {
+    if (!game || game.city !== city) return;
+    hud.blink(() => {
+      w.placeAt(city.enterShop(shop));
+      city.holdDoor(shop, false);
+      game.audio.shopChime();
+    }, () => {
+      if (!game) return;
+      game.shopDoor = false;
+      w.frozen = false;
+      w.keys.clear();
+      const h = Math.floor(game.clock / 3600) % 24;
+      const hello = h < 12 ? "¡Buenos días!" : h < 20 ? "¡Buenas tardes!" : "¡Buenas noches!";
+      hud.showMessage(`${shop.icon} «${hello} ¿Qué le sirvo?» · ${shop.name} · acércate a la caja del fondo para comprar`, "info", 4200);
+    });
+  }, open > 0.6 ? 60 : 420);
+}
+
+/** 2.17 · Salir del local por la misma puerta, de vuelta a la vereda. */
+function leaveShopDoor() {
+  if (!game || game.shopDoor || !game.city.inside) return;
+  const w = game.walker, city = game.city;
+  game.shopDoor = true;
+  w.frozen = true;
+  w.keys.clear();
+  hud.blink(() => {
+    const out = city.exitShop();
+    if (out) w.placeAt(out);
+    game.audio.shopChime();
+  }, () => {
+    if (!game) return;
+    game.shopDoor = false;
+    w.frozen = false;
+    w.keys.clear();
+  });
 }
 
 /** Foto del hito de la estación. */
@@ -2423,6 +2481,20 @@ function missionGuide() {
   if (w.space === "street") {
     const o = game.city.origin, a = STREET.access;
     const goMetro = (hint) => { toward(o.x + a.x, o.z + a.z + a.mouthZ - 0.8); g.hint = hint; };
+    // 2.17 · Dentro de un local: a la caja si la misión es aquí; si no, de vuelta a la puerta
+    const inside = game.city.inside?.shop;
+    if (inside) {
+      const here = target && target.name === w.station.name && (step.kind === "buy" || step.kind === "action") && step.shop === inside.kind;
+      g.label = here ? "ESTÁS EN EL DESTINO" : "SAL A LA CALLE";
+      g.target = here ? `${inside.icon} ${inside.name}` : (target?.name ?? `Estación ${w.station.name}`);
+      const c = game.city.counterSpot(), d = game.city.shopExitSpot();
+      if (here) {
+        toward(c.x, c.z);
+        g.hint = "Pide en la caja del mesón · E";
+        if (game.city.nearest(w.pos)?.kind === "counter") { g.here = true; g.hint = "¡Aquí es! Pulsa E en la caja"; }
+      } else { toward(d.x, d.z); g.hint = "Sal por la puerta del local para seguir con la misión"; }
+      return g;
+    }
     if (!target) {
       g.label = "BOLETERÍA";
       g.target = `Estación ${w.station.name}`;
@@ -2443,7 +2515,7 @@ function missionGuide() {
       const shop = plan.shops.find(sh => sh.kind === step.shop);
       g.target = shop ? `${shop.icon} ${shop.name}` : target.name;
       if (shop) toward(o.x + shop.door.x, o.z + shop.door.z);
-      g.hint = shop?.stand ? "Puesto en la vereda del Metro · E para atender" : "En la vereda del Metro · E en la puerta para entrar";
+      g.hint = shop?.stand ? "Puesto en la vereda del Metro · E para atender" : "En la vereda del Metro · entra por la puerta y pide en la caja";
       if (g.dist != null && g.dist < 2.6) { g.here = true; g.hint = "¡Aquí es! Pulsa E"; }
     } else if (step.kind === "photo" && plan.landmark) {
       g.target = `📷 ${plan.landmark.name}`;
@@ -3029,7 +3101,7 @@ function loop(now) {
   if (game.city && walker) updateOutdoor(walker);
   if (game.city) game.city.update(dt, inStreet ? walker.pos : null, game.clock);
   const ridden = player && game.rig.view !== "exterior" ? player : walker?.unit;
-  game.outdoor.update(dt, cameraWorld, game.clock, { street: inStreet, cityOutdoor: game.city?.outdoor || 0, dry: ridden ? trainBounds(ridden) : null });
+  game.outdoor.update(dt, cameraWorld, game.clock, { street: inStreet, indoor: inStreet && !!game.city?.inside, cityOutdoor: game.city?.outdoor || 0, dry: ridden ? trainBounds(ridden) : null });
   // Encuentros con otros viajeros (no durante el tutorial ni en un cambio de línea)
   if (game.encounters && !game.tutorial && !game.transition) game.encounters.update(dt);
   game.missionT = (game.missionT || 0) - dt;
@@ -3197,10 +3269,10 @@ function walkerHudData() {
   const closed = inService(clock) ? "" : `Fuera del horario comercial (${String(h0 | 0).padStart(2, "0")}:${h0 % 1 ? "30" : "00"}–${h1 | 0}:${h1 % 1 ? "30" : "00"}): servicio especial del juego cada 15 min · `;
   const base = { clock, worldZ: w.worldZ, hint: closed + (game.encounters?.hint() ?? w.hint()) };
   if (w.space === "street") {
-    const lm = game.city.landmark, band = riderFare(clock);
+    const lm = game.city.landmark, band = riderFare(clock), inShop = game.city.inside?.shop;
     return {
       ...base,
-      title: `CALLE${lm ? " · " + lm.name.toUpperCase() : ""}`,
+      title: inShop ? `${inShop.label.toUpperCase()} · ${inShop.name.toUpperCase()}` : `CALLE${lm ? " · " + lm.name.toUpperCase() : ""}`,
       station: w.station.name,
       sub: `Cuenta ${bank.label} · bip! ${card.label} · pasaje ahora ${formatCLP(band.price)} (${band.label.toLowerCase()}${band.card ? ` ${band.card}` : ""})`,
       highlight: w.station,

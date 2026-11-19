@@ -793,6 +793,7 @@ body.touch-mode .help-chip { display: none !important; }
   z-index: 6;
 }
 .fade.visible { opacity: 1; }
+.fade.quick { transition: opacity .22s; }   /* 2.17 · cruzar la puerta de un local */
 
 /* ---------- Puntaje del conductor ---------- */
 .score-pill {

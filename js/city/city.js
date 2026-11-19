@@ -36,6 +36,7 @@ import { BUS_METRO_STOPS, busRoutesAt } from "../bus/busRoute.js";
 import { REAL_STREETS, OSM_ATTRIBUTION } from "./realStreets.js";      // 2.6 · calles reales (OpenStreetMap)
 import { realStreetData, loadRealStreet } from "./streetData.js";      // 2.7 · se cargan cuando hacen falta
 import { RealStreet, sampleLane } from "./realCity.js";
+import { ShopInterior, INSIDE, ENTERABLE } from "./shopInterior.js";   // 2.17 · se entra caminando a los locales
 
 /** 1.15 · Paradero de la calle (local): aquí se toma el bus del recorrido si pasa por esta estación. */
 const BUS_STOP = { x: STREET.roadHalf + 1.5, z: 34 };
@@ -189,6 +190,8 @@ export class City {
     g.visible = (this.outdoor || 0) > 0;
     this.scene.add(g);
     this.blocks = [];                       // rectángulos no transitables (coordenadas locales)
+    this.doors = [];                        // 2.17 · puertas automáticas de los locales
+    this.inside = null;
     this.walkRects = [{ x0: -S.walkHalf + 0.35, x1: S.walkHalf - 0.35, z0: -S.halfLen, z1: S.halfLen }];
     this.real = realData ? new RealStreet(realData) : null;
     this.busStopAt = BUS_STOP;
@@ -249,6 +252,9 @@ export class City {
 
   unload() {
     if (!this.group) return;
+    this.inside?.dispose();
+    this.inside = null;
+    this.doors = [];
     this.scene.remove(this.group);
     this.sun?.shadow?.dispose();                    // 2.16.3 · el mapa de sombras del sol (2048²) quedaba en cada calle visitada
     this.shadow = null;
@@ -291,7 +297,12 @@ export class City {
     this.scene.fog.color.copy(this.base.fog).lerp(horizon, f);
     this.scene.fog.near = this.base.near + (70 - this.base.near) * f;
     this.scene.fog.far = this.base.far + (330 - this.base.far) * f;
-    if (this.hemi) {
+    if (this.hemi && this.inside) {                        // 2.17 · dentro de un local: luz pareja de las luminarias
+      this.hemi.color.setHex(0xfff6ea); this.hemi.groundColor.setHex(0x8a8274);
+      this.hemi.intensity = 1.9;
+      this.sun.intensity = 0;
+    } else if (this.hemi) {
+      this.hemi.color.setHex(0xcfe4ff); this.hemi.groundColor.setHex(0x4a4238);
       const k = f > 0 ? 0.5 + 0.5 * f : 0;               // la luz del día entra por la boca del acceso
       this.hemi.intensity = (0.25 + 0.75 * sky.day * (1 - 0.3 * sky.cloud)) * k;
       this.sun.intensity = 2.8 * sky.light * k;
@@ -434,13 +445,33 @@ export class City {
   buildShopFront(g, M, shop, { fx = S.walkHalf - 0.04, z = shop.z, w = 12 } = {}) {
     const k = w / 12;
     facingPlane(g, 12 * k, 3.2, M.shopGlow, fx, 1.9, z, -1);
-    facingPlane(g, 2, 2.6, M.darkGlass, fx - 0.02, 1.4, z, -1);
+    this.buildShopDoor(g, M, shop, fx, z);
     const awn = addBox(g, 1.6, 0.12, 12.4 * k, std(new THREE.Color(shop.color), { rough: 0.8 }), fx - 0.8, 3.75, z);
     awn.rotation.z = -0.25;
     facingPlane(g, 11 * k, 1.25, signMaterial(shop.name.toUpperCase(), { bg: shop.color, font: "800 76px Arial" }), fx - 0.03, 4.6, z, -1);
     if (shop.kind === "banco") {
       facingPlane(g, 1, 1.6, glow(0x2a7fd4), fx - 0.05, 1.5, z + 3.5, -1);    // cajero automático
     }
+  }
+
+  /**
+   * 2.17 · Puerta de vidrio del local: dos hojas correderas que se abren solas
+   * cuando alguien se acerca (por ella se entra caminando). El cajero del banco
+   * se usa desde la vereda: su puerta queda cerrada.
+   */
+  buildShopDoor(g, M, shop, fx, z) {
+    M.doorway ||= glow(0xffffff, { map: doorwayTexture((this.sky?.night ?? 0) > 0.5) });
+    M.doorGlass ||= std(0xa9c7d8, { metal: 0.5, rough: 0.05, transparent: true, opacity: 0.35, depthWrite: false });
+    facingPlane(g, 2, 2.6, ENTERABLE.has(shop.kind) ? M.doorway : M.darkGlass, fx - 0.02, 1.4, z, -1);
+    for (const s of [-1, 1]) addBox(g, 0.1, 2.75, 0.1, M.metal, fx - 0.07, 1.375, z + s * 1.05);
+    addBox(g, 0.1, 0.14, 2.2, M.metal, fx - 0.07, 2.72, z);
+    const leaves = [-1, 1].map(s => {
+      const leaf = addBox(g, 0.03, 2.55, 1.0, M.doorGlass, fx - 0.13, 1.33, z + s * 0.5);
+      addBox(leaf, 0.04, 2.55, 0.05, M.metal, 0, 0, -s * 0.48);          // canto de la hoja (donde se juntan)
+      addBox(leaf, 0.04, 0.08, 1.0, M.metal, 0, -1.24, 0);              // zócalo
+      return leaf;
+    });
+    if (ENTERABLE.has(shop.kind)) this.doors.push({ shop, leaves, z, open: 0 });
   }
 
   buildKiosk(g, M, shop) {
@@ -875,8 +906,20 @@ export class City {
       c.mesh.rotation.y = dir > 0 ? 0 : Math.PI;
     }
 
-    // Ambiente: bocinas, pájaros (de día) y alguna sirena a lo lejos
-    if (this.sound) {
+    // 2.17 · Puertas automáticas: se abren con el jugador o un peatón cerca
+    for (const d of this.doors) {
+      const dx = d.shop.door.x, dz = d.shop.door.z;
+      const me = Math.hypot(lx - dx, lz - dz) < 2.6;
+      const want = me || d.hold || this.walkers?.some(p => Math.hypot(p.x - dx, p.z - dz) < 1.6);
+      if (me && want && d.open < 0.02 && !this.inside) this.sound?.("door", {});
+      d.open = THREE.MathUtils.clamp(d.open + (want ? 1.6 : -1.1) * dt, 0, 1);
+      const e = d.open * d.open * (3 - 2 * d.open);
+      d.leaves.forEach((leaf, i) => { leaf.position.z = d.z + (i ? 1 : -1) * (0.5 + 0.98 * e); });
+    }
+    if (this.inside) this.inside.update(dt, lx - INSIDE.x, lz - INSIDE.z);
+
+    // Ambiente: bocinas, pájaros (de día) y alguna sirena a lo lejos (adentro de un local no se oyen)
+    if (this.sound && !this.inside) {
       this.hornT -= dt; this.birdT -= dt; this.sirenT -= dt;
       if (this.hornT <= 0) { this.hornT = 12 + Math.random() * 30; this.sound("horn", { far: Math.random() < 0.6 }); }
       if (this.birdT <= 0) { this.birdT = 3 + Math.random() * 7; if (this.sky.day > 0.4) this.sound("birds", {}); }
@@ -897,6 +940,7 @@ export class City {
   walkable(wx, wz) {
     if (!this.group) return false;
     const { lx, lz } = this.local(wx, wz);
+    if (this.inside) return this.inside.walkable(lx - INSIDE.x, lz - INSIDE.z);
     if (!this.walkRects.some(r => lx >= r.x0 && lx <= r.x1 && lz >= r.z0 && lz <= r.z1)) return false;
     if (this.walkers?.some(p => Math.hypot(p.x - lx, p.z - lz) < 0.45)) return false;   // no se atraviesa a los peatones
     if (this.real && !this.real.free(lx, lz)) return false;                              // 2.6 · edificios, árboles y postes reales
@@ -905,6 +949,7 @@ export class City {
 
   /** Altura del suelo (vereda o calzada), en coordenadas del mundo. */
   floorAt(wx) {
+    if (this.inside) return this.origin.y + this.inside.floor;
     const { lx } = this.local(wx, this.origin.z);
     if (this.real) return this.origin.y + 0.1;              // 2.6 · la calle real se dibuja pareja (soleras pintadas)
     return this.origin.y + (Math.abs(lx) > S.roadHalf ? 0.1 : 0);
@@ -918,6 +963,12 @@ export class City {
   /** Lo que hay al alcance: acceso al Metro, un local o el hito. */
   nearest(wpos) {
     const { lx, lz } = this.local(wpos.x, wpos.z);
+    if (this.inside) {
+      const ix = lx - INSIDE.x, iz = lz - INSIDE.z;
+      if (this.inside.atCounter(ix, iz)) return { kind: "counter", shop: this.inside.shop };
+      if (this.inside.nearDoor(ix, iz)) return { kind: "exit", shop: this.inside.shop };
+      return null;
+    }
     const a = S.access;
     if (Math.hypot(lx - a.x, lz - (a.z + a.mouthZ + 0.8)) < 2.4) return { kind: "access" };
     if (Math.abs(lx - this.busStopAt.x) < 2.6 && Math.abs(lz - this.busStopAt.z) < 4.5) return { kind: "busstop", served: !!this.busStop };
@@ -950,10 +1001,96 @@ export class City {
     return lx < -3 && Math.abs(lz) < this.landmark.halfZ + 6;
   }
 
+  /* ---------------------------------------------------------------------
+     2.17 · Entrar y salir de los locales
+     --------------------------------------------------------------------- */
+
+  /** ¿Se puede entrar caminando a este local? */
+  canEnter(shop) { return !!shop && ENTERABLE.has(shop.kind) && !shop.stand && this.doors.some(d => d.shop === shop); }
+
+  /** Fachada del local (punto en la puerta) y hacia dónde mira (hacia la vereda), en coordenadas locales. */
+  doorFrame(shop) {
+    const fx = this.real ? shop.x : S.walkHalf, fz = shop.z;
+    let ox = shop.door.x - fx, oz = shop.door.z - fz;
+    const n = Math.hypot(ox, oz) || 1;
+    ox /= n; oz /= n;
+    return { fx, fz, ox, oz };
+  }
+
+  /** Local cuya puerta (abierta) está cruzando el jugador, caminando hacia adentro. */
+  shopDoorAt(wpos, yaw) {
+    if (this.inside) return null;
+    const { lx, lz } = this.local(wpos.x, wpos.z);
+    const fwx = -Math.sin(yaw), fwz = -Math.cos(yaw);
+    for (const d of this.doors) {
+      if (d.open < 0.55) continue;
+      const { fx, fz, ox, oz } = this.doorFrame(d.shop);
+      const rx = lx - fx, rz = lz - fz;
+      const depth = rx * ox + rz * oz, lat = Math.abs(-rx * oz + rz * ox);
+      if (depth < 0.95 && depth > -0.6 && lat < 0.8 && fwx * ox + fwz * oz < -0.35) return d.shop;
+    }
+    return null;
+  }
+
+  /** Abre (o deja de forzar) la puerta de un local. */
+  holdDoor(shop, on = true) { const d = this.doors.find(x => x.shop === shop); if (d) d.hold = on; }
+
+  /** Entra al local: arma su interior y devuelve dónde queda el jugador (mundo). */
+  enterShop(shop) {
+    this.inside?.dispose();
+    const it = this.inside = new ShopInterior(shop, { night: this.sky?.night ?? 0 });
+    this.group.add(it.group);
+    markCity(it.group);
+    this.applySky();
+    const e = it.entry;
+    return { x: this.origin.x + INSIDE.x + e.x, y: this.origin.y + it.floor, z: this.origin.z + INSIDE.z + e.z, yaw: e.yaw };
+  }
+
+  /** ¿Está saliendo por la puerta del local? */
+  leavingShop(wpos, yaw) {
+    if (!this.inside) return false;
+    const { lx, lz } = this.local(wpos.x, wpos.z);
+    return this.inside.leaving(lx - INSIDE.x, lz - INSIDE.z, yaw);
+  }
+
+  /** Mesón del local donde está el jugador (mundo), para guiar a la caja. */
+  counterSpot() {
+    if (!this.inside) return null;
+    const c = this.inside.counterSpot;
+    return { x: this.origin.x + INSIDE.x + c.x, z: this.origin.z + INSIDE.z + c.z };
+  }
+
+  /** Puerta del local, vista desde adentro (mundo). */
+  shopExitSpot() {
+    if (!this.inside) return null;
+    return { x: this.origin.x + INSIDE.x + 0.4, z: this.origin.z + INSIDE.z };
+  }
+
+  /** Sale a la vereda frente a la puerta (con la puerta abierta), mirando hacia afuera. */
+  exitShop() {
+    const shop = this.inside?.shop;
+    this.inside?.dispose();
+    this.inside = null;
+    this.applySky();
+    if (!shop) return null;
+    const { fx, fz, ox, oz } = this.doorFrame(shop);
+    const d = this.doors.find(x => x.shop === shop);
+    if (d) d.open = 1;
+    return { x: this.origin.x + fx + ox * 1.15, y: this.origin.y + 0.1, z: this.origin.z + fz + oz * 1.15, yaw: Math.atan2(-ox, -oz), shop };
+  }
+
   hint(wpos) {
     const n = this.nearest(wpos);
+    if (this.inside) {
+      const sh = this.inside.shop;
+      if (n?.kind === "counter") return `E · pedir en la caja de ${sh.name}`;
+      if (n?.kind === "exit") return "Camina hacia la puerta (o E) para salir a la calle";
+      return `Dentro de ${sh.name} · la caja está al fondo, en el mesón · J misiones`;
+    }
     if (n?.kind === "access") return `E (o camina hacia la escalera) · bajar a la estación ${this.station.name}`;
-    if (n?.kind === "shop") return n.shop.kind === "banco" ? "E · usar el cajero automático (saldo y movimientos)" : `E · entrar a ${n.shop.name} (${n.shop.label.toLowerCase()})`;
+    if (n?.kind === "shop") return n.shop.kind === "banco" ? "E · usar el cajero automático (saldo y movimientos)"
+      : n.shop.stand ? `E · comprar en ${n.shop.name} (${n.shop.label.toLowerCase()})`
+      : `Camina hacia la puerta (o E) para entrar a ${n.shop.name} (${n.shop.label.toLowerCase()})`;
     if (n?.kind === "landmark") return `E · sacar una foto de ${n.landmark.name}`;
     if (n?.kind === "busstop") return n.served ? `E · paradero (${busRoutesAt(this.station?.name).map(r => r.id).join(", ")}): tomar el bus` : "Paradero: por aquí no pasa ninguno de los recorridos del juego";
     if (this.real) return `Calle real de ${this.station.name} (${OSM_ATTRIBUTION})${this.landmark ? ` · ${this.landmark.name}` : ""} · J misiones`;
@@ -961,4 +1098,23 @@ export class City {
       ? `Calle de ${this.station.name} · enfrente: ${this.landmark.name} · locales en la vereda del Metro · J misiones`
       : `Calle de ${this.station.name} · locales en la vereda del Metro · J misiones`;
   }
+}
+
+/** 2.17 · Lo que se ve por la puerta de vidrio: el local iluminado, con estanterías y el mesón al fondo. */
+function doorwayTexture(night) {
+  const c = makeCanvas(128, 192), g = c.getContext("2d");
+  const bg = g.createLinearGradient(0, 0, 0, 192);
+  bg.addColorStop(0, night ? "#fff1d0" : "#f4efe4"); bg.addColorStop(1, night ? "#b9a888" : "#c9c2b4");
+  g.fillStyle = bg; g.fillRect(0, 0, 128, 192);
+  const cols = ["#d32f2f", "#1976d2", "#fbc02d", "#388e3c", "#f57c00", "#7b1fa2"];
+  for (const x0 of [6, 92]) for (let y = 70; y < 170; y += 22) {
+    g.fillStyle = "#8d8a84"; g.fillRect(x0, y + 14, 30, 3);
+    for (let x = x0; x < x0 + 30; x += 6) { g.fillStyle = cols[(x + y) % cols.length]; g.fillRect(x, y + 2, 5, 12); }
+  }
+  g.fillStyle = "#7a5a3a"; g.fillRect(40, 118, 48, 30);           // mesón
+  g.fillStyle = "#3b4a5a"; g.fillRect(56, 92, 16, 26);            // quien atiende
+  g.fillStyle = "#e6c3a0"; g.beginPath(); g.arc(64, 86, 7, 0, Math.PI * 2); g.fill();
+  g.fillStyle = "#ffffff"; for (const x of [24, 64, 104]) g.fillRect(x - 12, 4, 24, 5);   // luminarias
+  g.fillStyle = "#9b9488"; g.fillRect(0, 160, 128, 32);           // piso
+  return toTexture(c);
 }

@@ -735,6 +735,19 @@ export class Hud {
     this.el.fade.classList.add("visible");
   }
   fadeIn() { this.el.fade.classList.remove("visible"); }
+
+  /** 2.17 · Parpadeo breve a negro (cruzar una puerta): fn() se ejecuta con la pantalla a oscuras. */
+  blink(fn, done) {
+    const el = this.el.fade;
+    this.setText(this.el.fadeText, "");
+    el.classList.add("quick", "visible");
+    setTimeout(() => {
+      try { fn(); } finally {
+        el.classList.remove("visible");
+        setTimeout(() => { el.classList.remove("quick"); done?.(); }, 260);
+      }
+    }, 240);
+  }
   get summaryOpen() { return !this.el.summary.classList.contains("hidden"); }
 }
 

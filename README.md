@@ -124,6 +124,21 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **Salir por los torniquetes es gratis**: solo se cobra el pasaje al pasar hacia la zona pagada (antes, al terminar
   de cruzar el torniquete de salida se cobraba un pasaje).
 
+## Versión 2.17 · Se entra caminando a los locales
+
+- **Puertas automáticas de vidrio**: los locales de la calle (panadería, almacén, farmacia, cafetería, fuente de soda,
+  florería y librería) tienen una puerta corredera que se abre sola cuando te acercas (o cuando pasa un peatón),
+  con su ruido de motor, y por el vidrio se ve el local iluminado.
+- **Se entra caminando**: al cruzar la puerta suena la campanilla y quedas adentro, donde te saludan según la hora
+  («¡Buenos días!», «¡Buenas tardes!»…). Cada rubro tiene su interior: góndolas y refrigerador en el almacén,
+  estanterías y número de turno en la farmacia, vitrina y canastos de pan en la panadería, mesas en la cafetería,
+  barra con taburetes y plancha en la fuente de soda, baldes de flores en la florería y libreros en la librería.
+- **Se compra en la caja**: al fondo está el mesón con quien atiende (que te sigue con la mirada), la caja, el POS
+  de la tarjeta y la lista de precios del local. Con E en la caja se pide; para salir se camina de vuelta por la puerta.
+- Adentro no llueve ni se oye la calle, la vidriera muestra el nombre del local al revés y la misión te guía a la caja
+  (o a la puerta, si el encargo es en otro lado). El cajero automático del banco y los puestos de la vereda (kiosko y
+  los locales sin fachada cerca) se siguen atendiendo desde afuera.
+
 ## Versión 2.16 · Mejor visibilidad en Google
 
 - **Página nueva `/que-es/`** («Qué es RedMoviSim»): explica el juego con texto que Google puede leer (Metro líneas 1 a 6,

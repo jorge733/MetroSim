@@ -129,6 +129,16 @@ export class Walker {
     this.gatePass = false;
   }
 
+  /** 2.17 · Se pone en un punto de la calle o de un local (al cruzar la puerta), sin cambiar de espacio. */
+  placeAt({ x, y, z, yaw }) {
+    this.pos.set(x, y, z);
+    this.yaw = yaw;
+    this.pitch = -0.05;
+    this.speed = 0;
+    this.turnRate = 0;
+    this.updateCamera();
+  }
+
   /** Sale a la calle de la estación (la calle ya debe estar construida en this.city). */
   enterStreet(st) {
     this.leaveSeat();
@@ -456,7 +466,9 @@ export class Walker {
   interact() {
     if (this.space === "street") {
       const target = this.city.nearest(this.pos);
-      if (!target) return { text: "Acércate a la puerta de un local, al acceso del Metro o al hito de enfrente", level: "info" };
+      if (!target) return this.city.inside
+        ? { text: "Acércate a la caja (en el mesón del fondo) para comprar, o sal por la puerta", level: "info" }
+        : { text: "Acércate a la puerta de un local, al acceso del Metro o al hito de enfrente", level: "info" };
       this.onEvent("street", target);
       return null;
     }
@@ -533,7 +545,12 @@ export class Walker {
     // En la calle: al entrar en la boca del acceso se sigue caminando escalera abajo (ya dentro de la estación)
     if (this.space === "street") {
       this.pos.y = this.city.floorAt(this.pos.x);
-      if (this.moving && this.city.atAccessMouth(this.pos) && this.stationAt(this.pos.z)) {
+      // 2.17 · Se entra a un local cruzando su puerta automática (y se sale por la misma)
+      if (this.moving && this.speed > 0.1) {
+        if (this.city.inside) { if (this.city.leavingShop(this.pos, this.yaw)) this.onEvent("leaveShop", {}); }
+        else { const shop = this.city.shopDoorAt(this.pos, this.yaw); if (shop) this.onEvent("enterShop", shop); }
+      }
+      if (!this.city.inside && this.moving && this.city.atAccessMouth(this.pos) && this.stationAt(this.pos.z)) {
         this.space = "world";
         this.paid = false;
         this.gatePass = false;
@@ -729,7 +746,7 @@ export class Walker {
     // Pasos: la cadencia sube con la velocidad; cada medio ciclo suena un paso
     const before = Math.floor((this.stepPhase || 0) / Math.PI);
     this.stepPhase = (this.stepPhase || 0) + dt * (5.2 + Math.abs(this.speed) * 2.6);
-    if (Math.floor(this.stepPhase / Math.PI) !== before) this.onEvent("step", { running, space: this.space });
+    if (Math.floor(this.stepPhase / Math.PI) !== before) this.onEvent("step", { running, space: this.city?.inside && this.space === "street" ? "shop" : this.space });
 
     const dx = -Math.sin(this.yaw) * this.speed * dt;
     const dz = -Math.cos(this.yaw) * this.speed * dt;

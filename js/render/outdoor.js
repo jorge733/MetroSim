@@ -453,7 +453,7 @@ export class OutdoorView {
    * @param {number} o.cityOutdoor  cuánto se ve la calle (0..1) mientras se sube por la salida
    * @param {object|null} o.dry  tren en que se va (zona sin lluvia: { x0, x1, z0, z1 })
    */
-  update(dt, cam, clock, { street = false, cityOutdoor = 0, dry = null } = {}) {
+  update(dt, cam, clock, { street = false, indoor = false, cityOutdoor = 0, dry = null } = {}) {
     const target = street ? 0 : this.exposureAt(cam.z);
     this.exposure += THREE.MathUtils.clamp(target - this.exposure, -dt * 1.2, dt * 1.2);
     const f = this.exposure;
@@ -481,7 +481,7 @@ export class OutdoorView {
     if (this.M) this.M.building.emissiveIntensity = sky.day < 0.35 ? 0.9 * (1 - sky.day / 0.35) : 0;
 
     // Lluvia: afuera (viaducto, trinchera o la calle)
-    const outside = street ? 1 : f;
+    const outside = indoor ? 0 : street ? 1 : f;           // 2.17 · dentro de un local no llueve
     this.updateRain(dt, cam, WEATHER.rain * outside, street ? null : dry);
     this.rainAmount = WEATHER.rain * outside;
 

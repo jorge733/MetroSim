@@ -516,6 +516,20 @@ export class AudioSystem {
     this.burst({ start: 0.05, duration: 0.18, gain: 0.05, type: "bandpass", freq: 1500, q: 2 });
   }
 
+  /** 2.17 · Campanilla de la puerta de un local (ding-dong) al entrar o salir. */
+  shopChime() {
+    if (!this.ctx) return;
+    this.tone(1319, { duration: 0.5, gain: 0.06, wave: "sine", attack: 0.004 });
+    this.tone(1047, { start: 0.28, duration: 0.8, gain: 0.06, wave: "sine", attack: 0.004 });
+  }
+
+  /** 2.17 · Puerta automática de vidrio que se abre (motor y riel). */
+  slideDoor() {
+    if (!this.ctx) return;
+    this.burst({ duration: 0.7, gain: 0.03, type: "bandpass", freq: 700, endFreq: 420, q: 1.2, attack: 0.08, buffer: this.brown });
+    this.tone(180, { duration: 0.6, gain: 0.015, wave: "sawtooth", attack: 0.1, endFreq: 150 });
+  }
+
   /* ---------------------------------------------------------------------
      Sonidos de la calle (city/city.js los pide con city.sound)
      --------------------------------------------------------------------- */
@@ -525,6 +539,7 @@ export class AudioSystem {
     if (type === "horn") return this.horn(o.far);
     if (type === "birds") return this.birds();
     if (type === "siren") return this.siren();
+    if (type === "door") return this.slideDoor();
   }
 
   /** Auto o micro que pasa: zumbido que sube y baja (más fuerte cuanto más cerca y rápido). */
