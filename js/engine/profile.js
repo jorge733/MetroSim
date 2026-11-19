@@ -61,7 +61,7 @@ export function buildProfile(line) {
   const elev = st.map((s, i) => {
     const ground = groundAt(s.z);
     if (levels[i] === "viaducto") return ground + 9;
-    if (levels[i] === "trinchera") return ground - 7;
+    if (levels[i] === "trinchera") return ground - (line.atGrade ? 1 : 7);   // 2.19 · el Merval va a nivel del suelo
     const shallow = levels[i - 1] && levels[i - 1] !== "tunel" || levels[i + 1] && levels[i + 1] !== "tunel";
     return ground - (shallow ? 12 : 18 + 8 * hash(line.id + s.name));
   });

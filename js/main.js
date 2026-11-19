@@ -486,7 +486,7 @@ function lineRealismText(line) {
     const a = Math.min(sp.zA, line.stations[0].z), b = Math.max(sp.zB, line.stations.at(-1).z);
     if (a > b) open[sp.type] = (open[sp.type] || 0) + (a - b);
   }
-  const km = Object.entries(open).filter(([, m]) => m > 300).map(([t, m]) => `${SECTION_LABEL[t]} ${(m / 1000).toFixed(1).replace(".", ",")} km`);
+  const km = Object.entries(open).filter(([, m]) => m > 300).map(([t, m]) => `${t === "trinchera" && line.atGrade ? "a nivel del suelo" : SECTION_LABEL[t]} ${(m / 1000).toFixed(1).replace(".", ",")} km`);   // 2.19 · el Merval va a nivel
   if (km.length) parts.push(`Al aire libre: ${km.join(" · ")}.`);
   if (line.express) parts.push("Ruta Expresa en punta (roja y verde).");
   return parts.join(" ");

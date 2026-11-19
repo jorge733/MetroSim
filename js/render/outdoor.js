@@ -28,6 +28,7 @@ import { lineStock } from "../engine/fleet.js";
 import { WEATHER } from "../engine/weather.js";
 import { std, glow, addBox, addBoxSpan, makeCanvas, toTexture, concreteTexture } from "../utils.js";
 import { SkyDome, sunDirection, crownGeometry, trunkGeometry, leafMaterial } from "./realism.js";
+import { valpoZones, buildValpoNear, ValpoPanorama } from "./valparaiso.js";   // 2.19 · el mar y los cerros del Metro Valparaíso
 
 const S = CONFIG.station;
 /** Color del túnel (fondo y niebla bajo tierra). */
@@ -155,6 +156,7 @@ export class OutdoorView {
     this.group.name = "outdoor";
     scene.add(this.group);
     this.exposure = 0;                 // 0 = bajo tierra … 1 = al aire libre (en la cámara)
+    this.valpo = line.city === "valparaiso" ? valpoZones() : null;   // 2.19 · costa e interior de Valparaíso
 
     // Tramos al aire libre recortados al mundo de la línea
     this.spans = this.sec.spans
@@ -173,6 +175,7 @@ export class OutdoorView {
     this.dome.setOpacity(0);
     scene.add(this.dome);
     this.sunDir = new THREE.Vector3(0, 1, 0);
+    if (this.valpo) { this.pano = new ValpoPanorama(); this.pano.visible = false; scene.add(this.pano); }
 
     this.buildRain();
   }
@@ -220,6 +223,7 @@ export class OutdoorView {
     for (const span of this.spans) this.buildSpan(g, M, span, rel);
     this.buildBuildings(g, M);
     this.buildCars(g, M);
+    if (this.valpo) this.valpoNear = buildValpoNear(g, { rel, flatRibbon, wallRibbon, walk: WALK[1], zones: this.valpo });
   }
 
   buildSpan(g, M, span, rel) {
@@ -233,7 +237,8 @@ export class OutdoorView {
       else this.buildTrenchPiece(g, M, a, b, rel, station);
       // Suelo: a los lados de la vía siempre; bajo el viaducto también en el centro (bandejón)
       [-1, 1].forEach(s => {
-        g.add(new THREE.Mesh(flatRibbon(s * 220, s * WALK[1], a, b, z => rel(z) - 0.02), M.earth));
+        // 2.19 · En la costa de Valparaíso, a la izquierda de la vereda está la costanera y el mar (valparaiso.js)
+        if (!(s < 0 && this.valpo?.inCoast(mid))) g.add(new THREE.Mesh(flatRibbon(s * 220, s * WALK[1], a, b, z => rel(z) - 0.02), M.earth));
         g.add(new THREE.Mesh(flatRibbon(s * WALK[1], s * WALK[0], a, b, z => rel(z) + 0.12), M.sidewalk));
         // De afuera hacia la vía: la línea amarilla del bandejón queda junto a la vía
         g.add(new THREE.Mesh(flatRibbon(s * ROAD[1], s * ROAD[0], a, b, z => rel(z) + 0.01), M.asphalt));
@@ -347,7 +352,10 @@ export class OutdoorView {
       for (const s of [-1, 1]) {
         let z = span.zA - 5;
         while (z > span.zB + 5) {
-          const d = 14 + rnd() * 22, w = 14 + rnd() * 18, h = rnd() < 0.15 ? 30 + rnd() * 40 : 7 + rnd() * 16;
+          if (s < 0 && this.valpo?.inCoast(z)) { z -= 20; continue; }   // 2.19 · del lado del mar no hay edificios
+          const d = 14 + rnd() * 22, w = 14 + rnd() * 18;
+          let h = rnd() < 0.15 ? 30 + rnd() * 40 : 7 + rnd() * 16;
+          if (this.valpo?.inCoast(z)) h = Math.min(h, 6 + rnd() * 9);   // 2.19 · el plan de Valparaíso es bajo: se ven los cerros detrás
           const x = s * (WALK[1] + 5 + w / 2 + rnd() * 6);
           const zc = z - d / 2;
           list.push({ x, z: zc, w, d, h, y: this.groundRel(zc) });
@@ -466,12 +474,14 @@ export class OutdoorView {
     if (!street && cityOutdoor <= 0) {
       const horizon = this.dome.set(sky, this.sunDir);
       this.dome.setOpacity(f);
+      this.pano?.set({ coast: cam.z > this.valpo.split ? 1 : 0, sky, horizon, opacity: f });
       this.scene.background.copy(TUNNEL_BG).lerp(horizon, f);
       this.scene.fog.color.copy(TUNNEL_BG).lerp(horizon, f);
       const far = 330 - 120 * WEATHER.rain;
       this.scene.fog.near = 30 + (60 - 30) * f;
       this.scene.fog.far = 240 + (far - 240) * f;
-    } else this.dome.setOpacity(0);
+    } else { this.dome.setOpacity(0); if (this.pano) this.pano.visible = false; }
+    if (this.valpoNear?.seaTex && this.group.visible) this.valpoNear.seaTex.offset.y = (this.valpoNear.seaTex.offset.y + dt * 0.004) % 1;
     const light = street ? 0 : f;
     this.sun.intensity = 2.4 * sky.light * light;
     this.sun.color.setHex(sky.dusk > 0.4 ? 0xffb37a : 0xfff1dc);
@@ -479,6 +489,7 @@ export class OutdoorView {
     this.sun.target.position.set(cam.x, cam.y, cam.z);
     this.hemi.intensity = (0.2 + 0.9 * sky.day * (1 - 0.3 * WEATHER.cloud)) * light;
     if (this.M) this.M.building.emissiveIntensity = sky.day < 0.35 ? 0.9 * (1 - sky.day / 0.35) : 0;
+    if (this.valpoNear) this.valpoNear.M.house.emissiveIntensity = this.M.building.emissiveIntensity;
 
     // Lluvia: afuera (viaducto, trinchera o la calle)
     const outside = indoor ? 0 : street ? 1 : f;           // 2.17 · dentro de un local no llueve

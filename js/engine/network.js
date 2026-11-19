@@ -55,7 +55,7 @@ function buildStations(data, lineId) {
 /** Crea una línea. Los sentidos se llaman <id>A / <id>B (la L3 conserva A / B). */
 function makeLine({ id, name, data, speedLimits = () => [], scheduleOffset = 0, description,
   peakHeadway = 200, demand = 1, centers = [], terrain = [520, 560], deep = {}, sections = [], express = null,
-  city = "santiago", bonus = false }) {
+  city = "santiago", bonus = false, atGrade = false }) {
   const stations = buildStations(data, id);
   // Importancia de cada estación: la indicada, o según combinaciones y terminales
   stations.forEach(s => {
@@ -80,6 +80,7 @@ function makeLine({ id, name, data, speedLimits = () => [], scheduleOffset = 0, 
     scheduleOffset,                    // desfase de su malla respecto a la de referencia
     peakHeadway, demand, centers, terrain, deep, sections, express,
     city, bonus,                       // 2.18 · ciudad de la línea y si es una línea bonus (fuera de la red de Santiago)
+    atGrade,                           // 2.19 · sus tramos «trinchera» van casi a nivel de la calle (el Merval)
   };
 }
 
@@ -385,7 +386,7 @@ export const RAN = makeLine({
    el Tren Nos (5 coches, 80 km/h). Estaciones reales; distancias aproximadas. */
 export const MER = makeLine({
   id: "MER", name: "METRO VALPARAÍSO", scheduleOffset: 120, peakHeadway: 360, demand: 0.45, terrain: [5, 90],
-  city: "valparaiso", bonus: true,
+  city: "valparaiso", bonus: true, atGrade: true,
   centers: ["PUERTO", "BELLAVISTA", "VIÑA DEL MAR", "QUILPUÉ"],
   description: "Bonus: el tren de EFE de Valparaíso, por la costa hasta Viña del Mar y al interior hasta Limache. Bajo tierra en Viña.",
   sections: [

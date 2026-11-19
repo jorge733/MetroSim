@@ -124,6 +124,19 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **Salir por los torniquetes es gratis**: solo se cobra el pasaje al pasar hacia la zona pagada (antes, al terminar
   de cruzar el torniquete de salida se cobraba un pasaje).
 
+## Versión 2.19 · El mar y los cerros de Valparaíso
+
+- **El Metro Valparaíso ya no pasa por una ciudad genérica.** En la costa, de Puerto a Recreo, va a la izquierda la
+  avenida, la costanera con su muro y las rocas, y el **mar** hasta el horizonte, con las grúas del puerto junto a la
+  estación Puerto. A la derecha están los **cerros de Valparaíso**: laderas con quebradas y **casas de colores** con sus
+  techos de zinc o teja, que de noche encienden las ventanas. En el interior, de El Salto a Limache, hay cerros secos a
+  los dos lados y el cerro La Campana al fondo.
+- Lo cercano (hasta ~330 m) está hecho en 3D y sigue el perfil de la vía. Lo lejano (el horizonte del mar y los cerros
+  del fondo, con las luces de las casas) es un panorama pintado en el infinito, como el cielo (`js/render/valparaiso.js`).
+- **El Merval va a nivel del suelo**, como el real, y no en una trinchera de 7 m como los trenes de EFE de Santiago:
+  desde la cabina se ve el paisaje por encima de un pretil bajo. En la costa los edificios del plan son bajos, para que
+  se vean los cerros detrás.
+
 ## Versión 2.18 · Bonus: Metro Valparaíso
 
 Lo pidió **charming-choom** en Reddit («Metro metro metro metro. ¿Podrías hacer el de Valpo? Es corto y bonito»).
