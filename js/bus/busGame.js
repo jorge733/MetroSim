@@ -211,7 +211,7 @@ class BusGame {
           <div class="bus-pill bus-weather"><span class="bus-label">CLIMA</span><strong>${esc(weatherLabel())}</strong></div>
           ${this.radio ? `<button class="bus-pill taxi-radio-btn" data-k="radioBtn" aria-label="Radio" title="Radio (R enciende · , y . cambian de emisora)">${ICON.radio}<span class="taxi-radio-btn-text"><span class="bus-label">RADIO</span><strong data-k="radioNow">Apagada</strong></span></button>` : ""}
           <button class="bus-icon-btn" data-k="sound" aria-label="Sonido">${ICON.sound}</button>
-          <button class="bus-icon-btn bus-menu-btn" data-k="menu" aria-label="Pausa y menú" title="Menú (Esc)">${ICON.menu}<span>Menú</span></button>
+          <button class="bus-icon-btn bus-menu-btn" data-k="menu" aria-label="Pausa y menú" title="Menú${this.touch ? "" : " (Esc)"}">${ICON.menu}<span>Menú</span></button>
         </div>
       </header>
       <div class="bus-strip" data-k="strip"></div>
@@ -226,7 +226,7 @@ class BusGame {
             <div class="bus-speed-num"><strong data-k="speed">0</strong><span class="bus-label">KM/H</span></div>
           </div>
           <div class="bus-cluster-side">
-            <div class="bus-limit" data-k="limit" title="Limitador (L)">${Math.round(R.speedLimit * 3.6)}<small>LIM</small></div>
+            <div class="bus-limit" data-k="limit" title="Limitador${this.touch ? "" : " (L)"}">${Math.round(R.speedLimit * 3.6)}<small>LIM</small></div>
             <div class="bus-tells">
               <i data-k="tDoors" title="${this.taxi ? "Puerta abierta" : "Puertas abiertas"}">${ICON.tDoors}</i>
               <i data-k="tBrake" class="brk" title="Frenando">${ICON.tBrake}</i>

@@ -48,6 +48,7 @@ import { STOCK } from "./consist.js";
 import { adhesionFor } from "./weather.js";
 import { nextStopIndex } from "./express.js";
 import { clamp, formatStopError } from "./format.js";
+import { key as keyText } from "../keys.js";
 
 const G = 9.81;
 /** Sacudida máxima (m/s³) en servicio y al aplicar la emergencia. */
@@ -163,7 +164,7 @@ export class TrainSim {
     if (this.notchData.type === "power") {
       if (this.tractionLock) return { text: `Tracción bloqueada: ${this.tractionLock}`, level: "warn" };
       if (!this.doorsClosed) return { text: "Tracción bloqueada: cierra las puertas", level: "warn" };
-      if (this.reverser === 0) return { text: "Inversor en NEUTRO: selecciona sentido (Q adelante · E atrás)", level: "warn" };
+      if (this.reverser === 0) return { text: `Inversor en NEUTRO: selecciona sentido (${keyText("Q adelante · E atrás", "llave del inversor: F adelante · R atrás")})`, level: "warn" };
     }
     return null;
   }

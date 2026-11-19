@@ -137,6 +137,10 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - Si **arrancas** mientras viene caminando, vuelve a la vereda a hacer señas; si arrancas mientras paga o con tu
   pasajero queriendo bajarse, hay aviso (y falta). Mientras la puerta está abierta el taxi no acelera.
 - La puerta suena como la de un auto (el clic de la chapa y el golpe al cerrar), no como la neumática del bus.
+- **2.20.1 · En el celular no se habla de teclas.** Los avisos, pistas y misiones ya no dicen «pulsa E», «F para
+  levantarte» o «J misiones» cuando se juega con la pantalla táctil: nombran el botón que hace lo mismo (**✋ Usar**,
+  **🧍 Levantarse**, **🤚 Agarrarse**, **🎯 Misiones**, **Puertas**, **⇄ Cambiar cabina**…) o simplemente no lo
+  mencionan. En el computador todo sigue igual, con sus teclas.
 
 ## Versión 2.19 · El mar y los cerros de Valparaíso
 

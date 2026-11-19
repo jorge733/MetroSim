@@ -103,7 +103,7 @@
       <div class="home-brand">
         <img class="home-logo" src="logo.svg" alt="">
         <h1>Red<span>Movi</span>Sim</h1>
-        <span class="start-ver">v2.20</span>
+        <span class="start-ver">v2.20.1</span>
       </div>
       <div class="home-bar-tools">
         <button class="home-clock" id="clockNow" type="button" aria-live="polite" title="Ver las tarifas según el horario">
@@ -304,7 +304,7 @@
         <canvas id="cabScreenDmi" aria-label="DMI: velocidad, señal y parada"></canvas>
         <canvas id="cabScreenStatus" aria-label="Estado del tren: recorrido y próximas estaciones"></canvas>
       </div>
-      <p class="cab-screens-hint">Toca para cerrar · <kbd>P</kbd></p>
+      <p class="cab-screens-hint">Toca para cerrar<span class="keys-only"> · <kbd>P</kbd></span></p>
     </div>
 
     <div id="hud">
@@ -419,7 +419,7 @@
 
       <!-- Misión activa (modo pasajero) -->
       <div id="missionTracker" class="mission-tracker hidden">
-        <span class="hud-label">MISIÓN · J ver todas</span>
+        <span class="hud-label">MISIÓN<span class="keys-only"> · J ver todas</span></span>
         <strong id="trackerTitle">—</strong>
         <ol id="trackerSteps"></ol>
         <!-- Mapa de la misión: hacia dónde ir (brújula) y dónde queda el destino en la línea -->
@@ -543,7 +543,7 @@
         <header class="ticket-head">
           <span class="store-icon"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg></span>
           <div class="ticket-head-text">
-            <span class="small-label">MISIONES · J o Esc para cerrar</span>
+            <span class="small-label">MISIONES<span class="keys-only"> · J o Esc para cerrar</span></span>
             <strong id="missionPanelTitle">Misiones</strong>
           </div>
           <button id="missionClose" class="ticket-close" aria-label="Cerrar"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>

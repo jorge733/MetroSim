@@ -41,6 +41,8 @@
    text, ...datos }. No usa Three.js.
    ========================================================================== */
 
+import { key as keyText } from "../keys.js";
+
 /** Probabilidad de puerta obstruida en cada cierre de puertas (el conductor que cierra con gente aún subiendo, mucho más). */
 const DOOR_CHANCE = { player: 0.08, playerBoarding: 0.55, auto: 0.03 };
 /** Minutos (de simulación) entre incidentes de vía/señal: mínimo y máximo. */
@@ -158,7 +160,7 @@ export class IncidentManager {
         const car = 1 + Math.floor(Math.random() * 5);
         this.bus.emit("incident", {
           line: this.ls.line, route: u.route, kind: "doorObstruction", phase: "start", unit: u, car,
-          text: `Puerta obstruida en el coche ${car} · reapertura automática${u.closedBoarding ? " · cerraste con pasajeros aún subiendo" : ""}${u.isPlayer ? " · vuelve a cerrar (D)" : ""}`,
+          text: `Puerta obstruida en el coche ${car} · reapertura automática${u.closedBoarding ? " · cerraste con pasajeros aún subiendo" : ""}${u.isPlayer ? ` · vuelve a cerrar${keyText(" (D)", " (Puertas)")}` : ""}`,
         });
         if (!u.isPlayer) this.recloses.push({ unit: u, at: clock + rand(4, 8) });
       }

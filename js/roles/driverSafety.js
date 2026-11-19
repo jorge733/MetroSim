@@ -23,6 +23,7 @@
 
 import * as THREE from "three";
 import { CONFIG } from "../config.js";
+import { key as keyText } from "../keys.js";
 
 /** Segundos sin tocar un mando antes del zumbador, y para responder después. */
 const VIGIL_ALARM = 45, VIGIL_TRIP = 7;
@@ -159,7 +160,7 @@ export class DriverSafety {
     if (this.vigil > VIGIL_ALARM && !this.alarm) {
       this.alarm = true;
       this.buzzT = 0;
-      this.notify("VIGILANCIA · pulsa X (o mueve el mando) para confirmar que estás atento", "alert", VIGIL_TRIP * 1000);
+      this.notify(`VIGILANCIA · ${keyText("pulsa X", "toca Vigilancia")} (o mueve el mando) para confirmar que estás atento`, "alert", VIGIL_TRIP * 1000);
     }
     if (!this.alarm) return;
     this.buzzT -= dt;
@@ -225,7 +226,7 @@ export class DriverSafety {
       for (const a of z.arms) a.rotation.x += (raise - a.rotation.x) * Math.min(1, dt * 4);
       if (!z.warned && d > 0 && d < WORK_WARN) {
         z.warned = true;
-        this.notify(`Personal trabajando en la vía a ${Math.round(d)} m · reduce a ${z.zone.kmh} km/h y toca la bocina (B)`, "warn", 6000);
+        this.notify(`Personal trabajando en la vía a ${Math.round(d)} m · reduce a ${z.zone.kmh} km/h y toca la bocina${keyText(" (B)", " (📯)")}`, "warn", 6000);
       }
       if (!z.passed && d <= 0 && d > -CONFIG.train.length) {
         z.passed = true;
@@ -243,7 +244,7 @@ export class DriverSafety {
     if (this.trip) return { text: sim.isStopped ? "ATP · ESPERA AUTORIZACIÓN PCC" : "ATP · FRENO DE EMERGENCIA", level: "alert" };
     if (sim.restriction) return { text: `${sim.restriction.label} · MÁX ${sim.restriction.kmh} KM/H`, level: "warn" };
     const z = this.zones.find(w => w.route === unit.route && !w.passed && sim.position - w.zone.from > 0 && sim.position - w.zone.from < WORK_WARN);
-    if (z) return { text: z.honked ? "PERSONAL EN LA VÍA" : "PERSONAL EN LA VÍA · BOCINA (B)", level: "warn" };
+    if (z) return { text: z.honked ? "PERSONAL EN LA VÍA" : `PERSONAL EN LA VÍA · BOCINA${keyText(" (B)", " (📯)")}`, level: "warn" };
     return null;
   }
 

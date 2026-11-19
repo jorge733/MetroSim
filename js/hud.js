@@ -17,6 +17,7 @@ import { BANK_NAME } from "./economy.js";
 import { MISSION_TYPES, MASTERY_REWARD } from "./missions.js";
 import { icon, textOn } from "./icons.js";
 import { renderShiftReport } from "./shiftReport.js";
+import { key as keyText } from "./keys.js";
 
 export class Hud {
   constructor() {
@@ -136,7 +137,7 @@ export class Hud {
     const html = icon(on ? "soundOn" : "soundOff");
     if (this.el.soundButton.innerHTML !== html) this.el.soundButton.innerHTML = html;
     this.el.soundButton.setAttribute("aria-label", on ? "Sonido activado" : "Sonido desactivado");
-    this.el.soundButton.title = on ? "Sonido activado (M)" : "Sonido desactivado (M)";
+    this.el.soundButton.title = (on ? "Sonido activado" : "Sonido desactivado") + keyText(" (M)");
     this.el.soundButton.classList.toggle("off", !on);
   }
 
@@ -209,7 +210,7 @@ export class Hud {
     if (info.docked) {
       this.setText(e.stationTitle, "EN ESTACIÓN");
       this.setText(e.nextStation, info.docked.name);
-      this.setText(e.distance, info.next ? `Siguiente: ${info.next.name}` : "Fin de línea · R reiniciar");
+      this.setText(e.distance, info.next ? `Siguiente: ${info.next.name}` : `Fin de línea${keyText(" · R reiniciar")}`);
     } else if (info.next) {
       this.setText(e.stationTitle, sim.movingBackwards ? "RETROCEDIENDO" : info.express ? `PRÓXIMA PARADA · RUTA ${info.express.toUpperCase()}` : "PRÓXIMA ESTACIÓN");
       this.setText(e.nextStation, info.next.name);
@@ -218,7 +219,7 @@ export class Hud {
       const d = Math.round(sim.position - sim.route.track.retireZ);
       this.setText(e.stationTitle, "COLA DE MANIOBRAS");
       this.setText(e.nextStation, "FIN DE MANIOBRA");
-      this.setText(e.distance, Math.abs(d) <= 15 && sim.isStopped ? "En posición · pulsa T para cambiar de cabina" : `${d} m · detente en el cartel`);
+      this.setText(e.distance, Math.abs(d) <= 15 && sim.isStopped ? `En posición · ${keyText("pulsa T", "toca ⇄ Cambiar cabina")} para cambiar de cabina` : `${d} m · detente en el cartel`);
     }
 
     // Precisión de parada. Dos escalas: amplia (±50 m) mientras te acercas y
@@ -274,7 +275,7 @@ export class Hud {
     e.doorLamp.classList.toggle("open", sim.doorState === "open");
     e.doorLamp.classList.toggle("moving", sim.doorState === "opening" || sim.doorState === "closing");
     let hint;
-    if (sim.doorState === "open") hint = extra.boardingBusy ? "Viajeros subiendo y bajando…" : "Embarque completo · D cerrar";
+    if (sim.doorState === "open") hint = extra.boardingBusy ? "Viajeros subiendo y bajando…" : `Embarque completo · ${keyText("D", "Puertas:")} cerrar`;
     else if (!sim.doorsClosed) hint = "Tracción bloqueada";
     else if (!sim.isStopped) hint = "Bloqueadas en marcha";
     else if (sim.dockedStation()) hint = sim.isBraking ? "D abrir · tren en posición" : "Aplica freno para abrir";
@@ -523,7 +524,7 @@ export class Hud {
     if (!m) {
       this.setText(e.trackerTitle, "Sin misión activa");
       const li = document.createElement("li");
-      li.textContent = "Pulsa J para elegir una misión";
+      li.textContent = keyText("Pulsa J para elegir una misión", "Toca 🎯 Misiones para elegir una");
       e.trackerSteps.replaceChildren(li);
       return;
     }

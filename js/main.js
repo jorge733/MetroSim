@@ -90,6 +90,7 @@ import { DriverSafety } from "./roles/driverSafety.js";
 import { TRAIN_STATES } from "./engine/state.js";
 import { ControlCenter } from "./control/controlCenter.js";
 import { TouchControls, wantsTouch } from "./touch.js";
+import { key as keyText } from "./keys.js";
 import { World } from "./world.js";
 import { createTrainLights, resetTrainAssets, trainLineMapMaterial, trainInfoMaterials, trainGlassMaterial } from "./train.js";
 import { PeopleSystem } from "./people.js";
@@ -1002,7 +1003,7 @@ async function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = 
     game.tutorial = new Tutorial({
       mode, parent: gameScreen, touch: wantsTouch(), step: opts.tutorialStep ?? 0,
       onStep: () => game?.audio.loadOk(),
-      onFinish: () => { if (game) { game.tutorial = null; hud.showMessage("Tutorial completado · H muestra los controles · se repite desde la portada", "ok", 5000); } },
+      onFinish: () => { if (game) { game.tutorial = null; hud.showMessage(`Tutorial completado${keyText(" · H muestra los controles")} · se repite desde la portada`, "ok", 5000); } },
     });
   }
 
@@ -1351,7 +1352,7 @@ function onKeyDown(event) {
     // Ciclo de vistas del conductor: cabina → interior del tren (salón) → exterior
     const next = { cab: "saloon", saloon: "exterior", exterior: "cab" }[game.rig.view] || "cab";
     game.rig.setView(next);
-    const label = { cab: "Vista de cabina", saloon: "Vista interior del tren", exterior: "Vista exterior · arrastra para girar · Shift+arrastrar desplaza · rueda zoom · C encuadre inicial" }[next];
+    const label = { cab: "Vista de cabina", saloon: "Vista interior del tren", exterior: keyText("Vista exterior · arrastra para girar · Shift+arrastrar desplaza · rueda zoom · C encuadre inicial", "Vista exterior · arrastra para girar") }[next];
     return hud.showMessage(label, "info", next === "exterior" ? 4500 : 1200);
   }
   // Mando del tren: el rol de Conductor envía órdenes al motor (la respuesta llega en onCommandResult).
@@ -1363,9 +1364,9 @@ function onKeyDown(event) {
   if (key === "n") {
     stopAssistOn = !stopAssistOn;
     saveSetting("metrosim.stopAssist", stopAssistOn ? "1" : "0");
-    return hud.showMessage(stopAssistOn ? "Asistente de parada ACTIVADO · parada prevista, aviso de frenado y pitidos" : "Asistente de parada desactivado (N para volver a activarlo)", "info", 2500);
+    return hud.showMessage(stopAssistOn ? "Asistente de parada ACTIVADO · parada prevista, aviso de frenado y pitidos" : `Asistente de parada desactivado${keyText(" (N para volver a activarlo)")}`, "info", 2500);
   }
-  if (key === "r") return game.net ? hud.showMessage("En una sala no se reinicia el servicio: Finalizar turno (F) te lleva al menú", "info") : restartGame();
+  if (key === "r") return game.net ? hud.showMessage(`En una sala no se reinicia el servicio: Finalizar turno${keyText(" (F)")} te lleva al menú`, "info") : restartGame();
   if (key === "t") return changeCab();
   if (key === "f") return requestEndShift();
 }
@@ -1520,7 +1521,7 @@ function onPlayerEvent(type, data) {
         game.score.penalty("offPosition");
         const e = Math.abs(data.error).toFixed(1).replace(".", ",");
         hud.showMessage(data.error < 0
-          ? `${data.station.name} · TE PASASTE ${e} m · inversor atrás (E) y retrocede despacio hasta la marca (máx. ${Math.round(CONFIG.train.reverseMaxSpeed * 3.6)} km/h)`
+          ? `${data.station.name} · TE PASASTE ${e} m · inversor atrás${keyText(" (E)", " (R)")} y retrocede despacio hasta la marca (máx. ${Math.round(CONFIG.train.reverseMaxSpeed * 3.6)} km/h)`
           : `${data.station.name} · TE QUEDASTE ${e} m ANTES · avanza despacio en TRACCIÓN 1 hasta la marca`, "warn", 6000);
       }
       break;
@@ -1629,7 +1630,7 @@ function newScore(route) {
  */
 function requestEndShift() {
   if (!game?.player || game.transition || hud.summaryOpen) return;
-  if (game.shiftEnded) return hud.showMessage("Este servicio ya terminó · haz la maniobra de retorno (T) o vuelve al menú", "info", 4000);
+  if (game.shiftEnded) return hud.showMessage(`Este servicio ya terminó · haz la maniobra de retorno${keyText(" (T)")} o vuelve al menú`, "info", 4000);
   const now = performance.now();
   if (!game.endShiftAsk || now - game.endShiftAsk > 4000) {
     game.endShiftAsk = now;
@@ -1671,7 +1672,7 @@ function showDriverSummary({ early = false } = {}) {
       ? { continueLabel: "Nuevo servicio", onContinue: restartGame, onMenu: stopGame }
       : {
         continueLabel: "Maniobra de retorno",
-        onContinue: () => hud.showMessage("Cierra puertas (D), avanza a la cola de maniobras (máx. 30 km/h) y detente en el cartel FIN DE MANIOBRA. Ahí asegura el tren (freno e inversor en N) y pulsa T", "info", 9000),
+        onContinue: () => hud.showMessage(`Cierra puertas${keyText(" (D)")}, avanza a la cola de maniobras (máx. 30 km/h) y detente en el cartel FIN DE MANIOBRA. Ahí asegura el tren (freno e inversor en N) y ${keyText("pulsa T", "toca ⇄ Cambiar cabina")}`, "info", 9000),
         altLabel: "Reiniciar",
         onAlt: restartGame,
         onMenu: stopGame,
@@ -1715,7 +1716,7 @@ function atTurnbackBoard(player) {
 function securedChecks(sim) {
   const t = sim.notchData.type;
   return [
-    { ok: sim.doorsClosed, text: "Puertas cerradas (D)" },
+    { ok: sim.doorsClosed, text: `Puertas cerradas${keyText(" (D)")}` },
     { ok: t === "brake" || t === "emergency", text: "Freno aplicado (S/▼)" },
     { ok: sim.reverser === 0, text: "Inversor en N (Q/E)" },
   ];
@@ -1740,7 +1741,7 @@ async function changeCab() {
   if (missing.length) return hud.showMessage(`Antes de dejar la cabina asegura el tren: ${missing.map(c => c.text).join(" · ")}`, "warn", 5000);
   const other = oppositeRoute(player.route);
   if (!game.traffic.depotFree(other)) {
-    return hud.showMessage("La vía de salida está ocupada por un tren que sale de cocheras · espera unos segundos y vuelve a pulsar T", "warn", 5000);
+    return hud.showMessage(`La vía de salida está ocupada por un tren que sale de cocheras · espera unos segundos y ${keyText("vuelve a pulsar T", "vuelve a intentarlo")}`, "warn", 5000);
   }
   if (game.turnPending) return;
   game.turnPending = true;
@@ -1766,7 +1767,7 @@ async function changeCab() {
   game.turn = { phase: "walk", trip, walkZ: CONFIG.train.length - 5, walking: false, auto: false, run: false, stepDist: 0, test: { b1: false, b3: false } };
   game.rig.walkZ = game.turn.walkZ;
   game.rig.setView("walk");
-  hud.showMessage(`Servicio ${trip.id} · ${other.label} · sale de ${other.first.name} a las ${formatClock(trip.departure)}. Camina hasta la otra cabina (W) o pulsa T para el recorrido automático`, "ok", 8000);
+  hud.showMessage(`Servicio ${trip.id} · ${other.label} · sale de ${other.first.name} a las ${formatClock(trip.departure)}. Camina hasta la otra cabina${keyText(" (W) o pulsa T para el recorrido automático", " (▲) o toca ⇄ Cambiar cabina para el recorrido automático")}`, "ok", 8000);
 }
 
 /** Objeto del tren al que se enganchan cámara y luces: su coche delantero (el grupo entero si es rígido). */
@@ -1815,7 +1816,7 @@ function updateTurn(dt, player) {
       turn.phase = "activate";
       game.rig.setView("cab");
       audio_(a => a.reverserClunk());
-      hud.showMessage("En la cabina nueva · llave puesta · inversor ADELANTE (Q) y prueba de frenos: suelta a FRENO 1 y vuelve a FRENO 3", "info", 7000);
+      hud.showMessage(`En la cabina nueva · llave puesta · inversor ADELANTE${keyText(" (Q)", " (F)")} y prueba de frenos: suelta a FRENO 1 y vuelve a FRENO 3`, "info", 7000);
     }
   }
   if (turn.phase === "activate") {
@@ -1831,7 +1832,7 @@ function updateTurn(dt, player) {
   }
   if (turn.phase === "shunt" && sim.isStopped && sim.dockedStation() === player.route.first) {
     game.turn = null;
-    hud.showMessage(`Maniobra completa · en el andén de ${player.route.first.name} · abre puertas (D) y sal a las ${formatClock(turn.trip.departure)}`, "ok", 7000);
+    hud.showMessage(`Maniobra completa · en el andén de ${player.route.first.name} · abre puertas${keyText(" (D)")} y sal a las ${formatClock(turn.trip.departure)}`, "ok", 7000);
   }
 }
 
@@ -1860,14 +1861,14 @@ function turnSteps(player) {
     const left = Math.max(0, Math.round(turn.walkZ - WALK_END));
     return { title: "MANIOBRA DE RETORNO · 2/4 · A LA OTRA CABINA", steps: [
       step(false, `Faltan ${left} m por el interior del tren`, true),
-      step(false, turn.auto ? "Recorrido automático…" : "W caminar · S detenerte · Shift correr"),
+      step(false, turn.auto ? "Recorrido automático…" : keyText("W caminar · S detenerte · Shift correr", "▲ caminar · ▼ detenerte")),
       step(false, "T: recorrido automático"),
     ] };
   }
   if (turn.phase === "activate") {
     return { title: "MANIOBRA DE RETORNO · 3/4 · ACTIVAR LA CABINA", steps: [
       step(true, "Llave puesta"),
-      step(sim.reverser === 1, "Inversor ADELANTE (Q)", sim.reverser !== 1),
+      step(sim.reverser === 1, `Inversor ADELANTE${keyText(" (Q)", " (F)")}`, sim.reverser !== 1),
       step(turn.test.b1, "Prueba de frenos: suelta a FRENO 1 (W/▲)", sim.reverser === 1 && !turn.test.b1),
       step(turn.test.b3, "…y vuelve a FRENO 3 (S/▼)", turn.test.b1 && !turn.test.b3),
     ] };
@@ -2447,7 +2448,7 @@ function addSouvenir(st) {
   }
   inventory.save();
   hud.setBank(bank);
-  return `Recuerdo de ${st.name} al álbum (${have}/${total}) · K para ver tu colección${extra}`;
+  return `Recuerdo de ${st.name} al álbum (${have}/${total}) · ${keyText("K", "☰ Tienda")} para ver tu colección${extra}`;
 }
 
 /** Tablero de misiones (J). */
@@ -2541,7 +2542,7 @@ function missionGuide() {
       if (here) {
         toward(c.x, c.z);
         g.hint = "Pide en la caja del mesón · E";
-        if (game.city.nearest(w.pos)?.kind === "counter") { g.here = true; g.hint = "¡Aquí es! Pulsa E en la caja"; }
+        if (game.city.nearest(w.pos)?.kind === "counter") { g.here = true; g.hint = `¡Aquí es! ${keyText("Pulsa E", "Toca ✋ Usar")} en la caja`; }
       } else { toward(d.x, d.z); g.hint = "Sal por la puerta del local para seguir con la misión"; }
       return g;
     }
@@ -2565,14 +2566,14 @@ function missionGuide() {
       const shop = plan.shops.find(sh => sh.kind === step.shop);
       g.target = shop ? `${shop.icon} ${shop.name}` : target.name;
       if (shop) toward(o.x + shop.door.x, o.z + shop.door.z);
-      g.hint = shop?.stand ? "Puesto en la vereda del Metro · E para atender" : "En la vereda del Metro · entra por la puerta y pide en la caja";
-      if (g.dist != null && g.dist < 2.6) { g.here = true; g.hint = "¡Aquí es! Pulsa E"; }
+      g.hint = shop?.stand ? `Puesto en la vereda del Metro · ${keyText("E", "✋ Usar")} para atender` : "En la vereda del Metro · entra por la puerta y pide en la caja";
+      if (g.dist != null && g.dist < 2.6) { g.here = true; g.hint = `¡Aquí es! ${keyText("Pulsa E", "Toca ✋ Usar")}`; }
     } else if (step.kind === "photo" && plan.landmark) {
       g.target = `📷 ${plan.landmark.name}`;
       const spot = game.city.landmarkGoal();
       toward(o.x + spot.x, o.z + spot.z);
-      g.hint = game.city.real ? "En la vereda, frente al edificio · E para sacar la foto" : "Al frente, cruzando la avenida · E para sacar la foto";
-      if (game.city.atLandmark(w.pos.x - o.x, w.pos.z - o.z)) { g.here = true; g.hint = "¡Aquí es! Pulsa E para sacar la foto"; }
+      g.hint = game.city.real ? `En la vereda, frente al edificio · ${keyText("E", "✋ Usar")} para sacar la foto` : `Al frente, cruzando la avenida · ${keyText("E", "✋ Usar")} para sacar la foto`;
+      if (game.city.atLandmark(w.pos.x - o.x, w.pos.z - o.z)) { g.here = true; g.hint = `¡Aquí es! ${keyText("Pulsa E", "Toca ✋ Usar")} para sacar la foto`; }
     } else {
       g.target = target.name;
       g.here = true;
@@ -2607,8 +2608,8 @@ function missionGuide() {
       const spots = totem ? [booth, ...MZ.totems.map(x => ({ x, z: st.z + MZ.totemZ - 0.8 }))] : [booth];
       const best = spots.reduce((b, p) => (Math.hypot(p.x - w.pos.x, p.z - w.pos.z) < Math.hypot(b.x - w.pos.x, b.z - w.pos.z) ? p : b));
       toward(best.x, best.z);
-      g.hint = totem ? "Boletería a la izquierda, tótems a la derecha · E para atender" : "A la izquierda de los torniquetes · E para atender";
-      if (g.dist < 1.4) { g.here = true; g.hint = "¡Aquí es! Pulsa E"; }
+      g.hint = totem ? `Boletería a la izquierda, tótems a la derecha · ${keyText("E", "✋ Usar")} para atender` : `A la izquierda de los torniquetes · ${keyText("E", "✋ Usar")} para atender`;
+      if (g.dist < 1.4) { g.here = true; g.hint = `¡Aquí es! ${keyText("Pulsa E", "Toca ✋ Usar")}`; }
     } else if (inExit) {
       toward(0, st.z + MZ.z1 - 2);
       g.hint = "Vuelve a la mezanina: está en la zona no pagada";

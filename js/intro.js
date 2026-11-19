@@ -26,6 +26,7 @@ import { LANDMARKS } from "./city/catalog.js";
 import { waitForSpanishVoice } from "./audio.js";
 import { VERSION, LINE_COLORS, isRail, RAIL_LINES } from "./config.js";
 import { LICENSES, LIVERIES, CONTRACTS, FURNITURE } from "./shop.js";
+import { key as keyText } from "./keys.js";
 
 const TUNNEL_TIME = 4.6;           // segundos de viaje por el túnel antes de salir a la ciudad
 
@@ -607,7 +608,7 @@ export function playIntro({ isMuted = () => false, menuReady = null } = {}) {
           <div><b data-count="${shopItems}">0</b><small>ARTÍCULOS EN TIENDA</small></div>
         </div>
         <div class="intro-cards">${cards.map(([c, b, txt], i) => `<div style="--c:${c};animation-delay:${1.6 + i * 0.12}s"><b>${b}</b>${txt}</div>`).join("")}</div>
-        <div class="intro-actions"><button class="intro-start">Comenzar ›</button><span class="intro-hint">Pulsa cualquier tecla · Esc para saltar</span></div>
+        <div class="intro-actions"><button class="intro-start">Comenzar ›</button><span class="intro-hint">${keyText("Pulsa cualquier tecla · Esc para saltar", "Toca la pantalla para seguir")}</span></div>
       </div>
       <div class="intro-mapbox">
         <canvas></canvas>

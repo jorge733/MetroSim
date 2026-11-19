@@ -51,6 +51,7 @@ import { clamp } from "./utils.js";
 import { platformSolidAt, isArrivalOnly } from "./stationLayout.js";
 import { Elevator, inElevatorShaft } from "./elevators.js";
 import { STREET } from "./city/plan.js";
+import { key as keyText } from "./keys.js";
 
 const EYE = 1.62;
 const WALK = 1.4, RUN = 3.2, BACK = 0.75;        // m/s: caminar, correr, retroceder
@@ -320,7 +321,7 @@ export class Walker {
       el.request(target);
       return { text: target ? "Ascensor subiendo a la mezanina…" : "Ascensor bajando al andén…", level: "ok" };
     }
-    if (el.openAt(level)) return { text: "Las puertas están abiertas: entra y pulsa E para viajar", level: "info" };
+    if (el.openAt(level)) return { text: `Las puertas están abiertas: entra y ${keyText("pulsa E", "toca ✋ Usar")} para viajar`, level: "info" };
     el.request(level);
     return { text: el.level === level && el.state !== "moving" ? "Abriendo puertas del ascensor" : "Ascensor llamado · espera a que llegue", level: "ok" };
   }
@@ -381,7 +382,7 @@ export class Walker {
     const car = carAt(this.pos.z);
     const seats = this.unit.slots.filter(s => s.type === "seat" && s.car === car).length;
     const load = Math.round(carLoads(this.unit)[car]);
-    if (load >= seats) return { text: `No hay asientos libres: en el coche ${car + 1} van ${load} personas y tiene ${seats} asientos · G agárrate de una barra`, level: "info" };
+    if (load >= seats) return { text: `No hay asientos libres: en el coche ${car + 1} van ${load} personas y tiene ${seats} asientos · ${keyText("G", "🤚")} agárrate de una barra`, level: "info" };
     const free = this.unit.slots
       .filter(s => s.type === "seat" && !s.occupant)
       .map(s => ({ s, d: Math.hypot(s.approach.x - this.pos.x, s.approach.z - this.pos.z) }))
@@ -393,7 +394,7 @@ export class Walker {
     this.seat = { place: slot, seatY: slot.seatY, stand: slot.approach.clone() };
     this.pos.set(slot.pos.x * 0.95, F, slot.pos.z);
     this.yaw = slot.yaw + Math.PI;
-    return { text: "Te sientas · F para levantarte", level: "ok" };
+    return { text: `Te sientas · ${keyText("F", "🧍 Levantarse")} para levantarte`, level: "ok" };
   }
 
   /** Banco del andén: te sientas mirando a la vía mientras esperas el tren. */
@@ -412,7 +413,7 @@ export class Walker {
     this.pos.set(side * 7.75, S.platformTop, spot.pos.z);
     this.yaw = side > 0 ? Math.PI / 2 : -Math.PI / 2;           // mirando a la vía
     this.pitch = -0.05;
-    return { text: "Te sientas en el banco · F para levantarte cuando llegue el tren", level: "ok" };
+    return { text: `Te sientas en el banco · ${keyText("F", "🧍 Levantarse")} para levantarte cuando llegue el tren`, level: "ok" };
   }
 
   /** G: agarrarse de una barra o del pasamanos (a bordo y de pie) o soltarse. */
@@ -424,7 +425,7 @@ export class Walker {
       return { text: "En el fuelle entre coches no hay barras: avanza un poco", level: "info" };
     }
     this.holding = true;
-    return { text: "Te agarras de la barra · caminar o G para soltarte", level: "ok" };
+    return { text: `Te agarras de la barra · caminar o ${keyText("G", "🤚 Soltarse")} para soltarte`, level: "ok" };
   }
 
   leaveSeat() {
@@ -676,13 +677,13 @@ export class Walker {
       this.onEvent("stumble", { braking: a < 0, bump: crowd });
       if (crowd && this.bumpT <= 0) {
         this.bumpT = 12;
-        this.onEvent("notice", { text: "Chocas con otro pasajero: «¡Perdón!» · G agárrate de una barra", level: "warn" });
+        this.onEvent("notice", { text: `Chocas con otro pasajero: «¡Perdón!» · ${keyText("G", "🤚")} agárrate de una barra`, level: "warn" });
       } else if (this.tipT <= 0) {
         this.tipT = 60;
         const what = a < 0 ? "¡Casi te caes con la frenada!"
           : this.brace < -0.3 ? "El tirón final al detenerse te hace trastabillar"
           : "El arranque te hace trastabillar";
-        this.onEvent("notice", { text: `${what} · G agárrate de una barra`, level: "warn" });
+        this.onEvent("notice", { text: `${what} · ${keyText("G", "🤚")} agárrate de una barra`, level: "warn" });
       }
     }
   }
@@ -789,27 +790,27 @@ export class Walker {
   /** Texto de ayuda contextual para el HUD. */
   hint() {
     if (this.space === "street") return this.city.hint(this.pos);
-    if (this.seat) return this.space === "train" ? "F levantarse" : "Sentado en el banco · F levantarse para subir al tren";
+    if (this.seat) return this.space === "train" ? keyText("F levantarse", "🧍 Levantarse") : `Sentado en el banco · ${keyText("F", "🧍")} levantarse para subir al tren`;
     if (this.space === "train") {
       const rs = this.unit.sim.dockedStation();
       const open = this.unit.sim.doorState === "open";
-      const hold = this.holding ? "Agarrado de la barra · G soltarte" : "G agarrarse";
-      if (open && rs) return `Puertas abiertas en ${rs.name} · camina hacia una puerta (lado derecho del pasillo) para bajar · F sentarse · ${hold}`;
-      return `${hold} · F sentarse · puedes recorrer los 5 coches por el pasillo${this.carCrowd() > 0.6 ? " (coche lleno: los de los extremos van más vacíos)" : ""}`;
+      const hold = this.holding ? `Agarrado de la barra · ${keyText("G", "🤚")} soltarte` : `${keyText("G", "🤚")} agarrarse`;
+      if (open && rs) return `Puertas abiertas en ${rs.name} · camina hacia una puerta (lado derecho del pasillo) para bajar · ${keyText("F", "🪑")} sentarse · ${hold}`;
+      return `${hold} · ${keyText("F", "🪑")} sentarse · puedes recorrer los 5 coches por el pasillo${this.carCrowd() > 0.6 ? " (coche lleno: los de los extremos van más vacíos)" : ""}`;
     }
     const lift = this.elevatorNear();
     if (lift?.inside) {
       if (lift.el.state === "moving") return "Ascensor en marcha…";
-      return (lift.el.level ? "Ascensor en la mezanina · E bajar al andén" : "Ascensor en el andén · E subir a la mezanina") + " · camina a la puerta para salir";
+      return (lift.el.level ? `Ascensor en la mezanina · ${keyText("E", "✋ Usar")} bajar al andén` : `Ascensor en el andén · ${keyText("E", "✋ Usar")} subir a la mezanina`) + " · camina a la puerta para salir";
     }
-    if (lift) return lift.el.openAt(lift.level) ? "Ascensor con las puertas abiertas · entra y pulsa E" : "E · llamar al ascensor";
+    if (lift) return lift.el.openAt(lift.level) ? `Ascensor con las puertas abiertas · entra y ${keyText("pulsa E", "toca ✋ Usar")}` : `${keyText("E", "✋ Usar")} · llamar al ascensor`;
     if (Math.abs(this.pos.y - MZ.y) < 0.3) {
       const here0 = this.stationAt(this.pos.z);
       const tl = this.atTransfer(here0, 6.0);
       if (tl) return `Pasillo de combinación · sigue caminando para cambiarte ${isRail(tl) ? "al" : "a la"} ${lineLabel(tl)}`;
       const service = this.nearService();
-      if (service?.kind === "boleteria") return "E · atención en boletería (cargar tarjeta bip!, comprar tarjeta)";
-      if (service?.kind === "totem") return "E · tótem de autoservicio: carga con tarjeta de débito o crédito";
+      if (service?.kind === "boleteria") return `${keyText("E", "✋ Usar")} · atención en boletería (cargar tarjeta bip!, comprar tarjeta)`;
+      if (service?.kind === "totem") return `${keyText("E", "✋ Usar")} · tótem de autoservicio: carga con tarjeta de débito o crédito`;
       if (this.nearExit() && !this.paid) return "Salida · sigue por el pasillo y sube la escalera hacia la calle";
       const here = this.stationAt(this.pos.z);
       const closed = here && [1, -1].find(sd => isArrivalOnly(here, sd));
@@ -832,7 +833,7 @@ export class Walker {
     const st = this.stationAt(this.pos.z);
     if (st && side && this.openUnit(st, side)) return "El tren tiene las puertas abiertas: camina hacia una puerta para subir";
     if (st && side && isArrivalOnly(st, side)) return "Andén de llegada de la terminal: no salen trenes desde aquí · sube a la mezanina para salir";
-    return "Espera el tren detrás de la línea amarilla · F sentarse en un banco · escaleras hacia la mezanina";
+    return `Espera el tren detrás de la línea amarilla · ${keyText("F", "🪑")} sentarse en un banco · escaleras hacia la mezanina`;
   }
 }
 

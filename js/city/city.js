@@ -40,6 +40,7 @@ import { ShopInterior, INSIDE, ENTERABLE } from "./shopInterior.js";   // 2.17 �
 
 /** 1.15 · Paradero de la calle (local): aquí se toma el bus del recorrido si pasa por esta estación. */
 const BUS_STOP = { x: STREET.roadHalf + 1.5, z: 34 };
+import { key as keyText } from "../keys.js";
 
 const S = STREET;
 /** Origen de la calle en el mundo: justo encima de la estación, con la boca del acceso sobre su escalera de salida. */
@@ -1083,20 +1084,20 @@ export class City {
     const n = this.nearest(wpos);
     if (this.inside) {
       const sh = this.inside.shop;
-      if (n?.kind === "counter") return `E · pedir en la caja de ${sh.name}`;
-      if (n?.kind === "exit") return "Camina hacia la puerta (o E) para salir a la calle";
-      return `Dentro de ${sh.name} · la caja está al fondo, en el mesón · J misiones`;
+      if (n?.kind === "counter") return `${keyText("E", "✋ Usar")} · pedir en la caja de ${sh.name}`;
+      if (n?.kind === "exit") return `Camina hacia la puerta (o ${keyText("E", "✋ Usar")}) para salir a la calle`;
+      return `Dentro de ${sh.name} · la caja está al fondo, en el mesón · ${keyText("J", "🎯")} misiones`;
     }
-    if (n?.kind === "access") return `E (o camina hacia la escalera) · bajar a la estación ${this.station.name}`;
-    if (n?.kind === "shop") return n.shop.kind === "banco" ? "E · usar el cajero automático (saldo y movimientos)"
-      : n.shop.stand ? `E · comprar en ${n.shop.name} (${n.shop.label.toLowerCase()})`
-      : `Camina hacia la puerta (o E) para entrar a ${n.shop.name} (${n.shop.label.toLowerCase()})`;
-    if (n?.kind === "landmark") return `E · sacar una foto de ${n.landmark.name}`;
-    if (n?.kind === "busstop") return n.served ? `E · paradero (${busRoutesAt(this.station?.name).map(r => r.id).join(", ")}): tomar el bus` : "Paradero: por aquí no pasa ninguno de los recorridos del juego";
-    if (this.real) return `Calle real de ${this.station.name} (${OSM_ATTRIBUTION})${this.landmark ? ` · ${this.landmark.name}` : ""} · J misiones`;
+    if (n?.kind === "access") return `${keyText("E", "✋ Usar")} (o camina hacia la escalera) · bajar a la estación ${this.station.name}`;
+    if (n?.kind === "shop") return n.shop.kind === "banco" ? `${keyText("E", "✋ Usar")} · usar el cajero automático (saldo y movimientos)`
+      : n.shop.stand ? `${keyText("E", "✋ Usar")} · comprar en ${n.shop.name} (${n.shop.label.toLowerCase()})`
+      : `Camina hacia la puerta (o ${keyText("E", "✋ Usar")}) para entrar a ${n.shop.name} (${n.shop.label.toLowerCase()})`;
+    if (n?.kind === "landmark") return `${keyText("E", "✋ Usar")} · sacar una foto de ${n.landmark.name}`;
+    if (n?.kind === "busstop") return n.served ? `${keyText("E", "✋ Usar")} · paradero (${busRoutesAt(this.station?.name).map(r => r.id).join(", ")}): tomar el bus` : "Paradero: por aquí no pasa ninguno de los recorridos del juego";
+    if (this.real) return `Calle real de ${this.station.name} (${OSM_ATTRIBUTION})${this.landmark ? ` · ${this.landmark.name}` : ""} · ${keyText("J", "🎯")} misiones`;
     return this.landmark
-      ? `Calle de ${this.station.name} · enfrente: ${this.landmark.name} · locales en la vereda del Metro · J misiones`
-      : `Calle de ${this.station.name} · locales en la vereda del Metro · J misiones`;
+      ? `Calle de ${this.station.name} · enfrente: ${this.landmark.name} · locales en la vereda del Metro · ${keyText("J", "🎯")} misiones`
+      : `Calle de ${this.station.name} · locales en la vereda del Metro · ${keyText("J", "🎯")} misiones`;
   }
 }
 

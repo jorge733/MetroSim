@@ -35,6 +35,7 @@ import { CONFIG, formatCLP, spokenName } from "./config.js";
 import { carAt, carLoads } from "./engine/passengers.js";
 import { routeQuestion } from "./routeQuiz.js";
 import { MusicBox, INSTRUMENTS, STYLES, STALL_ITEMS, dressMusician, dressVendor, musicVolume } from "./performers.js";
+import { key as keyText } from "./keys.js";
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
@@ -173,13 +174,13 @@ export class EncounterSystem {
     if ((!a || a.done || !close) && a?.kind !== "seat") {
       const sp = this.stationPerformer();
       if (sp) return sp.kind === "musician"
-        ? `E · darle una moneda al músico (toca ${STYLES[sp.who.style].name} en ${sp.who.inst.label})`
-        : "E · ver lo que vende el comerciante ambulante";
+        ? `${keyText("E", "✋ Usar")} · darle una moneda al músico (toca ${STYLES[sp.who.style].name} en ${sp.who.inst.label})`
+        : `${keyText("E", "✋ Usar")} · ver lo que vende el comerciante ambulante`;
     }
     if (!a || a.done) return null;
-    if (a.kind === "seat") return "F · levantarte y cederle el asiento a la persona mayor";
+    if (a.kind === "seat") return `${keyText("F", "🧍 Levantarse")} · levantarte y cederle el asiento a la persona mayor`;
     const what = { tourist: "orientar al turista", lost: `recoger ${a.item?.name}`, vendor: "comprarle al vendedor", music: "darle una moneda al músico", faint: "usar el citófono de emergencia" }[a.kind];
-    return close ? `E · ${what}` : `Acércate al ícono ${a.symbol} para ${what}`;
+    return close ? `${keyText("E", "✋ Usar")} · ${what}` : `Acércate al ícono ${a.symbol} para ${what}`;
   }
 
   /* ----- Paso por fotograma ----- */
@@ -293,7 +294,7 @@ export class EncounterSystem {
     // Pelo canoso: es una persona mayor
     for (const part of npc.mesh.parts) if (part.kind === "hair") part.color = new THREE.Color(0xd9d9d9);
     this.begin("seat", npc, "!", "#ffc247", { unit: w.unit, seat: w.seat.place, until: 35 });
-    this.say("Subió una persona mayor y no quedan asientos libres: pulsa F para levantarte y cederle el tuyo", "warn", 6500);
+    this.say(`Subió una persona mayor y no quedan asientos libres: ${keyText("pulsa F", "toca 🧍 Levantarse")} para levantarte y cederle el tuyo`, "warn", 6500);
     return true;
   }
 
@@ -314,7 +315,7 @@ export class EncounterSystem {
     npc.state = "chatting";                           // no sube a ningún tren mientras te pregunta
     const q = routeQuestion(this.line, here);
     this.begin("tourist", npc, "?", "#5cc8ff", { q, until: 150, from: pick(TOURIST_FROM) });
-    this.say("Un turista parece perdido en el andén: busca el ícono «?», acércate y pulsa E", "info", 5500);
+    this.say(`Un turista parece perdido en el andén: busca el ícono «?», acércate y ${keyText("pulsa E", "toca ✋ Usar")}`, "info", 5500);
     return true;
   }
 
@@ -331,7 +332,7 @@ export class EncounterSystem {
     const a = this.begin("lost", null, "!", "#ffd166", { unit: u, seat, prop, item, until: 600 });
     prop.add(a.marker);
     a.markerY = 0.55;
-    this.say(`Alguien olvidó ${item.name} en un asiento del coche ${car + 1}: recógela (E) y entrégala en una boletería`, "info", 6000);
+    this.say(`Alguien olvidó ${item.name} en un asiento del coche ${car + 1}: recógela (${keyText("E", "✋ Usar")}) y entrégala en una boletería`, "info", 6000);
     return true;
   }
 
@@ -368,7 +369,7 @@ export class EncounterSystem {
     const out = gangways(car).find(g => Math.abs(g - from) > 3) ?? null;     // ¿hay coche vecino al otro lado?
     this.begin("vendor", npc, "$", "#34d17c", { unit: this.walker.unit, until: 100, stops, out, pauseT: 0.6, shoutT: 2, markerY: 2.15 });
     const line = pick(VENDOR_LINES);
-    this.say(`📢 Un vendedor ambulante entra al coche con su caja: ${line} · E para comprarle`, "info", 6000);
+    this.say(`📢 Un vendedor ambulante entra al coche con su caja: ${line} · ${keyText("E", "✋ Usar")} para comprarle`, "info", 6000);
     this.audio?.shout?.(line.replace(/[«»…]/g, ""));
     return true;
   }
@@ -388,7 +389,7 @@ export class EncounterSystem {
       npc.performer.playing = true;
       a.playing = true;
     });
-    this.say(`🎶 Un músico entra al coche con su ${inst.label} y toca ${STYLES[style].name} · si te gusta, acércate (E) y dale una moneda`, "info", 6000);
+    this.say(`🎶 Un músico entra al coche con su ${inst.label} y toca ${STYLES[style].name} · si te gusta, acércate (${keyText("E", "✋ Usar")}) y dale una moneda`, "info", 6000);
     return true;
   }
 
@@ -446,7 +447,7 @@ export class EncounterSystem {
     const npc = this.inCar(9).sort((x, y) => this.dist(x) - this.dist(y))[0];
     if (!npc) return false;
     this.begin("faint", npc, "+", "#ff4d4d", { unit: this.walker.unit, until: 35, markerY: npc.pose === "sit" ? 1.6 : 2.05 });
-    this.say("¡Un pasajero se siente mal cerca de ti! Acércate (E) y usa el citófono de emergencia para avisar al conductor", "alert", 7000);
+    this.say(`¡Un pasajero se siente mal cerca de ti! Acércate (${keyText("E", "✋ Usar")}) y usa el citófono de emergencia para avisar al conductor`, "alert", 7000);
     return true;
   }
 

@@ -25,6 +25,7 @@
 
 import { BusSim } from "./busSim.js";
 import { LANES, CURB_X, busRouteFor } from "./busRoute.js";
+import { key as keyText } from "../keys.js";
 
 export const TAXI_LENGTH = 4.6;
 export const TAXI_WIDTH = 1.85;
@@ -157,7 +158,7 @@ export class TaxiSim extends BusSim {
       const s = b.s + 140 + this.rng() * 220;
       if (s > R.length - 30) {
         this.nextFareAt = 2;
-        return this.msg("Se acaba la calle: da la vuelta en U (U) para seguir buscando pasajeros", "info", "endStreet", 25);
+        return this.msg(`Se acaba la calle: da la vuelta en U (${keyText("U", "Vuelta")}) para seguir buscando pasajeros`, "info", "endStreet", 25);
       }
       this.fareN++;
       const ws = this.toIdaS(s);
@@ -254,7 +255,7 @@ export class TaxiSim extends BusSim {
     if (b.v >= 0.3) return;
     if (this.locked) {
       if (f.t > 0.5 && !f.tugged) { f.tugged = true; this.emit("taxiHandle", {}); }
-      if (f.t > 0.7) this.msg(`Tiene seguro: quítalo (Espacio) para que pueda ${verb}`, "warn", "locked", 5);
+      if (f.t > 0.7) this.msg(`Tiene seguro: quítalo (${keyText("Espacio", "Seguro")}) para que pueda ${verb}`, "warn", "locked", 5);
       return;
     }
     if (f.t < 0.5) return;                 // alcanza la manilla
@@ -276,7 +277,7 @@ export class TaxiSim extends BusSim {
     this.emit("fareBoard", { fare: { ...this.fare } });
     const km = `${(Math.abs(dws - f.ws) / 1000).toFixed(1).replace(".", ",")} km`;
     const behind = this.fromIdaS(dws) < this.bus.s;
-    this.msg(`«Hola, voy a ${this.fare.destName}, por favor» · ${km}${behind ? " · queda para atrás: da la vuelta en U en un cruce (U)" : ""}`, "ok");
+    this.msg(`«Hola, voy a ${this.fare.destName}, por favor» · ${km}${behind ? ` · queda para atrás: da la vuelta en U en un cruce (${keyText("U", "Vuelta")})` : ""}`, "ok");
   }
 
   pay() {

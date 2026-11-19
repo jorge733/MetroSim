@@ -28,14 +28,8 @@
    ========================================================================== */
 
 import { NOTCHES, NOTCH_INDEX } from "./config.js";
-
-/** ¿Hay que mostrar los controles táctiles? */
-export function wantsTouch() {
-  const forced = new URLSearchParams(location.search).get("touch");
-  if (forced === "1") return true;
-  if (forced === "0") return false;
-  return matchMedia("(pointer: coarse)").matches || "ontouchstart" in window;
-}
+import { wantsTouch } from "./keys.js";
+export { wantsTouch };            // 2.20.1 · vive en keys.js (lo usan también los textos con teclas)
 
 const CSS = `
 .touch-ui { position: absolute; z-index: 12; pointer-events: none; user-select: none; -webkit-user-select: none;

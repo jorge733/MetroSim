@@ -27,6 +27,7 @@ import { CONFIG, NOTCHES, NOTCH_INDEX } from "../config.js";
 import { adhesionFor } from "./weather.js";
 import { JERK } from "./sim.js";
 import { clamp } from "./format.js";
+import { key as keyText } from "../keys.js";
 
 const G = 9.81;
 const DT = 0.1;                 // paso de la integración (s)
@@ -115,7 +116,7 @@ export function stopAssist(sim, station) {
   if (dB3 > dist + tol) {
     const em = stoppingDistance(sim, -NOTCHES[NOTCH_INDEX.EM].accel, 4);
     cue = "late"; level = "alert";
-    text = em <= dist + tol ? "¡NO ALCANZAS CON FRENO 3! · EMERGENCIA (Espacio)" : `¡TE PASAS! · FRENO 3 · pararás ~${m(dB3 - dist)} después`;
+    text = em <= dist + tol ? `¡NO ALCANZAS CON FRENO 3! · EMERGENCIA${keyText(" (Espacio)")}` : `¡TE PASAS! · FRENO 3 · pararás ~${m(dB3 - dist)} después`;
   } else if (!braking) {
     if (dB2 + v * REACTION >= dist) { cue = "brake"; level = "warn"; text = `¡FRENA YA! · ${label(recommend || "B2")}`; }
     else if (dB2 + v * PREPARE >= dist) { cue = "soon"; level = "info"; text = `Prepárate para frenar · punto de frenado en ${m(dist - dB2 - v * REACTION)}`; }
