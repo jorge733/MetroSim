@@ -137,6 +137,8 @@ cuadrado, vertical, historia y horizontal, con capturas del 110 en PC y en el ce
 
 **2.14.2** · El post del 110 agradece a **@tomygrx**, el jugador que pidió el recorrido (en la imagen y en el texto).
 
+**2.14.3** · El texto del post del 110 manda al «link en la bio» (los posts se publican solo en Instagram, donde los enlaces del texto no se pueden tocar).
+
 ## Versión 2.13 · RedMoviSim te escucha: sugerencias y comentarios
 
 Nuevo `js/sugerencias.js`: un formulario para que los jugadores nos cuenten ideas, errores y lo que les gusta.

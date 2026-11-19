@@ -20,3 +20,6 @@ Antes de subir: `git fetch origin main` y, si `main` avanzó, rebasar encima (nu
 **Cuando una imagen muestra un celular, siempre va en horizontal** (captura a 844×390 y marco acostado,
 `aspect-ratio: 844/390`), nunca en vertical. Antes de subir, revisar las tres medidas (cuadrado, historia y horizontal)
 para que nada se corte ni quede una palabra sola en una línea.
+
+**Los posts se publican solo en Instagram.** En el texto (`texto.txt`) los enlaces no se pueden tocar: se manda al
+«link en la bio» y la dirección va escrita solo como referencia. Se puede etiquetar con `@usuario` de Instagram.
