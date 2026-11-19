@@ -134,6 +134,9 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **`sitemap.xml`** suma la página nueva y la imagen para compartir; **`robots.txt`** deja fuera de Google las
   plantillas de posts (`post-*`), `docs/` y `supabase/`.
 
+**2.16.1** · Post para Reddit que anuncia el juego (`post-reddit/texto.md`): títulos, texto en español para r/chile y
+r/santiago, versión en inglés para r/WebGames y r/indiegames, y consejos para publicar (reglas, flair, imágenes).
+
 ## Versión 2.15 · Volante en el bus y el taxi (deshecho)
 
 La 2.15 probó manejar el bus y el taxi con volante (girar en las curvas y para cambiar de pista).
