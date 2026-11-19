@@ -44,8 +44,6 @@ export function autopilot(sim, dt, { hold = false } = {}) {
       if (d > -0.5) target = Math.min(target, Math.sqrt(2 * PLAN_DECEL * Math.max(0, d - 0.4)));
     }
   }
-  // 2.15 · El bus gira de verdad: las curvas se toman despacio (cómodo para la gente de pie)
-  target = Math.min(target, sim.curveSpeed(sim.steerSpec.comfy * 0.8, PLAN_DECEL));
   const L = sim.nextLight(100);
   if (L && L.state !== "green" && L.d > 1.5) {
     const canStop = L.d > (b.v * b.v) / (2 * 2.5);

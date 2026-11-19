@@ -124,21 +124,11 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **Salir por los torniquetes es gratis**: solo se cobra el pasaje al pasar hacia la zona pagada (antes, al terminar
   de cruzar el torniquete de salida se cobraba un pasaje).
 
-## Versión 2.15 · Volante de verdad en el bus y el taxi
+## Versión 2.15 · Volante en el bus y el taxi (deshecho)
 
-El bus y el taxi ya no doblan solos con la calle: **ahora se maneja con el volante** (`js/bus/busSim.js`).
+La 2.15 probó manejar el bus y el taxi con volante (girar en las curvas y para cambiar de pista).
 
-- **A/D o ← →** (en el celular, mantener las flechas) giran el volante; al soltarlo vuelve solo al centro. En una curva
-  hay que girar y después enderezar: si no giras, el vehículo sigue derecho y se va hacia afuera.
-- **Cambiar de pista también es girar**: un toque de volante para salir y otro al revés para enderezar (el
-  intermitente se enciende solo al cruzar de pista).
-- **Modelo de bicicleta** con la curvatura real del trazado (`busPath.js`): el rumbo respecto de la calle se ve en el
-  3D, con las ruedas delanteras y el volante de la cabina girando y la carrocería que se inclina hacia afuera.
-- **A más velocidad, menos se puede doblar** (el agarre de las ruedas, menor con lluvia): las curvas se toman frenando
-  antes. El juego avisa *«Curva a la izquierda adelante»* si vienes muy rápido.
-- **Faltas nuevas**: golpear la solera de la vereda o rozar el bandejón central (−80) y tomar una curva muy rápido con
-  pasajeros de pie (−15; en el taxi, sin propina). El taxi es más ágil que el bus.
-- De pasajero, el conductor automático también gira el volante y baja la velocidad en las curvas.
+**2.15.1** · Se vuelve a la conducción de antes: la calle dobla sola y A/D cambian de pista.
 
 ## Versión 2.14 · Recorrido 110
 

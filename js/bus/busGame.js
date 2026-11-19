@@ -13,7 +13,7 @@
    piso mojado, más gente), el cielo, las personas y el acceso al Metro en
    la calle (busWorld.js) y la voz de la locución para la próxima parada.
 
-   Mandos: W/↑ acelerar · S/↓ frenar · A/← y D/→ volante (2.15: se dobla girando, también para cambiar de pista) ·
+   Mandos: W/↑ acelerar · S/↓ frenar · A/← y D/→ cambiar de pista ·
    Espacio puertas · B bocina · C cámara · M sonido · Esc pausa.
    R radio · , y . cambian de emisora · Taxi: U vuelta en U.
    ========================================================================== */
@@ -157,7 +157,6 @@ class BusGame {
     // 1.20 · La misma curva de demanda y el mismo clima que el Metro (con lluvia viaja más gente y el piso está mojado)
     const simOpts = { route: this.route, clock, demand: demandAt(clock, dayTypeOf(now)) * weatherDemandFactor(), startStop: this.ride?.from ?? 0, wet: WEATHER.wet };
     this.sim = this.taxi ? new TaxiSim(simOpts) : new BusSim(simOpts);
-    this.sim.assist = !!this.ride;          // 2.15 · de pasajero, el conductor automático también gira el volante
     this.world = new BusWorld({ scene: this.scene, route: this.route, clock, ride: !!this.ride, vehicle: this.taxi ? "taxi" : "bus", renderer: this.renderer });
     this.scene.add(this.camera);
     this.camPos = null;
@@ -241,7 +240,7 @@ class BusGame {
         <span><kbd>W</kbd><kbd>S</kbd> acelerar / frenar</span>
         <span><kbd>Shift</kbd> freno suave</span>
         <span><kbd>L</kbd> limitador</span>
-        <span><kbd>A</kbd><kbd>D</kbd> volante: girar en las curvas y cambiar de pista</span>
+        <span><kbd>A</kbd><kbd>D</kbd> cambiar de pista</span>
         <span><kbd>Espacio</kbd> ${this.taxi ? "puerta (subir y bajar pasajero)" : "puertas"}</span>
         ${this.taxi ? `<span><kbd>U</kbd> vuelta en U (en un cruce)</span>` : ""}
         <span><kbd>R</kbd> radio · <kbd>,</kbd><kbd>.</kbd> emisora</span>
@@ -256,8 +255,8 @@ class BusGame {
       </div>
       <div class="bus-touch">
         <div class="bus-touch-left">
-          <button data-t="left" aria-label="Girar el volante a la izquierda">${ICON.left}</button>
-          <button data-t="right" aria-label="Girar el volante a la derecha">${ICON.right}</button>
+          <button data-t="left" aria-label="Pista a la izquierda">${ICON.left}</button>
+          <button data-t="right" aria-label="Pista a la derecha">${ICON.right}</button>
         </div>
         <div class="bus-touch-mid">
           <button data-t="doors" aria-label="${this.taxi ? "Puerta" : "Puertas"}">${ICON.doors}<span>${this.taxi ? "Puerta" : "Puertas"}</span></button>
@@ -351,7 +350,7 @@ class BusGame {
   }
 
   bindTouch() {
-    const hold = { horn: "b", left: "a", right: "d" };      // 2.15 · el volante se gira mientras mantienes el botón
+    const hold = { horn: "b" };
     /* 1.18 · Pedales táctiles ANALÓGICOS: cuanto más arriba apoyas el dedo, más fuerte (abajo = suave).
        Se puede deslizar el dedo sin soltar para dosificar. */
     const level = (btn, e) => {
@@ -367,7 +366,9 @@ class BusGame {
         try { btn.setPointerCapture(e.pointerId); } catch { /* sin captura */ }
         if (pedal) { this.touchPedal[t] = level(btn, e); this.syncInput(); return; }
         if (hold[t]) { this.keys.add(hold[t]); this.syncInput(); return; }
-        if (t === "doors") this.sim.toggleDoors();
+        if (t === "left") this.sim.changeLane(1);
+        else if (t === "right") this.sim.changeLane(-1);
+        else if (t === "doors") this.sim.toggleDoors();
         else if (t === "cam") this.toggleCam();
         else if (t === "limiter") this.sim.toggleLimiter();
         else if (t === "uturn") this.sim.uTurn?.();
@@ -538,6 +539,8 @@ class BusGame {
       if (k === "c") return this.toggleCam();
       return;
     }
+    if (k === "a" || k === "arrowleft") return this.sim.changeLane(1);
+    if (k === "d" || k === "arrowright") return this.sim.changeLane(-1);
     if (k === " " || k === "e") return this.sim.toggleDoors();
     if (k === "u" && this.taxi) return this.sim.uTurn();
     if (this.radio && k === "r") return this.radio.power();
@@ -562,8 +565,6 @@ class BusGame {
     // Teclado: W/S a fondo; Shift (solo o con S) freno suave para clavar la parada. Táctil: el nivel del dedo.
     this.sim.input.throttle = k.has("w") || k.has("arrowup") ? 1 : tp.throttle;
     this.sim.input.brake = k.has("s") || k.has("arrowdown") ? (k.has("shift") ? 0.35 : 1) : k.has("shift") ? 0.35 : tp.brake;
-    // 2.15 · Volante: A/← a la izquierda, D/→ a la derecha (al soltar vuelve solo al centro)
-    this.sim.input.steer = (k.has("d") || k.has("arrowright") ? 1 : 0) - (k.has("a") || k.has("arrowleft") ? 1 : 0);
     this.audio.horn(k.has("b") || k.has("h"));
   }
 
