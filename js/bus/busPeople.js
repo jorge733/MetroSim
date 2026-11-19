@@ -41,6 +41,7 @@ const LINE_GAP = 0.78;           // m entre una persona y la siguiente en la fil
 const SIDEWALK_Y = 0.16, FLOOR_Y = 1.02;
 const DOORS = { front: 1.25, mid: 5.6, rear: 9.95 };   // z de las puertas en el bus (origen = frente)
 const W2 = BUS_WIDTH / 2;
+const TAXI_HEADROOM = 1.32;      // m: altura máxima de la cabeza dentro del taxi (el techo va de 1,35 a 1,41)
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const wrapAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 /** 1.20 · Peatones: cuántos y por dónde caminan (x de la vereda del bus y de la vereda de enfrente). */
@@ -107,7 +108,7 @@ export class BusPeople {
     d.mesh.parts.filter(x => x.obj.parent === d.mesh.armL || x.obj.parent === d.mesh.armR).forEach(x => x.color.setHex(0x9fc3e0));
     d.pose = "drive";
     d.local = true;
-    if (taxi) d.root.position.set(taxi.driver.x, taxi.driver.y - d.mesh.legLen, taxi.driver.z);
+    if (taxi) d.root.position.set(taxi.driver.x, this.taxiSitY(d, taxi.driver.y), taxi.driver.z);
     else d.root.position.set(-0.75, FLOOR_Y + 0.5 - d.mesh.legLen, 1.32);
     d.root.rotation.y = Math.PI;
     cabin.add(d.root);
@@ -139,13 +140,26 @@ export class BusPeople {
     if (!on) return;
     const p = this.person(kind);
     const r = this.taxi.rider;
-    p.root.position.set(r.x, r.y - p.mesh.legLen, r.z);
+    p.root.position.set(r.x, this.taxiSitY(p, r.y), r.z);
     p.root.rotation.y = Math.PI;
     p.pose = "sit";
     p.local = true;
     this.cabin.add(p.root);
     this.extras.push(p);
     this.rider = p;
+  }
+
+  /**
+   * 2.20.3 · Altura del origen (los pies) de alguien sentado en el taxi. Con la cadera en el asiento (seatY) a los más
+   * altos se les asomaba la cabeza por el techo (abajo a 1,35 m): se hunden en el asiento lo justo para que el pelo
+   * quede bajo el techo (las piernas no se ven, van tras la puerta).
+   */
+  taxiSitY(p, seatY) {
+    const m = p.mesh, s = p.scale ?? 1;
+    const hair = m.parts.find(x => x.kind === "hair")?.obj;
+    const above = hair ? (hair.position.y + hair.scale.y - m.legLen) * s : 0.95 * s;     // del asiento a la punta del pelo
+    const hip = Math.max(0.34, Math.min(seatY, TAXI_HEADROOM - above));
+    return hip - m.legLen * s;
   }
 
   /* 2.20 · Del espacio recto de la calle (x, z = −s de la ida) a la carrocería del taxi y de vuelta. Con el taxi
@@ -239,7 +253,7 @@ export class BusPeople {
           p.path = [];
           p.root.position.copy(door());
           p.duck = true;
-          this.timedPath(p, [gap(-0.3), V(r.x + 0.15, r.y - p.mesh.legLen * 0.95, r.z), V(r.x, r.y - p.mesh.legLen, r.z)], 1.6, () => {
+          this.timedPath(p, [gap(-0.3), V(r.x + 0.15, r.y - p.mesh.legLen * 0.95, r.z), V(r.x, this.taxiSitY(p, r.y), r.z)], 1.6, () => {
             p.duck = false;
             p.pose = "sit";
             p.targetYaw = Math.PI;
@@ -263,7 +277,7 @@ export class BusPeople {
       p.sitReach = false;
       p.duck = true;
       p.pose = "duck";                                                       // (sentado, move() lo dejaría a la altura del piso del bus)
-      p.root.position.set(r.x, r.y - p.mesh.legLen, r.z);
+      p.root.position.set(r.x, this.taxiSitY(p, r.y), r.z);
       this.timedPath(p, [V(r.x + 0.2, r.y - p.mesh.legLen * 0.95, r.z), gap(-0.3), door()], 1.5, () => {
         p.duck = false;
         p.targetYaw = -2.6;                                                  // hacia la puerta abierta, para cerrarla

@@ -144,6 +144,9 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **2.20.2 · El pasajero que sube es el mismo que baja.** Al cerrar la puerta aparecía otra persona haciendo señas
   junto al taxi y era ella la que después se bajaba. Además, al agacharse para entrar o salir ya no se le asoma la
   cabeza por el techo. Imágenes del post de Instagram en `post-taxi-puerta/`.
+- **2.20.3 · A nadie se le asoma el pelo por el techo del taxi.** Sentados, a los más altos (el pasajero de atrás y
+  el conductor) se les veía la cabeza o el pelo encima del techo amarillo: ahora cada uno se sienta a la altura justa
+  para quedar bajo el techo (`busPeople.js · taxiSitY`). Las capturas del post de Instagram se rehicieron sin ese detalle.
 
 ## Versión 2.19 · El mar y los cerros de Valparaíso
 
