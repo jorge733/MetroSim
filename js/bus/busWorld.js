@@ -812,7 +812,7 @@ export class BusWorld {
     const seat = std("#2a2d33", { roughness: 0.9 });
     for (const x of [-0.4, 0.4]) { box(body, 0.6, 0.12, 0.5, seat, x, 0.52, 2.15); box(body, 0.6, 0.5, 0.1, seat, x, 0.82, 2.42); }
     box(body, W - 0.3, 0.12, 0.55, seat, 0, 0.52, 3.25); box(body, W - 0.3, 0.5, 0.1, seat, 0, 0.82, 3.55);
-    // Puerta trasera derecha (por ahí sube y baja el pasajero): gira desde su borde delantero
+    // Puerta trasera derecha (por ahí sube y baja el pasajero, que la abre y la cierra): gira desde su borde delantero
     this.doorLeaves = [];
     this.taxiDoor = new THREE.Group();
     this.taxiDoor.position.set(W / 2 + 0.01, 0, 2.62);
@@ -849,26 +849,11 @@ export class BusWorld {
   /** Personas y marcador de la carrera en curso (lee sim.fare de taxiSim.js). */
   updateTaxi(sim, dt) {
     const f = sim.fare;
-    const key = f ? `${f.n ?? ""}:${f.phase}` : "none";
+    // 2.20 · Cada paso de la subida y la bajada (caminar a la puerta, abrirla, entrar, cerrarla…) lo dibuja busPeople.js
+    const key = f ? `${f.n ?? ""}:${f.phase}:${f.step ?? ""}` : "none";
     if (key !== this.fareKey) {
-      const prev = this.fareKey;
       this.fareKey = key;
-      if (f?.phase === "pickup") {
-        this.people.dropExtra(this.hailerP);
-        // En la vereda del sentido en que iba el taxi (la de enfrente si iba de vuelta)
-        this.hailerP = this.people.hailer(f.ws, f.dir > 0 ? CURB_X + 0.75 : MIRROR_X - CURB_X - 0.75, f.dir > 0 ? -Math.PI / 2 : Math.PI / 2);
-        this.riderKind = this.hailerP.kind;
-      } else if (f?.phase === "ride") {
-        this.people.dropExtra(this.hailerP);
-        this.hailerP = null;
-        this.people.taxiRider(true, this.riderKind);
-      } else if (f?.phase === "done" && prev?.endsWith(":ride")) {
-        this.people.taxiRider(false);
-        this.people.taxiAlight(sim, this.riderKind);
-      } else if (!f) {
-        this.people.dropExtra(this.hailerP);           // se fue en otro taxi
-        this.hailerP = null;
-      }
+      this.people.taxiScene(sim, f);
     }
     const t = sim.target;
     this.fareMarker.visible = !!t;

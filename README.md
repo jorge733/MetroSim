@@ -124,6 +124,20 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **Salir por los torniquetes es gratis**: solo se cobra el pasaje al pasar hacia la zona pagada (antes, al terminar
   de cruzar el torniquete de salida se cobraba un pasaje).
 
+## Versión 2.20 · Subir y bajar del taxi como en la vida real
+
+- **La puerta del taxi la abre y la cierra el pasajero**, no el conductor. Cuando te detienes junto a la vereda a su
+  lado, la persona deja de hacer señas, **camina hasta la puerta trasera derecha**, tira la manilla, **la abre**, se
+  agacha para entrar, se sienta y **la cierra**. Recién entonces te dice adónde va.
+- **Al llegar al destino** te detienes junto a la vereda y te **paga** (le pasa la plata al conductor); después abre la
+  puerta, **sale agachado**, se para en la calle, **cierra la puerta desde afuera** y se va caminando por la vereda.
+- **El seguro de la puerta:** Espacio (o el botón **Seguro** en el celular) ya no abre la puerta, sino que pone o
+  quita el seguro. Si el pasajero tira la manilla con el seguro puesto, se oye y aparece el aviso para que se lo
+  quites. El seguro **se pone solo al pasar de 15 km/h**, como en muchos autos.
+- Si **arrancas** mientras viene caminando, vuelve a la vereda a hacer señas; si arrancas mientras paga o con tu
+  pasajero queriendo bajarse, hay aviso (y falta). Mientras la puerta está abierta el taxi no acelera.
+- La puerta suena como la de un auto (el clic de la chapa y el golpe al cerrar), no como la neumática del bus.
+
 ## Versión 2.19 · El mar y los cerros de Valparaíso
 
 - **El Metro Valparaíso ya no pasa por una ciudad genérica.** En la costa, de Puerto a Recreo, va a la izquierda la
@@ -530,10 +544,11 @@ al aire libre:
 - **Conducir un taxi** (beta): en la portada, Conducir › **Taxi**, por la calle de cualquier recorrido de bus
   (Alameda u otro de Red). Es un taxi básico de Santiago, negro con el techo amarillo y el letrero TAXI.
   - **Carreras:** alguien hace señas en la vereda (marcador amarillo en la pista de la derecha y en el esquema de
-    arriba). Pásate a la pista de la vereda, detente a su lado y abre la puerta (**Espacio**): sube, cierra la puerta y
-    te dice adónde va, una esquina más adelante (marcador verde). Al llegar te detienes junto a la vereda y abres la
-    puerta: paga lo que marca el **taxímetro** y, si el viaje fue suave (sin frenadas bruscas ni faltas), deja
-    **propina**. Si te pasas de largo de quien hace señas, toma otro taxi.
+    arriba). Pásate a la pista de la vereda y detente a su lado: camina hasta el taxi, abre la puerta (si tiene seguro,
+    se lo quitas con **Espacio**), se sube, la cierra y te dice adónde va, una esquina más adelante (marcador verde).
+    Al llegar te detienes junto a la vereda: paga lo que marca el **taxímetro** y, si el viaje fue suave (sin frenadas
+    bruscas ni faltas), deja **propina**; después abre la puerta, se baja y la cierra (2.20). Si te pasas de largo de
+    quien hace señas, toma otro taxi.
   - **Taxímetro aproximado** (no oficial): $450 la bajada de bandera y $210 cada 200 m o cada minuto detenido.
   - Lo ganado va a tu cuenta, como el sueldo del bus o del Metro. El turno termina al acabarse la calle (o desde el
     menú), con su resumen y nota.

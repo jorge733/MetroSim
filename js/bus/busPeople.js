@@ -18,6 +18,9 @@
      · 1.20: peatones que pasan por las dos veredas y, en los paraderos con
        Metro, parte de los que bajan se van a combinar por el acceso (bajan
        la escalera junto al tótem, busWorld.js · buildMetroAccesses).
+     · 2.20: en el taxi el pasajero camina hasta la puerta, tira la manilla,
+       la abre, se agacha para entrar, se sienta y la cierra; al llegar paga,
+       la abre, sale agachado y la cierra desde afuera (taxiScene).
 
    Las CIFRAS (cuántos esperan, cuántos van a bordo) las lleva busSim.js; este
    módulo solo las dibuja (hasta MAX_STOP por paradero y MAX_ON a bordo).
@@ -28,6 +31,7 @@ import * as THREE from "three";
 import { createSkeleton, PeopleRenderer } from "../people.js";
 import { CURB_X, LANES } from "./busRoute.js";
 import { BUS_LENGTH, BUS_WIDTH, makeRng } from "./busSim.js";
+import { MIRROR_X, TAXI_DOOR_SPOT, TAXI_WIDTH } from "./taxiSim.js";
 
 const MAX_STOP = 16;             // personas dibujadas por paradero
 const MAX_ON = 44;               // personas dibujadas dentro del bus
@@ -116,6 +120,7 @@ export class BusPeople {
     const p = this.person(this.rng() < 0.2 ? "carga" : this.rng() < 0.3 ? "estudiante" : "adulto");
     p.root.position.set(x, SIDEWALK_Y, -s);
     p.root.rotation.y = yaw;                        // mira hacia la calle
+    p.hailSpot = { x, z: -s, yaw };
     p.pose = "hail";
     this.scene.add(p.root);
     this.extras.push(p);
@@ -142,17 +147,138 @@ export class BusPeople {
     this.extras.push(p);
     this.rider = p;
   }
-  /** Se baja del taxi por la puerta derecha y se va por la vereda. */
-  taxiAlight(sim, kind) {
-    const p = this.person(kind);
-    // En el espacio recto de la ida (si el taxi va de vuelta, todo se refleja hacia la vereda de enfrente)
-    const b = sim.bus, X = (x) => sim.toIdaX(x), z = -sim.toIdaS(b.s - 2.6);
-    p.root.position.set(X(b.x + 1.1), SIDEWALK_Y, z);
-    p.root.rotation.y = sim.dir > 0 ? -Math.PI / 2 : Math.PI / 2;
-    p.pose = "walk";
+
+  /* 2.20 · Del espacio recto de la calle (x, z = −s de la ida) a la carrocería del taxi y de vuelta. Con el taxi
+     detenido basta con trasladar; si va de vuelta (sim.dir < 0) todo está reflejado, que es girar media vuelta. */
+  toCabin(p, sim) {
+    if (p.local) return;
+    const b = sim.bus, pos = p.root.position, flip = sim.dir < 0 ? Math.PI : 0;
+    p.root.parent?.remove(p.root);
+    pos.set(sim.toIdaX(pos.x) - b.x, pos.y, b.s - sim.fromIdaS(-pos.z));
+    p.root.rotation.y -= flip;
+    if (p.targetYaw !== undefined) p.targetYaw -= flip;
+    this.cabin.add(p.root);
+    p.local = true;
+  }
+  toStreet(p, sim) {
+    if (!p.local) return;
+    const b = sim.bus, pos = p.root.position, flip = sim.dir < 0 ? Math.PI : 0;
+    this.cabin.remove(p.root);
+    pos.set(sim.toIdaX(b.x + pos.x), pos.y, -sim.toIdaS(b.s - pos.z));
+    p.root.rotation.y += flip;
+    if (p.targetYaw !== undefined) p.targetYaw += flip;
     this.scene.add(p.root);
+    p.local = false;
+  }
+  /** Recorre `path` en `secs` segundos (para ir al ritmo de la simulación); al llegar, `done`. */
+  timedPath(p, path, secs, done) {
+    let len = 0, prev = p.root.position;
+    for (const q of path) { len += Math.hypot(q.x - prev.x, q.z - prev.z); prev = q; }
+    p.path = path;
+    p.speed = Math.max(0.5, len / Math.max(0.3, secs));
+    p.onArrive = done;
+  }
+  /** Lo que hay que hacer cuando termine de caminar (o ya, si está quieto). */
+  then(p, fn) {
+    if (p.path.length) p.onArrive = fn;
+    else fn();
+  }
+
+  /**
+   * 2.20 · Dibuja cada paso de la carrera (sim.fare de taxiSim.js): llamar cuando cambia la fase o el paso.
+   * Las posiciones junto al taxi van en su carrocería (x a la derecha, z desde el frente hacia atrás).
+   */
+  taxiScene(sim, f) {
+    const half = TAXI_WIDTH / 2, D = TAXI_DOOR_SPOT, r = this.taxi.rider;
+    const door = () => V(half + D.out, 0, D.z);                         // junto a la puerta, detrás de su borde
+    const gap = (y) => V(half - 0.05, y, D.z - 0.5);                      // en el vano de la puerta
+    const faceCar = -Math.PI / 2;                                         // mirando el costado del taxi
+    if (!f) {
+      // Cerró la puerta desde afuera: se va por la vereda · o quien hacía señas tomó otro taxi
+      this.dropExtra(this.hailerP);
+      this.hailerP = null;
+      if (this.rider) this.walkAway(this.rider, sim);
+      this.rider = null;
+      return;
+    }
+    if (f.phase === "pickup") {
+      if (this.hailerP?.fareN !== f.n) {
+        this.dropExtra(this.hailerP);
+        this.taxiRider(false);
+        const back = f.dir < 0;
+        this.hailerP = this.hailer(f.ws, back ? MIRROR_X - CURB_X - 0.75 : CURB_X + 0.75, back ? Math.PI / 2 : -Math.PI / 2);
+        this.hailerP.fareN = f.n;
+        this.riderKind = this.hailerP.kind;
+      }
+      const p = this.hailerP;
+      p.reach = false;
+      switch (f.step) {
+        case null: {
+          if (!p.local) return;
+          // Arrancaste: vuelve a su lugar en la vereda y sigue haciendo señas
+          this.toStreet(p, sim);
+          const h = p.hailSpot;
+          p.duck = false;
+          p.speed = WALK;
+          p.path = [V(h.x, SIDEWALK_Y, h.z)];
+          p.onArrive = () => { p.pose = "hail"; p.targetYaw = h.yaw; };
+          return;
+        }
+        case "walk": {
+          this.toCabin(p, sim);
+          const curb = CURB_X - sim.bus.x;                                   // la solera, vista desde el taxi
+          this.timedPath(p, [V(curb + 0.3, SIDEWALK_Y, D.z + 0.2), V(curb - 0.15, 0, D.z + 0.1), door()], f.walkT - f.t - 0.15, () => { p.targetYaw = faceCar; });
+          return;
+        }
+        case "handle": case "opening":
+          return this.then(p, () => { p.targetYaw = faceCar; p.reach = true; p.pose = "stand"; });
+        case "in": {
+          // Se agacha, entra de lado y se sienta atrás a la derecha
+          p.path = [];
+          p.root.position.copy(door());
+          p.duck = true;
+          this.timedPath(p, [gap(0.15), V(r.x + 0.15, r.y - p.mesh.legLen * 0.7, r.z), V(r.x, r.y - p.mesh.legLen, r.z)], 1.6, () => {
+            p.duck = false;
+            p.pose = "sit";
+            p.targetYaw = Math.PI;
+          });
+          this.extras = this.extras.filter(q => q !== p);
+          this.extras.push(p);
+          this.rider = p;
+          this.hailerP = null;
+          return;
+        }
+      }
+      return;
+    }
+    // Viaje o bajada: el pasajero va atrás (si no se alcanzó a dibujar la subida, aparece sentado)
+    if (this.hailerP) { this.dropExtra(this.hailerP); this.hailerP = null; }
+    if (!this.rider) this.taxiRider(true, this.riderKind);
+    const p = this.rider;
+    p.paying = f.phase === "ride" && f.step === "pay";
+    p.sitReach = (f.phase === "pickup" && f.step === "closing") || (f.phase === "done" && (f.step === "handle" || f.step === "opening"));
+    if (f.phase === "done" && f.step === "out") {
+      p.sitReach = false;
+      p.duck = true;
+      p.pose = "duck";                                                       // (sentado, move() lo dejaría a la altura del piso del bus)
+      p.root.position.set(r.x, r.y - p.mesh.legLen, r.z);
+      this.timedPath(p, [V(r.x + 0.2, r.y - p.mesh.legLen * 0.7, r.z), gap(0.15), door()], 1.5, () => {
+        p.duck = false;
+        p.targetYaw = -2.6;                                                  // hacia la puerta abierta, para cerrarla
+        p.reach = true;
+      });
+    }
+  }
+  /** Ya cerró la puerta: sube a la vereda y se va caminando. */
+  walkAway(p, sim) {
+    this.extras = this.extras.filter(q => q !== p);
+    p.reach = p.duck = p.sitReach = p.paying = false;
+    if (p.local) this.toStreet(p, sim);
+    p.speed = p.kind === "mayor" ? 0.85 : WALK;
+    const pos = p.root.position, out = sim.dir > 0 ? 1 : -1;     // hacia su vereda (la de enfrente si el taxi va de vuelta)
     const away = Math.random() < 0.5 ? 1 : -1;
-    p.path = [V(X(CURB_X + 0.9), SIDEWALK_Y, z), V(X(CURB_X + 1.6 + Math.random() * 2), SIDEWALK_Y, z + away * 30)];
+    const curb = sim.dir > 0 ? CURB_X : MIRROR_X - CURB_X;
+    p.path = [V(curb + out * 0.9, SIDEWALK_Y, pos.z - 0.6 * out), V(curb + out * (1.6 + Math.random() * 2), SIDEWALK_Y, pos.z + away * 30)];
     p.onArrive = () => { p.gone = true; };
     this.walkers.push(p);
   }
@@ -510,7 +636,7 @@ export class BusPeople {
       const pos = p.root.position, target = p.path[0];
       const dx = target.x - pos.x, dz = target.z - pos.z, dist = Math.hypot(dx, dz);
       if (p.pose === "sit" || p.pose === "hold") pos.y = p.local ? FLOOR_Y : SIDEWALK_Y;
-      p.pose = p.speed > 2.5 ? "run" : "walk";
+      p.pose = p.duck ? "duck" : p.speed > 2.5 ? "run" : "walk";
       const step = p.speed * dt;
       if (dist <= step) {
         pos.copy(target);
@@ -569,7 +695,17 @@ export class BusPeople {
       case "sit":
         to(m.hipL, -Math.PI / 2); to(m.hipR, -Math.PI / 2);
         to(m.kneeL, Math.PI / 2); to(m.kneeR, Math.PI / 2);
-        to(m.armL, -0.55); to(m.armR, -0.55);
+        // 2.20 · En el taxi: le pasa la plata al conductor, o estira el brazo a la manilla de la puerta
+        to(m.armL, -0.55); to(m.armR, p.paying ? -1.35 + Math.sin(this.time * 3) * 0.08 : p.sitReach ? -1.0 : -0.55);
+        m.body.rotation.z = p.sitReach ? -0.12 : 0;
+        m.body.position.y = 0;
+        break;
+      case "duck":
+        // 2.20 · Agachado para entrar o salir del taxi
+        to(m.hipL, -0.9); to(m.hipR, -0.9);
+        to(m.kneeL, 1.1); to(m.kneeR, 1.1);
+        to(m.armL, -0.5); to(m.armR, -0.7);
+        m.body.rotation.x = 0.55 + p.hunch;
         m.body.position.y = 0;
         break;
       case "hold": {
@@ -589,7 +725,8 @@ export class BusPeople {
         to(m.hipL, 0); to(m.hipR, 0); to(m.kneeL, 0); to(m.kneeR, 0);
         const idle = Math.sin(this.time * 0.9 + p.idle);
         // Algunos miran el celular mientras esperan
-        if (!p.local && p.idle > 3.5) { to(m.armR, -1.2); to(m.armL, idle * 0.04); }
+        if (p.reach) { to(m.armR, -1.3); to(m.armL, idle * 0.04); }       // 2.20 · la mano en la manilla de la puerta del taxi
+        else if (!p.local && p.idle > 3.5) { to(m.armR, -1.2); to(m.armL, idle * 0.04); }
         else { to(m.armL, idle * 0.04); to(m.armR, p.kind === "carga" ? 0.05 : -idle * 0.04); }
         m.body.rotation.z = idle * 0.015;
         m.body.position.y = 0;

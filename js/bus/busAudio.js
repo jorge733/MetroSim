@@ -163,6 +163,36 @@ export class BusAudio {
     if (!open) for (let i = 0; i < 3; i++) this.tone(1450, 0.12, { type: "square", gain: 0.05, at: i * 0.22, decay: false });
   }
 
+  /** 2.20 · Puerta de auto (taxi): el chasquido de la chapa al abrir y el golpe al cerrar. */
+  carDoor(open) {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const n = this.ctx.createBufferSource();
+    n.buffer = this.noiseBuf;
+    const f = this.ctx.createBiquadFilter();
+    f.type = "lowpass";
+    f.frequency.value = open ? 2600 : 420;
+    const g = this.ctx.createGain();
+    // Al abrir: clic seco; al cerrar: se oye al final del giro de la puerta (dura 1,1 s)
+    const at = open ? 0 : 1.0;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.setValueAtTime(0.0001, t + at);
+    g.gain.exponentialRampToValueAtTime(open ? 0.22 : 0.55, t + at + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + at + (open ? 0.07 : 0.22));
+    n.connect(f).connect(g).connect(this.master);
+    n.start(t); n.stop(t + at + 0.3);
+    if (open) this.tone(900, 0.03, { type: "square", gain: 0.03, at: 0.04 });
+    else this.tone(70, 0.18, { type: "sine", gain: 0.35, at });
+  }
+  /** Seguro central: dos golpecitos. */
+  carLock(locked) {
+    for (let i = 0; i < 2; i++) this.tone(locked ? 520 : 640, 0.035, { type: "square", gain: 0.05, at: i * 0.06, decay: false });
+  }
+  /** Tiran la manilla con el seguro puesto. */
+  carHandle() {
+    for (let i = 0; i < 2; i++) this.tone(300, 0.04, { type: "square", gain: 0.04, at: i * 0.16, decay: false });
+  }
+
   /** El validador de la bip! al pasar la tarjeta. */
   validate(ok = true) {
     if (ok) this.tone(1950, 0.09, { type: "square", gain: 0.05, decay: false });

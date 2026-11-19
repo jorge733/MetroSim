@@ -5,11 +5,15 @@
    en vez de paraderos hay CARRERAS:
 
      1. Alguien hace señas en la vereda (pickup): te detienes junto a la
-        vereda (pista de la derecha) a su altura y abres la puerta (Espacio).
-     2. Sube y te dice adónde va (una esquina más adelante). Cierra la puerta
-        y llévalo: el taxímetro corre por distancia y por tiempo detenido.
-     3. En el destino te detienes junto a la vereda y abres la puerta: paga
-        lo que marca el taxímetro y, si el viaje fue suave, deja propina.
+        vereda (pista de la derecha) a su altura.
+     2. 2.20 · Como en la vida real, la puerta la abre y la cierra el
+        pasajero: camina hasta el taxi, tira la manilla (si tiene seguro,
+        se lo quitas con Espacio), abre, se sienta y cierra. Te dice adónde
+        va y lo llevas: el taxímetro corre por distancia y tiempo detenido.
+     3. En el destino te detienes junto a la vereda: paga lo que marca el
+        taxímetro (y propina si el viaje fue suave), le quitas el seguro, abre
+        la puerta, se baja y la cierra desde afuera.
+   El seguro se pone solo al pasar de 15 km/h (como en muchos autos).
 
    Si te pasas de largo de quien hace señas, toma otro taxi. El turno
    termina cuando se acaba la calle.
@@ -20,7 +24,7 @@
    ========================================================================== */
 
 import { BusSim } from "./busSim.js";
-import { LANES, busRouteFor } from "./busRoute.js";
+import { LANES, CURB_X, busRouteFor } from "./busRoute.js";
 
 export const TAXI_LENGTH = 4.6;
 export const TAXI_WIDTH = 1.85;
@@ -32,8 +36,17 @@ export const TAXI_FARE = { flag: 450, step: 210, meters: 200, seconds: 60 };
 const PICK_WINDOW = 7;        // m alrededor de quien hace señas en que se puede recoger
 const DROP_WINDOW = 18;       // m alrededor del destino en que se puede dejar (la esquina: más holgado)
 const PASSED = 22;            // m pasado el punto de recogida: la persona toma otro taxi
-const BOARD_TIME = 2.4;       // s que tarda en subir (abrir, sentarse, cerrar)
-const PAY_TIME = 2.6;         // s que tarda en pagar y bajar
+/* 2.20 · Subir y bajar paso a paso (la puerta la mueve el pasajero; ver busPeople.js · taxiStep) */
+const WALK_SPEED = 1.25;      // m/s al caminar hasta la puerta
+const IN_TIME = 1.8;          // s en agacharse, entrar y sentarse
+const OUT_TIME = 1.7;         // s en salir y pararse junto a la puerta
+const PAY_TIME = 2.6;         // s que tarda en pagar
+const STILL_TIME = 0.6;       // s detenido en el destino antes de que empiece a pagar
+const AUTOLOCK_V = 4.2;       // m/s (15 km/h): el seguro se pone solo
+const MOVED_V = 0.6;          // m/s: arrancaste en medio de la subida o del pago
+/** Dónde se para el pasajero junto a la puerta trasera derecha (detrás de su borde, fuera del giro de la puerta). */
+export const TAXI_DOOR_SPOT = { out: 0.35, z: 3.85 };
+const TAXI_HALF_W = 0.925;
 const MIN_TRIP = 450, MAX_TRIP = 1500;
 const PATIENCE = 150;         // s que espera quien hace señas si el taxi se va para el otro lado
 /** 2.3 · Eje del bandejón central: las pistas del otro sentido son las de este reflejadas (x → MIRROR_X − x). */
@@ -57,6 +70,7 @@ export class TaxiSim extends BusSim {
     this.taxi = { fares: 0, lost: 0, km: 0, earned: 0, tips: 0, uturns: 0 };
     this.totals.maxPoints = 0;
     this.nextFareAt = 4;          // s hasta la primera persona que hace señas
+    this.locked = true;           // 2.20 · seguro de las puertas (Espacio lo pone o lo quita)
   }
 
   /* --------- 2.3 · Sentido: la simulación va en el suyo; las carreras se guardan en el de la ida --------- */
@@ -70,7 +84,7 @@ export class TaxiSim extends BusSim {
   uTurn() {
     const b = this.bus, R = this.route;
     if (this.finished) return false;
-    if (b.doors !== "closed") return this.msg("Cierra la puerta antes de dar la vuelta", "warn", "uturn", 2), false;
+    if (b.doors !== "closed" || this.fare?.step) return this.msg("Espera que tu pasajero termine de subir o bajar", "warn", "uturn", 2), false;
     if (b.v > 5.5) return this.msg("Para dar la vuelta en U baja a menos de 20 km/h", "warn", "uturn", 2), false;
     const atEnd = b.s > R.length - 45;
     const L = R.lights.find(l => Math.abs(b.s - (l.s + 8)) < 13);
@@ -135,6 +149,8 @@ export class TaxiSim extends BusSim {
 
   updateFare(dt) {
     const b = this.bus, R = this.route, f = this.fare;
+    // El seguro se pone solo al andar
+    if (!this.locked && b.v > AUTOLOCK_V) this.setLock(true, true);
     if (!f) {
       // Siguiente persona que hace señas, más adelante en la calle (en la vereda del sentido en que vas)
       if ((this.nextFareAt -= dt) > 0) return;
@@ -145,35 +161,106 @@ export class TaxiSim extends BusSim {
       }
       this.fareN++;
       const ws = this.toIdaS(s);
-      this.fare = { phase: "pickup", n: this.fareN, ws, dir: this._dir, name: this.placeName(ws), since: this.elapsed };
+      this.fare = { phase: "pickup", n: this.fareN, ws, dir: this._dir, name: this.placeName(ws), since: this.elapsed, step: null, t: 0 };
       this.emit("fareHail", { fare: { ...this.fare } });
       this.msg(`Alguien hace señas en ${this.fare.name} (a ${Math.round(s - b.s)} m): acércate a la vereda y detente a su lado`, "ok");
       return;
     }
+    f.t += dt;
     if (f.phase === "pickup") {
       const sameSide = f.dir === this._dir;
-      const passed = sameSide && b.s > this.fromIdaS(f.ws) + PASSED;
-      if (f.boardT == null && (passed || (!sameSide && this.elapsed - f.since > PATIENCE))) {
-        this.taxi.lost++;
-        this.emit("fareLost", { fare: { ...f } });
-        this.msg(passed ? "Te pasaste: la persona tomó otro taxi" : "Se cansó de esperar y tomó otro taxi", "warn");
-        this.fare = null;
-        this.nextFareAt = 3 + this.rng() * 4;
+      const hs = this.fromIdaS(f.ws);
+      if (!f.step) {
+        const passed = sameSide && b.s > hs + PASSED;
+        if (passed || (!sameSide && this.elapsed - f.since > PATIENCE)) {
+          this.taxi.lost++;
+          this.emit("fareLost", { fare: { ...f } });
+          this.msg(passed ? "Te pasaste: la persona tomó otro taxi" : "Se cansó de esperar y tomó otro taxi", "warn");
+          this.fare = null;
+          this.nextFareAt = 3 + this.rng() * 4;
+          return;
+        }
+        if (!sameSide || b.v >= 0.3 || b.doors !== "closed") return;
+        const at = this.atCurb(hs);
+        if (!at.near) return;
+        if (!at.curb) return this.msg("Acércate a la vereda (pista de la derecha) para que pueda subir", "warn", "curbPick", 4);
+        // Te detuviste a su lado: camina hasta la puerta trasera derecha
+        const along = Math.abs(hs - (b.s - TAXI_DOOR_SPOT.z));
+        const across = Math.max(0.5, Math.abs((CURB_X + 0.75) - (b.x + TAXI_HALF_W + TAXI_DOOR_SPOT.out)));
+        this.setStep("walk", { walkT: (along + across) / WALK_SPEED + 0.3 });
+        this.emit("fareBoarding", { fare: { ...f } });
         return;
       }
-      if (f.boardT != null && b.doors === "open" && (f.boardT += dt) >= BOARD_TIME) this.board();
+      if (f.step === "walk") {
+        if (b.v > MOVED_V) return this.cancelWalk();
+        if (f.t >= f.walkT) this.setStep("handle");
+        return;
+      }
+      if (f.step === "handle") return this.tryHandle(f, "subir");
+      if (f.step === "in" && f.t >= IN_TIME) { this.setStep("closing"); this.closeDoor(); }
       return;
     }
-    if (f.phase !== "ride") return;
-    // Viaje: el taxímetro corre por distancia o por tiempo detenido
-    if (b.doors === "closed") {
-      if (b.v > 1) f.dist += b.v * dt;
-      else f.idle += dt;
-      const steps = Math.floor(f.dist / TAXI_FARE.meters) + Math.floor(f.idle / TAXI_FARE.seconds);
-      f.meter = TAXI_FARE.flag + steps * TAXI_FARE.step;
-      if (b.v > 1) this.taxi.km += b.v * dt / 1000;
+    if (f.phase === "ride") {
+      // Viaje: el taxímetro corre por distancia o por tiempo detenido
+      if (b.doors === "closed" && f.step !== "pay") {
+        if (b.v > 1) f.dist += b.v * dt;
+        else f.idle += dt;
+        const steps = Math.floor(f.dist / TAXI_FARE.meters) + Math.floor(f.idle / TAXI_FARE.seconds);
+        f.meter = TAXI_FARE.flag + steps * TAXI_FARE.step;
+        if (b.v > 1) this.taxi.km += b.v * dt / 1000;
+      }
+      if (f.step === "pay") {
+        if (b.v > MOVED_V) { f.step = null; f.still = 0; return this.msg("Detente: tu pasajero estaba pagando", "warn"); }
+        if (f.t >= PAY_TIME) this.pay();
+        return;
+      }
+      // Detenido junto a la vereda en el destino: paga
+      const at = this.atCurb(this.fromIdaS(f.dws), DROP_WINDOW);
+      if (b.v >= 0.3 || !at.near) { f.still = 0; return; }
+      if (!at.curb) return this.msg("Acércate a la vereda para que tu pasajero baje seguro", "warn", "curbDrop", 4);
+      if ((f.still = (f.still ?? 0) + dt) >= STILL_TIME) {
+        this.setStep("pay");
+        this.emit("farePaying", { fare: { ...f } });
+        this.msg("«Aquí está bien, gracias. ¿Cuánto es?»", "info");
+      }
+      return;
     }
-    if (f.payT != null && b.doors === "open" && (f.payT += dt) >= PAY_TIME) this.pay();
+    // Pagó y se baja
+    if (f.step === "handle") return this.tryHandle(f, "bajar");
+    if (f.step === "out" && f.t >= OUT_TIME) { this.setStep("closing"); this.closeDoor(); }
+  }
+
+  setStep(step, extra = {}) {
+    Object.assign(this.fare, { step, t: 0 }, extra);
+    this.emit("taxiStep", { step, phase: this.fare.phase });
+  }
+
+  /** Arrancaste mientras caminaba hacia el taxi: vuelve a la vereda a hacer señas. */
+  cancelWalk() {
+    const f = this.fare;
+    f.step = null; f.t = 0;
+    this.emit("taxiStep", { step: null, phase: f.phase });
+    this.msg("Arrancaste antes de que llegara a la puerta: vuelve a la vereda", "warn");
+  }
+
+  /** Tira la manilla: si hay seguro, espera a que se lo quites; si no, abre la puerta. */
+  tryHandle(f, verb) {
+    const b = this.bus;
+    if (b.v > MOVED_V) {
+      if (f.phase === "pickup") return this.cancelWalk();
+      if (!f.fled) { f.fled = true; this.penalty(20, "Arrancaste con tu pasajero queriendo bajarse"); }
+      return;
+    }
+    if (b.v >= 0.3) return;
+    if (this.locked) {
+      if (f.t > 0.5 && !f.tugged) { f.tugged = true; this.emit("taxiHandle", {}); }
+      if (f.t > 0.7) this.msg(`Tiene seguro: quítalo (Espacio) para que pueda ${verb}`, "warn", "locked", 5);
+      return;
+    }
+    if (f.t < 0.5) return;                 // alcanza la manilla
+    this.setStep("opening");
+    b.doors = "opening"; b.doorT = 0;
+    this.emit("door", { open: true });
   }
 
   board() {
@@ -184,9 +271,8 @@ export class TaxiSim extends BusSim {
     let sign = (this.rng() < 0.6 ? 1 : -1) * f.dir;
     if (f.ws + sign * MIN_TRIP > hi || f.ws + sign * MIN_TRIP < lo) sign = -sign;
     const dws = Math.max(lo, Math.min(hi, f.ws + sign * trip));
-    this.fare = { phase: "ride", n: f.n, fromWs: f.ws, fromName: f.name, dws, destName: this.placeName(dws), dist: 0, idle: 0, meter: TAXI_FARE.flag, smooth: true, waited: this.elapsed - f.since, start: this.elapsed };
+    this.fare = { phase: "ride", n: f.n, fromWs: f.ws, fromName: f.name, dws, destName: this.placeName(dws), dist: 0, idle: 0, meter: TAXI_FARE.flag, smooth: true, waited: this.elapsed - f.since, start: this.elapsed, step: null, t: 0 };
     this.onboard = [dws];                  // para los avisos de frenada brusca de busSim
-    this.closeDoor();                      // el pasajero cierra la puerta al subir
     this.emit("fareBoard", { fare: { ...this.fare } });
     const km = `${(Math.abs(dws - f.ws) / 1000).toFixed(1).replace(".", ",")} km`;
     const behind = this.fromIdaS(dws) < this.bus.s;
@@ -204,14 +290,27 @@ export class TaxiSim extends BusSim {
     this.totals.maxPoints += 120;
     this.totals.wage += fare + tip;
     this.onboard = [];
-    this.fare = { phase: "done" };
-    this.closeDoor();                      // y la cierra al bajar
+    this.fare = { phase: "done", n: f.n, step: null, t: 0 };
+    this.setStep("handle");                // ahora quiere bajarse
     this.emit("farePaid", { fare: { ...f }, amount: fare, tip, smooth: f.smooth });
     this.msg(f.smooth ? `Pagó ${fare} pesos y dejó ${tip} de propina: «¡Gracias, muy buen viaje!»` : `Pagó ${fare} pesos. Sin propina: el viaje no fue tan suave`, f.smooth ? "ok" : "info");
   }
 
-  /* --------- Puerta --------- */
-  /** La puerta la cierra el pasajero (al subir y al bajar). */
+  /* --------- Puerta y seguro --------- */
+  /** 2.20 · Espacio: el conductor no abre la puerta, solo pone o quita el seguro. */
+  toggleDoors() {
+    if (this.finished) return;
+    if (this.bus.doors !== "closed") return this.msg("La puerta la abre y la cierra tu pasajero", "info", "doorPax", 3);
+    this.setLock(!this.locked);
+  }
+  setLock(locked, auto = false) {
+    if (this.locked === locked) return;
+    this.locked = locked;
+    this.emit("taxiLock", { locked, auto });
+    if (!auto) this.msg(locked ? "Pusiste el seguro" : "Quitaste el seguro: ya pueden abrir la puerta", "info", "lock", 0);
+  }
+
+  /** La puerta la cierra el pasajero (adentro al subir, desde afuera al bajar). */
   closeDoor() {
     const b = this.bus;
     if (b.doors !== "open") return;
@@ -227,24 +326,18 @@ export class TaxiSim extends BusSim {
 
   onDoorsOpen() {
     const f = this.fare;
-    if (f?.phase === "pickup") {
-      if (f.dir !== this._dir) return this.msg("Esa persona está en la vereda de enfrente: da la vuelta en U para recogerla", "info");
-      const at = this.atCurb(this.fromIdaS(f.ws));
-      if (at.near && at.curb) { f.boardT = 0; this.emit("fareBoarding", { fare: { ...f } }); return; }
-      if (at.near) return this.msg("Acércate a la vereda (pista de la derecha) para que pueda subir", "warn");
-    } else if (f?.phase === "ride") {
-      const at = this.atCurb(this.fromIdaS(f.dws), DROP_WINDOW);
-      if (at.near && at.curb) { f.payT = 0; this.emit("farePaying", { fare: { ...f } }); return; }
-      if (at.near) return this.msg("Acércate a la vereda para que tu pasajero baje seguro", "warn");
-      return this.msg(`Todavía no llegan: el destino es ${f.destName}`, "info");
-    }
+    if (f?.step === "opening") this.setStep(f.phase === "pickup" ? "in" : "out");
   }
 
   onDoorsClosed() {
     const f = this.fare;
-    if (f?.phase === "pickup" && f.boardT != null) { f.boardT = null; this.msg("Cerraste antes de que alcanzara a subir", "warn"); }
-    if (f?.phase === "ride" && f.payT != null) { f.payT = null; this.msg("Cerraste antes de que alcanzara a pagar", "warn"); }
-    if (f?.phase === "done") { this.fare = null; this.nextFareAt = 4 + this.rng() * 6; }
+    if (f?.step !== "closing") return;
+    if (f.phase === "pickup") return this.board();
+    if (f.phase === "done") {
+      this.fare = null;
+      this.nextFareAt = 4 + this.rng() * 6;
+      this.emit("fareGone", {});
+    }
   }
 
   /* --------- Final (desde el menú: el turno sigue mientras quieras, en los dos sentidos) --------- */

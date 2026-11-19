@@ -184,7 +184,7 @@ class BusGame {
     this.el.pause.classList.add("hidden");
     this.paused = false;
     if (this.taxi) {
-      this.toast(`Taxi por ${this.route.name} · busca a quien haga señas en la vereda, detente a su lado junto a la vereda y abre la puerta (${this.touch ? "Puerta" : "Espacio"})${WEATHER.wet > 0.3 ? ". Llueve: frena antes" : ""}`, "info", 7000);
+      this.toast(`Taxi por ${this.route.name} · busca a quien haga señas en la vereda, detente a su lado junto a la vereda y quítale el seguro a la puerta (${this.touch ? "Seguro" : "Espacio"}): la abre y la cierra el pasajero${WEATHER.wet > 0.3 ? ". Llueve: frena antes" : ""}`, "info", 7000);
     } else if (this.ride) {
       this.wantOff = null;
       this.toast(`Subiste al bus ${this.route.id} hacia ${this.route.to} · ${this.ride.fareText} · toca el timbre (${this.touch ? "🔔" : "Espacio"}) antes de tu parada`, "ok", 7000);
@@ -259,7 +259,7 @@ class BusGame {
         <span><kbd>Shift</kbd> freno suave</span>
         <span><kbd>L</kbd> limitador</span>
         <span><kbd>A</kbd><kbd>D</kbd> cambiar de pista</span>
-        <span><kbd>Espacio</kbd> ${this.taxi ? "puerta (subir y bajar pasajero)" : "puertas"}</span>
+        <span><kbd>Espacio</kbd> ${this.taxi ? "seguro de la puerta (para que suba o baje tu pasajero)" : "puertas"}</span>
         ${this.taxi ? `<span><kbd>U</kbd> vuelta en U (en un cruce)</span>` : ""}
         <span><kbd>R</kbd> radio · <kbd>,</kbd><kbd>.</kbd> emisora</span>
         <span><kbd>B</kbd> bocina</span>
@@ -277,7 +277,7 @@ class BusGame {
           <button data-t="right" aria-label="Pista a la derecha">${ICON.right}</button>
         </div>
         <div class="bus-touch-mid">
-          <button data-t="doors" aria-label="${this.taxi ? "Puerta" : "Puertas"}">${ICON.doors}<span>${this.taxi ? "Puerta" : "Puertas"}</span></button>
+          <button data-t="doors" aria-label="${this.taxi ? "Seguro de la puerta" : "Puertas"}">${ICON.doors}<span>${this.taxi ? "Seguro" : "Puertas"}</span></button>
           <button data-t="horn" aria-label="Bocina">${ICON.horn}<span>Bocina</span></button>
           <button data-t="cam" aria-label="Cámara">${ICON.cam}<span>Cámara</span></button>
           <button data-t="limiter" aria-label="Limitador"><b class="bus-lim-ico">50</b><span>Limitador</span></button>
@@ -860,8 +860,10 @@ class BusGame {
         this.el.routeTitle.textContent = `${R.name.toUpperCase()} · ${R.from.toUpperCase()} → ${R.to.toUpperCase()}`;
         return true;
       }
-      case "fareBoarding": case "farePaying": case "fareDest": return true;
-      case "fareBoard": this.audio.door(false); return true;
+      case "fareBoarding": case "farePaying": case "fareDest": case "fareBoard": case "fareGone": case "taxiStep": return true;
+      case "door": this.audio.carDoor(e.open); return true;              // 2.20 · puerta de auto, no la neumática del bus
+      case "taxiLock": this.audio.carLock(e.locked); return true;
+      case "taxiHandle": this.audio.carHandle(); return true;
       case "fareLost": this.audio.fault(); return true;
       case "farePaid": {
         const total = e.amount + e.tip;
@@ -879,8 +881,8 @@ class BusGame {
 
   updateTaxiHud() {
     const sim = this.sim, b = sim.bus, el = this.el, f = sim.fare, t = sim.target;
-    el.doors.textContent = { closed: "Puerta cerrada", opening: "Abriendo la puerta…", open: "Puerta abierta", closing: "Cerrando la puerta…" }[b.doors];
-    el.doors.classList.toggle("open", b.doors !== "closed");
+    el.doors.textContent = b.doors === "closed" ? (sim.locked ? "Puerta con seguro" : "Puerta sin seguro") : { opening: "Abren la puerta…", open: "Puerta abierta", closing: "Cierran la puerta…" }[b.doors];
+    el.doors.classList.toggle("open", b.doors !== "closed" || !sim.locked);
     el.bell.classList.add("hidden");
     el.meter.textContent = f?.phase === "ride" ? formatCLP(f.meter) : "libre";
     el.meter.parentElement.classList.toggle("on", f?.phase === "ride");
@@ -896,7 +898,7 @@ class BusGame {
       const km = (m) => m > 1000 ? `${(m / 1000).toFixed(1).replace(".", ",")} km` : `${Math.round(m)} m`;
       el.stopDist.textContent = t.across ? `vereda de enfrente · ${km(Math.abs(d))}` : Math.abs(d) <= t.win ? "aquí" : d > 0 ? km(d) : `atrás · ${km(-d)} · da la vuelta`;
     } else {
-      el.stopName.textContent = f?.phase === "done" ? "Cierra la puerta" : "Buscando pasajeros…";
+      el.stopName.textContent = f?.phase === "done" ? "Tu pasajero se baja…" : "Buscando pasajeros…";
       el.stopDist.textContent = "";
     }
     el.stopWait.textContent = `${sim.taxi.fares} ${sim.taxi.fares === 1 ? "carrera" : "carreras"}`;
@@ -940,10 +942,14 @@ class BusGame {
     const sim = this.sim, b = sim.bus, f = sim.fare, t = sim.target;
     const K = this.touch ? { doors: "toca Puerta", right: "▶", gas: "ACELERAR" } : { doors: "Espacio", right: "D", gas: "W" };
     if (sim.finished) return "";
-    if (f?.phase === "pickup" && f.boardT != null) return "Subiendo al taxi…";
-    if (f?.phase === "ride" && f.payT != null) return "Pagando…";
-    if (f?.phase === "done") return `Cierra la puerta (${K.doors}) para seguir`;
-    if (b.doors !== "closed") return `Cierra la puerta (${K.doors}) para poder avanzar`;
+    // 2.20 · Subir y bajar paso a paso: la puerta la abre y la cierra el pasajero; tú solo quitas el seguro
+    const K2 = this.touch ? "toca Seguro" : "Espacio";
+    if (f?.step === "walk") return "Viene caminando hacia el taxi: espera detenido";
+    if (f?.step === "handle") return sim.locked ? `Está tirando la manilla: quita el seguro (${K2}) para que pueda ${f.phase === "pickup" ? "subir" : "bajarse"}` : "Abre la puerta…";
+    if (f?.phase === "pickup" && f.step) return f.step === "in" ? "Se agacha, se sube y se sienta…" : f.step === "closing" ? "Cierra la puerta…" : "Abre la puerta…";
+    if (f?.step === "pay") return "Te está pagando…";
+    if (f?.phase === "done") return f.step === "out" ? "Se baja del taxi…" : f.step === "closing" ? "Cierra la puerta desde afuera…" : "Abre la puerta…";
+    if (b.doors !== "closed") return "Espera que tu pasajero cierre la puerta";
     if (!t) return b.v < 0.5 ? `Acelera con ${K.gas} y busca a quien haga señas` : "Atento a la vereda: alguien te va a hacer señas";
     const d = t.s - b.s, curb = Math.abs(b.x - LANES[0]) < 1.0;
     if (t.across || t.behind) {
@@ -956,7 +962,7 @@ class BusGame {
       if (L) return `Frena en el cruce que viene (${Math.max(0, Math.round(L.s + 8 - b.s))} m) y da la vuelta en U (${U})`;
       return `Al final de la calle, detente y da la vuelta en U (${U})`;
     }
-    if (Math.abs(d) <= t.win && b.v < 0.3 && curb) return `Abre la puerta (${K.doors})`;
+    if (Math.abs(d) <= t.win && curb) return b.v < 0.3 ? (t.kind === "pickup" ? "Ya viene hacia el taxi" : "Llegaron: espera que pague") : "¡Aquí! Detente junto a la vereda";
     if (d < 160 && !curb) return `Pásate a la pista de la derecha (${K.right}) para ${t.kind === "pickup" ? "recogerlo" : "dejarlo"} junto a la vereda`;
     const L = sim.nextLight(70);
     if (L && L.state === "red" && L.d > 0) return "Semáforo en rojo: detente antes de la línea blanca";
