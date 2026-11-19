@@ -26,7 +26,7 @@
    y curva de demanda horaria de un día real de Santiago.
    ========================================================================== */
 
-export const VERSION = "2.14.3";
+export const VERSION = "2.14.4";
 
 /* ---------- Colores oficiales de las líneas ---------- */
 export const LINE_COLORS = {

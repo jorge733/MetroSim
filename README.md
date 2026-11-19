@@ -133,11 +133,13 @@ trenes de los dos motores quedan a ~1 m (mediana).
   estaciones, y el taxi suma la calle Av. Teniente Cruz.
 
 **2.14.1** · Post «Pediste el 110, ¡aquí lo tienes!» para anunciar el recorrido que pidió un jugador (`post-recorrido-110/`:
-cuadrado, vertical, historia y horizontal, con capturas del 110 en PC y en el celular acostado, y el texto listo en `texto.txt`).
+cuadrado, vertical e historia, con capturas del 110 en PC y en el celular acostado, y el texto listo en `texto.txt`).
 
 **2.14.2** · El post del 110 agradece a **@tomygrx**, el jugador que pidió el recorrido (en la imagen y en el texto).
 
 **2.14.3** · El texto del post del 110 manda al «link en la bio» (los posts se publican solo en Instagram, donde los enlaces del texto no se pueden tocar).
+
+**2.14.4** · Los posts dejan la medida horizontal: se hacen solo las de Instagram (cuadrado, vertical 4:5 e historia). El del 110 queda sin `portada-horizontal.png`.
 
 ## Versión 2.13 · RedMoviSim te escucha: sugerencias y comentarios
 
