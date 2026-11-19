@@ -130,6 +130,13 @@ La 2.15 probó manejar el bus y el taxi con volante (girar en las curvas y para 
 
 **2.15.1** · Se vuelve a la conducción de antes: la calle dobla sola y A/D cambian de pista.
 
+**2.15.2** · Paraderos y accesos al Metro en su lugar:
+- En la calle del bus, el pasto ya no tapa la escalera del acceso al Metro (pasaba en todas las estaciones).
+- En la calle real de las estaciones, el paradero que caía en medio de un cruce o dentro de un edificio (33 de 133
+  calles, entre ellas Cristóbal Colón) se corre a la vereda más cercana, junto a la solera.
+- Los edificios de OpenStreetMap que tapaban la boca del acceso o la vereda de enfrente (16 calles, entre ellas
+  Cristóbal Colón, Pajaritos y Estadio Nacional) se recortan para dejar el paso libre.
+
 ## Versión 2.14 · Recorrido 110
 
 - **Nuevo recorrido 110 de Red** (25 en total, más el A01 de práctica): un tramo real por **Av. Teniente Cruz**, de

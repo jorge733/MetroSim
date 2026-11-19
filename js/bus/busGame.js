@@ -124,7 +124,7 @@ class BusGame {
 
     clearTrackLift();           // la Alameda es plana: sin las pendientes de la última línea de Metro jugada
     this.buildDom();
-    this.renderer = new THREE.WebGLRenderer({ antialias: true });
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, stencil: true });   // 2.15.2 · stencil: la boca del Metro no la tapa el terreno
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, touch ? 1 : 1.5));
     this.renderer.setSize(innerWidth, innerHeight);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;

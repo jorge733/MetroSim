@@ -84,10 +84,47 @@ function flatMesh(pos, idx, mat) {
   return m;
 }
 
+/* 2.15.2 · Lo que tiene que quedar libre en la calle real.
+   Los edificios de OSM a veces quedan encima de la boca del acceso o justo delante (donde aparece el pasajero):
+   se recortan con el corte recto que les quita menos, o se sacan si casi no queda nada. */
+/** Boca del acceso, baranda, tótem y la vereda donde aparece el pasajero (coordenadas locales). */
+export const ACCESS_CLEAR = { x0: 7.6, x1: 12.4, z0: -4, z1: 9.5 };
+const ringArea = (ring) => { let a = 0; for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) a += (ring[j][0] - ring[i][0]) * (ring[j][1] + ring[i][1]); return a / 2; };
+function ringHitsRect(ring, r) {
+  if (ring.some(([x, z]) => x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1)) return true;
+  for (let x = r.x0; x <= r.x1 + 1e-6; x += 0.4) for (let z = r.z0; z <= r.z1 + 1e-6; z += 0.4) if (inPoly(x, z, ring)) return true;
+  return false;
+}
+/** Sutherland–Hodgman con un semiplano: se queda con los puntos donde f(p) ≥ 0 (f lineal). */
+function clipRing(ring, f) {
+  const out = [];
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i], b = ring[(i + 1) % ring.length], fa = f(a), fb = f(b);
+    if (fa >= 0) out.push(a);
+    if ((fa >= 0) !== (fb >= 0)) { const t = fa / (fa - fb); out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]); }
+  }
+  return out;
+}
+function clearRect(buildings, r) {
+  const out = [];
+  for (const b of buildings) {
+    if (!ringHitsRect(b.ring, r)) { out.push(b); continue; }
+    const A = Math.abs(ringArea(b.ring));
+    const cuts = [p => p[1] - r.z1, p => r.z0 - p[1], p => p[0] - r.x1, p => r.x0 - p[0]];
+    let best = null;
+    for (const f of cuts) {
+      const ring = clipRing(b.ring, f), a = ring.length >= 3 ? Math.abs(ringArea(ring)) : 0;
+      if (!best || a > best.a) best = { ring, a };
+    }
+    if (best.a > Math.max(15, A * 0.25)) out.push({ ...b, ring: best.ring });
+  }
+  return out;
+}
+
 export class RealStreet {
   constructor(data) {
     this.d = data;
-    this.buildings = data.buildings.map(b => ({ h: b[0], c: b[1], s: b[2], lm: !!b[3], ring: pairs(b, 4) }));
+    this.buildings = clearRect(data.buildings.map(b => ({ h: b[0], c: b[1], s: b[2], lm: !!b[3], ring: pairs(b, 4) })), ACCESS_CLEAR);
     this.roads = data.roads.map(r => ({ w: r[0], service: !!r[1], pts: pairs(r, 2) }));
     this.rot = data.rot;
     this.grid = new Map();
@@ -125,6 +162,32 @@ export class RealStreet {
     if (this.obstacle(x, z, m)) return false;
     return !(this.inBuilding(x, z) || this.inBuilding(x + m, z) || this.inBuilding(x - m, z) || this.inBuilding(x, z + m) || this.inBuilding(x, z - m));
   }
+  /**
+   * 2.15.2 · Dónde va el paradero (refugio de 1,6 × 5 m con la calzada a su izquierda, −x). El punto que dejó el script
+   * a veces cae en un cruce o en un edificio: entonces se busca el más cercano en la vereda, junto a la solera.
+   * `avoid`: [x, z, radio] que no se pueden tapar (boca del acceso, kiosko, puertas de los locales).
+   */
+  placeBusStop(b, avoid = []) {
+    const c = ACCESS_CLEAR;
+    const fits = (x, z, curb = true) => {
+      const over = (x0, x1, z0, z1) => x + 0.9 > x0 && x - 0.9 < x1 && z + 2.6 > z0 && z - 3.4 < z1;
+      if (over(c.x0, c.x1, c.z0, c.z1) || avoid.some(([ax, az, r]) => over(ax - r, ax + r, az - r, az + r))) return false;
+      for (let xx = x - 0.9; xx <= x + 0.91; xx += 0.3) for (let zz = z - 3.4; zz <= z + 2.61; zz += 0.5)
+        if (this.onRoad(xx, zz, -0.2) || this.inBuilding(xx, zz) || this.obstacle(xx, zz, 0.1)) return false;
+      // La solera a la izquierda, a lo largo de todo el refugio (si no hay dónde, basta con una vereda libre)
+      return !curb || [z - 2, z, z + 2].every(zz => [1.3, 1.7, 2.1, 2.5].some(d => this.onRoad(x - d, zz)));
+    };
+    if (fits(b.x, b.z)) return { x: b.x, z: b.z, moved: false };
+    for (const curb of [true, false]) for (let dz = 0; dz <= 70; dz += 1) for (const sz of dz ? [1, -1] : [1]) {
+      const z = b.z + sz * dz;
+      for (let dx = 0; dx <= 12; dx += 0.3) for (const sx of dx ? [1, -1] : [1]) {
+        const x = b.x + sx * dx;
+        if (fits(x, z, curb)) return { x: Math.round(x * 10) / 10, z: Math.round(z * 10) / 10, moved: true };
+      }
+    }
+    return { x: b.x, z: b.z, moved: false };
+  }
+
   /** Gira un vector del mundo (x este, −z norte) a la calle local (la del juego sigue la avenida). */
   toLocal(v) {
     const [dn, de] = this.rot, x = v.x, z = v.z;

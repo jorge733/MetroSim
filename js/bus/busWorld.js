@@ -38,6 +38,9 @@ const ONCOMING = [-9.1, -12.5, -15.9];
 /** 1.20 · Acceso al Metro junto al paradero: centro (x desde la vereda, z relativo a la marca) y tamaño. */
 const ACCESS = { dx: 3.9, dz: -9, w: 1.9, len: 5.2 };
 const SIDEWALK_Y = 0.16;
+/** 2.15.2 · Boca del acceso: no pinta nada, solo deja un 1 en el stencil (el terreno no se dibuja ahí). */
+const ACCESS_MASK = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false, stencilWrite: true, stencilRef: 1,
+  stencilFunc: THREE.AlwaysStencilFunc, stencilZPass: THREE.ReplaceStencilOp });
 const TZ = new THREE.Matrix4();
 /** 2.2 · Taxi: largo, ancho y asientos (conductor adelante a la izquierda, pasajero atrás a la derecha). */
 const TAXI_L = 4.6, TAXI_W = 1.85;
@@ -310,7 +313,9 @@ export class BusWorld {
     box(s, 0.25, 0.18, this.len, curbMat, ROAD_FAR - 0.12, 0.09, this.zMid);
 
     // Terreno: un plano grande que acompaña al vehículo (la calle dobla encima)
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(3200, 3200), worldUV(std(this.night ? "#3a3c3a" : "#b9b7a4", { map: grassTexture() }), GRASS_TILE));
+    // 2.15.2 · No se dibuja donde las bocas del Metro marcaron el stencil (ACCESS_MASK): ahí se ve la escalera
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(3200, 3200), worldUV(std(this.night ? "#3a3c3a" : "#b9b7a4", { map: grassTexture(),
+      stencilWrite: true, stencilWriteMask: 0, stencilRef: 1, stencilFunc: THREE.NotEqualStencilFunc }), GRASS_TILE));
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -0.05;
     s.add(ground);
@@ -900,6 +905,13 @@ export class BusWorld {
     this.accesses = this.accessStops().map(st => {
       const g = metroStreetAccess(this.scene, { name: st.metro, lines: linesAtStation(st.metro), night: this.night ? 1 : 0, w: ACCESS.w, len: ACCESS.len });
       g.position.set(CURB_X + ACCESS.dx, SIDEWALK_Y, -st.s + ACCESS.dz);
+      // 2.15.2 · Máscara invisible en la boca: marca el stencil para que el terreno (que pasa por debajo, a ras de suelo)
+      // no tape la escalera; antes se veía pasto en vez de los peldaños
+      const mask = new THREE.Mesh(new THREE.PlaneGeometry(ACCESS.w, ACCESS.len, 1, 2), ACCESS_MASK);
+      mask.rotation.x = -Math.PI / 2;
+      mask.position.y = 0.005;
+      mask.renderOrder = -2;
+      g.add(mask);
       const z = -st.s + ACCESS.dz;
       return { stop: st, x: CURB_X + ACCESS.dx, z, mouthZ: z + ACCESS.len / 2 + 0.6, bottomZ: z - ACCESS.len / 2 + 0.7 };
     });

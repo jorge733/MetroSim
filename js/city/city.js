@@ -201,7 +201,9 @@ export class City {
       this.buildAccess(g, M);
       this.buildRealShops(g, M);
       this.buildRealLandmark(g, M);
-      const b = realData.busStop;
+      // 2.15.2 · Si el paradero del script cayó en un cruce o en un edificio, se corre a la vereda más cercana
+      const k = realData.kiosk;
+      const b = this.real.placeBusStop(realData.busStop, [[k.x, k.z, 1.8], ...realData.shops.map(s => [s.door[0], s.door[1], 1.2])]);
       this.busStopAt = { x: b.x, z: b.z };
       this.buildBusStop(g, M, b.x - 1.4, b.z);
       this.buildRealVehicles(g, rnd);
