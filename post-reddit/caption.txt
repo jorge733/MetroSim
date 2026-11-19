@@ -1,0 +1,33 @@
+TÍTULO
+Hice un simulador 3D gratis del transporte público de Santiago: Metro, trenes de EFE, buses Red y taxi, en el navegador
+
+TEXTO
+Hola! Les quería mostrar un proyecto que he estado haciendo: **RedMoviSim**, un simulador 3D del transporte público de Santiago. Es gratis, sin anuncios y se juega directo en el navegador, en el PC o en el celular: **https://www.redmovisim.cl/**
+
+**Qué se puede hacer**
+
+- **Manejar el Metro**: las líneas 1, 2, 3, 4, 4A, 5 y 6, con sus estaciones, señales y horarios.
+- **Manejar los trenes de EFE**: Tren Nos y Tren Rancagua.
+- **Manejar buses Red**: 25 recorridos reales (sacados de la API pública de red.cl), con sus paraderos, semáforos y pasajeros. El último que agregué, el 110 por Av. Teniente Cruz, lo pidió un jugador.
+- **Manejar un taxi** por calles reales de la ciudad (de OpenStreetMap), con radio en vivo.
+- **Viajar de pasajero**: cargar la bip!, pasar los torniquetes, combinar entre líneas y tomar la micro, con la tarifa integrada como en la vida real.
+- **Dirigir el Centro de Control**: supervisar la red y resolver señales averiadas, trenes detenidos y fallas de puertas sin que se caiga la puntualidad.
+- **Jugar con amigos**: uno hace de Centro de Control y hasta 4 conducen trenes en la misma red, cada uno desde su PC o celular.
+
+Conductor y pasajero comparten el mismo mundo: los trenes que manejas son los mismos que esperan los pasajeros en el andén.
+
+Se puede instalar como app y después funciona sin internet. Si quieres, puedes entrar con tu correo para seguir la partida en otro dispositivo, pero no es obligatorio.
+
+Todavía le falta harto y cada semana le agrego cosas, varias de ellas pedidas por la gente que juega. Así que me encantaría saber qué les parece: qué línea, recorrido o estación quieren ver, qué se ve raro o qué no funciona en su celular. Lo leo todo, acá en los comentarios o en el botón «Opinar» del juego.
+
+¿Qué línea manejarían primero? 🚇
+
+*(Es un proyecto independiente, sin relación con Red, Metro de Santiago, EFE ni el Ministerio de Transportes.)*
+
+LEYENDAS DE LAS IMÁGENES (en la galería, en este orden)
+1-metro-cabina.png · Manejando la Línea 3 a 82 km/h, desde la cabina
+2-metro-anden.png · Esperando la salida en Plaza Quilicura, con los pasajeros en el andén
+3-bus-red.png · Bus Red en la Alameda, llegando al paradero de Estación Central
+4-taxi.png · El taxi buscando pasajeros por la Alameda
+5-centro-de-control.png · El Centro de Control: un tren detenido en la vía y una falla de puertas por resolver
+6-portada.png · Se juega gratis en www.redmovisim.cl

@@ -3,6 +3,10 @@
 En Reddit, a diferencia de Instagram, los enlaces del texto **sí se pueden tocar**, así que la dirección va directa.
 El tono es otro: primera persona, sin hashtags y con pocos emojis (en Reddit se ven como publicidad).
 
+**Listo para copiar:** `caption.txt` (título, texto y leyendas). **Imágenes** (capturas de la 2.16.1 a 2560×1440, subirlas
+como galería en este orden): `1-metro-cabina.png`, `2-metro-anden.png`, `3-bus-red.png`, `4-taxi.png`,
+`5-centro-de-control.png` y `6-portada.png`.
+
 **Dónde:** r/chile y r/santiago (en español), r/WebGames y r/indiegames (en inglés, versión de abajo).
 Antes de publicar, leer las reglas de cada subreddit sobre autopromoción y elegir el flair que corresponda
 (p. ej. «Proyecto», «OC» o «Juegos»). Publicar como **post con imagen o video** (una captura del Metro y otra del bus,

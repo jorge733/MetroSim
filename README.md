@@ -139,6 +139,9 @@ trenes de los dos motores quedan a ~1 m (mediana).
   (o a la puerta, si el encargo es en otro lado). El cajero automático del banco y los puestos de la vereda (kiosko y
   los locales sin fachada cerca) se siguen atendiendo desde afuera.
 
+**2.17.1** · El post de Reddit suma seis capturas nuevas del juego, de la 2.16.1 (Metro en cabina y en el andén, bus, taxi, Centro
+de Control y portada) y `caption.txt` con el título, el texto y las leyendas listos para copiar.
+
 ## Versión 2.16 · Mejor visibilidad en Google
 
 - **Página nueva `/que-es/`** («Qué es RedMoviSim»): explica el juego con texto que Google puede leer (Metro líneas 1 a 6,
