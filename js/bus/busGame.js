@@ -654,7 +654,7 @@ class BusGame {
   handleEvents() {
     for (const e of this.sim.drain()) {
       this.world.people.onEvent(e, this.sim);                  // 1.19 · los pasajeros 3D suben, bajan y corren
-      if (e.type === "stopDone") this.announceNext(e.index);   // 1.20 · locución: próxima parada
+      if (e.type === "stopDone" && this.ride) this.announceNext(e.index);   // 1.20 · locución: próxima parada (2.19.2: solo de pasajero, no al conducir)
       if (e.type === "abs") this.audio.abs();
       if (this.ride) { this.rideEvent(e); continue; }
       if (this.taxi && this.taxiEvent(e)) continue;

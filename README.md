@@ -141,6 +141,8 @@ trenes de los dos motores quedan a ~1 m (mediana).
   al bus desde una estación y en «Otra vuelta» / «Otro turno». Antes la pantalla quedaba quieta unos segundos. Al
   **unirse a una sala** del Centro de Control también aparece mientras se busca la sala; si no se encuentra, se vuelve
   a la portada con el aviso.
+- **2.19.2 · Sin locución al conducir el bus.** Al manejar ya no suena la voz de «Próxima parada» (ni sus dos notas)
+  al salir de cada paradero. Si vas de **pasajero** en el bus, la locución sigue anunciando la próxima parada.
 
 ## Versión 2.18 · Bonus: Metro Valparaíso
 
