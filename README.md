@@ -132,6 +132,9 @@ trenes de los dos motores quedan a ~1 m (mediana).
   pública de red.cl con `node tools/recorridos-red.mjs`; se puede manejar y también tomar de pasajero desde esas
   estaciones, y el taxi suma la calle Av. Teniente Cruz.
 
+**2.14.1** · Post «Pediste el 110, ¡aquí lo tienes!» para anunciar el recorrido que pidió un jugador (`post-recorrido-110/`:
+cuadrado, vertical, historia y horizontal, con capturas del 110 en PC y en el celular acostado, y el texto listo en `texto.txt`).
+
 ## Versión 2.13 · RedMoviSim te escucha: sugerencias y comentarios
 
 Nuevo `js/sugerencias.js`: un formulario para que los jugadores nos cuenten ideas, errores y lo que les gusta.
