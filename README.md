@@ -141,6 +141,9 @@ trenes de los dos motores quedan a ~1 m (mediana).
   levantarte» o «J misiones» cuando se juega con la pantalla táctil: nombran el botón que hace lo mismo (**✋ Usar**,
   **🧍 Levantarse**, **🤚 Agarrarse**, **🎯 Misiones**, **Puertas**, **⇄ Cambiar cabina**…) o simplemente no lo
   mencionan. En el computador todo sigue igual, con sus teclas.
+- **2.20.2 · El pasajero que sube es el mismo que baja.** Al cerrar la puerta aparecía otra persona haciendo señas
+  junto al taxi y era ella la que después se bajaba. Además, al agacharse para entrar o salir ya no se le asoma la
+  cabeza por el techo. Imágenes del post de Instagram en `post-taxi-puerta/`.
 
 ## Versión 2.19 · El mar y los cerros de Valparaíso
 
