@@ -147,6 +147,9 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **2.20.3 · A nadie se le asoma el pelo por el techo del taxi.** Sentados, a los más altos (el pasajero de atrás y
   el conductor) se les veía la cabeza o el pelo encima del techo amarillo: ahora cada uno se sienta a la altura justa
   para quedar bajo el techo (`busPeople.js · taxiSitY`). Las capturas del post de Instagram se rehicieron sin ese detalle.
+- **2.20.4 · Post de Instagram «Ahora entras a los locales».** Anuncia que en el modo pasajero se entra caminando a
+  los locales (la novedad de la 2.17): la puerta que se abre sola, el saludo, la caja y el interior de cada rubro, con
+  capturas reales del juego en el celular. Imágenes y texto en `post-locales/`.
 
 ## Versión 2.19 · El mar y los cerros de Valparaíso
 
