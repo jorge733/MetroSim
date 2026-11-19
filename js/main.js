@@ -125,6 +125,7 @@ import { riderFare, riderSpecial, riderAsked, riderCategory, riderBusFare } from
 import { quoteStage, commitStage, loadTrip, saveTrip, fareModeOfLine, minutesLeft, payWith } from "./trip.js";
 import { setupRiderPanel, openRiderPanel, closeRiderPanel, riderPanelOpen } from "./riderPanel.js";
 import { startBusGame } from "./bus/busGame.js";
+import { BusAudio } from "./bus/busAudio.js";
 import { busTripsFrom, BUS_ROUTES, busRouteById } from "./bus/busRoute.js";
 import { setupAccountButton, openAccount, closeAccount, accountOpen, state as accountState } from "./cuenta.js";
 import { setupFeedbackButtons, openFeedback, closeFeedback, feedbackOpen } from "./sugerencias.js";
@@ -606,8 +607,14 @@ function saveSetting(key, value) { try { localStorage.setItem(key, value); } cat
 function useLine(line) {
   setActiveLine(line);
   hud.setLine();
-  $("loadingBadge").textContent = lineSign(line.id);
-  $("loadingTitle").textContent = `Preparando ${lineArticle(line.id)} ${lineLabel(line.id)}…`;
+  setLoadingHead(lineSign(line.id), `Preparando ${lineArticle(line.id)} ${lineLabel(line.id)}…`);
+}
+/** 2.19.1 · Rótulo de la pantalla de carga: el letrero (línea, recorrido o TAXI) y el título. */
+function setLoadingHead(badge, title, kind = "") {
+  const b = $("loadingBadge");
+  b.textContent = badge;
+  b.dataset.kind = kind;              // "bus" / "taxi": colores propios (styles.css)
+  $("loadingTitle").textContent = title;
 }
 
 // 1.10 · La primera vez que se juega, antes de empezar se pregunta la fecha de nacimiento (tarifas TNE y adulto mayor)
@@ -692,6 +699,12 @@ async function joinRoomAsDriver() {
   joining = true;
   btn.disabled = true;
   msg.textContent = localNetwork() ? `Modo local (?red=local): buscando la sala ${code} en otra pestaña de este navegador…` : `Conectando con la sala ${code}…`;
+  // 2.19.1 · Mientras responde el Centro de Control se ve la pantalla de carga (antes quedaba la portada quieta)
+  const line = lineById(driverLineSelect.value);
+  setLoadingHead(lineSign(line.id), `Sala ${code}`);
+  startScreen.classList.add("hidden");
+  showLoading();
+  setLoading(0.03, msg.textContent);
   try {
     const net = await joinDriverRoom(code, { name, line: driverLineSelect.value, dir: directionSelect.value });
     msg.textContent = "";
@@ -699,6 +712,9 @@ async function joinRoomAsDriver() {
   } catch (err) {
     audio.stop();
     exitMobileFullscreen();
+    loadingScreen.classList.add("hidden");
+    startScreen.classList.remove("hidden");
+    useLine(lineById(paxLineSelect.value));           // devuelve el rótulo de la pantalla de carga
     msg.textContent = err.message;
   } finally {
     joining = false;
@@ -1050,12 +1066,42 @@ function stopGame({ keepFullscreen = false } = {}) {
 let bus = null;
 /** 2.9.3 · Al taxi se le pasa la calle con su sector (p. ej. «Av. Matta · Ñuñoa») para el letrero de arriba y los avisos. */
 const taxiRoute = (r, taxi) => taxi ? { ...r, name: streetName(r) } : r;
+let busStarting = false;
+/** 2.19.1 · Pantalla de carga del bus y el taxi: armar la calle traba unos segundos, así se ve qué pasa. */
+const busLoading = {
+  show(text) {
+    showLoading();
+    setLoading(0.15, text);
+    return paintPause();
+  },
+  /** Se esconde tras el segundo cuadro: el primero compila los materiales (es el que más traba). */
+  hide() {
+    setLoading(0.95, "Preparando luces y materiales");
+    requestAnimationFrame(() => requestAnimationFrame(() => { setLoading(1, "¡Listo!"); loadingScreen.classList.add("hidden"); }));
+  },
+};
 function startBus({ ride = null, taxi = false } = {}) {
-  if (bus) return;
+  if (bus || busStarting) return;
   startScreen.classList.add("hidden");
   if (wantsTouch()) enterMobileFullscreen();       // dentro del gesto del usuario
+  const route = ride ? ride.route : taxiRoute(busRouteById(busRouteSelect.value), taxi);
+  const isTaxi = taxi && !ride;
+  setLoadingHead(isTaxi ? "TAXI" : route.id, isTaxi ? "Preparando tu taxi…" : ride ? `Subiendo al ${route.id}…` : `Preparando el ${route.id}…`, isTaxi ? "taxi" : "bus");
+  // El sonido se enciende ahora, dentro del gesto del usuario (después de la espera el navegador puede negarlo)
+  const audio = new BusAudio();
+  audio.muted = muted;
+  audio.start({ rain: WEATHER.rain });
+  busStarting = true;
+  busLoading.show(ride ? `Esperando el bus en el paradero de ${route.stops?.[ride.from]?.name ?? route.from}` : isTaxi ? `Armando ${streetName(route)} y su tráfico` : `Armando el recorrido ${route.from} → ${route.to}`).then(() => {
+    busStarting = false;
+    if (bus || game) return audio.stop();
+    startBusNow({ ride, taxi, route, audio });
+    busLoading.hide();
+  });
+}
+function startBusNow({ ride, taxi, route, audio }) {
   bus = startBusGame({
-    bank, muted, touch: wantsTouch(), ride, taxi, route: ride ? null : taxiRoute(busRouteById(busRouteSelect.value), taxi),
+    bank, muted, touch: wantsTouch(), ride, taxi, route: ride ? null : route, audio, loading: busLoading,
     onMuteChange: (m) => { muted = m; saveSetting("metrosim.muted", m ? "1" : "0"); hud.setSound(!m); },
     onExit: () => {
       bus = null;

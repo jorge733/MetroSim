@@ -607,6 +607,10 @@ body.touch-mode .help-chip { display: none !important; }
 
 /* Pantalla de carga */
 .loading-screen { display: grid; place-items: center; background: radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--line) 22%, var(--bg)) 0, var(--bg) 60%); }
+/* 2.19.1 · Fija y encima de todo: también tapa la pantalla del bus (z-index 30) mientras se arma la calle */
+.loading-screen { position: fixed; inset: 0; z-index: 40; }
+.loading-screen .line-dot.big[data-kind="bus"] { width: auto; min-width: 64px; padding: 0 12px; background: #e8343f; color: #fff; font-size: 30px; }
+.loading-screen .line-dot.big[data-kind="taxi"] { width: auto; min-width: 64px; padding: 0 12px; background: #f2c200; color: #111; font-size: 24px; letter-spacing: .5px; }
 .loading-card { display: grid; justify-items: center; gap: 10px; width: min(320px, 86vw); text-align: center; }
 .loading-card strong { font: 700 28px/1.1 var(--f-display); letter-spacing: .3px; }
 .loading-card small { color: var(--muted); font-size: 14px; }

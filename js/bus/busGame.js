@@ -93,7 +93,7 @@ export function startBusGame(o) {
 }
 
 class BusGame {
-  constructor({ bank, muted, touch, onMuteChange, onExit, ride = null, route = null, taxi = false }) {
+  constructor({ bank, muted, touch, onMuteChange, onExit, ride = null, route = null, taxi = false, audio = null, loading = null }) {
     /* 2.2 · taxi: conducir un taxi por la misma calle (taxiSim.js): carreras en vez de paraderos */
     this.taxi = !ride && taxi;
     /* 1.15 · ride: el jugador viaja como PASAJERO (maneja el piloto automático):
@@ -104,9 +104,13 @@ class BusGame {
     this.touch = touch;
     this.onMuteChange = onMuteChange;
     this.onExit = onExit;
-    this.audio = new BusAudio();
-    this.audio.muted = muted;
-    this.audio.start({ rain: WEATHER.rain });
+    /* 2.19.1 · audio: ya encendido en el clic (main.js), antes de la pantalla de carga · loading: esa pantalla */
+    this.loading = loading;
+    this.audio = audio ?? new BusAudio();
+    if (!audio) {
+      this.audio.muted = muted;
+      this.audio.start({ rain: WEATHER.rain });
+    }
     /* 2.8 · La radio: emisoras de Santiago en vivo (taxiRadio.js) · 2.8.1 · también al conducir el bus (no al viajar de pasajero) */
     if (!this.ride) {
       this.radio = new TaxiRadio({
@@ -146,6 +150,17 @@ class BusGame {
     this.radio?.resume();
     this.last = performance.now();
     this.raf = requestAnimationFrame((t) => this.loop(t));
+  }
+
+  /** 2.19.1 · «Otra vuelta» / «Otro turno»: rearmar la calle traba unos segundos, con la pantalla de carga delante. */
+  again() {
+    if (!this.loading || this.rebuilding) return this.newRun();
+    this.rebuilding = true;
+    this.loading.show(this.taxi ? "Buscando pasajeros para otro turno" : `Volviendo a ${this.route.from}`).then(() => {
+      this.rebuilding = false;
+      if (!this.dead) this.newRun();
+      this.loading.hide();
+    });
   }
 
   /** Arma (o vuelve a armar) el recorrido: mundo 3D y simulación nuevos. */
@@ -741,7 +756,7 @@ class BusGame {
         <button class="bus-btn primary" data-a="again">Otra vuelta</button>
         <button class="bus-btn" data-a="quit">Volver a la portada</button>
       </div>`;
-    this.el.summaryCard.querySelector("[data-a=again]").addEventListener("click", () => this.newRun());
+    this.el.summaryCard.querySelector("[data-a=again]").addEventListener("click", () => this.again());
     this.el.summaryCard.querySelector("[data-a=quit]").addEventListener("click", () => this.exit());
     setTimeout(() => this.el.summary.classList.remove("hidden"), 900);
     this.releaseControls();
@@ -977,7 +992,7 @@ class BusGame {
         <button class="bus-btn primary" data-a="again">Otro turno</button>
         <button class="bus-btn" data-a="quit">Volver a la portada</button>
       </div>`;
-    this.el.summaryCard.querySelector("[data-a=again]").addEventListener("click", () => this.newRun());
+    this.el.summaryCard.querySelector("[data-a=again]").addEventListener("click", () => this.again());
     this.el.summaryCard.querySelector("[data-a=quit]").addEventListener("click", () => this.exit());
     setTimeout(() => this.el.summary.classList.remove("hidden"), 900);
     this.releaseControls();

@@ -136,6 +136,11 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **El Merval va a nivel del suelo**, como el real, y no en una trinchera de 7 m como los trenes de EFE de Santiago:
   desde la cabina se ve el paisaje por encima de un pretil bajo. En la costa los edificios del plan son bajos, para que
   se vean los cerros detrás.
+- **2.19.1 · Pantallas de carga donde faltaban.** El **bus y el taxi** ahora muestran la pantalla de carga (con el
+  letrero del recorrido o de TAXI) mientras se arma la calle, igual que el Metro: al empezar desde la portada, al subir
+  al bus desde una estación y en «Otra vuelta» / «Otro turno». Antes la pantalla quedaba quieta unos segundos. Al
+  **unirse a una sala** del Centro de Control también aparece mientras se busca la sala; si no se encuentra, se vuelve
+  a la portada con el aviso.
 
 ## Versión 2.18 · Bonus: Metro Valparaíso
 
