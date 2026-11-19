@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Qué es RedMoviSim · Juego del Metro de Santiago, buses Red y trenes EFE en 3D</title>
+  <!-- 2.16 · Página de texto para buscadores: explica el juego con palabras que la gente busca
+       (simulador del Metro de Santiago, juego de buses Red, Tren Nos…) y enlaza a la portada. -->
+  <meta name="description" content="RedMoviSim es un juego gratis que simula el transporte público de Santiago en 3D: conduce el Metro en las líneas 1 a 6, el Tren Nos y el Tren Rancagua, maneja buses Red por recorridos reales, viaja como pasajero o dirige el Centro de Control. Se juega en el navegador y el celular.">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <link rel="canonical" href="https://www.redmovisim.cl/que-es/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="RedMoviSim">
+  <meta property="og:title" content="Qué es RedMoviSim · Simulador del transporte público de Santiago">
+  <meta property="og:description" content="Conduce el Metro, el Tren Nos y buses Red, viaja como pasajero o dirige el Centro de Control. Gratis, en el navegador y en el celular.">
+  <meta property="og:url" content="https://www.redmovisim.cl/que-es/">
+  <meta property="og:image" content="https://www.redmovisim.cl/icons/og.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="es_CL">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://www.redmovisim.cl/icons/og.jpg">
+  <meta name="theme-color" content="#05080e">
+  <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebPage",
+        "@id": "https://www.redmovisim.cl/que-es/#page",
+        "url": "https://www.redmovisim.cl/que-es/",
+        "name": "Qué es RedMoviSim",
+        "inLanguage": "es-CL",
+        "isPartOf": { "@id": "https://www.redmovisim.cl/#website" },
+        "about": { "@id": "https://www.redmovisim.cl/#game" },
+        "primaryImageOfPage": "https://www.redmovisim.cl/icons/og.jpg"
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "RedMoviSim", "item": "https://www.redmovisim.cl/" },
+          { "@type": "ListItem", "position": 2, "name": "Qué es RedMoviSim", "item": "https://www.redmovisim.cl/que-es/" }
+        ]
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          { "@type": "Question", "name": "¿RedMoviSim es gratis?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Sí. Se juega gratis en el navegador, sin descargar nada. También se puede instalar como app en el celular." } },
+          { "@type": "Question", "name": "¿Funciona en el celular?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Sí. Funciona en Android, iPhone, tablet y PC, con controles táctiles en el celular (se juega con el celular acostado). En Android también hay una app (APK)." } },
+          { "@type": "Question", "name": "¿Qué líneas del Metro de Santiago tiene?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Las líneas 1, 2, 3, 4, 4A, 5 y 6 del Metro, con sus estaciones y combinaciones, además del Tren Nos y el Tren Rancagua de EFE." } },
+          { "@type": "Question", "name": "¿Se pueden manejar buses de Red?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Sí. Hay más de 20 recorridos reales de Red (como el 110, 201, 210, 430 o 517) por calles reales de Santiago, con paraderos, semáforos, pista Solo Bus y pasajeros que pagan con la bip!. También se puede manejar un taxi." } },
+          { "@type": "Question", "name": "¿Tiene multijugador?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Sí. Un jugador dirige el Centro de Control y hasta 4 amigos conducen trenes en la misma red, cada uno desde su computador o celular, con un código de sala de 4 letras." } },
+          { "@type": "Question", "name": "¿Es el juego oficial del Metro de Santiago?",
+            "acceptedAnswer": { "@type": "Answer", "text": "No. RedMoviSim es un proyecto independiente y gratuito, sin relación con Red Metropolitana de Movilidad, Metro de Santiago, EFE ni el Ministerio de Transportes." } }
+        ]
+      }
+    ]
+  }
+  </script>
+  <style>
+    @font-face { font-family: "Barlow"; font-weight: 400; font-display: swap; src: url("../fonts/barlow-latin-400-normal.woff2") format("woff2"); }
+    @font-face { font-family: "Barlow"; font-weight: 600; font-display: swap; src: url("../fonts/barlow-latin-600-normal.woff2") format("woff2"); }
+    @font-face { font-family: "Barlow Condensed"; font-weight: 700; font-display: swap; src: url("../fonts/barlow-condensed-latin-700-normal.woff2") format("woff2"); }
+    :root { --bg: #05080e; --card: #0d1420; --line: #1c2738; --text: #e8eef6; --muted: #9fb0c4; --accent: #e5322d; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.6 "Barlow", system-ui, sans-serif; }
+    a { color: #fff; }
+    .wrap { width: min(100% - 32px, 820px); margin: 0 auto; padding: 28px 0 48px; }
+    .top { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
+    .top img { width: 44px; height: 44px; }
+    .top a { font: 700 26px/1 "Barlow Condensed", sans-serif; text-decoration: none; letter-spacing: .5px; }
+    .top a span { color: var(--accent); }
+    h1, h2 { font-family: "Barlow Condensed", sans-serif; font-weight: 700; line-height: 1.15; }
+    h1 { font-size: clamp(30px, 6vw, 44px); margin: 0 0 12px; }
+    h2 { font-size: 27px; margin: 40px 0 10px; }
+    h3 { font-size: 18px; margin: 22px 0 4px; }
+    p, li { color: var(--muted); }
+    b, strong { color: var(--text); font-weight: 600; }
+    .lead { font-size: 19px; }
+    .hero { width: 100%; height: auto; border-radius: 14px; border: 1px solid var(--line); margin: 18px 0 8px; display: block; }
+    .play { display: inline-block; margin: 14px 0; padding: 13px 26px; border-radius: 999px; background: var(--accent);
+            color: #fff; font-weight: 600; text-decoration: none; font-size: 18px; }
+    .play:hover, .play:focus-visible { filter: brightness(1.1); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 4px 18px 10px; }
+    details { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; margin: 10px 0; }
+    summary { cursor: pointer; font-weight: 600; color: var(--text); }
+    details p { margin: 8px 0 2px; }
+    footer { margin-top: 48px; padding-top: 18px; border-top: 1px solid var(--line); font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <img src="../logo.svg" alt="" width="44" height="44">
+      <a href="../">Red<span>Movi</span>Sim</a>
+    </header>
+
+    <main>
+      <h1>RedMoviSim: el simulador del transporte público de Santiago</h1>
+      <p class="lead"><b>RedMoviSim</b> es un juego gratis en 3D del <b>Metro de Santiago</b>, los <b>buses Red</b> y los
+        <b>trenes de EFE</b>. Puedes conducir un tren, manejar una micro o un taxi por calles reales, viajar como
+        pasajero o dirigir toda la red desde el Centro de Control. Se juega en el navegador del computador o del
+        celular, sin descargar nada.</p>
+      <a class="play" href="../">Jugar gratis ahora</a>
+      <img class="hero" src="../icons/og.jpg" width="1200" height="630" alt="Un bus de Red por la Alameda en RedMoviSim, el simulador del transporte público de Santiago">
+
+      <h2>Qué puedes hacer</h2>
+      <div class="grid">
+        <section class="card">
+          <h3>Conducir el Metro y los trenes</h3>
+          <p>Maneja los trenes del Metro en las <b>líneas 1, 2, 3, 4, 4A, 5 y 6</b>, el <b>Tren Nos</b> (Estación Central
+            a Nos) y el <b>Tren Rancagua</b>, con señales, pendientes, horarios y estaciones reales. Gana puntos por
+            llegar a la hora y frenar suave.</p>
+        </section>
+        <section class="card">
+          <h3>Manejar buses Red y taxi</h3>
+          <p>Más de 20 <b>recorridos reales de Red</b> (110, 201, 210, 430, 517 y otros) por la Alameda, Providencia,
+            Gran Avenida o Vicuña Mackenna, con paraderos, semáforos, pista Solo Bus y pasajeros que pagan con la
+            <b>bip!</b>. En el taxi haces carreras con taxímetro.</p>
+        </section>
+        <section class="card">
+          <h3>Viajar como pasajero</h3>
+          <p>Parte en la calle, baja al andén, paga el pasaje con tarifa integrada, espera el tren entre la gente y haz
+            combinaciones. En hora punta los andenes se llenan.</p>
+        </section>
+        <section class="card">
+          <h3>Dirigir el Centro de Control</h3>
+          <p>Como jefe de turno del <b>PCC</b>, vigila la red en un esquema, retiene trenes y responde a incidentes:
+            puertas obstruidas, fallas de señal y restricciones de velocidad.</p>
+        </section>
+      </div>
+
+      <h2>Multijugador con amigos</h2>
+      <p>Un jugador abre una sala del Centro de Control y <b>hasta 4 amigos conducen trenes</b> en la misma red, cada uno
+        desde su computador o celular. Basta compartir el código de 4 letras. El Centro de Control da órdenes por radio,
+        retiene trenes y autoriza señales averiadas.</p>
+
+      <h2>En el celular y en el PC</h2>
+      <p>Funciona en <b>Android, iPhone, tablet y PC</b> (Windows, macOS o Linux) con cualquier navegador moderno. En el
+        celular se juega acostado, con controles táctiles. Se puede <b>instalar como app</b> desde la portada y, después de
+        la primera partida, funciona sin internet. Con una cuenta (solo tu correo) guardas tu avance y sigues en otro
+        dispositivo.</p>
+
+      <h2>Preguntas frecuentes</h2>
+      <details open><summary>¿RedMoviSim es gratis?</summary>
+        <p>Sí. Se juega gratis en el navegador, sin descargar nada. También se puede instalar como app en el celular.</p></details>
+      <details><summary>¿Funciona en el celular?</summary>
+        <p>Sí. Funciona en Android, iPhone, tablet y PC, con controles táctiles en el celular (se juega con el celular acostado). En Android también hay una app (APK).</p></details>
+      <details><summary>¿Qué líneas del Metro de Santiago tiene?</summary>
+        <p>Las líneas 1, 2, 3, 4, 4A, 5 y 6 del Metro, con sus estaciones y combinaciones, además del Tren Nos y el Tren Rancagua de EFE.</p></details>
+      <details><summary>¿Se pueden manejar buses de Red?</summary>
+        <p>Sí. Hay más de 20 recorridos reales de Red (como el 110, 201, 210, 430 o 517) por calles reales de Santiago, con paraderos, semáforos, pista Solo Bus y pasajeros que pagan con la bip!. También se puede manejar un taxi.</p></details>
+      <details><summary>¿Tiene multijugador?</summary>
+        <p>Sí. Un jugador dirige el Centro de Control y hasta 4 amigos conducen trenes en la misma red, cada uno desde su computador o celular, con un código de sala de 4 letras.</p></details>
+      <details><summary>¿Es el juego oficial del Metro de Santiago?</summary>
+        <p>No. RedMoviSim es un proyecto independiente y gratuito, sin relación con Red Metropolitana de Movilidad, Metro de Santiago, EFE ni el Ministerio de Transportes.</p></details>
+
+      <a class="play" href="../">Jugar RedMoviSim</a>
+    </main>
+
+    <footer>
+      <p>Síguenos en Instagram: <a href="https://www.instagram.com/redmovisim/" rel="noopener">@redmovisim</a></p>
+      <p>RedMoviSim es un proyecto independiente y gratuito, sin relación con Red Metropolitana de Movilidad, Metro de
+        Santiago, EFE ni el Ministerio de Transportes. Los nombres de líneas, estaciones y lugares se usan solo como
+        referencia.</p>
+    </footer>
+  </div>
+</body>
+</html>

@@ -206,6 +206,8 @@ body.touch-mode .keys-only { display: none; }
 a.home-icon-btn { text-decoration: none; }
 .home-insta { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 8px; color: var(--muted); font-size: 13px; text-decoration: none; }
 .home-insta b { color: #fff; font-weight: 600; }
+.home-about { display: block; margin-bottom: 8px; color: var(--muted); font-size: 13px; }
+.home-about:hover, .home-about:focus-visible { color: #fff; }
 .home-insta:hover b, .home-insta:focus-visible b { text-decoration: underline; }
 .start-note.disclaimer { font-size: 11.5px; line-height: 1.5; color: var(--dim); }
 

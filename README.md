@@ -124,6 +124,16 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **Salir por los torniquetes es gratis**: solo se cobra el pasaje al pasar hacia la zona pagada (antes, al terminar
   de cruzar el torniquete de salida se cobraba un pasaje).
 
+## Versión 2.16 · Mejor visibilidad en Google
+
+- **Página nueva `/que-es/`** («Qué es RedMoviSim»): explica el juego con texto que Google puede leer (Metro líneas 1 a 6,
+  Tren Nos, Tren Rancagua, buses Red, taxi, pasajero, Centro de Control, multijugador, celular) y trae preguntas
+  frecuentes con datos estructurados (`FAQPage` y migas `BreadcrumbList`). Se enlaza desde el pie de la portada.
+- **Portada**: título y descripción con lo que la gente busca («simulador del Metro de Santiago», «buses Red»), y datos
+  estructurados más completos (palabras clave, versión, autor, captura, país, `hreflang`).
+- **`sitemap.xml`** suma la página nueva y la imagen para compartir; **`robots.txt`** deja fuera de Google las
+  plantillas de posts (`post-*`), `docs/` y `supabase/`.
+
 ## Versión 2.15 · Volante en el bus y el taxi (deshecho)
 
 La 2.15 probó manejar el bus y el taxi con volante (girar en las curvas y para cambiar de pista).

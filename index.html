@@ -3,11 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <title>RedMoviSim · Simulador del transporte público de Santiago en 3D (gratis, en el navegador)</title>
+  <title>RedMoviSim · Simulador del Metro de Santiago y buses Red en 3D, gratis en el navegador</title>
   <!-- Difusión: descripción para buscadores y vista previa al compartir el enlace (WhatsApp, X, Discord...) -->
-  <meta name="description" content="Simulador 3D gratuito del transporte público de Santiago de Chile en el navegador y el celular: conduce trenes del Metro en sus 7 líneas reales, maneja buses por la Alameda, viaja como pasajero o dirige el Centro de Control. Proyecto independiente, no oficial. Sin descargas.">
+  <meta name="description" content="Simulador 3D gratuito del transporte público de Santiago de Chile en el navegador y el celular: conduce el Metro en sus 7 líneas, el Tren Nos y el Tren Rancagua, maneja buses Red por recorridos reales, viaja como pasajero o dirige el Centro de Control. Gratis, sin descargas. Proyecto no oficial.">
   <meta name="robots" content="index, follow, max-image-preview:large">
   <link rel="canonical" href="https://www.redmovisim.cl/">
+  <link rel="alternate" hreflang="es" href="https://www.redmovisim.cl/">
+  <link rel="alternate" hreflang="x-default" href="https://www.redmovisim.cl/">
   <meta name="author" content="RedMoviSim">
   <meta name="application-name" content="RedMoviSim">
   <meta property="og:type" content="website">
@@ -34,7 +36,7 @@
         "@id": "https://www.redmovisim.cl/#website",
         "url": "https://www.redmovisim.cl/",
         "name": "RedMoviSim",
-        "alternateName": ["RedMoviSim Santiago", "Simulador del transporte público de Santiago", "MetroSim"],
+        "alternateName": ["RedMoviSim Santiago", "Simulador del transporte público de Santiago", "Simulador del Metro de Santiago", "MetroSim"],
         "inLanguage": "es-CL",
         "sameAs": ["https://www.instagram.com/redmovisim/"]
       },
@@ -44,10 +46,16 @@
         "name": "RedMoviSim · Simulador del transporte público de Santiago",
         "url": "https://www.redmovisim.cl/",
         "image": "https://www.redmovisim.cl/icons/og.jpg",
-        "description": "Simulador 3D gratuito y no oficial del transporte público de Santiago de Chile: conduce trenes del Metro en las líneas 1, 2, 3, 4, 4A, 5 y 6, maneja buses, viaja como pasajero o dirige el Centro de Control. Funciona en el navegador, en el celular y como app instalable, con multijugador.",
+        "description": "Simulador 3D gratuito y no oficial del transporte público de Santiago de Chile: conduce trenes del Metro en las líneas 1, 2, 3, 4, 4A, 5 y 6, el Tren Nos y el Tren Rancagua de EFE, maneja buses Red por recorridos reales o un taxi, viaja como pasajero o dirige el Centro de Control. Funciona en el navegador, en el celular y como app instalable, con multijugador.",
+        "keywords": "simulador Metro de Santiago, juego del Metro de Santiago, simulador de buses Red, juego de micros Santiago, Tren Nos, Tren Rancagua, EFE, simulador de trenes, juego de taxi, transporte público Santiago",
+        "softwareVersion": "2.16",
+        "screenshot": "https://www.redmovisim.cl/icons/og.jpg",
+        "author": { "@type": "Organization", "name": "RedMoviSim", "url": "https://www.redmovisim.cl/", "sameAs": ["https://www.instagram.com/redmovisim/"] },
+        "mainEntityOfPage": "https://www.redmovisim.cl/que-es/",
         "inLanguage": "es-CL",
         "genre": ["Simulación", "Simulador de trenes", "Simulador de buses"],
         "gamePlatform": ["Navegador web", "Android", "iOS", "PC"],
+        "countryOfOrigin": "CL",
         "applicationCategory": "GameApplication",
         "operatingSystem": "Cualquiera con navegador moderno (Windows, macOS, Linux, Android, iOS)",
         "playMode": ["SinglePlayer", "MultiPlayer"],
@@ -95,7 +103,7 @@
       <div class="home-brand">
         <img class="home-logo" src="logo.svg" alt="">
         <h1>Red<span>Movi</span>Sim</h1>
-        <span class="start-ver">v2.15.3</span>
+        <span class="start-ver">v2.16</span>
       </div>
       <div class="home-bar-tools">
         <button class="home-clock" id="clockNow" type="button" aria-live="polite" title="Ver las tarifas según el horario">
@@ -271,6 +279,7 @@
     <footer class="home-foot">
       <a class="home-insta" href="https://www.instagram.com/redmovisim/" target="_blank" rel="noopener"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r=".6"/></svg> Síguenos en Instagram <b>@redmovisim</b></a>
       <button id="feedbackFoot" class="home-link home-feedback" type="button"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/><path d="M8.5 11h.01M12 11h.01M15.5 11h.01"/></svg> ¿Una idea o algo que mejorar? <b>RedMoviSim escucha a sus jugadores · escríbenos</b></button>
+      <a class="home-about" href="que-es/">Qué es RedMoviSim · cómo se juega y preguntas frecuentes</a>
       <p class="start-note disclaimer">RedMoviSim es un proyecto independiente y gratuito, sin relación con Red Metropolitana de Movilidad, Metro de Santiago, EFE ni el Ministerio de Transportes. Los nombres de líneas, estaciones y lugares se usan solo como referencia.</p>
     </footer>
   </section>

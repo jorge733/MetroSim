@@ -1,6 +1,10 @@
 User-agent: *
 Allow: /
+# Archivos internos que no son páginas del juego (plantillas de posts, herramientas, servidor)
 Disallow: /android/
 Disallow: /tools/
+Disallow: /supabase/
+Disallow: /docs/
+Disallow: /post-
 
 Sitemap: https://www.redmovisim.cl/sitemap.xml
