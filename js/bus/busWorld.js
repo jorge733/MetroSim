@@ -947,19 +947,25 @@ export class BusWorld {
   /* ----------------------------- Cada fotograma ----------------------------- */
   update(sim, dt, now, cam = null) {
     const b = sim.bus;
-    // Bus: posición, leve giro al cambiar de pista y ruedas
+    // Bus: posición, rumbo y ruedas
+    // 2.15 · El rumbo respecto de la calle sale de la simulación (el volante): en una curva sin girar se ve irse hacia afuera
     const g = this.bus;
-    const latV = this.prevX == null ? 0 : (b.x - this.prevX) / Math.max(dt, 1e-3);
-    this.prevX = b.x;
-    const yaw = b.v > 0.3 ? -Math.atan2(latV, b.v) : 0;
-    this.busYaw = (this.busYaw ?? 0) + (yaw - (this.busYaw ?? 0)) * Math.min(1, dt * 8);
+    const yaw = -(b.psi ?? 0);
     // 2.3 · El taxi puede ir en el otro sentido: se dibuja en la calzada de enfrente, dado vuelta
     const flip = sim.dir < 0 ? Math.PI : 0;
-    if (this.lastDir !== sim.dir) { this.lastDir = sim.dir; this.prevX = b.x; this.busYaw = 0; }
-    this.place(g, sim.toIdaX(b.x), sim.idaS, (sim.len ?? BUS_LENGTH) * sim.dir, this.busYaw + flip);
-    this.body.rotation.x = THREE.MathUtils.lerp(this.body.rotation.x, THREE.MathUtils.clamp(-b.accel * 0.006, -0.02, 0.02), Math.min(1, dt * 4));
-    for (const w of this.wheels) w.rotation.x -= (b.v * dt) / 0.5;
-    this.steering.rotation.z = THREE.MathUtils.lerp(this.steering.rotation.z, -yaw * 6 + this.path.curvature(b.s) * 25, Math.min(1, dt * 6));
+    this.place(g, sim.toIdaX(b.x), sim.idaS, (sim.len ?? BUS_LENGTH) * sim.dir, yaw + flip);
+    const k = Math.min(1, dt * 4);
+    this.body.rotation.x = THREE.MathUtils.lerp(this.body.rotation.x, THREE.MathUtils.clamp(-b.accel * 0.006, -0.02, 0.02), k);
+    // 2.15 · La carrocería se inclina hacia afuera de la curva (más el bus, que es alto)
+    const roll = (this.taxi ? 0.006 : 0.011) * (b.latA ?? 0);
+    this.body.rotation.z = THREE.MathUtils.lerp(this.body.rotation.z, THREE.MathUtils.clamp(roll, -0.05, 0.05), k);
+    const wheelAngle = (b.steer ?? 0) * Math.atan(sim.tanLock ? sim.tanLock(b.v) : 0);
+    this.wheels.forEach((w, i) => {
+      w.rotation.x -= (b.v * dt) / (this.taxi ? 0.32 : 0.5);
+      if (i < 2) { w.rotation.order = "YXZ"; w.rotation.y = -wheelAngle; }       // las delanteras doblan
+    });
+    // Volante: ~1¼ vuelta a cada lado (+ = a la derecha, gira en el sentido del reloj)
+    this.steering.rotation.z = -(b.steer ?? 0) * 2.6 * (this.taxi ? 1 : 1.4);
     // Puertas
     const open = b.doors === "open" ? 1 : b.doors === "opening" ? b.doorT / 1.1 : b.doors === "closing" ? 1 - b.doorT / 1.1 : 0;
     for (const leaf of this.doorLeaves) {
@@ -967,8 +973,8 @@ export class BusWorld {
       leaf.position.x = BUS_WIDTH / 2 + 0.02 + open * 0.08;
     }
     this.tailMat.emissiveIntensity = b.brake > 0.1 || b.doors !== "closed" ? 2.2 : this.night ? 0.8 : 0.35;
-    // Intermitente mientras cambia de pista
-    const changing = Math.abs(sim.bus.x - LANES[b.targetLane]) > 0.15;
+    // Intermitente mientras cambia de pista (2.15: cuando el vehículo se mueve de lado)
+    const changing = b.v > 1 && Math.abs(b.latV ?? 0) > 0.45;
     const on = changing && Math.floor(now * 2.6) % 2 === 0;
     this.blinkMat.emissiveIntensity = on ? 2.5 : 0;
 

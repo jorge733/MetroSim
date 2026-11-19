@@ -14,9 +14,18 @@
    con el piso mojado (`wet`, 0..1) el bus frena menos (el ABS recorta el
    freno, como el antideslizamiento del tren) y patina un poco al partir;
    los autos van más lento y dejan más distancia.
+
+   2.15 · Volante: el bus ya no dobla solo con la calle. El conductor gira el
+   volante (A/D, ← →) y el vehículo sigue el modelo de bicicleta: con el rumbo
+   respecto de la calle (`psi`) y la curvatura de la calle (busPath.js), si no
+   giras en una curva te vas hacia afuera. A más velocidad, menos se puede
+   doblar (el agarre de las ruedas, menor con lluvia): las curvas se toman
+   frenando antes. Cambiar de pista también es girar y enderezar. La vereda y
+   el bandejón central son un borde: si te subes a la solera, falta.
    ========================================================================== */
 
-import { LANES, lightState, makeTimetable } from "./busRoute.js";
+import { LANES, CURB_X, MEDIAN_X, lightState, makeTimetable } from "./busRoute.js";
+import { RoutePath } from "./busPath.js";
 
 export const BUS_LENGTH = 12;
 export const BUS_WIDTH = 2.55;
@@ -41,6 +50,11 @@ const NO_BALANCE = 0.025;         // tarjeta sin saldo: el validador la rechaza 
 const COMMERCIAL = 21 / 3.6;
 /** 2.2 · Potencia del bus: aceleración al partir (m/s²), freno máximo (m/s²) y velocidad en que se acaba la tracción (m/s). */
 export const BUS_SPEC = { accel: 1.45, brake: 3.4, vmax: 19 };      // velocidad comercial del horario (m/s)
+/**
+ * 2.15 · Dirección: distancia entre ejes (m), ángulo máximo de las ruedas (rad), aceleración lateral que aguantan
+ * las ruedas en seco (m/s²) y la que todavía es cómoda para los pasajeros de pie.
+ */
+export const BUS_STEER = { wheelbase: 6.1, lock: 0.62, grip: 3.8, comfy: 2.4 };
 
 const round10 = (n) => Math.max(0, Math.round(n / 10) * 10);
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
@@ -74,6 +88,8 @@ export class BusSim {
     this.len = vehicle?.len ?? BUS_LENGTH;
     this.wid = vehicle?.wid ?? BUS_WIDTH;
     this.spec = vehicle?.spec ?? BUS_SPEC;
+    this.steerSpec = vehicle?.steer ?? BUS_STEER;
+    this.path = new RoutePath(route);            // 2.15 · trazado de la calle: su curvatura es la que hay que girar
     this.wet = clamp(wet, 0, 1);
     /** Freno máximo que deja el ABS (fracción del freno en seco) y tracción al partir. */
     this.grip = 1 - 0.3 * this.wet;
@@ -92,11 +108,13 @@ export class BusSim {
     const first = route.stops[startStop];
     this.bus = {
       s: first.s, v: 0, x: LANES[0], lane: 0, targetLane: 0, latV: 0,
+      psi: 0, steer: 0, latA: 0,         // 2.15 · rumbo respecto de la calle (rad, + = derecha), volante −1..1 y aceleración lateral
       throttle: 0, brake: 0, accel: 0, decel: 0,
       doors: "closed", doorT: 0,
     };
     /* Pedales: true/false (teclado) o un número 0..1 (pedal táctil analógico, freno suave). */
-    this.input = { throttle: false, brake: false };
+    this.input = { throttle: false, brake: false, steer: 0 };   // 2.15 · steer: volante −1 (izquierda) .. 1 (derecha)
+    this.assist = false;               // 2.15 · el bus gira solo (el conductor automático, cuando el jugador va de pasajero)
     this.limiter = false;              // 1.18 · limitador de velocidad (L): corta el acelerador en el máximo de la calle
     this.lead = null;                  // 1.18 · lo que va adelante en la pista del bus: { gap, v, ttc }
 
@@ -189,17 +207,94 @@ export class BusSim {
     return true;
   }
 
-  changeLane(dir) {
+  /* --------- 2.15 · Dirección --------- */
+
+  /** Curvatura de la calle en `s` (1/m, + = dobla a la izquierda) en el sentido en que se va. */
+  roadK(s) { return this.path.curvature(s); }
+  /** La curva más fuerte entre `s` y `s + range` (para avisar y planificar la velocidad). */
+  roadKAhead(s, range) { return this.path.curvature(s + range / 2, range / 2); }
+
+  /** Tangente del ángulo de las ruedas con el volante a fondo: a más velocidad, menos (no pasa del agarre). */
+  tanLock(v) {
+    const S = this.steerSpec;
+    return Math.min(Math.tan(S.lock), (S.grip * this.grip * S.wheelbase) / Math.max(0.01, v * v));
+  }
+
+  /**
+   * Velocidad máxima (m/s) para alcanzar a tomar las curvas que vienen con aceleración lateral `aLat`,
+   * frenando a `decel` desde ahora. Infinity si la calle sigue recta.
+   */
+  curveSpeed(aLat, decel = 1.2, range = 90) {
+    if (this.path.straight) return Infinity;
     const b = this.bus;
-    const target = clamp(b.targetLane + dir, 0, LANES.length - 1);
-    if (target === b.targetLane) return;
-    if (b.doors !== "closed") return this.msg("Cierra las puertas antes de moverte", "warn", "laneDoors");
-    if (b.v < 0.8) return this.msg("Para cambiar de pista el bus tiene que ir avanzando", "warn", "laneSlow");
-    const tx = LANES[target];
-    const blocked = this.cars.some(c => Math.abs(c.x - tx) < 2.4 && c.s > b.s - this.len - 5 && c.s - CAR_LEN < b.s + 4);
-    if (blocked) return this.msg("Pista ocupada: espera que pase el auto", "warn", "laneBusy", 2);
-    b.targetLane = target;
-    this.emit("blinker", { dir });
+    let vmax = Infinity;
+    for (let d = 0; d <= range; d += 6) {
+      const k = Math.abs(this.roadK(b.s + d));
+      if (k < 1e-3) continue;
+      vmax = Math.min(vmax, Math.sqrt(aLat / k + 2 * decel * d));
+    }
+    return vmax;
+  }
+
+  /** El volante que mantiene el vehículo en el centro de `targetLane` (conductor automático). */
+  assistSteer() {
+    const b = this.bus, S = this.steerSpec;
+    const v = Math.max(b.v, 0.5);
+    const psiWant = clamp(0.12 * (LANES[b.targetLane] - b.x), -0.12, 0.12);
+    const cv = (2.5 * (psiWant - b.psi)) / v - this.roadK(b.s);
+    return clamp((cv * S.wheelbase) / this.tanLock(v), -1, 1);
+  }
+
+  /** Gira el volante, avanza con el modelo de bicicleta y choca con los bordes de la calzada. */
+  updateSteering(dt, ds0) {
+    const b = this.bus, S = this.steerSpec;
+    if (this.assist) b.steer += clamp(this.assistSteer() - b.steer, -3 * dt, 3 * dt);
+    else {
+      const want = clamp(+this.input.steer || 0, -1, 1);
+      // Al soltar, el volante vuelve solo al centro (más rápido cuanto más rápido vas); contravolante más ágil
+      const rate = want === 0 ? 0.3 + 0.09 * b.v : b.steer * want < 0 ? 2.6 : 1.2;
+      b.steer += clamp(want - b.steer, -rate * dt, rate * dt);
+    }
+    const cv = (b.steer * this.tanLock(b.v)) / S.wheelbase;          // curvatura del vehículo (1/m, + = derecha)
+    const k = this.roadK(b.s);
+    // Avance sobre la calle: en la pista de afuera de una curva se recorre más camino para el mismo `s`
+    const ds = (ds0 * Math.cos(b.psi)) / clamp(1 + b.x * k, 0.5, 1.5);
+    b.s += ds;
+    b.psi = clamp(b.psi + ds0 * cv + ds * k, -1.1, 1.1);
+    b.latV = b.v * Math.sin(b.psi);
+    b.x += b.latV * dt;
+    b.latA = b.v * b.v * cv;
+    // Bordes: la solera de la vereda (derecha) y la del bandejón central (izquierda)
+    const hw = this.wid / 2 + 0.12, right = CURB_X - hw, left = MEDIAN_X + hw;
+    if (b.x > right || b.x < left) {
+      const side = b.x > right ? 1 : -1;
+      b.x = side > 0 ? right : left;
+      const into = side * b.psi;                                      // > 0: la trompa apunta contra la solera
+      if (into > 0) {
+        if (b.v > 2.5 && into > 0.06 && !(this.cool.curb > this.elapsed)) {
+          this.cool.curb = this.elapsed + 3;
+          this.penalty(80, side > 0 ? "¡Golpeaste la solera de la vereda! Gira antes y más despacio" : "¡Rozaste el bandejón central! Endereza el volante");
+          this.emit("crash", { curb: true });
+          b.v *= clamp(1 - into * 2.5, 0.35, 0.9);
+        }
+        b.psi -= side * Math.min(into, 3 * dt + into * 0.5);         // la solera endereza el vehículo
+      }
+      b.v = Math.max(0, b.v - 1.2 * dt);                              // y lo frena mientras roza
+    }
+    const lane = LANES.reduce((best, x, i) => Math.abs(x - b.x) < Math.abs(LANES[best] - b.x) ? i : best, 0);
+    if (lane !== b.lane && !this.assist) this.emit("blinker", { dir: lane > b.lane ? 1 : -1 });
+    b.lane = lane;
+    if (!this.assist) b.targetLane = lane;
+    // Curva muy rápida con pasajeros: se van para el lado
+    if (Math.abs(b.latA) > S.comfy && this.onboard.length > 0) {
+      this.hardTurn = (this.hardTurn ?? 0) + dt;
+      if (this.hardTurn > 0.5) { this.hardTurn = 0; this.penalty(15, "Curva muy rápida: los pasajeros de pie se van para el lado", "hardTurn"); }
+    } else this.hardTurn = 0;
+    // Aviso: viene una curva y vas muy rápido para tomarla
+    if (!this.assist && b.v > 6 && b.v > this.curveSpeed(S.grip * this.grip * 0.85, 2.2, 60) + 0.8) {
+      const kk = this.roadKAhead(b.s, 60);
+      this.msg(`Curva a la ${kk > 0 ? "izquierda" : "derecha"} adelante: frena y prepárate a girar el volante`, "warn", "curveFast", 6);
+    }
   }
 
   /** 1.18 · Limitador de velocidad: el motor no pasa del máximo de la calle (el freno sigue siendo tuyo). */
@@ -274,17 +369,8 @@ export class BusSim {
     b.accel = (b.v - v0) / dt;
     b.decel += ((b.v > 0.05 ? -b.accel : 0) - b.decel) * Math.min(1, dt * 6);   // frenada suavizada (para la predicción)
     const prevS = b.s;
-    b.s += b.v * dt;
-
-    // Movimiento lateral hacia la pista elegida
-    // 1.18: con una curva suave (el bus acelera y frena de lado, como al girar el volante y enderezarlo)
-    const tx = LANES[b.targetLane];
-    const rate = Math.min(2.2, 0.5 + b.v * 0.35);
-    const want = b.v > 0.05 ? clamp((tx - b.x) * 2.4, -rate, rate) : 0;
-    b.latV += clamp(want - b.latV, -4.5 * dt, 4.5 * dt);
-    if (Math.abs(tx - b.x) < 0.04 && Math.abs(b.latV) < 0.12) { b.x = tx; b.latV = 0; }
-    else b.x += b.latV * dt;
-    b.lane = LANES.reduce((best, x, i) => Math.abs(x - b.x) < Math.abs(LANES[best] - b.x) ? i : best, 0);
+    // 2.15 · Avance y dirección: el conductor gira el volante (la calle ya no dobla sola)
+    this.updateSteering(dt, b.v * dt);
 
     // Semáforos en rojo
     for (const L of R.lights) {
@@ -661,7 +747,9 @@ export class BusSim {
           this.penalty(300, "¡Rozaste a un auto al cambiar de pista!");
           this.emit("crash");
         }
-        b.targetLane = LANES.indexOf(LANES.reduce((best, x) => Math.abs(x - b.x) < Math.abs(best - b.x) ? x : best));
+        // 2.15 · El roce endereza el vehículo, alejándolo del auto
+        if (Math.sign(b.psi) === Math.sign(car.x - b.x)) b.psi = 0;
+        b.steer *= 0.3;
         b.latV = 0;
         car.s = rear - 0.4;
         car.v = 0;

@@ -26,6 +26,8 @@ export const TAXI_LENGTH = 4.6;
 export const TAXI_WIDTH = 1.85;
 /** Potencia: acelera más que el bus y frena más fuerte. */
 export const TAXI_SPEC = { accel: 2.6, brake: 6.2, vmax: 24 };
+/** 2.15 · Dirección: más corto y ágil que el bus, y aguanta más en las curvas (busSim.js · BUS_STEER). */
+export const TAXI_STEER = { wheelbase: 2.65, lock: 0.6, grip: 6.2, comfy: 4.2 };
 /** Taxímetro (pesos, aproximado): bajada de bandera y cada tramo de 200 m o de 60 s detenido. */
 export const TAXI_FARE = { flag: 450, step: 210, meters: 200, seconds: 60 };
 
@@ -42,7 +44,7 @@ const round10 = (n) => Math.max(0, Math.round(n / 10) * 10);
 
 export class TaxiSim extends BusSim {
   constructor(o) {
-    super({ ...o, startStop: 0, vehicle: { len: TAXI_LENGTH, wid: TAXI_WIDTH, spec: TAXI_SPEC } });
+    super({ ...o, startStop: 0, vehicle: { len: TAXI_LENGTH, wid: TAXI_WIDTH, spec: TAXI_SPEC, steer: TAXI_STEER } });
     // 2.3 · Los dos sentidos de la calle: la ida (como se dibuja) y la vuelta (busRoute.js · reversed)
     this.ida = o.route;
     this.back = busRouteFor("vuelta", o.route.id);
@@ -64,6 +66,9 @@ export class TaxiSim extends BusSim {
   toIdaS(s) { return this._dir > 0 ? s : this.span - s; }
   fromIdaS(ws) { return this._dir > 0 ? ws : this.span - ws; }
   toIdaX(x) { return this._dir > 0 ? x : MIRROR_X - x; }
+  /** 2.15 · La curvatura del trazado (el de la ida): de vuelta, las curvas a la izquierda son a la derecha. */
+  roadK(s) { return this._dir * this.path.curvature(this.toIdaS(s)); }
+  roadKAhead(s, range) { return this._dir * this.path.curvature(this.toIdaS(s + range / 2), range / 2); }
 
   /** Vuelta en U: despacio, desde la pista junto al bandejón, en un cruce con semáforo (o al final de la calle). */
   uTurn() {
@@ -82,6 +87,7 @@ export class TaxiSim extends BusSim {
     b.lane = b.targetLane = LANES.length - 1;
     b.x = LANES.at(-1);
     b.latV = 0;
+    b.psi = 0; b.steer = 0;          // 2.15 · sale de la vuelta derecho
     b.v = Math.min(b.v, 2.5);
     this.waiting.reverse();          // los paraderos del otro sentido son los mismos, al revés
     this.arrivalAcc.reverse();
