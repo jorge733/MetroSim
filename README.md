@@ -137,6 +137,9 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - Si **arrancas** mientras viene caminando, vuelve a la vereda a hacer señas; si arrancas mientras paga o con tu
   pasajero queriendo bajarse, hay aviso (y falta). Mientras la puerta está abierta el taxi no acelera.
 - La puerta suena como la de un auto (el clic de la chapa y el golpe al cerrar), no como la neumática del bus.
+- **2.20.1 · El pasajero que sube es el mismo que baja.** Al cerrar la puerta aparecía otra persona haciendo señas
+  junto al taxi y era ella la que después se bajaba. Además, al agacharse para entrar o salir ya no se le asoma la
+  cabeza por el techo. Imágenes del post de Instagram en `post-taxi-puerta/`.
 
 ## Versión 2.19 · El mar y los cerros de Valparaíso
 

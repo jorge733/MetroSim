@@ -191,7 +191,7 @@ export class BusPeople {
   taxiScene(sim, f) {
     const half = TAXI_WIDTH / 2, D = TAXI_DOOR_SPOT, r = this.taxi.rider;
     const door = () => V(half + D.out, 0, D.z);                         // junto a la puerta, detrás de su borde
-    const gap = (y) => V(half - 0.05, y, D.z - 0.5);                      // en el vano de la puerta
+    const gap = (y) => V(half - 0.1, y, D.z - 0.5);                      // en el vano de la puerta
     const faceCar = -Math.PI / 2;                                         // mirando el costado del taxi
     if (!f) {
       // Cerró la puerta desde afuera: se va por la vereda · o quien hacía señas tomó otro taxi
@@ -202,15 +202,17 @@ export class BusPeople {
       return;
     }
     if (f.phase === "pickup") {
-      if (this.hailerP?.fareN !== f.n) {
+      if (this.sceneFare !== f.n) {                      // una persona nueva hace señas (no al pasar de un paso a otro)
+        this.sceneFare = f.n;
         this.dropExtra(this.hailerP);
         this.taxiRider(false);
         const back = f.dir < 0;
         this.hailerP = this.hailer(f.ws, back ? MIRROR_X - CURB_X - 0.75 : CURB_X + 0.75, back ? Math.PI / 2 : -Math.PI / 2);
-        this.hailerP.fareN = f.n;
         this.riderKind = this.hailerP.kind;
       }
+      if (f.step === "closing") { if (this.rider) this.rider.sitReach = true; return; }     // ya está sentado: cierra la puerta
       const p = this.hailerP;
+      if (!p) return;
       p.reach = false;
       switch (f.step) {
         case null: {
@@ -237,7 +239,7 @@ export class BusPeople {
           p.path = [];
           p.root.position.copy(door());
           p.duck = true;
-          this.timedPath(p, [gap(0.15), V(r.x + 0.15, r.y - p.mesh.legLen * 0.7, r.z), V(r.x, r.y - p.mesh.legLen, r.z)], 1.6, () => {
+          this.timedPath(p, [gap(-0.3), V(r.x + 0.15, r.y - p.mesh.legLen * 0.95, r.z), V(r.x, r.y - p.mesh.legLen, r.z)], 1.6, () => {
             p.duck = false;
             p.pose = "sit";
             p.targetYaw = Math.PI;
@@ -262,7 +264,7 @@ export class BusPeople {
       p.duck = true;
       p.pose = "duck";                                                       // (sentado, move() lo dejaría a la altura del piso del bus)
       p.root.position.set(r.x, r.y - p.mesh.legLen, r.z);
-      this.timedPath(p, [V(r.x + 0.2, r.y - p.mesh.legLen * 0.7, r.z), gap(0.15), door()], 1.5, () => {
+      this.timedPath(p, [V(r.x + 0.2, r.y - p.mesh.legLen * 0.95, r.z), gap(-0.3), door()], 1.5, () => {
         p.duck = false;
         p.targetYaw = -2.6;                                                  // hacia la puerta abierta, para cerrarla
         p.reach = true;
@@ -702,10 +704,11 @@ export class BusPeople {
         break;
       case "duck":
         // 2.20 · Agachado para entrar o salir del taxi
-        to(m.hipL, -0.9); to(m.hipR, -0.9);
-        to(m.kneeL, 1.1); to(m.kneeR, 1.1);
-        to(m.armL, -0.5); to(m.armR, -0.7);
-        m.body.rotation.x = 0.55 + p.hunch;
+        // (el cuerpo baja con la ruta, que va bajo el nivel de la calle: así la cabeza no atraviesa el techo)
+        to(m.hipL, -1.25); to(m.hipR, -1.25);
+        to(m.kneeL, 1.5); to(m.kneeR, 1.5);
+        to(m.armL, -0.6); to(m.armR, -0.8);
+        m.body.rotation.x = 0.8 + p.hunch;
         m.body.position.y = 0;
         break;
       case "hold": {
