@@ -439,9 +439,13 @@ export class Walker {
    * @param {number} minX  |x| desde el que cuenta (más bajo = "cerca", más alto = "dentro")
    */
   atTransfer(st, minX) {
-    if (!st?.combos.length || Math.abs(this.pos.y - MZ.y) > 0.3) return false;
+    if (!st?.combos.length || Math.abs(this.pos.y - MZ.y) > 0.3) return null;
     const T = MZ.transfer, dz = this.pos.z - st.z;
-    return this.pos.x > minX && dz > T.z0 + 0.2 && dz < T.z1 - 0.2;
+    if (!(dz > T.z0 + 0.2 && dz < T.z1 - 0.2)) return null;
+    // 2.17.2 · Devuelve la línea: muro +X la primera combinación y, si hay otra (Estación Central), muro −X la segunda
+    if (this.pos.x > minX) return st.combos[0];
+    if (this.pos.x < -minX && st.combos[1]) return st.combos[1];
+    return null;
   }
 
   /** Junto a la salida a la calle. */
@@ -635,9 +639,10 @@ export class Walker {
         // Si retrocede sin cruzar, el pase validado se conserva (como en la realidad, ya se cobró)
         // Pasillo de combinación: al entrar en él se pasa a la otra línea
         if (this.transferring && !this.atTransfer(st, 6.0)) this.transferring = false;   // se alejó: se rearma
-        if (this.moving && !this.transferring && this.atTransfer(st, 7.9)) {
+        const lineId = this.moving && !this.transferring ? this.atTransfer(st, 7.9) : null;
+        if (lineId) {
           this.transferring = true;
-          this.onEvent("transfer", { station: st, lineId: st.combos[0] });
+          this.onEvent("transfer", { station: st, lineId });
         }
       }
     }
@@ -800,7 +805,8 @@ export class Walker {
     if (lift) return lift.el.openAt(lift.level) ? "Ascensor con las puertas abiertas · entra y pulsa E" : "E · llamar al ascensor";
     if (Math.abs(this.pos.y - MZ.y) < 0.3) {
       const here0 = this.stationAt(this.pos.z);
-      if (this.atTransfer(here0, 6.0)) return `Pasillo de combinación · sigue caminando para cambiarte ${isRail(here0.combos[0]) ? "al" : "a la"} ${lineLabel(here0.combos[0])}`;
+      const tl = this.atTransfer(here0, 6.0);
+      if (tl) return `Pasillo de combinación · sigue caminando para cambiarte ${isRail(tl) ? "al" : "a la"} ${lineLabel(tl)}`;
       const service = this.nearService();
       if (service?.kind === "boleteria") return "E · atención en boletería (cargar tarjeta bip!, comprar tarjeta)";
       if (service?.kind === "totem") return "E · tótem de autoservicio: carga con tarjeta de débito o crédito";

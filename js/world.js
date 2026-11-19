@@ -777,7 +777,8 @@ function buildStation(scene, M, st, gates, elevators) {
   });
 
   buildMezzanine(group, M, st, nameMat, gates);
-  if (st.combos.length) buildTransfer(group, M, st);
+  // 2.17.2 · Un pasillo por combinación: la primera en el muro +X y la segunda (Estación Central) en el −X
+  st.combos.slice(0, 2).forEach((lineId, i) => buildTransfer(group, M, st, lineId, i ? -1 : 1));
 
   buildExitPassage(group, M, z);
 
@@ -841,20 +842,20 @@ function buildExitPassage(group, M, z) {
  * y cartel "COMBINACIÓN LÍNEA N". Al recorrerlo el pasajero pasa a la otra
  * línea (main.js → transferLine); aquí solo se dibuja.
  */
-function buildTransfer(group, M, st) {
-  const T = MZ.transfer, lineId = st.combos[0];
-  const y = MZ.y, x = S.wallX - 0.02, z0 = st.z + T.z0, z1 = st.z + T.z1, zc = (z0 + z1) / 2, w = z1 - z0;
-  const rot = -Math.PI / 2;                                              // mira hacia el centro de la estación
+function buildTransfer(group, M, st, lineId = st.combos[0], side = 1) {
+  const T = MZ.transfer;
+  const y = MZ.y, x = side * (S.wallX - 0.02), z0 = st.z + T.z0, z1 = st.z + T.z1, zc = (z0 + z1) / 2, w = z1 - z0;
+  const rot = -side * Math.PI / 2;                                       // mira hacia el centro de la estación
   addPlane(group, w, T.h, glow(0xffffff, { map: toTexture(transferCorridorCanvas(lineId)) }), x, y + T.h / 2, zc, rot);
   // Marco
-  [z0 - 0.08, z1 + 0.08].forEach(pz => addBox(group, 0.2, T.h + 0.1, 0.16, M.steel, x - 0.08, y + (T.h + 0.1) / 2, pz));
-  addBox(group, 0.2, 0.16, w + 0.32, M.steel, x - 0.08, y + T.h + 0.08, zc);
+  [z0 - 0.08, z1 + 0.08].forEach(pz => addBox(group, 0.2, T.h + 0.1, 0.16, M.steel, x - side * 0.08, y + (T.h + 0.1) / 2, pz));
+  addBox(group, 0.2, 0.16, w + 0.32, M.steel, x - side * 0.08, y + T.h + 0.08, zc);
   // Umbral con franja táctil amarilla
-  addBoxSpan(group, x - 0.45, 0.9, y, y + 0.015, z0, z1, M.platformEdge);
+  addBoxSpan(group, x - side * 0.45, 0.9, y, y + 0.015, z0, z1, M.platformEdge);
   // Cartel sobre la boca, y otro colgado visible desde los torniquetes
   const sign = glow(0xffffff, { map: toTexture(transferSignCanvas(lineId)) });
-  addPlane(group, w + 0.3, (w + 0.3) * 192 / 1024, sign, x - 0.03, y + T.h + 0.45, zc, rot);
-  const hx = 5.0, hy = y + 2.75, hz = st.z + 42.9, hw = 2.6;
+  addPlane(group, w + 0.3, (w + 0.3) * 192 / 1024, sign, x - side * 0.03, y + T.h + 0.45, zc, rot);
+  const hx = side * 5.0, hy = y + 2.75, hz = st.z + 42.9, hw = 2.6;
   addPlane(group, hw, hw * 192 / 1024, sign, hx, hy, hz, 0);
   [-1, 1].forEach(s => addBox(group, 0.03, S.ceilingY - hy, 0.03, M.steel, hx + s * (hw / 2 - 0.1), (S.ceilingY + hy) / 2, hz - 0.02));
 }

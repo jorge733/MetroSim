@@ -2143,12 +2143,14 @@ function transferLine(lineId, st) {
 }
 
 /** Llega a la mezanina por el pasillo de combinación (zona pagada, mirando hacia los andenes). */
-function arriveByTransfer(st) {
+function arriveByTransfer(st, fromId) {
   const walker = game.walker;
   walker.enterStation(st);
   const T = CONFIG.mezzanine.transfer;
-  walker.pos.set(CONFIG.station.wallX - 1.4, CONFIG.mezzanine.y, st.z + (T.z0 + T.z1) / 2);
-  walker.yaw = Math.PI / 2;                 // de espaldas al pasillo, mirando al centro
+  // 2.17.2 · Sale por el pasillo de la línea de la que viene (en Estación Central, la segunda está en el muro −X)
+  const side = st.combos.indexOf(fromId) === 1 ? -1 : 1;
+  walker.pos.set(side * (CONFIG.station.wallX - 1.4), CONFIG.mezzanine.y, st.z + (T.z0 + T.z1) / 2);
+  walker.yaw = side * Math.PI / 2;          // de espaldas al pasillo, mirando al centro
   walker.paid = true;
   walker.transferring = true;               // no vuelve a entrar al pasillo hasta alejarse
   game.ride = { origin: null, boardedClock: null };
@@ -3086,7 +3088,7 @@ function loop(now) {
     el.events.length = 0;
   }
   game.signalViews.update(cameraZ);
-  people.update(dt, game.clock, { cameraZ, hideUnit: player && game.rig.view === "cab" ? player : null });
+  people.update(dt, game.clock, { cameraZ, hideUnit: player && game.rig.view === "cab" ? player : null, eye: game.walker ? cameraWorld : null });
   if (!game.transition) game.performers?.update(dt, cameraWorld);
   deckAgents.length = 0;
   people.deckAgents(deckAgents);

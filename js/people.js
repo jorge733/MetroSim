@@ -127,6 +127,10 @@ export function createSkeleton() {
 }
 
 const BENT = new THREE.Matrix4();
+/** 2.17.2 · ¿La cámara (`eye`, a la altura de los ojos) está a la altura de una persona parada en `y`? */
+const sameFloor = (y, eye) => eye.y - y > 0.6 && eye.y - y < 2.4;
+const nearEye = (pos, eye, r) => sameFloor(pos.y, eye) && Math.hypot(pos.x - eye.x, pos.z - eye.z) < r;
+
 export class PeopleRenderer {
   constructor(scene, capacity) {
     const mk = (geo, rough, n) => {
@@ -733,7 +737,7 @@ export class PeopleSystem {
   /* ---------------------------------------------------------------------
      Actualización por fotograma
      --------------------------------------------------------------------- */
-  update(dt, clock, { cameraZ = 0, hideUnit = null, render = true } = {}) {
+  update(dt, clock, { cameraZ = 0, hideUnit = null, render = true, eye = null } = {}) {
     this.time += dt;
     const R = CONFIG.people.activeRadius;
     const demand = demandAt(clock);
@@ -832,17 +836,33 @@ export class PeopleSystem {
     }
 
     // 5. Movimiento, animación y dibujo
+    // 2.17.2 · `eye`: dónde está la cámara del jugador (mundo). La gente no camina a meterse en ella y, si igual queda
+    // encima (al subir a un tren lleno), no se dibuja: antes una cabeza tapaba media pantalla
+    this.eyeFrame = (this.eyeFrame || 0) + 1;
     for (const p of this.people) {
       if (p.state === "gone") continue;
-      this.move(p, dt);
+      const e = eye && this.eyeFor(p, eye);
+      this.move(p, dt, e);
       this.animate(p, dt);
       p.hidden = p.space === "train" && (!p.unit.group.visible || p.unit === hideUnit);
+      if (e && !p.hidden && nearEye(p.root.position, e, 0.45)) p.hidden = true;
     }
     if (this.people.some(p => p.state === "gone")) this.people = this.people.filter(p => p.state !== "gone");   // 2.16.3 · sin un arreglo nuevo en cada cuadro
     if (render) this.renderer.render(this.people);
   }
 
-  move(p, dt) {
+  /** La cámara en las coordenadas donde vive esta persona (la estación es el mundo; en el tren, el del tren). */
+  eyeFor(p, eye) {
+    if (p.space !== "train") return eye;
+    const u = p.unit;
+    if (u._eyeFrame !== this.eyeFrame) {
+      u._eyeFrame = this.eyeFrame;
+      u._eye = u.group.worldToLocal((u._eye ??= new THREE.Vector3()).copy(eye));
+    }
+    return u._eye;
+  }
+
+  move(p, dt, eye = null) {
     if (p.path.length) {
       const target = p.path[0], pos = p.root.position;
       const dx = target.x - pos.x, dz = target.z - pos.z;
@@ -868,9 +888,18 @@ export class PeopleSystem {
           cb?.();
         }
       } else {
+        // 2.17.2 · Si el paso lo mete en la cámara del jugador, espera un poco (después sigue igual, para no trabarse)
+        const nx = pos.x + (dx / dist) * step, nz = pos.z + (dz / dist) * step;
+        const close = eye && !onEsc && sameFloor(pos.y, eye) && Math.hypot(nx - eye.x, nz - eye.z) < 0.6
+          && Math.hypot(nx - eye.x, nz - eye.z) < Math.hypot(pos.x - eye.x, pos.z - eye.z);
+        if (close) {
+          p.blockT = (p.blockT || 0) + dt;
+          if (p.blockT < 1.5) { p.pose = "stand"; p.heldByEye = true; return; }
+        } else p.blockT = 0;
+        if (p.heldByEye) { p.heldByEye = false; p.pose = "walk"; }
         pos.y += (target.y - pos.y) * (step / dist);        // sube o baja en proporción (escaleras)
-        pos.x += (dx / dist) * step;
-        pos.z += (dz / dist) * step;
+        pos.x = nx;
+        pos.z = nz;
         p.targetYaw = Math.atan2(dx, dz);
       }
     }

@@ -142,6 +142,15 @@ trenes de los dos motores quedan a ~1 m (mediana).
 **2.17.1** · El post de Reddit suma seis capturas nuevas del juego, de la 2.16.1 (Metro en cabina y en el andén, bus, taxi, Centro
 de Control y portada) y `caption.txt` con el título, el texto y las leyendas listos para copiar.
 
+**2.17.2** · Lo que quedó de la auditoría:
+- **Estación Central** combina con las dos líneas que pasan: además del pasillo de siempre (muro derecho de la
+  mezanina) hay uno en el muro izquierdo hacia la segunda. Ahora se puede ir de la Línea 1 al Tren Rancagua y entre el
+  Tren Nos y el Tren Rancagua, como anuncian los letreros; al llegar se sale por el pasillo de la línea de la que se viene.
+- La gente de las estaciones y los trenes ya no camina a meterse en la cámara del pasajero (espera un momento) y, si
+  igual queda encima, no se dibuja: al subir a un tren lleno ya no hay una cabeza tapando media pantalla.
+- Bus: la ventana del lado del conductor empieza junto al parabrisas; antes un panel blanco tapaba un tercio de la vista
+  desde la cabina.
+
 ## Versión 2.16 · Mejor visibilidad en Google
 
 - **Página nueva `/que-es/`** («Qué es RedMoviSim»): explica el juego con texto que Google puede leer (Metro líneas 1 a 6,

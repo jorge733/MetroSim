@@ -647,9 +647,12 @@ export class BusWorld {
       const x = side * (W / 2 - 0.02), gaps = side > 0 ? DOOR_GAPS : [];
       for (const [a, b] of spans(0, L, gaps)) box(body, 0.04, WIN0 - BOT, b - a, white, x, (BOT + WIN0) / 2, (a + b) / 2);   // bajo las ventanas
       box(body, 0.04, TOP - WIN1, L, white, x, (WIN1 + TOP) / 2, L / 2);                                                  // sobre las ventanas
-      for (const [a, b] of spans(0, L, [[side > 0 ? 0.65 : 1.3, 11.3]])) box(body, 0.04, WIN1 - WIN0, b - a, white, x, (WIN0 + WIN1) / 2, (a + b) / 2);   // pilares de los extremos
+      // 2.17.2 · Al lado del conductor (izquierda) la ventana empieza a 0,25 m del frente: antes un panel blanco de 1,3 m
+      // tapaba un tercio de la vista desde la cabina
+      const w0 = side > 0 ? 0.65 : 0.25;
+      for (const [a, b] of spans(0, L, [[w0, 11.3]])) box(body, 0.04, WIN1 - WIN0, b - a, white, x, (WIN0 + WIN1) / 2, (a + b) / 2);   // pilares de los extremos
       for (const z of [3.3, 4.45, 7.0, 8.2, 11.25]) if (!gaps.some(([g0, g1]) => z > g0 - 0.1 && z < g1 + 0.1)) box(body, 0.05, WIN1 - WIN0, 0.09, white, side * (W / 2 - 0.01), (WIN0 + WIN1) / 2, z);
-      for (const [a, b] of spans(1.3, 11.3, gaps)) box(body, 0.02, WIN1 - WIN0, b - a, glassT, side * (W / 2 + 0.005), (WIN0 + WIN1) / 2, (a + b) / 2);   // ventanas
+      for (const [a, b] of spans(side > 0 ? 1.3 : w0, 11.3, gaps)) box(body, 0.02, WIN1 - WIN0, b - a, glassT, side * (W / 2 + 0.005), (WIN0 + WIN1) / 2, (a + b) / 2);   // ventanas
     }
     box(body, W, 1.225 - BOT, 0.04, white, 0, (BOT + 1.225) / 2, 0.0);   // frente bajo el parabrisas
     box(body, W, 1.75 - BOT, 0.04, white, 0, (BOT + 1.75) / 2, L);       // atrás: bajo la luneta
