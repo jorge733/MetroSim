@@ -149,6 +149,19 @@ r/santiago, versión en inglés para r/WebGames y r/indiegames, y consejos para 
   al perder la conexión de la sala se levantan las fallas y limitaciones del anfitrión; las horas antes de
   medianoche ya no salen negativas («-1:-10:00»).
 
+**2.16.3** · Auditoría (interfaz, estaciones y calle):
+- Sin conexión: el juego abre aunque solo se haya visitado una vez (el service worker guarda todos los módulos
+  siguiendo sus import, y Three.js); si aun así no carga, se avisa en pantalla en vez de quedar en negro.
+- Portada en vertical (celular parado): ya no se corta a la derecha ni quedan botones fuera de la pantalla.
+- Tras celebrar una línea completa, el teclado ya no queda muerto si se cerró con el botón antes de tiempo.
+- En el celular horizontal, el tutorial del pasajero ya no tapa el panel de misiones.
+- Ascensor del andén de llegada de una terminal: ahora sube a quien lo llama (antes no abría y la gente esperaba
+  para siempre); pararse en la puerta de la mezanina ya no lo retiene abierto en el andén.
+- Los postes con cinta de la fila de la boletería ya no se atraviesan.
+- Memoria: se libera el mapa de sombras de cada calle visitada y lo propio de cada tren que sale de servicio; la
+  gente de las estaciones sube a la GPU solo lo que se usa en cada cuadro.
+- Pregunta de ruta: «cambia al Tren Nos» (antes «a la Tren Nos»).
+
 ## Versión 2.15 · Volante en el bus y el taxi (deshecho)
 
 La 2.15 probó manejar el bus y el taxi con volante (girar en las curvas y para cambiar de pista).

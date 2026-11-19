@@ -159,9 +159,11 @@ export class PeopleRenderer {
       }
     }
     for (const k of Object.keys(meshes)) {
-      meshes[k].count = n[k];
-      meshes[k].instanceMatrix.needsUpdate = true;
-      meshes[k].instanceColor.needsUpdate = true;
+      // 2.16.3 · Se sube a la GPU solo lo usado (antes, el búfer entero de miles de instancias en cada cuadro)
+      const m = meshes[k], im = m.instanceMatrix, ic = m.instanceColor;
+      m.count = n[k];
+      im.clearUpdateRanges(); im.addUpdateRange(0, Math.max(1, n[k]) * 16); im.needsUpdate = true;
+      ic.clearUpdateRanges(); ic.addUpdateRange(0, Math.max(1, n[k]) * 3); ic.needsUpdate = true;
     }
   }
 }
@@ -836,7 +838,7 @@ export class PeopleSystem {
       this.animate(p, dt);
       p.hidden = p.space === "train" && (!p.unit.group.visible || p.unit === hideUnit);
     }
-    this.people = this.people.filter(p => p.state !== "gone");
+    if (this.people.some(p => p.state === "gone")) this.people = this.people.filter(p => p.state !== "gone");   // 2.16.3 · sin un arreglo nuevo en cada cuadro
     if (render) this.renderer.render(this.people);
   }
 

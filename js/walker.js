@@ -264,7 +264,9 @@ export class Walker {
       let gateOk = !nearGates;
       // Solo se cobra al pasar hacia la zona pagada: salir (o seguir saliendo tras cruzar la línea) es gratis
       if (nearGates && inGate) gateOk = this.paid || this.gatePass || dz >= MZ.gateZ || this.tryValidate();
-      if (gateOk && !inBooth && !inTotem && !inShaft) candidates.push(MZ.y);
+      // 2.16.3 · Los postes con cinta de la fila de la boletería (world.js · buildTicketOffice) también chocan
+      const inQueue = Math.abs(x + 4.0) < 0.2 && dz > 46.7 && dz < 50.8;
+      if (gateOk && !inBooth && !inTotem && !inShaft && !inQueue) candidates.push(MZ.y);
     }
     // Salida a la calle: puerta, pasillo y escaleras hasta la vereda
     const ey = this.exitFloor(ax, dz);
@@ -576,7 +578,8 @@ export class Walker {
           // Botón de abrir: al acercarse a la puerta con la cabina detenida, se reabre
           if (el.state === "idle" && ax < EV.x0 + 0.5) el.request(el.level);
         }
-        else if (this.inLiftDoor(ax, dz)) el.obstruct();
+        // 2.16.3 · Solo la puerta del piso donde está la cabina (antes, parado en la mezanina, la retenía abierta en el andén)
+        else if (this.inLiftDoor(ax, dz) && Elevator.levelOf(this.pos.y) === el.level && el.state !== "moving") el.obstruct();
       }
     }
 

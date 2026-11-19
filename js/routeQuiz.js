@@ -17,6 +17,8 @@
 
 import { LINES, TRANSFERS } from "./engine/network.js";
 import { spokenName, lineLabel, lineArticle } from "./config.js";
+/** 2.16.3 · «al Tren Nos» / «a la Línea 3» (antes salía «a la Tren Nos»). */
+const al = (l) => lineArticle(l.id) === "el" ? "al" : "a la";
 
 const nice = spokenName;
 const pickOf = (arr, rnd) => arr[Math.floor(rnd() * arr.length)];
@@ -71,23 +73,23 @@ export function routeQuestion(line, station, rnd = Math.random) {
       const here = t.here === station || t.here.name === station.name;
       const leg2 = towards(destLine, t.there, dest), wrong2 = away(destLine, t.there, dest);
       const correct = here
-        ? `Aquí mismo, cambia a la ${dir(destLine, leg2)}`
-        : `${leg(line, station, t.here)}, y ahí cambia a la ${dir(destLine, leg2)}`;
+        ? `Aquí mismo, cambia ${al(destLine)} ${dir(destLine, leg2)}`
+        : `${leg(line, station, t.here)}, y ahí cambia ${al(destLine)} ${dir(destLine, leg2)}`;
       const wrongs = [];
       if (here) {
-        if (wrong2 !== t.there) wrongs.push(`Aquí mismo, cambia a la ${dir(destLine, wrong2)}`);
+        if (wrong2 !== t.there) wrongs.push(`Aquí mismo, cambia ${al(destLine)} ${dir(destLine, wrong2)}`);
         const lt = line.stations.at(-1) === station ? line.stations[0] : line.stations.at(-1);
         wrongs.push(`Sigue en la ${dir(line, lt)}: ${nice(dest.name)} queda en esta línea`);
       } else {
         const w1 = away(line, station, t.here);
-        if (w1 !== station) wrongs.push(`${dir(line, w1)} hasta ${nice(t.here.name)}, y ahí cambia a la ${dir(destLine, leg2)}`);
-        if (wrong2 !== t.there) wrongs.push(`${leg(line, station, t.here)}, y ahí cambia a la ${dir(destLine, wrong2)}`);
+        if (w1 !== station) wrongs.push(`${dir(line, w1)} hasta ${nice(t.here.name)}, y ahí cambia ${al(destLine)} ${dir(destLine, leg2)}`);
+        if (wrong2 !== t.there) wrongs.push(`${leg(line, station, t.here)}, y ahí cambia ${al(destLine)} ${dir(destLine, wrong2)}`);
       }
       // De respaldo: combinar en una estación donde NO pasa la otra línea
       const noTransfer = line.stations.filter(s => s !== station && s !== t.here && !via.some(x => x.here === s));
       while (wrongs.length < 2 && noTransfer.length) {
         const s = noTransfer.splice(Math.floor(rnd() * noTransfer.length), 1)[0];
-        wrongs.push(`${leg(line, station, s)}, y ahí cambia a la ${dir(destLine, leg2)}`);
+        wrongs.push(`${leg(line, station, s)}, y ahí cambia ${al(destLine)} ${dir(destLine, leg2)}`);
       }
       return finish({ dest, destLine, correct, wrongs, stops: null, rnd,
         explain: here ? `Aquí se combina con ${lineArticle(destLine.id)} ${lname(destLine)}.` : `Se combina con ${lineArticle(destLine.id)} ${lname(destLine)} en ${nice(t.here.name)}.` });
@@ -107,8 +109,8 @@ export function routeQuestion(line, station, rnd = Math.random) {
   if (via.length) {
     const { l, t } = pickOf(via, rnd);
     wrongs.push(t.here === station
-      ? `Aquí mismo, cambia a la ${dir(l, l.stations.at(-1))}`
-      : `${leg(line, station, t.here)}, y ahí cambia a la ${dir(l, pickOf([l.stations[0], l.stations.at(-1)], rnd))}`);
+      ? `Aquí mismo, cambia ${al(l)} ${dir(l, l.stations.at(-1))}`
+      : `${leg(line, station, t.here)}, y ahí cambia ${al(l)} ${dir(l, pickOf([l.stations[0], l.stations.at(-1)], rnd))}`);
   }
   if (wrongs.length < 2) wrongs.push(`Sal a la calle: ${nice(dest.name)} no tiene Metro`);
   return finish({ dest, destLine: line, correct, wrongs, stops, rnd,

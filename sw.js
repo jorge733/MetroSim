@@ -14,7 +14,7 @@
    sin conexión.
    ========================================================================== */
 
-const CACHE = "metrosim-v2.16.2";
+const CACHE = "metrosim-v2.16.3";
 const CDN = ["cdn.jsdelivr.net", "unpkg.com"];
 
 /** Lo mínimo para que la portada abra sin conexión aunque no se haya jugado. */
@@ -29,9 +29,47 @@ const SHELL = [
   "fonts/jetbrains-mono-latin-500-normal.woff2", "fonts/jetbrains-mono-latin-700-normal.woff2",
 ];
 
+/** 2.16.3 · Three.js y lo demás del CDN (mismas URL que el importmap de index.html). */
+const CDN_FILES = [
+  "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+  "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/environments/RoomEnvironment.js",
+  "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/utils/BufferGeometryUtils.js",
+  "https://unpkg.com/es-module-shims@1.10.0/dist/es-module-shims.js",
+];
+
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  e.waitUntil((async () => {
+    const cache = await caches.open(CACHE);
+    await cache.addAll(SHELL);
+    // 2.16.3 · Todos los módulos del juego, siguiendo sus import desde boot.js (antes solo se guardaban 5 y, sin
+    // conexión, la primera visita quedaba en negro). Si algo falla, se instala igual: el resto se guarda al usarlo.
+    await crawl(cache, ["js/boot.js", "js/main.js", ...CDN_FILES]).catch(() => {});
+    await self.skipWaiting();
+  })());
 });
+
+/** import … from "./x.js", import "./x.js" e import("./x.js"): solo rutas relativas (las de «three» van en CDN_FILES). */
+const IMPORT_RE = /\b(?:import|export)\s[^;"'`]*?\bfrom\s*["']([^"']+)["']|\bimport\s*\(\s*["']([^"']+)["']\s*\)|\bimport\s*["']([^"']+)["']/g;
+async function crawl(cache, entries) {
+  const seen = new Set(), queue = entries.map(u => new URL(u, self.registration.scope).href);
+  while (queue.length) {
+    const url = queue.shift();
+    if (seen.has(url)) continue;
+    seen.add(url);
+    try {
+      const own = new URL(url).origin === self.location.origin;
+      if (!own && await cache.match(url)) continue;
+      const res = await fetch(url, own ? { cache: "no-cache" } : { mode: "cors" });
+      if (!res.ok) continue;
+      await cache.put(url, res.clone());
+      if (!/\.m?js$/.test(new URL(url).pathname)) continue;
+      for (const m of (await res.text()).matchAll(IMPORT_RE)) {
+        const spec = m[1] || m[2] || m[3];
+        if (spec.startsWith(".")) queue.push(new URL(spec, url).href);
+      }
+    } catch { /* sin red o archivo que no está: se sigue con los demás */ }
+  }
+}
 
 self.addEventListener("activate", (e) => {
   e.waitUntil((async () => {

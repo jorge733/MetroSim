@@ -425,6 +425,7 @@ export function buildTrain({ routeId = "A", cab = false, articulated = false } =
   // Pilotos de puerta (exterior, sobre cada puerta del lado del andén): se encienden
   // en naranjo mientras las puertas no están cerradas, como en los trenes reales
   const lampMat = new THREE.MeshBasicMaterial({ color: 0x3a1c00, toneMapped: false });
+  lampMat.userData.own = true;          // 2.16.3 · propio de este tren: se libera al sacarlo (trainViews.js · disposeModel)
   const doorSets = [];
   const addDoors = (parent, doorZs, shift) => {
     const n = doorZs.length * 2;
@@ -438,6 +439,7 @@ export function buildTrain({ routeId = "A", cab = false, articulated = false } =
       leaves.push({ closedZ, openZ: closedZ + leaf * (A.leafW - 0.04) });
     }));
     const lamps = new THREE.InstancedMesh(new THREE.BoxGeometry(0.04, 0.07, 0.22), lampMat, doorZs.length);
+    lamps.geometry.userData.own = true;
     lamps.frustumCulled = false;
     doorZs.forEach((zc, i) => { m.makeTranslation(T.halfWidth + 0.05, T.floorY + T.doorHeight + 0.14, zc + shift); lamps.setMatrixAt(i, m); });
     parent.add(leafBody, leafGlass, lamps);

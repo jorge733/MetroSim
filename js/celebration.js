@@ -88,7 +88,11 @@ export function celebrate(o) {
 
   const stopConfetti = confetti($(".confetti"), [color, "#ffd23f", "#ffffff", "#4fd6ff", "#ff5d8f", "#6fe39a"], o.grand ? 9 : 6);
 
+  let closed = false, armT = 0;
   const close = () => {
+    if (closed) return;                             // 2.16.3 · una sola vez (si no, onClose corría dos veces)
+    closed = true;
+    clearTimeout(armT);
     stopConfetti();
     root.classList.add("leaving");
     setTimeout(() => root.remove(), 350);
@@ -101,7 +105,8 @@ export function celebrate(o) {
   };
   $(".go-button").onclick = close;
   // Se puede cerrar recién cuando terminó de entrar (evita cerrarla sin querer al caminar)
-  setTimeout(() => window.addEventListener("keydown", onKey, true), 1200);
+  // 2.16.3 · Si se cerró antes con el botón, no se engancha (dejaba el teclado del juego muerto)
+  armT = setTimeout(() => { if (!closed) window.addEventListener("keydown", onKey, true); }, 1200);
   return close;
 }
 

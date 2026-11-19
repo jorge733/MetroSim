@@ -20,5 +20,15 @@ if (ACTIVA && !saltarMantencion()) {
   // 2.11 · Con sesión iniciada, primero se trae la partida de la nube (mientras corre la intro, máx. 4 s)
   const game = syncAtBoot().then(() => import("./main.js"));
   playIntro({ isMuted, menuReady: game });
-  game.catch(err => console.error("RedMoviSim no pudo cargar el juego:", err));
+  game.catch(err => {
+    console.error("RedMoviSim no pudo cargar el juego:", err);
+    // 2.16.3 · Que se vea: antes quedaba la pantalla en negro sin explicación
+    const box = document.createElement("div");
+    box.setAttribute("role", "alert");
+    box.style.cssText = "position:fixed;inset:auto 16px 16px 16px;z-index:99999;padding:14px 16px;border-radius:12px;background:#1b1f24;color:#fff;font:500 15px/1.4 system-ui,sans-serif;box-shadow:0 8px 30px #0008";
+    box.textContent = navigator.onLine === false
+      ? "No se pudo cargar RedMoviSim sin conexión. Conéctate a internet una vez y vuelve a abrirlo."
+      : "No se pudo cargar RedMoviSim. Recarga la página para intentarlo de nuevo.";
+    document.body.append(box);
+  });
 }

@@ -38,8 +38,19 @@ export class TrainViews {
     this.scene = scene;
     const drawn = (u) => u.route.line === ROUTE_A.line;      // solo la línea activa tiene mundo 3D
     bus.on("train:created", (u) => drawn(u) && this.create(u));
-    bus.on("train:rebuilt", (u) => { if (!drawn(u)) return; this.scene.remove(u.group); this.create(u); });
-    bus.on("train:removed", (u) => drawn(u) && this.scene.remove(u.group));
+    bus.on("train:rebuilt", (u) => { if (!drawn(u)) return; this.drop(u); this.create(u); });
+    bus.on("train:removed", (u) => drawn(u) && this.drop(u));
+  }
+
+  /** 2.16.3 · Saca el modelo y libera lo que era solo suyo (las geometrías y materiales del molde son compartidos). */
+  drop(u) {
+    if (!u.group) return;
+    this.scene.remove(u.group);
+    u.group.traverse(o => {
+      if (o.isInstancedMesh) o.dispose();                  // búferes de instancias (no la geometría del molde)
+      if (o.geometry?.userData.own) o.geometry.dispose();
+      if (o.material?.userData?.own) o.material.dispose();
+    });
   }
 
   create(u) {
@@ -67,7 +78,7 @@ export class TrainViews {
     for (const u of units) {
       // Empieza o termina de cruzar un cambio de vía: modelo articulado ↔ rígido
       if (!!u.crossing !== !!u.model.articulated && u.route.line === ROUTE_A.line) {
-        this.scene.remove(u.group);
+        this.drop(u);
         this.create(u);
       }
       this.place(u);

@@ -9,6 +9,7 @@
 .home {
   position: relative; overflow-y: auto; overflow-x: hidden;
   display: grid; grid-template-rows: auto 1fr auto;
+  grid-template-columns: minmax(0, 1fr);   /* 2.16.3 · si no, la barra de arriba ensanchaba la columna y en vertical se cortaba */
   background:
     radial-gradient(60% 50% at 0% 0%, #e8343f1f 0, transparent 70%),
     radial-gradient(50% 45% at 100% 100%, #6c9bff14 0, transparent 70%),
@@ -235,6 +236,8 @@ a.home-icon-btn { text-decoration: none; }
   .home-clock .clock-band b, .home-clock .clock-band span { display: none; }
   .home-clock .clock-band { padding: 6px; }
   .home-clock, .home-wallet { padding: 0 10px; gap: 8px; }
+  .home-bar { flex-wrap: wrap; }
+  .home-bar-tools { flex-wrap: wrap; justify-content: flex-end; }
   .home-hero h2 { font-size: 34px; }
   .tagline { font-size: 15px; }
   .mode-tags { display: none; }

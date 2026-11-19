@@ -79,7 +79,8 @@ export class Elevator {
 
   /** Pide el ascensor hacia un nivel (llamada desde un piso o botón de cabina). */
   request(level) {
-    if (level === 0 && this.downBlocked) return false;
+    // 2.16.3 · En el andén de llegada de una terminal el ascensor SÍ baja a buscar a quien sube (antes no abría nunca):
+    // lo que no se puede es viajar hacia abajo desde la mezanina (walker.useElevator y people.liftFor lo impiden)
     if (this.state === "moving") { if (this.pending !== level) return false; return true; }
     if (level === this.level) {
       this.pending = null;

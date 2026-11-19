@@ -250,10 +250,13 @@ export class City {
   unload() {
     if (!this.group) return;
     this.scene.remove(this.group);
+    this.sun?.shadow?.dispose();                    // 2.16.3 · el mapa de sombras del sol (2048²) quedaba en cada calle visitada
+    this.shadow = null;
     this.group.traverse(o => {
       o.geometry?.dispose();
       const mats = Array.isArray(o.material) ? o.material : o.material ? [o.material] : [];
       mats.forEach(m => { m.map?.dispose(); m.dispose(); });
+      o.customDepthMaterial?.dispose();
     });
     this.group = null;
     this.station = null;

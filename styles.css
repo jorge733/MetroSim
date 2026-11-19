@@ -1233,6 +1233,8 @@ body.touch-mode .tutorial {
 body.touch-mode .tutorial.enter { animation: none; }
 body.touch-mode .tutorial-title { font-size: 15px; }
 body.touch-mode .tutorial-text { font-size: 12px; line-height: 1.3; }
+/* 2.16.3 · En el celular horizontal el tutorial del pasajero va a la derecha: centrado tapaba el panel de misiones */
+body.touch-mode .tutorial.tutorial-passenger { left: auto; right: 96px; transform: none; width: max(220px, min(360px, calc(100% - 370px))); }
 body.touch-mode .tutorial footer button { padding: 5px 10px; }
 
 /* Señal compacta en el panel de estación (cuando el panel de señal y horario no cabe) */
