@@ -189,7 +189,12 @@ export class BusWorld {
             const sPos = -v.z;
             // Edificios, árboles y faroles que quedarían sobre la calle en la parte de adentro de una curva: no van
             if (Math.abs(v.x) > 7.5 && this.path.inside(v.x > 0 ? v.x - 2 : v.x + 2, sPos, 14)) { o.setMatrixAt(i, ZERO); continue; }
-            o.setMatrixAt(i, this.bendMatrix(sPos, B).multiply(W));
+            this.bendMatrix(sPos, B).multiply(W);
+            // 2.15.3 · Lo que está más allá de las veredas (edificios) se dobla entero, sin deformarse: en una curva
+            // cerrada un edificio grande puede quedar montado sobre la calle (de este tramo o del de al lado). Se mira su
+            // planta ya doblada y, si algún punto cae en la calle o las veredas, no va.
+            if ((v.x > CURB_X + 6.2 || v.x < ROAD_FAR - 6.2) && this.overStreet(o.geometry, B, sPos)) { o.setMatrixAt(i, ZERO); continue; }
+            o.setMatrixAt(i, B);
           }
           o.instanceMatrix.needsUpdate = true;
           o.frustumCulled = false;
@@ -222,6 +227,18 @@ export class BusWorld {
       root.traverse(o => { if (!o.isLight) { o.position.set(0, 0, 0); o.rotation.set(0, 0, 0); o.scale.set(1, 1, 1); } });
     }
     for (const [l, p] of lights) { l.parent?.worldToLocal(p); l.position.copy(p); }
+  }
+  /** 2.15.3 · ¿La planta de `geo` (con la matriz ya doblada `B`) pisa la calzada o las veredas en algún punto? */
+  overStreet(geo, B, sPos) {
+    if (!geo.boundingBox) geo.computeBoundingBox();
+    const bb = geo.boundingBox, p = (this._osP ??= new THREE.Vector3());
+    const lo = ROAD_FAR - 6.2 + 0.3, hi = CURB_X + 6.2 - 0.3;
+    for (const fx of [0, 0.25, 0.5, 0.75, 1]) for (const fz of [0, 0.25, 0.5, 0.75, 1]) {
+      p.set(bb.min.x + (bb.max.x - bb.min.x) * fx, 0, bb.min.z + (bb.max.z - bb.min.z) * fz).applyMatrix4(B);
+      const lat = this.path.lateralAt(p.x, p.z, sPos);
+      if (lat != null && lat > lo && lat < hi) return true;
+    }
+    return false;
   }
   /** A01 de práctica (sin trazado): la calle recta va hacia el oriente. */
   straightToEast(objs) {

@@ -137,6 +137,9 @@ La 2.15 probó manejar el bus y el taxi con volante (girar en las curvas y para 
 - Los edificios de OpenStreetMap que tapaban la boca del acceso o la vereda de enfrente (16 calles, entre ellas
   Cristóbal Colón, Pajaritos y Estadio Nacional) se recortan para dejar el paso libre.
 
+**2.15.3** · En la calle del bus, los edificios que en una curva cerrada quedaban montados sobre la calzada o la vereda
+ya no se dibujan.
+
 ## Versión 2.14 · Recorrido 110
 
 - **Nuevo recorrido 110 de Red** (25 en total, más el A01 de práctica): un tramo real por **Av. Teniente Cruz**, de

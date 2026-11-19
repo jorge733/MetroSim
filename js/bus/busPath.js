@@ -125,6 +125,23 @@ export class RoutePath {
   }
 
   /**
+   * 2.15.3 · Al revés: para un punto del mapa, a cuántos metros (+ derecha) queda del eje más cercano de la calle,
+   * buscando cerca de `s` (±win m). null si el más cercano es un extremo del trazado.
+   */
+  lateralAt(wx, wz, s, win = 120) {
+    if (this.straight) return null;
+    const N = this.X.length, c = Math.round(this.arc(s) / STEP);
+    let best = Infinity, bi = -1;
+    for (let i = Math.max(0, c - win); i <= Math.min(N - 1, c + win); i++) {
+      const dx = wx - this.X[i], dz = wz - this.Z[i], d = dx * dx + dz * dz;
+      if (d < best) { best = d; bi = i; }
+    }
+    if (bi <= 0 || bi >= N - 1) return null;
+    const phi = this.PHI[bi];
+    return (wx - this.X[bi]) * Math.cos(phi) - (wz - this.Z[bi]) * Math.sin(phi);
+  }
+
+  /**
    * Punto recto (x, y, z) → mapa, en `out` (THREE.Vector3 o similar).
    * Recto: x de lado (+ derecha), z = −s.
    */
