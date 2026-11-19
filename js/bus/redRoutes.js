@@ -1,6 +1,6 @@
 /* ==========================================================================
    RedMoviSim — bus/redRoutes.js  (GENERADO: no editar a mano)
-   Recorridos reales de buses Red, tomados de la API pública de red.cl el 2026-11-18
+   Recorridos reales de buses Red, tomados de la API pública de red.cl el 2026-11-19
    con `node tools/recorridos-red.mjs`. De cada servicio es un tramo jugable
    (sentido ida) por estaciones de Metro; s = metros por el trazado real.
    path: el trazado del tramo [este, norte, s] en metros (2.3: la calle dobla como el recorrido real).
@@ -360,6 +360,42 @@ export const RED_ROUTES = [
       [0,0,-318],[202.4,-10.5,-116],[357.8,-3.7,40],[531.4,9.7,214],[579.2,8.8,262],[589.8,31,287],[591.6,90.1,346],[598.7,115,372],[678.7,326.8,598],[686.4,355.3,628],[698.9,457.2,730],[695.4,518.4,792],
       [679.6,590.2,865],[654,647.4,928],[568.3,791.9,1096],[551.7,826.3,1134],[545.3,855.1,1164],[541.4,950.2,1259],[546.3,957.7,1268],[562,964.4,1285],[611.8,939.6,1341],[630.6,934.3,1360],[895.3,966,1630],[717,2716.9,3390],
       [480.9,2709,3627],[445.9,2902.9,3823],[430.7,2906.7,3839],[398.3,2931.3,3880],[373.3,2942.4,3907],[338.9,2943,3942],[321.6,2935,3961],[220,3345.1,4384],[184.6,3426.8,4473],[158.7,3505.3,4556],[128.4,3546.7,4608],[116.5,3598.8,4662],
+    ],
+  },
+  {
+    ...{"id":"110","name":"Av. Teniente Cruz","color":"#0f9d58","from":"Los Placeres","to":"Laguna Sur","destino":"Maipú","origen":"Renca","operador":"Voy Santiago SpA","length":4207},
+    stops: [
+      {"name":"Los Placeres","s":40,"code":"PJ1771"},
+      {"name":"Av. José J. Pérez","s":331,"code":"PJ64"},
+      {"name":"Tomás Alba Edison","s":764,"code":"PJ65"},
+      {"name":"CESFAM Dr. Carlos Avendaño","s":1055,"code":"PJ66"},
+      {"name":"Lago Ontario","s":1361,"code":"PJ67"},
+      {"name":"Ricardo Vial","s":1670,"code":"PJ68"},
+      {"name":"Pudahuel","s":2081,"code":"PJ69","metro":"PUDAHUEL","hint":"Metro L5"},
+      {"name":"José Villagra","s":2352,"code":"PJ70"},
+      {"name":"Corona Sueca","s":2646,"code":"PJ71"},
+      {"name":"Barrancas","s":2949,"code":"PJ627","metro":"BARRANCAS","hint":"Metro L5"},
+      {"name":"Av. La Travesía","s":3535,"code":"PI765"},
+      {"name":"Los Halcones","s":3780,"code":"PI766"},
+      {"name":"Laguna Sur","s":4067,"code":"PI767","metro":"LAGUNA SUR","hint":"Metro L5"},
+    ],
+    lights: [
+      {"s":186,"street":"Av. José J. Pérez"},
+      {"s":548,"street":"Tomás Alba Edison"},
+      {"s":910,"street":"Semáforo"},
+      {"s":1208,"street":"Lago Ontario"},
+      {"s":1516,"street":"Ricardo Vial"},
+      {"s":1876,"street":"Semáforo"},
+      {"s":2217,"street":"José Villagra"},
+      {"s":2499,"street":"Corona Sueca"},
+      {"s":2798,"street":"Semáforo"},
+      {"s":3242,"street":"Av. La Travesía"},
+      {"s":3658,"street":"Los Halcones"},
+      {"s":3924,"street":"Semáforo"},
+    ],
+    path: [
+      [0,0,-307],[27.1,-126.4,-178],[19.4,-133,-168],[-87.1,-416,135],[-87.7,-612.1,331],[-94.8,-620.8,343],[-103.2,-1342.9,1065],[-79.6,-1773.9,1497],[-66.5,-1946.6,1670],[-75,-2375.6,2099],[-64.7,-2398.5,2125],[12.9,-2460.9,2224],
+      [23.1,-2477.9,2245],[68.1,-3144.1,2912],[73.3,-3198.2,2967],[89,-3267.4,3038],[96.6,-3327.3,3098],[95.5,-3351.2,3122],[177,-4273.6,4049],[-393.5,-4142.9,4634],
     ],
   },
   {

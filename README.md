@@ -124,6 +124,14 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **Salir por los torniquetes es gratis**: solo se cobra el pasaje al pasar hacia la zona pagada (antes, al terminar
   de cruzar el torniquete de salida se cobraba un pasaje).
 
+## Versión 2.14 · Recorrido 110
+
+- **Nuevo recorrido 110 de Red** (25 en total, más el A01 de práctica): un tramo real por **Av. Teniente Cruz**, de
+  Los Placeres a Laguna Sur (13 paraderos, 4,2 km), pasando por las estaciones **Pudahuel**, **Barrancas** y
+  **Laguna Sur** de la Línea 5. El servicio va de Renca a Maipú y lo opera Voy Santiago. Sale, como los demás, de la API
+  pública de red.cl con `node tools/recorridos-red.mjs`; se puede manejar y también tomar de pasajero desde esas
+  estaciones, y el taxi suma la calle Av. Teniente Cruz.
+
 ## Versión 2.13 · RedMoviSim te escucha: sugerencias y comentarios
 
 Nuevo `js/sugerencias.js`: un formulario para que los jugadores nos cuenten ideas, errores y lo que les gusta.

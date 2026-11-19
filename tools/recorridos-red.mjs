@@ -35,6 +35,7 @@ const SERVICES = [
   // 2.9 · Más recorridos, por otras calles de la ciudad
   { cod: "104", color: "#0f9d58" },   // Av. Los Leones · Providencia ⇄ Ñuñoa
   { cod: "113", color: "#0f9d58" },   // Lord Cochrane · Rondizzoni, Toesca
+  { cod: "110", color: "#0f9d58" },   // 2.14 · Av. Teniente Cruz · Pudahuel, Barrancas, Laguna Sur
   { cod: "201", color: "#f2a900" },   // Gran Avenida · Departamental ⇄ La Cisterna
   { cod: "203", color: "#f2a900" },   // Av. Recoleta · Cerro Blanco, Patronato
   { cod: "302", color: "#d7262e" },   // Manuel Rodríguez · Santa Ana ⇄ Rondizzoni
