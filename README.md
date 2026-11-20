@@ -156,6 +156,9 @@ trenes de los dos motores quedan a ~1 m (mediana).
   enlaces en su propio navegador; esta página salta al navegador del teléfono (el predeterminado en Android, Safari en
   iPhone con iOS 17 o más) y, si no puede, explica cómo hacerlo a mano (⋯ → «Abrir en el navegador externo»). Desde un
   navegador normal manda directo a la portada.
+- **2.24.6:** al conducir **bus o taxi**, «Volver a la portada» en el menú de pausa ahora **pide confirmación**
+  (¿Volver a la portada? · Seguir manejando / Volver a la portada). Esc o el botón Atrás del celular cierran el aviso
+  y sigues en la pausa.
 
 ## Versión 2.23 · Informe animado al terminar el turno de bus y de taxi
 

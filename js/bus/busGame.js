@@ -184,6 +184,8 @@ class BusGame {
     this.renderStrip();
     this.hideReport();
     this.el.pause.classList.add("hidden");
+    this.el.quitAsk.classList.add("hidden");
+    this.quitOpen = false;
     this.paused = false;
     if (this.taxi) {
       this.toast(`Taxi por ${this.route.name} · busca a quien haga señas en la vereda, detente a su lado junto a la vereda y quítale el seguro a la puerta (${this.touch ? "Seguro" : "Espacio"}): la abre y la cierra el pasajero${WEATHER.wet > 0.3 ? ". Llueve: frena antes" : ""}`, "info", 7000);
@@ -311,6 +313,17 @@ class BusGame {
           </footer>
         </div>
       </div>
+      <div class="bus-overlay bus-quit hidden" data-k="quitAsk">
+        <div class="bus-card ticket-card confirm-card" role="alertdialog" aria-modal="true" aria-labelledby="busQuitTitle" aria-describedby="busQuitText">
+          <span class="small-label">MENÚ</span>
+          <strong id="busQuitTitle">¿Volver a la portada?</strong>
+          <p id="busQuitText" class="station-sub">${this.taxi ? "Terminarás el turno de taxi aquí. Lo que cobraste en cada carrera ya está en tu cuenta." : this.ride ? "Te bajarás del bus y saldrás del viaje." : "Dejarás el recorrido a medias. El sueldo de cada paradero ya está en tu cuenta, pero no recibes el bono del servicio."}</p>
+          <footer class="ticket-actions">
+            <button class="ghost-button" data-k="quitNo">${this.ride ? "Seguir el viaje" : "Seguir manejando"}</button>
+            <button class="go-button" data-k="quitYes">Volver a la portada</button>
+          </footer>
+        </div>
+      </div>
       <div class="bus-overlay bus-summary hidden" data-k="summary"><div class="bus-card" data-k="summaryCard"></div></div>
     `;
     document.body.append(el);
@@ -321,7 +334,9 @@ class BusGame {
     this.el.sound.addEventListener("click", (e) => { e.currentTarget.blur(); this.toggleMute(); });
     this.el.menu.addEventListener("click", (e) => { e.currentTarget.blur(); this.setPaused(true); });
     this.el.resume.addEventListener("click", () => this.setPaused(false));
-    this.el.quit.addEventListener("click", () => this.exit());
+    this.el.quit.addEventListener("click", () => this.askQuit());   // 2.24.6 · pide confirmación antes de salir
+    this.el.quitNo.addEventListener("click", () => this.closeQuit(false));
+    this.el.quitYes.addEventListener("click", () => this.closeQuit(true));
     // 2.0 · Menú: sonido y lista de teclas (que se oculta sola a los 12 s)
     const syncMenu = () => {
       this.el.pmSoundState.textContent = this.audio.muted ? "desactivado" : "activado";
@@ -564,6 +579,10 @@ class BusGame {
     const k = e.key.toLowerCase();
     if (["arrowup", "arrowdown", "arrowleft", "arrowright", " "].includes(k)) e.preventDefault();
     if (e.repeat) return;
+    if (this.quitOpen) {                 // aviso de salida: Esc sigue jugando (los botones responden a Enter solos)
+      if (k === "escape") this.closeQuit(false);
+      return;
+    }
     if (k === "escape") {
       if (this.sim.finished) return;
       return this.setPaused(!this.paused);
@@ -1158,9 +1177,30 @@ class BusGame {
     this.camera.updateProjectionMatrix();
   }
 
+  /** Atrás del celular: abre la pausa; desde la pausa, pregunta; con la pregunta abierta, la cierra. */
   requestExit() {
-    if (this.sim.finished || this.paused) return this.exit();
+    if (this.sim.finished) return this.exit();
+    if (this.quitOpen) return this.closeQuit(false);
+    if (this.paused) return this.askQuit();
     this.setPaused(true);
+  }
+
+  /** 2.24.6 · ¿Volver a la portada? (desde la pausa) */
+  askQuit() {
+    if (this.sim.finished) return this.exit();
+    if (this.quitOpen) return;
+    if (!this.paused) this.setPaused(true);
+    this.quitOpen = true;
+    this.el.quitAsk.classList.remove("hidden");
+    this.el.quitNo.focus();
+  }
+
+  closeQuit(leave) {
+    if (!this.quitOpen) return;
+    this.quitOpen = false;
+    this.el.quitAsk.classList.add("hidden");
+    if (leave) return this.exit();
+    this.el.quit.focus();
   }
 
   exit() {
