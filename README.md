@@ -134,6 +134,8 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **2.25.1 · Los autos ya no desaparecen al terminar la vuelta**: el tráfico del otro sentido ahora es de verdad
   (respeta semáforos, sigue al de adelante y cambia de pista, como el tuyo). Al dar la vuelta, los autos de enfrente
   pasan a ser los de tu sentido y los tuyos quedan en la calzada de enfrente. Mientras cruzas, los que vienen frenan y te esperan.
+- **2.25.2 · Nueva imagen para compartir el enlace**: `icons/og.jpg` (1200×630) con capturas actuales del bus Red por
+  la Alameda, la cabina del Metro y el taxi; la descripción de Open Graph y X ahora nombra los trenes, el taxi y el Centro de Control.
 
 ## Versión 2.24 · Tienda RedMovi más grande y un depto de verdad
 
