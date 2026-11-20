@@ -70,6 +70,10 @@ export class TaxiSim extends BusSim {
     this.bus.lane = this.bus.targetLane = 1;
     this.bus.x = LANES[1];
     this.cars = this.cars.filter(c => Math.abs(c.s - this.bus.s) > 25);   // 2.15.4 · nadie encima del taxi al partir
+    // 2.25.1 · El tráfico del otro sentido también es de verdad (antes era decorado): al dar la vuelta en U se
+    // intercambian las dos listas y ningún auto desaparece. Se guarda en el sistema de su propio sentido.
+    this.opp = [];
+    this.withOpp(() => this.spawnCars());
     this.fare = null;             // carrera en curso: { phase: "pickup" | "ride" | "done", ... } (posiciones ws: de la ida)
     this.fareN = 0;
     this.taxi = { fares: 0, lost: 0, km: 0, earned: 0, tips: 0, uturns: 0, log: [] };   // 2.23 · log: cada carrera, para el informe del turno
@@ -146,13 +150,44 @@ export class TaxiSim extends BusSim {
     b.latV = 0;
     this.waiting.reverse();          // los paraderos del otro sentido son los mismos, al revés
     this.arrivalAcc.reverse();
-    this.cars = [];
-    this.spawnCars();
-    this.cars = this.cars.filter(c => Math.abs(c.s - b.s) > 25);     // nadie encima del taxi al salir de la vuelta
+    // 2.25.1 · Los autos no desaparecen: los de enfrente pasan a ser los de tu sentido y los tuyos, los de enfrente
+    [this.cars, this.opp] = [this.opp, this.cars];
+    this.cars = this.cars.filter(c => Math.abs(c.x - b.x) > 2.2 || c.s - c.len > b.s + 0.5 || c.s < b.s - this.len - 0.5);   // nadie encima del taxi
     this.lead = null;
     this.taxi.uturns++;
     this.emit("uturn", { dir: this._dir });
     this.msg(`Vuelta en U: ahora vas hacia ${this.route.to}`, "ok");
+  }
+
+  /* --------- 2.25.1 · Tráfico del otro sentido --------- */
+  /** Corre `fn` con la simulación mirando el otro sentido: sus autos, su recorrido y un taxi «fantasma» lejos de sus
+   *  pistas (solo marca la ventana en que se reciclan los autos, que queda adelante del taxi, de donde vienen). */
+  withOpp(fn) {
+    const keep = [this.cars, this.route, this.bus];
+    this.cars = this.opp;
+    this.route = this._dir > 0 ? this.back : this.ida;
+    this.bus = { s: this.span - keep[2].s - 330, x: 1e4, v: 0 };
+    this.oppOf = keep[2];
+    try { return fn(); } finally {
+      this.opp = this.cars;
+      [this.cars, this.route, this.bus] = keep;
+      this.oppOf = null;
+    }
+  }
+
+  updateCars(dt) {
+    super.updateCars(dt);
+    this.withOpp(() => super.updateCars(dt));
+  }
+
+  /** Los de enfrente frenan por el taxi mientras cruza sus pistas en la vuelta en U. */
+  leaderOf(car) {
+    const lead = super.leaderOf(car), b = this.oppOf;
+    if (!b || !this.turn) return lead;
+    const s = this.span - b.s + this.len / 2, x = MIRROR_X - b.x;       // el taxi visto desde el otro sentido
+    if (Math.abs(x - car.x) > 3.4 || s < car.s - 1) return lead;
+    const gap = Math.max(0, s - 3 - car.s);
+    return !lead || gap < lead.gap ? { gap, v: 0 } : lead;
   }
 
   /* --------- Textos: los avisos heredados del bus hablan del taxi --------- */

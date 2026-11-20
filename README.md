@@ -131,6 +131,9 @@ trenes de los dos motores quedan a ~1 m (mediana).
   todas las cámaras, y la cámara de atrás acompaña la curva.
 - **Anda solo a paso de hombre** mientras gira (caja automática, unos 8 segundos); con el acelerador la curva se hace
   más rápido (hasta unos 15 km/h) y con el freno te detienes en medio de la vuelta.
+- **2.25.1 · Los autos ya no desaparecen al terminar la vuelta**: el tráfico del otro sentido ahora es de verdad
+  (respeta semáforos, sigue al de adelante y cambia de pista, como el tuyo). Al dar la vuelta, los autos de enfrente
+  pasan a ser los de tu sentido y los tuyos quedan en la calzada de enfrente. Mientras cruzas, los que vienen frenan y te esperan.
 
 ## Versión 2.24 · Tienda RedMovi más grande y un depto de verdad
 

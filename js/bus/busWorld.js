@@ -1061,10 +1061,19 @@ export class BusWorld {
       m.userData.tails.emissiveIntensity = car.braking || car.v < 0.3 ? 2.2 : this.night ? 0.9 : 0.3;
       seen.add(car.id);
     }
+    // 2.25.1 · Taxi: los autos del otro sentido también son del motor (al dar la vuelta en U se intercambian)
+    for (const car of sim.opp ?? []) {
+      let m = this.carMeshes.get(car.id);
+      if (!m) { m = this.carMesh(car); this.carMeshes.set(car.id, m); }
+      this.place(m, sim.toIdaX(MIRROR_X - car.x), sim.toIdaS(sim.span - car.s), -car.len * sim.dir, Math.PI + flip);
+      m.userData.tails.emissiveIntensity = car.braking || car.v < 0.3 ? 2.2 : this.night ? 0.9 : 0.3;
+      seen.add(car.id);
+    }
     for (const [id, m] of this.carMeshes) if (!seen.has(id)) { this.scene.remove(m); this.disposeCar(m); this.carMeshes.delete(id); }
     // Autos de vuelta (decorado)
     const zBus = -b.s;
     for (const o of this.oncoming) {
+      if ((o.mesh.visible = !sim.opp) === false) continue;     // 2.25.1 · el taxi trae los suyos
       o.z += o.v * dt;
       if (o.z > zBus + 160) o.z -= 720;
       if (o.z < zBus - 560) o.z += 720;
