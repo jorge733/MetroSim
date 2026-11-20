@@ -1,0 +1,31 @@
+LOCUCIÓN DEL REEL (para ElevenLabs) · 27 s · español de Chile, tono entusiasta y cercano
+Texto para pegar en ElevenLabs (una sola toma, con las pausas marcadas con «...»):
+
+Santiago... en tu celular.
+¿Y si tú manejaras el Metro?
+Maneja buses Red por recorridos reales.
+O sal en taxi.
+Viaja como pasajero: carga tu bip y combina.
+Dirige toda la red desde el Centro de Control.
+Y juega con tus amigos.
+Estaciones, calles y horarios reales.
+Red Movi Sim. Gratis, en redmovisim punto ce ele. ¡Link en la bio!
+
+Guía de tiempos (cada frase debe caber en su escena):
+ 0,0 –  3,0 s  Santiago... en tu celular.                     (intro)
+ 3,0 –  6,5 s  ¿Y si tú manejaras el Metro?                   (cabina)
+ 6,5 – 10,0 s  Maneja buses Red por recorridos reales.        (bus)
+10,0 – 12,0 s  O sal en taxi.                                 (taxi)
+12,0 – 15,5 s  Viaja como pasajero: carga tu bip y combina.   (pasajero)
+15,5 – 18,0 s  Dirige toda la red desde el Centro de Control. (PCC)
+18,0 – 20,5 s  Y juega con tus amigos.                        (multijugador)
+20,5 – 23,0 s  Estaciones, calles y horarios reales.          (red)
+23,0 – 27,0 s  Red Movi Sim. Gratis, en redmovisim punto ce ele. ¡Link en la bio!  (cierre)
+
+Consejos:
+- Escribe «Red Movi Sim» separado y «redmovisim punto ce ele» para que lo pronuncie bien.
+- Modelo multilingüe, idioma español; velocidad normal o un poco rápida. La toma entera debe durar ≤ 26 s.
+- Exporta MP3 o WAV y guárdalo aquí como voz.mp3 (o voz.wav). generar.js lo mezcla solo:
+  baja la música mientras hay voz. Si la voz tiene que empezar más tarde: VOZ_INICIO=0.3 node generar.js
+- Si prefieres generar cada frase por separado, nómbralas voz-01.mp3 … voz-09.mp3 y cada una
+  entra al comienzo de su escena.

@@ -148,6 +148,8 @@ trenes de los dos motores quedan a ~1 m (mediana).
   intro del juego, la cabina del Metro, el bus por la Alameda, el taxi, el modo pasajero, el Centro de Control y el
   multijugador, con música propia sintetizada (`musica.py`). Las tomas se graban del juego con un reloj virtual
   (`clips/`) y `generar.js` arma el vídeo.
+- **2.24.3:** guion de la locución del reel para ElevenLabs con los tiempos de cada escena (`post-reel/locucion.txt`);
+  `generar.js` mezcla la voz (`voz.mp3`, o una por escena `voz-01…09.mp3`) y baja la música mientras se habla.
 
 ## Versión 2.23 · Informe animado al terminar el turno de bus y de taxi
 

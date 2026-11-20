@@ -1,5 +1,6 @@
 // Arma el reel (1080×1920, 30 fps) con plantilla.html, las tomas de clips/ y musica.wav.
 // Uso (desde esta carpeta):  python3 musica.py 27 && node generar.js   → reel.mp4 y portada.jpg
+// Locución opcional: voz.mp3 (o voz-01…voz-09.mp3, una por escena); ver locucion.txt
 const {chromium}=require('playwright');const path=require('path');const fs=require('fs');const os=require('os');const {execFileSync}=require('child_process');
 const FPS=30,Q=['-v','error','-y'];
 (async()=>{
@@ -22,8 +23,23 @@ const FPS=30,Q=['-v','error','-y'];
   if(k===Math.round(4.2*FPS))fs.copyFileSync(path.join(out,String(k).padStart(4,'0')+'.jpg'),'portada.jpg');
   if(k%60===0)process.stdout.write(`${k}/${total} `);}
  await b.close();
- // 3. Vídeo con música
- execFileSync('ffmpeg',[...Q,'-framerate',String(FPS),'-i',path.join(out,'%04d.jpg'),'-i','musica.wav','-c:v','libx264','-preset','slow','-crf','19','-pix_fmt','yuv420p',
-  '-c:a','aac','-b:a','192k','-shortest','-movflags','+faststart','reel.mp4']);
+ // 3. Vídeo con música y, si está, la locución (voz.mp3/voz.wav o voz-01…voz-09, una por escena)
+ const SCENE_T=[0,3,6.5,10,12,15.5,18,20.5,23];
+ const one=['voz.mp3','voz.wav'].find(f=>fs.existsSync(f));
+ const parts=SCENE_T.map((t,i)=>['mp3','wav'].map(e=>`voz-${String(i+1).padStart(2,'0')}.${e}`).find(f=>fs.existsSync(f))).map((f,i)=>f&&{f,t:SCENE_T[i]}).filter(Boolean);
+ const voices=one?[{f:one,t:+(process.env.VOZ_INICIO||0.2)}]:parts;
+ const args=[...Q,'-framerate',String(FPS),'-i',path.join(out,'%04d.jpg'),'-i','musica.wav'];
+ voices.forEach(v=>args.push('-i',v.f));
+ const vcod=['-c:v','libx264','-preset','slow','-crf','19','-pix_fmt','yuv420p','-c:a','aac','-b:a','192k','-movflags','+faststart'];
+ if(!voices.length)execFileSync('ffmpeg',[...args,...vcod,'-shortest','reel.mp4']);
+ else{
+  // Voz: limpia, al mismo volumen y en su segundo; la música baja (sidechain) mientras se habla
+  const d=voices.map((v,i)=>`[${i+2}:a]aresample=44100,aformat=channel_layouts=stereo,adelay=${Math.round(v.t*1000)}:all=1[v${i}]`).join(';');
+  const mixV=voices.length>1?`${voices.map((_,i)=>`[v${i}]`).join('')}amix=inputs=${voices.length}:normalize=0,`:`[v0]`;
+  const fc=`${d};${mixV}${voices.length>1?'':'anull,'}loudnorm=I=-16:TP=-1.5,apad,asplit[va][vb];`+
+   `[1:a]volume=0.85[m];[m][va]sidechaincompress=threshold=0.02:ratio=10:attack=30:release=400:makeup=1[md];`+
+   `[md][vb]amix=inputs=2:duration=first:normalize=0,alimiter=limit=0.95[a]`;
+  execFileSync('ffmpeg',[...args,'-filter_complex',fc,'-map','0:v','-map','[a]',...vcod,'-t',String(dur),'reel.mp4']);
+  console.log('\nlocución mezclada:',voices.map(v=>v.f).join(', '));}
  fs.rmSync(tmp,{recursive:true,force:true});console.log('\nreel.mp4 listo');
 })();
