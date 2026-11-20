@@ -124,6 +124,23 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **Salir por los torniquetes es gratis**: solo se cobra el pasaje al pasar hacia la zona pagada (antes, al terminar
   de cruzar el torniquete de salida se cobraba un pasaje).
 
+## Versión 2.23 · Informe animado al terminar el turno de bus y de taxi
+
+El informe de fin de turno del Metro (el recorrido que se dibuja, el timbre con la nota, el récord y la boleta) ahora
+también aparece al terminar de conducir el **bus** y el **taxi**, en lugar de la tarjeta con la lista de datos.
+
+- **Bus:** el recorrido se dibuja **paradero por paradero** con su color (a la hora, desfase, muy tarde o saltado, y
+  en gris los que pasaste de largo sin pasajeros; estrella si fue perfecto). Al tocar cada paradero (o con ← →) se ve
+  la llegada, a cuántos metros del letrero paraste, cuántos subieron y bajaron, los puntos y el sueldo (con el descuento
+  por faltas). Pestaña **Conducción**: puntualidad, parada media y pasajeros, y las faltas (luces rojas, choques,
+  paraderos saltados y puntos de falta). Pestaña **Sueldo**: la boleta paradero por paradero con el bono del recorrido.
+- **Taxi:** cada **carrera** es un punto del recorrido (viaje suave, brusco o persona que tomó otro taxi; estrella si
+  dejó propina). Al tocarla se ve de dónde a dónde fue, los km y minutos, el taxímetro y la propina. Pestaña
+  **Ganancias**: carrera por carrera, el bono del turno y el saldo.
+- **Récord** por recorrido y sentido (bus) y por calle (taxi), con confeti si hay récord o nota S/A.
+- El **bus** también se puede terminar desde la pausa: «Terminar el recorrido aquí y ver el resumen» (sin el bono del
+  recorrido), como «Finalizar turno» en el Metro.
+
 ## Versión 2.22 · Accesos al Metro y paraderos como en la calle real
 
 Los accesos y paraderos que rodean cada estación ahora salen de OpenStreetMap (© colaboradores de OpenStreetMap, ODbL),

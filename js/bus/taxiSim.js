@@ -68,7 +68,7 @@ export class TaxiSim extends BusSim {
     this.cars = this.cars.filter(c => Math.abs(c.s - this.bus.s) > 25);   // 2.15.4 · nadie encima del taxi al partir
     this.fare = null;             // carrera en curso: { phase: "pickup" | "ride" | "done", ... } (posiciones ws: de la ida)
     this.fareN = 0;
-    this.taxi = { fares: 0, lost: 0, km: 0, earned: 0, tips: 0, uturns: 0 };
+    this.taxi = { fares: 0, lost: 0, km: 0, earned: 0, tips: 0, uturns: 0, log: [] };   // 2.23 · log: cada carrera, para el informe del turno
     this.totals.maxPoints = 0;
     this.nextFareAt = 4;          // s hasta la primera persona que hace señas
     this.locked = true;           // 2.20 · seguro de las puertas (Espacio lo pone o lo quita)
@@ -175,6 +175,7 @@ export class TaxiSim extends BusSim {
         const passed = sameSide && b.s > hs + PASSED;
         if (passed || (!sameSide && this.elapsed - f.since > PATIENCE)) {
           this.taxi.lost++;
+          this.taxi.log.push({ lost: true, name: f.name, passed });
           this.emit("fareLost", { fare: { ...f } });
           this.msg(passed ? "Te pasaste: la persona tomó otro taxi" : "Se cansó de esperar y tomó otro taxi", "warn");
           this.fare = null;
@@ -287,6 +288,7 @@ export class TaxiSim extends BusSim {
     this.taxi.fares++;
     this.taxi.earned += fare + tip;
     this.taxi.tips += tip;
+    this.taxi.log.push({ name: f.fromName, dest: f.destName, km: f.dist / 1000, min: (this.elapsed - f.start) / 60, waited: f.waited, amount: fare, tip, smooth: f.smooth });
     this.points += 100 + (f.smooth ? 20 : 0);
     this.totals.maxPoints += 120;
     this.totals.wage += fare + tip;

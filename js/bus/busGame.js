@@ -23,7 +23,7 @@ import { BUS_ROUTE, LANES } from "./busRoute.js";
 import { autopilot } from "./busAutopilot.js";
 import { clearTrackLift } from "../render/trackLift.js";
 import { BusSim, BUS_CAPACITY } from "./busSim.js";
-import { TaxiSim, TAXI_FARE } from "./taxiSim.js";
+import { TaxiSim } from "./taxiSim.js";
 import { BusWorld } from "./busWorld.js";
 import { BusAudio } from "./busAudio.js";
 import { TaxiRadio, RADIO_STATIONS } from "./taxiRadio.js";
@@ -31,6 +31,8 @@ import { demandAt, dayTypeOf, formatCLP, lineLabel, isRail } from "../config.js"
 import { WEATHER, weatherLabel, weatherDemandFactor } from "../engine/weather.js";
 import { linesAtStation } from "../engine/network.js";
 import { BANK_NAME } from "../economy.js";
+import { renderShiftReport } from "../shiftReport.js";
+import { icon } from "../icons.js";
 
 const two = (n) => String(Math.floor(n)).padStart(2, "0");
 const clockText = (t, secs = true) => {
@@ -180,7 +182,7 @@ class BusGame {
     const R0 = this.route;               // 2.15.4 · tras una vuelta en U el título quedaba al revés en el turno nuevo
     if (this.el?.routeTitle) this.el.routeTitle.textContent = `${R0.name.toUpperCase()} · ${R0.from.toUpperCase()} → ${R0.to.toUpperCase()}`;
     this.renderStrip();
-    this.el.summary.classList.add("hidden");
+    this.hideReport();
     this.el.pause.classList.add("hidden");
     this.paused = false;
     if (this.taxi) {
@@ -299,7 +301,7 @@ class BusGame {
           <p class="bus-menu-route"><b${this.taxi ? ' class="taxi"' : ""}>${this.taxi ? "TAXI" : R.id}</b> ${esc(R.name)} · ${esc(R.from)} → ${esc(R.to)}</p>
           <div class="game-menu-list">
             <button class="go-button game-menu-resume" data-k="resume"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16l13-8z"/></svg> ${this.ride ? "Seguir el viaje" : "Seguir manejando"}</button>
-            ${this.taxi ? `<button class="game-menu-item" data-k="pmEnd"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg><span>Terminar el turno y ver el resumen</span></button>` : ""}
+            ${!this.ride ? `<button class="game-menu-item" data-k="pmEnd"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg><span>${this.taxi ? "Terminar el turno y ver el resumen" : "Terminar el recorrido aquí y ver el resumen"}</span></button>` : ""}
             ${this.ride ? "" : `<button class="game-menu-item" data-k="pmKeys"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg><span>Controles · <b data-k="pmKeysState">ocultos</b></span></button>`}
             <button class="game-menu-item" data-k="pmSound"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4zM16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/></svg><span>Sonido · <b data-k="pmSoundState">activado</b></span><kbd>M</kbd></button>
           </div>
@@ -328,7 +330,7 @@ class BusGame {
     this.syncMenu = syncMenu;
     this.el.pmSound.addEventListener("click", () => this.toggleMute());
     this.el.pmKeys?.addEventListener("click", () => { this.root.classList.toggle("bus-keys-on"); syncMenu(); });
-    this.el.pmEnd?.addEventListener("click", () => { this.setPaused(false); this.sim.finish(); });
+    this.el.pmEnd?.addEventListener("click", () => { this.setPaused(false); this.sim.finish({ early: true }); });
     this.root.classList.add("bus-keys-on");
     this.keysTimer = setTimeout(() => { this.root.classList.remove("bus-keys-on"); syncMenu(); }, 12000);
     syncMenu();
@@ -734,33 +736,111 @@ class BusGame {
       this.updateBank();
       this.moneyFloat(e.bonus);
     }
-    const t = e.totals, n = this.route.stops.length;
-    const rows = [
-      ["Paraderos atendidos", `${t.served} de ${n}`],
-      ["Pasajeros que subieron", t.boarded],
-      ["A la hora", `${t.onTime} paraderos`],
-      ["Luces rojas", t.reds],
-      ["Choques", t.crashes],
-      ["Paraderos saltados", t.skipped],
-      ["Faltas", `−${t.penalties} pts`],
-      ["Bono del servicio", formatCLP(e.bonus)],
-      ["Ganado en este recorrido", formatCLP(this.earned)],
-    ];
-    this.el.summaryCard.innerHTML = `
-      <span class="bus-label">BUSES · FIN DEL RECORRIDO ${this.route.id}</span>
-      <div class="bus-grade grade-${e.grade}">${e.grade}</div>
-      <h2>${esc(this.route.from)} → ${esc(this.route.to)}</h2>
-      <dl class="bus-stats">${rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("")}</dl>
-      <p>Lo ganado ya está en tu cuenta del ${esc(BANK_NAME)}: úsalo como pasajero en el Metro o en la Tienda.</p>
-      <div class="bus-card-actions">
-        <button class="bus-btn primary" data-a="again">Otra vuelta</button>
-        <button class="bus-btn" data-a="quit">Volver a la portada</button>
-      </div>`;
-    this.el.summaryCard.querySelector("[data-a=again]").addEventListener("click", () => this.again());
-    this.el.summaryCard.querySelector("[data-a=quit]").addEventListener("click", () => this.exit());
-    setTimeout(() => this.el.summary.classList.remove("hidden"), 900);
+    // 2.23 · Informe animado como el del Metro: el recorrido paradero por paradero, la nota, el récord y la boleta
+    const t = e.totals, R = this.route;
+    const log = e.results.map(r => ({ ...r, stop: r.error == null ? 0 : Math.abs(r.error), delay: r.delay ?? 0 }));
+    const served = log.filter(r => r.served && r.error != null);
+    const onTime = served.filter(r => r.punctual === 100).length;
+    const pct = served.length ? Math.round(onTime / served.length * 100) : 0;
+    const avg = served.length ? served.reduce((a, r) => a + r.stop, 0) / served.length : 0;
+    const late = (d) => Math.abs(d) <= 60 ? "a la hora" : d > 0 ? "atrasado" : "adelantado";
+    const level = (p) => p === 100 ? "ok" : p >= 40 ? "warn" : "bad";
+    this.showReport({
+      kicker: e.early ? `Bus ${R.id} · recorrido terminado antes` : `Bus ${R.id} · fin del recorrido`,
+      title: `${R.from} → ${R.to}`,
+      line: { id: R.id, color: R.color || "#d7262e" },
+      vehicle: "bus",
+      noun: { one: "paradero", many: "paraderos", Many: "Paraderos" },
+      stations: log,
+      tripLabel: `Tu recorrido · ${served.length} de ${R.stops.length} paraderos atendidos`,
+      legend: `<i class="ok"></i>a la hora <i class="warn"></i>desfase <i class="bad"></i>muy tarde o saltado <i class="free"></i>sin pasajeros ${icon("star", "star")}perfecto`,
+      stopClass: (r) => r.skipped ? "bad" : r.error == null ? "free" : r.punctual === 100 ? "ok" : r.punctual === 50 ? "warn" : "bad",
+      stopLabel: (r) => `${r.name} · ${r.skipped ? "saltado" : r.error == null ? "sin pasajeros" : late(r.delay)}`,
+      perfectLabel: "Paradero perfecto",
+      emptyText: "No alcanzaste a atender ningún paradero en este recorrido.",
+      detail: (r) => r.skipped
+        ? [["Estado", "Saltado <small>había gente esperando</small>", "bad"], ["Sueldo", formatCLP(0)]]
+        : r.error == null
+          ? [["Estado", "De largo <small>nadie esperaba ni pidió parada</small>"], ["Sueldo", formatCLP(0)]]
+          : [
+            ["Llegada", `${Math.abs(r.delay) <= 60 ? "" : r.delay > 0 ? "+" : "−"}${mmss(r.delay)} <small>${late(r.delay)}</small>`, level(r.punctual)],
+            ["Parada", `${r.stop.toFixed(1)} m`, level(r.precision)],
+            ["Pasajeros", `${r.boarded} <small>suben</small> · ${r.alighted} <small>bajan</small>`],
+            ["Puntos", `+${r.gained}`],
+            ["Sueldo", `+${formatCLP(r.pay)}${r.discount ? ` <small>−${formatCLP(r.discount)} por faltas</small>` : ""}`, "money"],
+          ],
+      tiles: [
+        { ring: pct, label: "Puntualidad", value: served.length ? `<span data-count="${pct}">0</span> %` : "—", sub: served.length ? `${onTime} de ${served.length} a ±1 min` : "sin paraderos atendidos" },
+        { icon: "target", label: "Parada media", value: served.length ? `${avg.toFixed(1)} m` : "—", sub: !served.length ? "sin paradas" : avg <= 1.5 ? "junto al letrero" : avg <= 3.5 ? "precisa" : "mejorable" },
+        { icon: "walk", label: "Pasajeros", value: `<span data-count="${t.boarded}">0</span>`, sub: `subieron · ${t.alighted} bajaron` },
+      ],
+      faultList: [
+        ["Luces rojas", t.reds],
+        ["Choques", t.crashes],
+        ["Paraderos saltados", t.skipped],
+        ["Puntos de falta", t.penalties],
+      ],
+      pay: {
+        title: "Liquidación del recorrido",
+        subLabel: "Sueldo por paraderos",
+        rows: log.filter(r => r.pay > 0 || r.skipped).map(r => [r.name, r.pay, !r.pay]),
+        emptyText: "Sin paraderos atendidos",
+        stations: log.reduce((a, r) => a + r.pay, 0),
+        bonus: e.bonus, bonusOk: e.bonus > 0, bonusLabel: "Bono del recorrido", noBonusText: e.early ? "Sin bono: terminaste antes del final" : "Sin bono del recorrido",
+      },
+      bestKey: `bus.${R.id}.${R.from}`,
+      firstText: "Primer recorrido en este servicio y sentido",
+      grade: e.grade, points: e.points,
+      continueLabel: "Otra vuelta",
+    });
+  }
+
+  /**
+   * 2.23 · Informe de fin de turno (shiftReport.js, el mismo del Metro) para el bus y el taxi.
+   * Guarda el récord de puntos en el mismo formato que DriverScore (metrosim.best.*).
+   */
+  showReport(o) {
+    const key = `metrosim.best.${o.bestKey}`;
+    let best = null;
+    try { best = JSON.parse(localStorage.getItem(key)); } catch { /* sin almacenamiento */ }
+    const total = Math.max(0, Math.round(o.points));
+    const prevBest = best?.total ?? 0;
+    const record = total > prevBest;
+    if (record) try { localStorage.setItem(key, JSON.stringify({ total, grade: o.grade, date: new Date().toISOString().slice(0, 10) })); } catch { /* sin almacenamiento */ }
+    const r = {
+      ...o,
+      score: { total, grade: o.grade, record, prevBest },
+      pay: { minStations: 0, bank: BANK_NAME, balance: formatCLP(this.bank.balance), ...o.pay },
+      actions: { continueLabel: o.continueLabel, onContinue: () => this.again(), onMenu: () => this.exit() },
+    };
+    const box = this.el.summary, sim = this.sim;
+    setTimeout(() => {
+      if (this.dead || this.sim !== sim) return;
+      this.closeReport?.();
+      this.el.summaryCard.classList.add("hidden");
+      box.classList.add("bus-report");
+      this.closeReport = renderShiftReport(box, r, {
+        sound: {
+          tick: () => this.audio.tick(),
+          stamp: () => this.audio.stamp(),
+          record: () => this.audio.bell(),
+          cash: () => this.audio.coin(),
+        },
+        onAction: (fn) => { this.hideReport(); fn?.(); },
+      });
+      box.classList.remove("hidden");
+    }, 900);
     this.releaseControls();
     this.syncInput();
+  }
+
+  hideReport() {
+    if (!this.el) return;
+    this.closeReport?.();
+    this.closeReport = null;
+    this.el.summary.classList.add("hidden");
+    this.el.summary.classList.remove("bus-report");
+    this.el.summaryCard.classList.remove("hidden");
   }
 
   updateHud() {
@@ -977,34 +1057,60 @@ class BusGame {
       this.updateBank();
       this.moneyFloat(e.bonus);
     }
+    // 2.23 · Informe animado como el del Metro: carrera por carrera, la nota, el récord y lo cobrado
     const x = e.taxi, t = e.totals;
-    const rows = [
-      ["Carreras", x.fares],
-      ["Tomaron otro taxi", x.lost],
-      ["Kilómetros con pasajero", x.km.toFixed(1).replace(".", ",")],
-      ["Propinas", formatCLP(x.tips)],
-      ["Luces rojas", t.reds],
-      ["Choques", t.crashes],
-      ["Bono del turno", formatCLP(e.bonus)],
-      ["Ganado en este turno", formatCLP(this.earned)],
-    ];
-    this.el.summaryCard.innerHTML = `
-      <span class="bus-label">TAXI · FIN DEL TURNO</span>
-      <div class="bus-grade grade-${e.grade}">${e.grade}</div>
-      <h2>${esc(this.route.name)}</h2>
-      <dl class="bus-stats">${rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("")}</dl>
-      <p>Lo ganado ya está en tu cuenta del ${esc(BANK_NAME)}. Taxímetro aproximado: ${formatCLP(TAXI_FARE.flag)} la bajada de bandera y ${formatCLP(TAXI_FARE.step)} cada ${TAXI_FARE.meters} m o cada minuto detenido.</p>
-      <div class="bus-card-actions">
-        <button class="bus-btn primary" data-a="again">Otro turno</button>
-        <button class="bus-btn" data-a="quit">Volver a la portada</button>
-      </div>`;
-    this.el.summaryCard.querySelector("[data-a=again]").addEventListener("click", () => this.again());
-    this.el.summaryCard.querySelector("[data-a=quit]").addEventListener("click", () => this.exit());
-    setTimeout(() => this.el.summary.classList.remove("hidden"), 900);
-    this.releaseControls();
-    this.syncInput();
+    const paid = x.log.filter(f => !f.lost);
+    const smooth = paid.filter(f => f.smooth).length;
+    const pct = paid.length ? Math.round(smooth / paid.length * 100) : 0;
+    const log = x.log.map(f => ({ ...f, delay: 0, perfect: !f.lost && f.smooth && f.tip > 0, title: f.lost ? f.name : `${f.name} → ${f.dest}` }));
+    const km = (n) => n.toFixed(1).replace(".", ",");
+    this.showReport({
+      kicker: "Taxi · fin del turno",
+      title: this.route.name,
+      line: { id: "TAXI", icon: "taxi", color: "#f2c200" },
+      vehicle: "taxi",
+      noun: { one: "carrera", many: "carreras", Many: "Carreras" },
+      stations: log,
+      tripLabel: `Tus carreras · ${x.fares} ${x.fares === 1 ? "cobrada" : "cobradas"}${x.lost ? ` · ${x.lost} ${x.lost === 1 ? "perdida" : "perdidas"}` : ""}`,
+      legend: `<i class="ok"></i>viaje suave <i class="warn"></i>brusco <i class="bad"></i>tomó otro taxi ${icon("star", "star")}con propina`,
+      stopClass: (f) => f.lost ? "bad" : f.smooth ? "ok" : "warn",
+      stopLabel: (f) => f.lost ? `${f.name} · tomó otro taxi` : `${f.name} a ${f.dest} · ${formatCLP(f.amount + f.tip)}`,
+      perfectLabel: "Propina por viaje suave",
+      emptyText: "No alcanzaste a hacer ninguna carrera en este turno.",
+      detail: (f) => f.lost
+        ? [["Estado", `Tomó otro taxi <small>${f.passed ? "te pasaste de largo" : "se cansó de esperar"}</small>`, "bad"], ["Cobrado", formatCLP(0)]]
+        : [
+          ["Recorrido", `${km(f.km)} km <small>${mmss(f.min * 60)} min</small>`],
+          ["Viaje", f.smooth ? "Suave" : "Brusco <small>frenadas o faltas</small>", f.smooth ? "ok" : "warn"],
+          ["Taxímetro", formatCLP(f.amount)],
+          ["Propina", f.tip ? `+${formatCLP(f.tip)}` : formatCLP(0), f.tip ? "money" : ""],
+        ],
+      tiles: [
+        { ring: pct, label: "Viajes suaves", value: paid.length ? `<span data-count="${pct}">0</span> %` : "—", sub: paid.length ? `${smooth} de ${paid.length} con propina` : "sin carreras" },
+        { icon: "route", label: "Con pasajero", value: `${km(x.km)} km`, sub: `${x.fares} ${x.fares === 1 ? "carrera" : "carreras"}` },
+        { icon: "coins", label: "Propinas", value: formatCLP(x.tips), sub: paid.length ? `promedio ${formatCLP(Math.round(x.tips / paid.length))}` : "—" },
+      ],
+      faultList: [
+        ["Tomaron otro taxi", x.lost],
+        ["Luces rojas", t.reds],
+        ["Choques", t.crashes],
+        ["Puntos de falta", t.penalties],
+      ],
+      pay: {
+        title: "Taxímetro del turno",
+        subLabel: "Carreras y propinas",
+        rows: paid.map(f => [`${f.name} → ${f.dest}`, f.amount + f.tip]),
+        emptyText: "Sin carreras cobradas",
+        stations: x.earned,
+        bonus: e.bonus, bonusOk: e.bonus > 0, bonusLabel: "Bono del turno", noBonusText: "Bono (desde 2 carreras)",
+      },
+      tabs: { drive: "Conducción", pay: "Ganancias" },
+      bestKey: `taxi.${this.route.id}`,
+      firstText: "Primer turno de taxi en esta calle",
+      grade: e.grade, points: e.points,
+      continueLabel: "Otro turno",
+    });
   }
-
 
   rideHint() {
     const sim = this.sim, at = this.exitStop(), st = sim.nextStop;
@@ -1067,6 +1173,7 @@ class BusGame {
     this.dead = true;
     cancelAnimationFrame(this.raf);
     clearTimeout(this.toastTimer);
+    this.closeReport?.();
     removeEventListener("keydown", this.onKeyDown);
     removeEventListener("keyup", this.onKeyUp);
     removeEventListener("resize", this.onResize);

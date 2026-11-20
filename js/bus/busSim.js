@@ -437,7 +437,7 @@ export class BusSim {
   }
 
   /** Cierra la atención de un paradero: puntos, sueldo y siguiente paradero. */
-  finishStop(i, sv, { free = false } = {}) {
+  finishStop(i, sv, { free = false, skipped = false } = {}) {
     const st = this.route.stops[i];
     const due = this.timetable[i].time;
     let precision = 0, punctual = 0, delay = null;
@@ -463,7 +463,7 @@ export class BusSim {
     this.points += gained;
     if (!free) this.totals.maxPoints += 200 + moved * 5;     // pasar de largo un paradero vacío no baja la nota
     this.totals.wage += pay;
-    const result = { index: i, name: st.name, served: !!sv, precision, punctual, delay, moved, gained, perfect, pay, discount, error: sv?.error ?? null };
+    const result = { index: i, name: st.name, served: !!sv, skipped, free, precision, punctual, delay, moved, boarded: sv?.boarded ?? 0, alighted: sv?.alighted ?? 0, gained, perfect, pay, discount, error: sv?.error ?? null };
     this.results.push(result);
     this.emit("stopDone", result);
 
@@ -487,7 +487,7 @@ export class BusSim {
       this.emit("complaint");
     } else this.msg(`Nadie en ${st.name} y nadie pidió parada: sigues de largo`, "ok");
     if (!wanted) this.totals.served++;
-    this.finishStop(i, null, { free: !wanted && i !== this.route.stops.length - 1 });
+    this.finishStop(i, null, { free: !wanted && i !== this.route.stops.length - 1, skipped: wanted || i === this.route.stops.length - 1 });
   }
 
   updateWaiting(dt) {
@@ -676,13 +676,14 @@ export class BusSim {
     return ratio >= 0.9 ? "S" : ratio >= 0.75 ? "A" : ratio >= 0.6 ? "B" : ratio >= 0.4 ? "C" : "D";
   }
 
-  finish() {
+  /** @param {{early?: boolean}} o  early: terminado desde la pausa antes del último paradero (sin bono) */
+  finish({ early = false } = {}) {
     if (this.finished) return;
     this.finished = true;
     const grade = this.grade();
-    const bonus = this.totals.served - this.totals.skipped > 0 && this.results.some(r => r.served) ? BUS_WAGE.finish[grade] : 0;
+    const bonus = !early && this.totals.served - this.totals.skipped > 0 && this.results.some(r => r.served) ? BUS_WAGE.finish[grade] : 0;
     this.totals.wage += bonus;
-    this.emit("finished", { grade, bonus, totals: { ...this.totals }, points: this.points, results: this.results.slice() });
+    this.emit("finished", { early, grade, bonus, totals: { ...this.totals }, points: this.points, results: this.results.slice() });
   }
 
   /* ----------------------------- Lecturas para la interfaz ----------------------------- */

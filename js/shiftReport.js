@@ -15,6 +15,11 @@
    principal. Con "reducir movimiento" todo aparece directamente.
    Solo DOM; vive dentro de #summary para que el juego se pause igual que
    con el resumen de siempre (hud.summaryOpen).
+
+   2.23 · El mismo informe sirve al bus (paraderos) y al taxi (carreras):
+   r.vehicle, r.noun, r.legend, r.stopClass, r.detail, r.tiles, r.faults…
+   reemplazan lo propio del Metro (ver busGame.js). Sin ellos, todo sigue
+   como en el Metro.
    ========================================================================== */
 
 import { formatCLP } from "./config.js";
@@ -48,6 +53,9 @@ export function renderShiftReport(host, r, o = {}) {
   const g = GRADES[r.score.grade] || GRADES.D;
   const log = r.stations;
   const w = r.punctualWindow;
+  const vehicle = r.vehicle || "train";
+  const noun = r.noun || { one: "estación", many: "estaciones", Many: "Estaciones" };
+  const tabs0 = r.tabs || { drive: "Conducción", pay: "Sueldo" };
   const timers = new Set(), finishers = [];
   let intro = !reduced, stopConfetti = null;
 
@@ -61,7 +69,7 @@ export function renderShiftReport(host, r, o = {}) {
   el.innerHTML = `
     <canvas class="report-confetti" aria-hidden="true"></canvas>
     <header class="report-head">
-      <span class="line-badge"></span>
+      <span class="line-badge${String(r.line.id).length > 2 ? " wide" : ""}"></span>
       <div class="report-head-text"><span class="small-label report-kicker"></span><h2 id="reportTitle"></h2></div>
       <div class="report-grade" aria-label="Nota ${r.score.grade}: ${g.label}"><b>${r.score.grade}</b><small>${g.label}</small></div>
     </header>
@@ -74,29 +82,30 @@ export function renderShiftReport(host, r, o = {}) {
 
     <section class="report-trip">
       <div class="report-trip-head">
-        <span class="small-label">Tu recorrido · ${log.length} de ${r.totalStations} estaciones</span>
-        <span class="report-legend"><i class="ok"></i>puntual <i class="warn"></i>desfase <i class="bad"></i>muy tarde ${icon("star", "star")}perfecta</span>
+        <span class="small-label">${r.tripLabel || `Tu recorrido · ${log.length} de ${r.totalStations} ${noun.many}`}</span>
+        <span class="report-legend">${r.legend || `<i class="ok"></i>puntual <i class="warn"></i>desfase <i class="bad"></i>muy tarde ${icon("star", "star")}perfecta`}</span>
       </div>
-      <div class="trip-track" role="listbox" aria-label="Estaciones servidas"><span class="trip-line"></span><span class="trip-fill"></span><span class="trip-train">${icon("train")}</span></div>
+      <div class="trip-track" role="listbox" aria-label="${noun.Many} del turno"><span class="trip-line"></span><span class="trip-fill"></span><span class="trip-train">${icon(vehicle)}</span></div>
       <div class="trip-detail" aria-live="polite"></div>
     </section>
 
     <nav class="report-tabs" role="tablist">
-      <button role="tab" data-tab="drive" aria-selected="true">${icon("train")} Conducción</button>
-      <button role="tab" data-tab="pay" aria-selected="false">${icon("coins")} Sueldo</button>
+      <button role="tab" data-tab="drive" aria-selected="true">${icon(vehicle)} ${tabs0.drive}</button>
+      <button role="tab" data-tab="pay" aria-selected="false">${icon("coins")} ${tabs0.pay}</button>
     </nav>
     <section class="report-panel" data-panel="drive"></section>
     <section class="report-panel" data-panel="pay" hidden></section>
 
     <footer class="report-actions">
-      <span class="report-hint"><kbd>←</kbd><kbd>→</kbd> estaciones · <kbd>Enter</kbd> ${r.actions.continueLabel.toLowerCase()}</span>
+      <span class="report-hint"><kbd>←</kbd><kbd>→</kbd> ${noun.many} · <kbd>Enter</kbd> ${r.actions.continueLabel.toLowerCase()}</span>
       <div class="report-buttons"></div>
     </footer>`;
   host.append(el);
   const $ = (s) => el.querySelector(s);
 
   /* ---------- Encabezado ---------- */
-  $(".line-badge").textContent = r.line.id;
+  if (r.line.icon) $(".line-badge").innerHTML = icon(r.line.icon);
+  else $(".line-badge").textContent = r.line.id;
   $(".report-kicker").textContent = r.kicker;
   $("#reportTitle").textContent = titleCase(r.title);
 
@@ -108,16 +117,17 @@ export function renderShiftReport(host, r, o = {}) {
   const recordText = $(".report-record");
   if (record) recordText.innerHTML = `<b class="report-newrecord">${icon("star")} ¡Nuevo récord!</b> Antes ${fmtInt(prevBest)} pts`;
   else if (prevBest) recordText.textContent = `Tu récord en este servicio: ${fmtInt(prevBest)} pts · te faltaron ${fmtInt(prevBest - total)}`;
-  else recordText.textContent = "Primer servicio en esta línea y sentido";
+  else recordText.textContent = r.firstText || "Primer servicio en esta línea y sentido";
 
   /* ---------- Recorrido ---------- */
   const track = $(".trip-track");
-  const cls = (d) => Math.abs(d) <= w ? "ok" : Math.abs(d) <= 4 * w ? "warn" : "bad";
+  const byDelay = (d) => Math.abs(d) <= w ? "ok" : Math.abs(d) <= 4 * w ? "warn" : "bad";
+  const cls = (st) => r.stopClass ? r.stopClass(st) : byDelay(st.delay);
   const stops = log.map((st, i) => {
     const b = document.createElement("button");
-    b.className = `trip-stop ${cls(st.delay)}` + (st.perfect ? " perfect" : "");
+    b.className = `trip-stop ${cls(st)}` + (st.perfect ? " perfect" : "");
     b.setAttribute("role", "option");
-    b.setAttribute("aria-label", `${titleCase(st.name)} · llegada ${formatDelay(st.delay)}`);
+    b.setAttribute("aria-label", r.stopLabel ? r.stopLabel(st) : `${titleCase(st.name)} · llegada ${formatDelay(st.delay)}`);
     b.style.left = log.length > 1 ? `${(i / (log.length - 1)) * 100}%` : "50%";
     b.style.animationDelay = `${0.25 + i * stepOf(log.length)}s`;
     if (st.perfect) b.innerHTML = icon("star");
@@ -129,7 +139,7 @@ export function renderShiftReport(host, r, o = {}) {
   el.style.setProperty("--trip-time", `${tripTime}s`);
   if (!log.length) {
     el.classList.add("report-empty");
-    track.insertAdjacentHTML("beforeend", `<p class="trip-empty">No alcanzaste a servir ninguna estación en este turno.</p>`);
+    track.insertAdjacentHTML("beforeend", `<p class="trip-empty">${r.emptyText || "No alcanzaste a servir ninguna estación en este turno."}</p>`);
   }
 
   let selected = -1;
@@ -137,18 +147,21 @@ export function renderShiftReport(host, r, o = {}) {
     if (!log.length) return;
     selected = Math.max(0, Math.min(log.length - 1, i));
     stops.forEach((b, k) => b.setAttribute("aria-selected", String(k === selected)));
-    const st = log[selected], c = cls(st.delay);
+    const st = log[selected], c = cls(st);
     const when = c === "ok" ? "puntual" : st.delay > 0 ? "con retraso" : "adelantado";
+    // Cada dato: [etiqueta, valor (HTML), clase]
+    const rows = r.detail ? r.detail(st, c) : [
+      ["Llegada", `${formatDelay(st.delay)} <small>${when}</small>`, c],
+      ["Parada", `${st.stop.toFixed(2)} m`],
+      ["Puntos", `+${fmtInt(st.points)}`],
+      ["Sueldo", `+${formatCLP(st.pay)}`, "money"],
+    ];
+    const Noun = noun.one[0].toUpperCase() + noun.one.slice(1);
     $(".trip-detail").innerHTML = `
-      <div class="trip-detail-name"><span class="small-label">Estación ${selected + 1} de ${log.length}</span><strong></strong></div>
-      <dl>
-        <div><dt class="small-label">Llegada</dt><dd class="${c}">${formatDelay(st.delay)} <small>${when}</small></dd></div>
-        <div><dt class="small-label">Parada</dt><dd>${st.stop.toFixed(2)} m</dd></div>
-        <div><dt class="small-label">Puntos</dt><dd>+${fmtInt(st.points)}</dd></div>
-        <div><dt class="small-label">Sueldo</dt><dd class="money">+${formatCLP(st.pay)}</dd></div>
-      </dl>
-      ${st.perfect ? `<span class="trip-perfect">${icon("star")} Estación perfecta</span>` : ""}`;
-    $(".trip-detail-name strong").textContent = titleCase(st.name);
+      <div class="trip-detail-name"><span class="small-label">${Noun} ${selected + 1} de ${log.length}</span><strong></strong></div>
+      <dl>${rows.map(([k, v, cl]) => `<div><dt class="small-label">${k}</dt><dd${cl ? ` class="${cl}"` : ""}>${v}</dd></div>`).join("")}</dl>
+      ${st.perfect ? `<span class="trip-perfect">${icon("star")} ${r.perfectLabel || "Estación perfecta"}</span>` : ""}`;
+    $(".trip-detail-name strong").textContent = st.title || titleCase(st.name);
     const b = stops[selected];
     b.classList.remove("pulse"); void b.offsetWidth; b.classList.add("pulse");
   }
@@ -157,14 +170,25 @@ export function renderShiftReport(host, r, o = {}) {
   const punctual = log.filter(s => Math.abs(s.delay) <= w).length;
   const pct = log.length ? Math.round((punctual / log.length) * 100) : 0;
   const avgStop = log.length ? log.reduce((a, s) => a + s.stop, 0) / log.length : 0;
-  const faults = [
+  const faults = r.faultList || [
     ["Señales en rojo", r.faults.redSignals],
     ["Excesos de velocidad", r.faults.overspeeds],
     ["Frenos de emergencia", r.faults.emergencies],
     ["Tirones", r.score.jerks],
     ["Paradas bruscas", r.score.harshStops],
   ];
-  $('[data-panel="drive"]').innerHTML = `
+  // Cada ficha: { ring: % | icon, label, value (HTML, admite data-count), sub }
+  const tile = (t) => `
+      <div class="report-tile">
+        ${t.ring != null
+          ? `<svg class="ring" viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="18"/><circle class="ring-fill" cx="22" cy="22" r="18" style="--p:${t.ring}"/></svg>`
+          : `<div class="report-tile-big">${icon(t.icon)}</div>`}
+        <div><span class="small-label">${t.label}</span><b>${t.value}</b><small>${t.sub}</small></div>
+      </div>`;
+  $('[data-panel="drive"]').innerHTML = r.tiles ? `
+    <div class="report-tiles">${r.tiles.map(tile).join("")}</div>
+    <ul class="report-faults">${faults.map(([k, v]) =>
+      `<li class="${v ? "bad" : "ok"}"><span>${v ? icon("close") : icon("check")}${k}</span><b>${v}</b></li>`).join("")}</ul>` : `
     <div class="report-tiles">
       <div class="report-tile">
         <svg class="ring" viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="18"/><circle class="ring-fill" cx="22" cy="22" r="18" style="--p:${pct}"/></svg>
@@ -184,23 +208,21 @@ export function renderShiftReport(host, r, o = {}) {
 
   /* ---------- Pestaña Sueldo (boleta) ---------- */
   const p = r.pay;
-  const payRows = [
-    ...log.map(s => [titleCase(s.name), s.pay]),
-  ];
-  const bonusRow = p.bonusOk ? [`Bono de servicio · nota ${r.score.grade}`, p.bonus] : [`Bono (desde ${p.minStations} estaciones)`, 0];
+  const payRows = p.rows || log.map(s => [titleCase(s.name), s.pay]);
+  const bonusRow = p.bonusOk ? [`${p.bonusLabel || "Bono de servicio"} · nota ${r.score.grade}`, p.bonus] : [p.noBonusText || `Bono (desde ${p.minStations} estaciones)`, 0];
   $('[data-panel="pay"]').innerHTML = `
     <div class="receipt">
-      <div class="receipt-head"><span class="small-label">Liquidación del turno</span><span class="small-label">${p.bank}</span></div>
-      <ol class="receipt-rows">${payRows.map(([k, v]) => `<li><span></span><b>+${formatCLP(v)}</b></li>`).join("") || `<li class="muted"><span>Sin estaciones servidas</span><b>$0</b></li>`}</ol>
+      <div class="receipt-head"><span class="small-label">${p.title || "Liquidación del turno"}</span><span class="small-label">${p.bank}</span></div>
+      <ol class="receipt-rows">${payRows.map(([k, v]) => `<li><span></span><b>+${formatCLP(v)}</b></li>`).join("") || `<li class="muted"><span>${p.emptyText || "Sin estaciones servidas"}</span><b>$0</b></li>`}</ol>
       <div class="receipt-sums">
-      <div class="receipt-sub"><span>Sueldo por estaciones</span><b>${formatCLP(p.stations)}</b></div>
+      <div class="receipt-sub"><span>${p.subLabel || "Sueldo por estaciones"}</span><b>${formatCLP(p.stations)}</b></div>
       <div class="receipt-sub ${p.bonusOk ? "" : "muted"}"><span></span><b>+${formatCLP(bonusRow[1])}</b></div>
       <div class="receipt-total"><span>Ganaste en este turno</span><b class="receipt-amount">$0</b></div>
       <div class="receipt-balance"><span>Saldo en tu cuenta</span><b>${p.balance}</b></div>
       </div>
     </div>`;
-  const rowEls = [...el.querySelectorAll(".receipt-rows li:not(.muted)")];
-  rowEls.forEach((li, i) => { li.firstChild.textContent = payRows[i][0]; li.style.animationDelay = `${i * 0.05}s`; });
+  const rowEls = [...el.querySelectorAll(".receipt-rows li")].slice(0, payRows.length);
+  rowEls.forEach((li, i) => { li.firstChild.textContent = payRows[i][0]; if (payRows[i][2]) li.classList.add("muted"); li.style.animationDelay = `${i * 0.05}s`; });
   el.querySelectorAll(".receipt-sub span")[1].textContent = bonusRow[0];
   let payShown = false;
 

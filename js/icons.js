@@ -8,6 +8,9 @@
 
 const PATHS = {
   train: '<rect x="5" y="3" width="14" height="14" rx="3"/><path d="M5 11h14M9 17l-2 4M15 17l2 4"/><path d="M9 14h.01M15 14h.01"/>',
+  bus: '<rect x="4" y="3" width="16" height="15" rx="3"/><path d="M4 11h16M4 7h16M8 18v3M16 18v3"/><path d="M8 14.5h.01M16 14.5h.01"/>',
+  taxi: '<path d="M10 3h4l1 3M5 17v3M19 17v3M3 12l2-6h14l2 6v5H3z"/><path d="M3 12h18M7 14.5h.01M17 14.5h.01"/>',
+  route: '<circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a3.5 3.5 0 0 0 0-7H9a3.5 3.5 0 0 1 0-7h7"/>',
   walk: '<circle cx="13" cy="4" r="2"/><path d="m9 21 2-6 3 3v3M7 12l3-4h4l2 4 3 1M11 15l-1-4"/>',
   monitor: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4M6 10h3l2-3 2 5 2-2h3"/>',
   bag: '<path d="M4 7h16l-1.5 13h-13zM9 7V5a3 3 0 0 1 6 0v2"/>',

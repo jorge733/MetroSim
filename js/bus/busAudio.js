@@ -228,6 +228,13 @@ export class BusAudio {
     this.tone(2093, 0.25, { type: "triangle", gain: 0.12, at: 0.09 });
   }
 
+  /** 2.23 · Informe del turno: tic de cada paradero que se dibuja y golpe del timbre con la nota. */
+  tick() { this.tone(1760, 0.04, { type: "square", gain: 0.035 }); }
+  stamp() {
+    this.tone(110, 0.22, { type: "triangle", gain: 0.35 });
+    this.tone(70, 0.3, { type: "sine", gain: 0.3, at: 0.02 });
+  }
+
   /** Falta (multa de puntos). */
   fault() {
     this.tone(330, 0.18, { type: "sawtooth", gain: 0.08 });
