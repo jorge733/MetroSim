@@ -156,6 +156,8 @@ cada uno con sus datos reales, y se dibujan como se ven en Santiago.
   (nueva, para el modo bus; escribe `js/bus/paraderosOsm.js`).
 - **2.22.1:** la señal del paradero se lee por los dos lados (antes, por atrás solo se veía el marco oscuro), y post de
   Instagram «Calles como las de Santiago» con las novedades de la 2.21 y la 2.22 (`post-calles-reales/`).
+- **2.22.2:** la cuenta de Instagram **@redmovisim** lleva la insignia azul de verificado donde aparece (barra
+  superior y pie de la portada, y la página «Qué es»).
 
 ## Versión 2.21 · Autos y buses más realistas
 

@@ -45,6 +45,9 @@
 .shop-balance-mini { font: 700 15px/1 var(--f-data); color: var(--ok); }
 .home-icon-btn .ico { width: 18px; height: 18px; }
 .home-icon-btn span { font-size: 14px; font-weight: 600; }
+.verif { width: 16px; height: 16px; flex: none; }
+.home-icon-btn .verif { margin-left: -2px; }
+.home-insta .verif { width: 15px; height: 15px; margin-left: -4px; }
 .creator-launch { border-color: #3ad37f66; color: #bff0d3; }
 
 /* ---------- Pasos ---------- */
