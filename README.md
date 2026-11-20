@@ -124,6 +124,14 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **Salir por los torniquetes es gratis**: solo se cobra el pasaje al pasar hacia la zona pagada (antes, al terminar
   de cruzar el torniquete de salida se cobraba un pasaje).
 
+## Versión 2.25 · Vuelta en U de verdad con el taxi
+
+- **La vuelta en U ya no es instantánea**: el taxi gira de verdad en el cruce, en una curva de media vuelta que
+  atraviesa el bandejón y termina en la pista junto al bandejón del otro sentido. Se ve el giro (y el volante) desde
+  todas las cámaras, y la cámara de atrás acompaña la curva.
+- **Anda solo a paso de hombre** mientras gira (caja automática, unos 8 segundos); con el acelerador la curva se hace
+  más rápido (hasta unos 15 km/h) y con el freno te detienes en medio de la vuelta.
+
 ## Versión 2.24 · Tienda RedMovi más grande y un depto de verdad
 
 **Más cosas para comprar en la Tienda RedMovi** (tecla K o desde la portada):

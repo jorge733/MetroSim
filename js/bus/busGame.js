@@ -952,9 +952,8 @@ class BusGame {
   taxiEvent(e) {
     switch (e.type) {
       case "fareHail": this.audio.bell(); return true;
+      case "uturnStart": this.audio.blinker(); return true;        // 2.25 · la vuelta ya no es instantánea: la cámara sigue el giro
       case "uturn": {
-        this.audio.blinker();
-        this.camPos = null;
         const R = this.sim.route;
         this.el.routeTitle.textContent = `${R.name.toUpperCase()} · ${R.from.toUpperCase()} → ${R.to.toUpperCase()}`;
         return true;
@@ -1049,6 +1048,7 @@ class BusGame {
     if (f?.step === "pay") return "Te está pagando…";
     if (f?.phase === "done") return f.step === "out" ? "Se baja del taxi…" : f.step === "closing" ? "Cierra la puerta desde afuera…" : "Abre la puerta…";
     if (b.doors !== "closed") return "Espera que tu pasajero cierre la puerta";
+    if (sim.turn) return "Dando la vuelta en U… avanza despacio; frena si viene alguien";
     if (!t) return b.v < 0.5 ? `Acelera con ${K.gas} y busca a quien haga señas` : "Atento a la vereda: alguien te va a hacer señas";
     const d = t.s - b.s, curb = Math.abs(b.x - LANES[0]) < 1.0;
     if (t.across || t.behind) {

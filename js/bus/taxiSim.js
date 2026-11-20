@@ -52,6 +52,10 @@ const MIN_TRIP = 450, MAX_TRIP = 1500;
 const PATIENCE = 150;         // s que espera quien hace señas si el taxi se va para el otro lado
 /** 2.3 · Eje del bandejón central: las pistas del otro sentido son las de este reflejadas (x → MIRROR_X − x). */
 export const MIRROR_X = -10.8;
+/* 2.25 · Vuelta en U de verdad (no instantánea) */
+const UTURN_ALONG = 5.5;      // m que avanza hacia el cruce hasta quedar atravesado
+const UTURN_CREEP = 1.8;      // m/s: sin pedales, anda solo (caja automática)
+const UTURN_VMAX = 4.2;       // m/s con el acelerador a fondo (15 km/h en una curva cerrada)
 const round10 = (n) => Math.max(0, Math.round(n / 10) * 10);
 
 export class TaxiSim extends BusSim {
@@ -81,24 +85,65 @@ export class TaxiSim extends BusSim {
   fromIdaS(ws) { return this._dir > 0 ? ws : this.span - ws; }
   toIdaX(x) { return this._dir > 0 ? x : MIRROR_X - x; }
 
-  /** Vuelta en U: despacio, desde la pista junto al bandejón, en un cruce con semáforo (o al final de la calle). */
+  /** Vuelta en U: despacio, desde la pista junto al bandejón, en un cruce con semáforo (o al final de la calle).
+   *  2.25 · Ya no es instantánea: el taxi gira de verdad, en una curva de media vuelta que cruza el bandejón por el
+   *  cruce y termina en la pista junto al bandejón del otro sentido. Anda solo a paso de hombre (caja automática);
+   *  el acelerador lo apura un poco y el freno lo detiene en medio de la curva. */
   uTurn() {
     const b = this.bus, R = this.route;
-    if (this.finished) return false;
+    if (this.finished || this.turn) return false;
     if (b.doors !== "closed" || this.fare?.step) return this.msg("Espera que tu pasajero termine de subir o bajar", "warn", "uturn", 2), false;
     if (b.v > 5.5) return this.msg("Para dar la vuelta en U baja a menos de 20 km/h", "warn", "uturn", 2), false;
     const atEnd = b.s > R.length - 45;
     const L = R.lights.find(l => Math.abs(b.s - (l.s + 8)) < 13);
     if (!L && !atEnd) return this.msg("La vuelta en U se da en un cruce con semáforo (o al final de la calle)", "warn", "uturn", 2), false;
     if (!atEnd && b.lane !== LANES.length - 1) return this.msg("Para dar la vuelta pásate a la pista de la izquierda, junto al bandejón", "warn", "uturn", 2), false;
-    const ws = this.toIdaS(L && !atEnd ? L.s + 8 : b.s);      // el centro del cruce, visto desde la ida
+    // La curva (en el sentido en que vas): de x0 a la pista junto al bandejón de enfrente, avanzando UTURN_ALONG en el medio
+    const x1 = MIRROR_X - LANES.at(-1);
+    this.turn = { th: 0, s0: b.s, x0: b.x, r: (b.x - x1) / 2, a: UTURN_ALONG, yaw: 0, steer: 0 };
+    b.targetLane = b.lane;
+    b.latV = 0;
+    this.emit("uturnStart", {});
+    this.msg("Dando la vuelta en U: gira despacio (frena si viene alguien)", "info", "uturnGo", 0);
+    return true;
+  }
+
+  /** 2.25 · Avanza por la curva de la vuelta en U (reemplaza el paso normal del bus mientras dura). */
+  updateBus(dt) {
+    const U = this.turn;
+    if (!U) return super.updateBus(dt);
+    const b = this.bus, clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const wantT = clamp(+this.input.throttle || 0, 0, 1), wantB = clamp(+this.input.brake || 0, 0, 1);
+    b.throttle += clamp(wantT - b.throttle, -3 * dt, 1.8 * dt);
+    b.brake += clamp(wantB - b.brake, -3.2 * dt, 2.6 * dt);
+    // Sin pedales avanza solo, despacio; con el acelerador, algo más rápido (pero la curva es cerrada); el freno lo detiene
+    const vT = b.brake > 0.05 ? 0 : UTURN_CREEP + b.throttle * (UTURN_VMAX - UTURN_CREEP);
+    const a = b.v < vT ? Math.min(1.6, (vT - b.v) * 2) : -(b.brake * this.spec.brake + Math.max(0, b.v - vT) * 1.5);
+    const v0 = b.v;
+    b.v = Math.max(0, b.v + a * dt);
+    b.accel = (b.v - v0) / dt;
+    b.decel += ((b.v > 0.05 ? -b.accel : 0) - b.decel) * Math.min(1, dt * 6);
+    // Media elipse: s = s0 + a·sen θ, x = x0 − r·(1 − cos θ); θ avanza según lo recorrido
+    const tan = Math.hypot(U.r * Math.sin(U.th), U.a * Math.cos(U.th));
+    U.th = Math.min(Math.PI, U.th + b.v * dt / Math.max(0.5, tan));
+    b.s = U.s0 + U.a * Math.sin(U.th);
+    b.x = U.x0 - U.r * (1 - Math.cos(U.th));
+    U.yaw = Math.atan2(U.r * Math.sin(U.th), U.a * Math.cos(U.th));      // 0 → π/2 (cruzando) → π (ya del otro lado)
+    U.steer = Math.min(1, U.th / 0.4, (Math.PI - U.th) / 0.4);           // volante: se gira al entrar y se endereza al salir
+    if (U.th >= Math.PI) this.endTurn();
+  }
+
+  /** Terminó la curva: ahora la simulación sigue en el otro sentido. */
+  endTurn() {
+    const b = this.bus;
+    const ws = this.toIdaS(b.s), wx = this.toIdaX(b.x);
+    this.turn = null;
     this._dir = -this._dir;
     this.route = this._dir > 0 ? this.ida : this.back;
-    b.s = this.fromIdaS(ws) + 2;
+    b.s = this.fromIdaS(ws);
+    b.x = this._dir > 0 ? wx : MIRROR_X - wx;
     b.lane = b.targetLane = LANES.length - 1;
-    b.x = LANES.at(-1);
     b.latV = 0;
-    b.v = Math.min(b.v, 2.5);
     this.waiting.reverse();          // los paraderos del otro sentido son los mismos, al revés
     this.arrivalAcc.reverse();
     this.cars = [];
@@ -108,7 +153,6 @@ export class TaxiSim extends BusSim {
     this.taxi.uturns++;
     this.emit("uturn", { dir: this._dir });
     this.msg(`Vuelta en U: ahora vas hacia ${this.route.to}`, "ok");
-    return true;
   }
 
   /* --------- Textos: los avisos heredados del bus hablan del taxi --------- */
@@ -324,6 +368,7 @@ export class TaxiSim extends BusSim {
   /** ¿Está el taxi junto a la vereda y a la altura de `s`? */
   atCurb(s, win = PICK_WINDOW) {
     const b = this.bus;
+    if (this.turn) return { near: false, curb: false, error: b.s - s };     // 2.25 · girando en U
     return { near: Math.abs(b.s - s) <= win, curb: Math.abs(b.x - LANES[0]) < 1.0, error: b.s - s };
   }
 

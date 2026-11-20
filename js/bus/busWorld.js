@@ -1032,14 +1032,14 @@ export class BusWorld {
     const latV = this.prevX == null ? 0 : (b.x - this.prevX) / Math.max(dt, 1e-3);
     this.prevX = b.x;
     const yaw = b.v > 0.3 ? -Math.atan2(latV, b.v) : 0;
-    this.busYaw = (this.busYaw ?? 0) + (yaw - (this.busYaw ?? 0)) * Math.min(1, dt * 8);
+    this.busYaw = sim.turn ? sim.turn.yaw : (this.busYaw ?? 0) + (yaw - (this.busYaw ?? 0)) * Math.min(1, dt * 8);   // 2.25 · girando en U
     // 2.3 · El taxi puede ir en el otro sentido: se dibuja en la calzada de enfrente, dado vuelta
     const flip = sim.dir < 0 ? Math.PI : 0;
     if (this.lastDir !== sim.dir) { this.lastDir = sim.dir; this.prevX = b.x; this.busYaw = 0; }
     this.place(g, sim.toIdaX(b.x), sim.idaS, (sim.len ?? BUS_LENGTH) * sim.dir, this.busYaw + flip);
     this.body.rotation.x = THREE.MathUtils.lerp(this.body.rotation.x, THREE.MathUtils.clamp(-b.accel * 0.006, -0.02, 0.02), Math.min(1, dt * 4));
     for (const w of this.wheels) w.rotation.x -= (b.v * dt) / (this.taxi ? 0.32 : 0.5);     // 2.15.4 · radio de la rueda del taxi
-    this.steering.rotation.z = THREE.MathUtils.lerp(this.steering.rotation.z, -yaw * 6 + this.path.curvature(sim.idaS ?? b.s) * (sim.dir ?? 1) * 25, Math.min(1, dt * 6));
+    this.steering.rotation.z = THREE.MathUtils.lerp(this.steering.rotation.z, sim.turn ? -2.6 * sim.turn.steer : -yaw * 6 + this.path.curvature(sim.idaS ?? b.s) * (sim.dir ?? 1) * 25, Math.min(1, dt * 6));
     // Puertas
     const open = b.doors === "open" ? 1 : b.doors === "opening" ? b.doorT / 1.1 : b.doors === "closing" ? 1 - b.doorT / 1.1 : 0;
     for (const leaf of this.doorLeaves) {
