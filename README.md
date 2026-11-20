@@ -124,6 +124,22 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **Salir por los torniquetes es gratis**: solo se cobra el pasaje al pasar hacia la zona pagada (antes, al terminar
   de cruzar el torniquete de salida se cobraba un pasaje).
 
+## Versión 2.21 · Autos y buses más realistas
+
+- **Los autos ya no son cajas.** La carrocería sale del perfil lateral de cada modelo: capó que sube hacia el
+  parabrisas inclinado, techo, maleta y los **pasos de rueda recortados**. Hay **sedanes, hatchbacks, SUV (con barras
+  en el techo), camionetas con la caja cubierta y furgones**, en los colores que más se ven en la calle (mucho blanco,
+  gris y negro).
+- Cada auto tiene **ruedas con llanta y rayos**, focos, parrilla, antinieblas, parachoques, espejos, manillas, la
+  línea de las puertas y **patente blanca** adelante y atrás. Las luces traseras siguen encendiéndose al frenar.
+- **El bus que manejas:** la rueda se ve entera dentro de su **paso de rueda con arco negro** (antes la tapaba el
+  costado), llantas que se ven girar, zócalo negro, marco de las ventanas, **cantos del techo y esquinas
+  redondeados**, frente con la máscara negra de los focos, **parachoques envolventes**, patentes, limpiaparabrisas,
+  espejos «orejas de conejo» con su brazo y la rejilla del motor atrás.
+- **El taxi** también lleva llantas y patentes.
+- Los mismos autos (y un bus de la calle con el techo redondeado, ventanas, puertas y pasos de rueda) circulan por
+  las calles de la ciudad y por las avenidas que se ven desde el tren en los tramos al aire libre.
+
 ## Versión 2.20 · Subir y bajar del taxi como en la vida real
 
 - **La puerta del taxi la abre y la cierra el pasajero**, no el conductor. Cuando te detienes junto a la vereda a su

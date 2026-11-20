@@ -30,6 +30,7 @@ import { skyAt } from "../render/outdoor.js";
 import { WEATHER } from "../engine/weather.js";
 import { metroStreetAccess } from "../city/city.js";
 import { linesAtStation } from "../engine/network.js";
+import { carGroup, pickCarKind, CAR_COLORS, wheelGroup, sharedVehicleMaterials, spansOutside } from "../render/vehicles.js";
 import { SkyDome, SunShadow, sunDirection, skyEnvironment, shadows, asphaltTexture, asphaltRoughness, paverTexture, grassTexture, worldUV, facadeUV, facadeSet, crownGeometry, trunkGeometry, leafMaterial, ASPHALT_TILE, PAVER_TILE, GRASS_TILE } from "../render/realism.js";
 
 const ROAD_FAR = -17.6;          // borde de la calzada de vuelta
@@ -45,7 +46,6 @@ const TZ = new THREE.Matrix4();
 /** 2.2 · Taxi: largo, ancho y asientos (conductor adelante a la izquierda, pasajero atrás a la derecha). */
 const TAXI_L = 4.6, TAXI_W = 1.85;
 const TAXI_SEATS = { driver: { x: -0.4, y: 0.62, z: 2.05 }, rider: { x: 0.42, y: 0.62, z: 3.2 } };
-const CAR_COLORS = ["#d9dde2", "#1d1f24", "#8a9099", "#b3242a", "#21457a", "#e8e4d8", "#4c5a4a", "#6b4a2f", "#c9b03a", "#2f6f8f"];
 
 /* ---------- utilidades ---------- */
 function canvasTexture(w, h, draw, { repeat = null, srgb = true } = {}) {
@@ -637,16 +637,24 @@ export class BusWorld {
     const BOT = 0.475, WIN0 = 1.655, WIN1 = 2.705, TOP = 3.025;
     const glassT = new THREE.MeshStandardMaterial({ color: "#22323f", roughness: 0.08, metalness: 0.5, transparent: true, opacity: 0.38, depthWrite: false });
     const DOOR_GAPS = [[0.65, 1.85], [5.0, 6.2], [9.35, 10.55]];          // vanos de las puertas (lado derecho)
-    const spans = (a, b, gaps) => {                                      // tramos de [a, b] fuera de los vanos
-      const out = []; let x = a;
-      for (const [g0, g1] of gaps) { if (g0 > x) out.push([x, Math.min(g0, b)]); x = Math.max(x, g1); }
-      if (x < b) out.push([x, b]);
-      return out.filter(([p, q]) => q - p > 0.02);
-    };
+    const AXLES = [2.6, 8.9], ARCH = 0.62, ARCH_TOP = 1.16;                // 2.21 · ejes y pasos de rueda
+    const spans = spansOutside;                                          // tramos de [a, b] fuera de los vanos
+    const sortGaps = (gs) => [...gs].sort((p, q) => p[0] - q[0]);
+    const wheelGaps = AXLES.map(z => [z - ARCH, z + ARCH]);
     for (const side of [-1, 1]) {
       const x = side * (W / 2 - 0.02), gaps = side > 0 ? DOOR_GAPS : [];
-      for (const [a, b] of spans(0, L, gaps)) box(body, 0.04, WIN0 - BOT, b - a, white, x, (BOT + WIN0) / 2, (a + b) / 2);   // bajo las ventanas
-      box(body, 0.04, TOP - WIN1, L, white, x, (WIN1 + TOP) / 2, L / 2);                                                  // sobre las ventanas
+      // 2.21 · El panel bajo las ventanas deja el paso de la rueda (antes la tapaba entera) y sobre ella va un arco negro
+      for (const [a, b] of spans(0, L, sortGaps([...gaps, ...wheelGaps]))) box(body, 0.04, WIN0 - BOT, b - a, white, x, (BOT + WIN0) / 2, (a + b) / 2);   // bajo las ventanas
+      for (const z of AXLES) {
+        box(body, 0.04, WIN0 - ARCH_TOP, 2 * ARCH, white, x, (ARCH_TOP + WIN0) / 2, z);
+        box(body, 0.46, 0.04, 2 * ARCH, dark, side * (W / 2 - 0.25), ARCH_TOP - 0.02, z);     // techo del paso de rueda
+        box(body, 0.04, ARCH_TOP - 0.3, 2 * ARCH, dark, side * (W / 2 - 0.48), (ARCH_TOP + 0.3) / 2, z);
+        const arch = new THREE.Mesh(new THREE.TorusGeometry(0.59, 0.05, 6, 18, Math.PI), dark);
+        arch.rotation.y = Math.PI / 2;
+        arch.position.set(side * (W / 2 + 0.005), 0.5, z);
+        body.add(arch);
+      }
+      box(body, 0.04, 3.01 - WIN1, L, white, x, (WIN1 + 3.01) / 2, L / 2);                                                  // sobre las ventanas
       // 2.17.2 · Al lado del conductor (izquierda) la ventana empieza a 0,25 m del frente: antes un panel blanco de 1,3 m
       // tapaba un tercio de la vista desde la cabina
       const w0 = side > 0 ? 0.65 : 0.25;
@@ -659,16 +667,44 @@ export class BusWorld {
     box(body, W, TOP - 2.65, 0.04, white, 0, (2.65 + TOP) / 2, L);       // sobre la luneta
     for (const x of [-1, 1]) box(body, 0.16, 0.9, 0.04, white, x * (W / 2 - 0.08), 2.2, L);
     for (const side of [-1, 1]) {                                        // franjas rojas
-      box(body, 0.02, 0.5, L - 0.2, red, side * (W / 2 + 0.01), 0.72, L / 2);
+      for (const [a, b] of spans(0.1, L - 0.1, sortGaps([...(side > 0 ? DOOR_GAPS : []), ...wheelGaps]))) box(body, 0.02, 0.5, b - a, red, side * (W / 2 + 0.01), 0.72, (a + b) / 2);
+      for (const [a, b] of spans(0.1, L - 0.1, sortGaps([...(side > 0 ? DOOR_GAPS : []), ...wheelGaps]))) box(body, 0.05, 0.1, b - a, dark, side * (W / 2 + 0.01), BOT + 0.03, (a + b) / 2);   // zócalo negro
       box(body, 0.02, 0.12, L - 0.4, red, side * (W / 2 + 0.015), 1.42, L / 2);
     }
-    box(body, W - 0.2, 0.5, 0.02, red, 0, 0.72, -0.01);                  // franja del frente
-    box(body, W - 0.2, 0.5, 0.02, red, 0, 0.72, L + 0.01);               // y de atrás
     const windshield = new THREE.MeshStandardMaterial({ color: "#1b2733", roughness: 0.1, metalness: 0.5, transparent: true, opacity: 0.55, depthWrite: false });
     this.windshield = box(body, W - 0.2, 1.45, 0.02, windshield, 0, 1.95, -0.01);   // parabrisas (se ve a través desde la cabina)
     box(body, W - 0.3, 0.9, 0.02, glassT, 0, 2.2, L + 0.01);              // luneta
-    box(body, W - 0.1, 0.12, 0.08, dark, 0, 0.45, -0.02);                 // parachoques
-    box(body, W, 0.1, L, std("#d4d7da"), 0, 3.06, L / 2);                // techo
+    // 2.21 · Frente y cola: parachoques envolventes, máscara negra con los focos dobles, patentes, limpiaparabrisas,
+    // cantos redondeados y la rejilla del motor atrás
+    box(body, W + 0.04, 0.34, 0.2, dark, 0, 0.5, 0.0);                   // parachoques delantero
+    box(body, W + 0.04, 0.34, 0.2, dark, 0, 0.5, L);                     // y trasero
+    for (const x of [-1, 1]) for (const z of [0.12, L - 0.12]) box(body, 0.06, 0.34, 0.26, dark, x * (W / 2 + 0.01), 0.5, z);
+    box(body, W - 0.3, 0.32, 0.02, dark, 0, 0.88, -0.02);                // máscara de los focos
+    const plateMat = sharedVehicleMaterials().plate;
+    box(body, 0.42, 0.14, 0.02, plateMat, 0, 0.5, -0.115);
+    box(body, 0.42, 0.14, 0.02, plateMat, 0, 1.45, L + 0.03);
+    for (let i = 0; i < 5; i++) box(body, W - 0.8, 0.035, 0.02, dark, 0, 0.95 + i * 0.09, L + 0.03);   // rejilla del motor
+    for (const x of [-0.45, 0.35]) {                                     // limpiaparabrisas
+      const wiper = box(body, 0.75, 0.025, 0.02, dark, x, 1.32, -0.035);
+      wiper.rotation.z = 0.35;
+    }
+    const cornerGeo = new THREE.CylinderGeometry(0.09, 0.09, TOP - BOT, 10, 1, false, 0, Math.PI / 2);
+    for (const [sx, sz, rot] of [[1, 0, Math.PI / 2], [-1, 0, Math.PI], [1, L, 0], [-1, L, -Math.PI / 2]]) {   // esquinas redondeadas
+      const c = new THREE.Mesh(cornerGeo, white);
+      c.position.set(sx * (W / 2 - 0.07), (BOT + TOP) / 2, sz === 0 ? 0.07 : L - 0.07);
+      c.rotation.y = rot;
+      body.add(c);
+    }
+    const edgeGeo = new THREE.CylinderGeometry(0.1, 0.1, L - 0.1, 10, Math.ceil(L / 3), false, 0, Math.PI / 2);
+    edgeGeo.rotateX(Math.PI / 2);
+    for (const sx of [-1, 1]) {                                           // canto redondeado del techo
+      const e = new THREE.Mesh(edgeGeo, white);
+      e.position.set(sx * (W / 2 - 0.1), 3.01, L / 2);
+      e.rotation.z = sx > 0 ? Math.PI / 2 : Math.PI;
+      body.add(e);
+      for (const y of [WIN0, WIN1]) box(body, 0.03, 0.05, L - 0.2, dark, sx * (W / 2 + 0.012), y, L / 2);   // marco de las ventanas
+    }
+    box(body, W - 0.2, 0.1, L, std("#d4d7da"), 0, 3.06, L / 2);          // techo
     box(body, 1.6, 0.35, 3.2, std("#c8ccd0"), 0, 3.25, L * 0.62);        // equipo de aire acondicionado
     // Letrero LED con el recorrido
     const ledTex = signTexture([`${this.route.id}  ${this.route.to.toUpperCase()}`], { w: 512, h: 80, bg: "#100c05", fg: "#ffb000", font: "700 52px JetBrains Mono, monospace", led: true });
@@ -690,16 +726,18 @@ export class BusWorld {
     this.blinkMat = new THREE.MeshStandardMaterial({ color: "#552e00", emissive: new THREE.Color("#ffa000"), emissiveIntensity: 0 });
     for (const [x, z] of [[-W / 2, 0.15], [W / 2, 0.15], [-W / 2, L - 0.15], [W / 2, L - 0.15]]) box(body, 0.06, 0.16, 0.22, this.blinkMat, x, 1.1, z);
     this.blinkDir = 0;
-    // Espejos
-    for (const x of [-1, 1]) box(body, 0.08, 0.38, 0.16, dark, x * (W / 2 + 0.25), 2.25, 0.25);
+    // Espejos «orejas de conejo»: brazo hacia adelante y el espejo colgando delante de las esquinas
+    for (const x of [-1, 1]) {
+      const arm = box(body, 0.05, 0.05, 0.55, dark, x * (W / 2 + 0.05), 2.7, -0.12);
+      arm.rotation.y = x * 0.5;
+      box(body, 0.05, 0.4, 0.05, dark, x * (W / 2 + 0.17), 2.5, -0.35);
+      box(body, 0.18, 0.42, 0.06, dark, x * (W / 2 + 0.17), 2.2, -0.36);
+    }
     // Ruedas
     this.wheels = [];
-    const wheelGeo = new THREE.CylinderGeometry(0.5, 0.5, 0.32, 18);
-    wheelGeo.rotateZ(Math.PI / 2);
-    const tire = std("#16181a", { roughness: 0.9 });
-    for (const z of [2.6, 8.9]) for (const x of [-1, 1]) {
-      const w = new THREE.Mesh(wheelGeo, tire);
-      w.position.set(x * (W / 2 - 0.12), 0.5, z);
+    for (const z of AXLES) for (const x of [-1, 1]) {
+      const w = wheelGroup(0.5, 0.3, x);                                // 2.21 · con llanta y rayos (se ve girar)
+      w.position.set(x * (W / 2 - 0.2), 0.5, z);
       body.add(w);
       this.wheels.push(w);
     }
@@ -780,6 +818,9 @@ export class BusWorld {
     body.add(sign);
     box(body, W - 0.1, 0.12, 0.1, dark, 0, 0.3, -0.03);                  // parachoques
     box(body, W - 0.1, 0.12, 0.1, dark, 0, 0.3, L + 0.03);
+    const plateMat = sharedVehicleMaterials().plate;                     // 2.21 · patentes
+    box(body, 0.4, 0.13, 0.02, plateMat, 0, 0.3, -0.09);
+    box(body, 0.4, 0.13, 0.02, plateMat, 0, 0.55, L + 0.012);
     // Luces
     this.headMat = new THREE.MeshStandardMaterial({ color: "#fff", emissive: new THREE.Color("#fff6dd"), emissiveIntensity: this.night ? 2 : 0.3 });
     this.tailMat = new THREE.MeshStandardMaterial({ color: "#400", emissive: new THREE.Color("#ff1a10"), emissiveIntensity: 0.4 });
@@ -792,11 +833,8 @@ export class BusWorld {
     for (const x of [-1, 1]) box(body, 0.16, 0.1, 0.08, black, x * (W / 2 + 0.08), 1.0, 1.55);   // espejos
     // Ruedas
     this.wheels = [];
-    const wheelGeo = new THREE.CylinderGeometry(0.32, 0.32, 0.22, 16);
-    wheelGeo.rotateZ(Math.PI / 2);
-    const tire = std("#16181a", { roughness: 0.9 });
     for (const z of [0.85, L - 0.85]) for (const x of [-1, 1]) {
-      const w = new THREE.Mesh(wheelGeo, tire);
+      const w = wheelGroup(0.32, 0.22, x);                             // 2.21 · con llanta
       w.position.set(x * (W / 2 - 0.1), 0.32, z);
       body.add(w);
       this.wheels.push(w);
@@ -875,27 +913,26 @@ export class BusWorld {
   disposeCar(g) {
     g.traverse(o => {
       if (!o.isMesh) return;
-      o.geometry.dispose();
-      if (o.material !== this.headMat) o.material.dispose();
+      if (!o.geometry.userData.shared) o.geometry.dispose();       // 2.21 · las geometrías de los modelos se comparten
+      if (o.material !== this.headMat && !o.material.userData.shared) o.material.dispose();
     });
   }
 
+  /** 2.21 · Auto con forma de auto (render/vehicles.js): sedán, hatchback, SUV, camioneta o furgón. Origen = centro del frente. */
   carMesh(car) {
+    let seed = (car.tint >>> 0) || 1;
+    const rnd = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296);
+    const kind = pickCarKind(rnd, car.kind === "van");
+    const color = CAR_COLORS[Math.floor(rnd() * CAR_COLORS.length)];
+    const paint = std(color, { roughness: 0.28, metalness: 0.45 });
+    const tails = new THREE.MeshStandardMaterial({ color: "#5a0b0b", roughness: 0.25, emissive: new THREE.Color("#ff1a10"), emissiveIntensity: this.night ? 0.9 : 0.3 });
+    const model = carGroup(kind, { paint, tail: tails, ...(this.night ? { head: this.headMat } : {}) });
+    const L = model.userData.model.L;
+    model.scale.z = Math.min(1, (car.len + 0.3) / L);              // que no se monte sobre el de atrás
+    model.position.z = car.len / 2;
     const g = new THREE.Group();
-    const color = CAR_COLORS[car.tint % CAR_COLORS.length];
-    const paint = std(color, { roughness: 0.35, metalness: 0.35 });
-    const glass = new THREE.MeshStandardMaterial({ color: "#1c252e", roughness: 0.15, metalness: 0.4 });
-    const van = car.kind === "van";
-    box(g, 1.8, van ? 1.5 : 0.72, car.len, paint, 0, van ? 1.05 : 0.62, car.len / 2);
-    if (!van) box(g, 1.62, 0.55, 2.2, glass, 0, 1.25, car.len / 2 + 0.2);
-    else box(g, 1.82, 0.5, car.len - 1.2, glass, 0, 1.45, car.len / 2 + 0.3);
-    const tire = std("#141414");
-    for (const z of [0.85, car.len - 0.85]) for (const x of [-0.85, 0.85]) box(g, 0.24, 0.56, 0.56, tire, x, 0.28, z);
-    const tails = new THREE.MeshStandardMaterial({ color: "#400", emissive: new THREE.Color("#ff1a10"), emissiveIntensity: this.night ? 0.9 : 0.3 });
-    for (const x of [-0.65, 0.65]) box(g, 0.35, 0.14, 0.04, tails, x, van ? 1.0 : 0.78, car.len + 0.02);
-    if (this.night) for (const x of [-0.6, 0.6]) box(g, 0.3, 0.12, 0.04, this.headMat, x, 0.7, -0.02);
+    g.add(model);
     g.userData.tails = tails;
-    shadows(g);
     this.scene.add(g);
     return g;
   }

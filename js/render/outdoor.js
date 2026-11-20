@@ -22,6 +22,7 @@
    ========================================================================== */
 
 import * as THREE from "three";
+import { carModel, sharedVehicleMaterials } from "./vehicles.js";   // 2.21 · autos con forma
 import { CONFIG, STATIONS, WORLD } from "../config.js";
 import { ROUTE_A } from "../engine/route.js";
 import { lineStock } from "../engine/fleet.js";
@@ -377,24 +378,31 @@ export class OutdoorView {
     g.add(mesh);
   }
 
-  /** Autos que circulan por la avenida cerca de la cámara (se reciclan al alejarse). */
+  /** Autos que circulan por la avenida cerca de la cámara (se reciclan al alejarse).
+   *  2.21 · Con forma de auto (render/vehicles.js): tres tipos, cada uno instanciado por material. */
   buildCars(g, M) {
-    const N = 48;
-    const body = new THREE.InstancedMesh(new THREE.BoxGeometry(1.8, 1.0, 4.3), M.carBody, N);
-    const cabin = new THREE.InstancedMesh(new THREE.BoxGeometry(1.6, 0.6, 2.2), M.carGlass, N);
-    const front = new THREE.InstancedMesh(new THREE.BoxGeometry(1.5, 0.15, 0.05), M.headlight, N);
-    const rear = new THREE.InstancedMesh(new THREE.BoxGeometry(1.5, 0.15, 0.05), M.taillight, N);
-    const colors = [0xc8ccd0, 0x1d2228, 0xf2f2f0, 0x8a1c1c, 0x2b4a7a, 0x6b6f73, 0xd9b44a, 0x3d6b4a];
+    const N = 48, KINDS = ["sedan", "hatch", "suv"];
+    const colors = [0xe9ebed, 0x16181c, 0xc3c7cc, 0x8a1c1c, 0x2b4a7a, 0x6b6f73, 0xd8d2c2, 0x3d6b4a, 0xe9ebed, 0x55595f];
+    const S = sharedVehicleMaterials();
+    const mats = { ...S, paint: M.carBody, glass: M.carGlass, head: M.headlight, tail: M.taillight };
     const c = new THREE.Color();
     this.cars = [];
+    this.carSets = KINDS.map(kind => ({ meshes: Object.entries(carModel(kind).geos).map(([slot, geo]) => {
+      const m = new THREE.InstancedMesh(geo, mats[slot], N);
+      m.frustumCulled = false;
+      m.count = 0;
+      m.userData.slot = slot;
+      g.add(m);
+      return m;
+    }), n: 0 }));
     const lanes = [11, 14.5, 18];
     for (let i = 0; i < N; i++) {
       const side = i % 2 ? 1 : -1;
-      this.cars.push({ side, x: side * lanes[i % 3], z: 0, v: 9 + Math.random() * 7, dir: side > 0 ? -1 : 1, placed: false });
-      body.setColorAt(i, c.setHex(colors[i % colors.length]));
+      const set = this.carSets[i % KINDS.length], k = set.n++;
+      this.cars.push({ side, x: side * lanes[i % 3], z: 0, v: 9 + Math.random() * 7, dir: side > 0 ? -1 : 1, placed: false, set, k });
+      set.meshes.find(m => m.userData.slot === "paint").setColorAt(k, c.setHex(colors[i % colors.length]));
     }
-    for (const mesh of [body, cabin, front, rear]) { mesh.frustumCulled = false; mesh.count = N; g.add(mesh); }
-    this.carMeshes = { body, cabin, front, rear };
+    for (const set of this.carSets) for (const m of set.meshes) m.count = set.n;
   }
 
   /* ---------------------------------------------------------------------
@@ -505,23 +513,24 @@ export class OutdoorView {
   }
 
   updateCars(dt, cam, sky) {
-    const { body, cabin, front, rear } = this.carMeshes;
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), v = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1), zero = new THREE.Vector3(0, 0, 0);
     const R = 320;
-    this.cars.forEach((c, i) => {
+    for (const c of this.cars) {
       if (!c.placed || Math.abs(c.z - cam.z) > R) { c.z = cam.z + (Math.random() * 2 - 1) * R; c.placed = true; }
       c.z += c.dir * c.v * dt;
       const open = this.sec.exposedAt(c.z);
       const y = this.groundRel(c.z) + 0.1;
-      q.setFromAxisAngle(_up, c.dir > 0 ? Math.PI : 0);
-      const s = open ? one : zero;
-      body.setMatrixAt(i, m.compose(v.set(c.x, y + 0.65, c.z), q, s));
-      cabin.setMatrixAt(i, m.compose(v.set(c.x, y + 1.45, c.z + c.dir * 0.3), q, s));
-      front.setMatrixAt(i, m.compose(v.set(c.x, y + 0.75, c.z + c.dir * 2.17), q, s));
-      rear.setMatrixAt(i, m.compose(v.set(c.x, y + 0.75, c.z - c.dir * 2.17), q, s));
-    });
-    for (const mesh of [body, cabin, front, rear]) mesh.instanceMatrix.needsUpdate = true;
-    front.visible = rear.visible = sky.day < 0.6 || WEATHER.rain > 0.3;
+      q.setFromAxisAngle(_up, c.dir > 0 ? Math.PI : 0);   // el modelo mira a −z
+      m.compose(v.set(c.x, y, c.z), q, open ? one : zero);
+      for (const mesh of c.set.meshes) mesh.setMatrixAt(c.k, m);
+    }
+    // De día los focos son vidrio; de noche (o con lluvia) se encienden
+    const lit = sky.day < 0.6 || WEATHER.rain > 0.3, S = sharedVehicleMaterials();
+    for (const set of this.carSets) for (const mesh of set.meshes) {
+      mesh.instanceMatrix.needsUpdate = true;
+      if (mesh.userData.slot === "head") mesh.material = lit ? this.M.headlight : S.head;
+      else if (mesh.userData.slot === "tail") mesh.material = lit ? this.M.taillight : S.tail;
+    }
   }
 }
 

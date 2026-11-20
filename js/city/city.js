@@ -31,6 +31,7 @@ import { skyAt } from "../render/outdoor.js";            // cielo según la hora
 import { buildLandmark } from "./landmarks.js";
 import { cityMaterials, genericBuilding, signMaterial, facingPlane, streetLamp, tree, bench, addMesh } from "./kit.js";
 import { markCity } from "../render/trackLift.js";
+import { carGroup, pickCarKind, streetBusGroup, CAR_COLORS } from "../render/vehicles.js";   // 2.21
 import { SkyDome, SunShadow, sunDirection, lampPool } from "../render/realism.js";
 import { BUS_METRO_STOPS, busRoutesAt } from "../bus/busRoute.js";
 import { REAL_STREETS, OSM_ATTRIBUTION } from "./realStreets.js";      // 2.6 · calles reales (OpenStreetMap)
@@ -675,33 +676,29 @@ export class City {
     }
   }
 
-  /** Auto o micro (Red: blanca con franja roja); el frente mira a +Z·dir. */
+  /** Auto o micro (Red: blanca con franja roja); el frente mira a +Z·dir.
+   *  2.21 · Con forma de verdad (render/vehicles.js): sedanes, hatchbacks, SUV, camionetas y furgones; el bus con
+   *  techo redondeado, pasos de rueda, ventanas y puertas. */
   vehicleMesh(bus, rnd, dir = 1) {
-    const colors = [0xd8d8d8, 0x1d1f22, 0x9b1c1c, 0x2c4f8a, 0x8a8f96, 0xf1f1ee, 0x2f6b3a, 0xc9a227];
-    const wheelGeo = this._wheelGeo ??= new THREE.CylinderGeometry(0.34, 0.34, 0.25, 10);
-    const wheelMat = this._wheelMat ??= std(0x111111);
-    const glass = this._carGlass ??= std(0x22303d, { metal: 0.5, rough: 0.2 });
-    const lane = { dir };
-    {
-      const v = new THREE.Group();
-      const L = bus ? 12 : 4.3, W = bus ? 2.5 : 1.8, H = bus ? 3.1 : 1.45;
-      const bodyColor = bus ? 0xd9d9d9 : colors[Math.floor(rnd() * colors.length)];
-      addBox(v, W, bus ? H - 0.4 : 0.75, L, std(bodyColor, { metal: 0.4, rough: 0.4 }), 0, bus ? (H - 0.4) / 2 + 0.35 : 0.72, 0);
-      if (bus) {
-        addBox(v, W + 0.02, 1.1, L * 0.9, glass, 0, 2.1, 0);
-        addBox(v, W + 0.03, 0.35, L, std(0xc8102e), 0, 0.9, 0);       // franja roja de la red de buses
-      } else {
-        addBox(v, W * 0.9, 0.6, L * 0.5, glass, 0, 1.35, -0.2);
-      }
-      for (const [x, z] of [[-W / 2, L * 0.33], [W / 2, L * 0.33], [-W / 2, -L * 0.33], [W / 2, -L * 0.33]]) {
-        const w = addMesh(v, wheelGeo, wheelMat, x, 0.34, z);
-        w.rotation.z = Math.PI / 2;
-      }
-      // Faros delanteros y luces traseras
-      addBox(v, W * 0.8, 0.15, 0.05, glow(0xfff6d8), 0, bus ? 0.8 : 0.8, L / 2 * lane.dir);
-      addBox(v, W * 0.8, 0.15, 0.05, glow(0xb01010), 0, bus ? 0.8 : 0.8, -L / 2 * lane.dir);
-      return { mesh: v, len: L };
+    const v = new THREE.Group();
+    let model, L;
+    if (bus) {
+      model = streetBusGroup({ paint: this._busWhite ??= std(0xeef0f2, { metal: 0.15, rough: 0.4 }), stripe: this._busRed ??= std(0xc8102e, { rough: 0.5 }),
+        sign: this._busSign ??= glow(0xffb000), head: this._lens ??= glow(0xfff6d8), tail: this._tail ??= glow(0xc01010) });
+      L = 12;
+    } else {
+      let seed = Math.floor(rnd() * 4294967296) >>> 0;            // un solo número del azar de la ciudad (no corre la secuencia)
+      const r2 = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296);
+      const kind = pickCarKind(r2, r2() < 0.06);
+      const color = CAR_COLORS[Math.floor(r2() * CAR_COLORS.length)];
+      const paint = (this._paints ??= new Map()).get(color) ?? std(color, { metal: 0.45, rough: 0.3 });
+      this._paints.set(color, paint);
+      model = carGroup(kind, { paint, head: this._lens ??= glow(0xfff6d8), tail: this._tail ??= glow(0xc01010) });
+      L = model.userData.model.L;
     }
+    model.rotation.y = dir > 0 ? Math.PI : 0;              // los modelos miran a −z
+    v.add(model);
+    return { mesh: v, len: L };
   }
 
   /**
