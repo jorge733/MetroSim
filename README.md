@@ -150,6 +150,8 @@ trenes de los dos motores quedan a ~1 m (mediana).
   (`clips/`) y `generar.js` arma el vídeo.
 - **2.24.3:** guion de la locución del reel para ElevenLabs con los tiempos de cada escena (`post-reel/locucion.txt`);
   `generar.js` mezcla la voz (`voz.mp3`, o una por escena `voz-01…09.mp3`) y baja la música mientras se habla.
+- **2.24.4:** el reel lleva la locución (ElevenLabs, una frase por escena) y **subtítulos** sincronizados con la voz;
+  cada escena dura más (40 s en total) para que los textos se alcancen a leer.
 
 ## Versión 2.23 · Informe animado al terminar el turno de bus y de taxi
 

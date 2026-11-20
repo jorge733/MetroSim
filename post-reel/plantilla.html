@@ -32,12 +32,17 @@ h1 em{font-style:normal;color:var(--hl,#f4b400)}
 #scr img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform-origin:50% 50%}
 #flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none}
 /* Bajo el celular */
-.sub{position:absolute;left:70px;right:70px;top:1440px;display:flex;flex-wrap:wrap;justify-content:center;gap:16px}
+.sub{position:absolute;left:70px;right:70px;top:1560px;display:flex;flex-wrap:wrap;justify-content:center;gap:16px}
 .chip{background:#ffffff14;border:3px solid #ffffff30;border-radius:999px;padding:12px 28px;font-weight:800;font-size:38px;white-space:nowrap;color:#eef2f8}
 /* Marca abajo (fuera de la zona de botones del reel) */
-#brand{position:absolute;left:0;right:0;top:1600px;display:flex;justify-content:center;align-items:center;gap:18px;font:800 44px Barlow;opacity:.92}
+#brand{position:absolute;left:0;right:0;top:1700px;display:flex;justify-content:center;align-items:center;gap:18px;font:800 44px Barlow;opacity:.92}
 #brand svg{width:78px}
 #brand b span{color:#ff5a62}
+/* Subtítulos de la locución */
+#subt{position:absolute;left:60px;right:60px;top:1418px;display:flex;justify-content:center;pointer-events:none;z-index:5}
+#subt span{display:inline-block;max-width:960px;text-align:center;background:#000000d0;color:#fff;font:800 50px/1.18 Barlow;padding:14px 30px;border-radius:22px;box-shadow:0 10px 30px #0008;opacity:0}
+#subt span b{color:#f4b400}
+body.ending #subt{top:1385px}
 /* Escena final */
 #end{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:44px;text-align:center;opacity:0;padding:0 70px 120px}
 #end .logo{width:300px;filter:drop-shadow(0 0 60px #d7262eaa)}
@@ -58,6 +63,7 @@ h1 em{font-style:normal;color:var(--hl,#f4b400)}
 <div class="top"><div class="kick anim" id="kick"></div><h1 class="anim" id="title"></h1></div>
 <div id="phone"><div id="scr"><img id="imA"><img id="imB"></div><div id="flash"></div></div>
 <div class="sub" id="sub"></div>
+<div id="subt"><span id="subtx"></span></div>
 <div id="brand"><svg viewBox="0 0 200 130"><rect x="6" y="6" width="188" height="118" rx="30" fill="#d7262e"/><path d="M30 94H78L122 36H170" fill="none" stroke="#fff" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/><path d="M100 18V112" fill="none" stroke="#ffd2d5" stroke-width="9" stroke-linecap="round" stroke-dasharray="0.1 17"/><circle cx="30" cy="94" r="10" fill="#fff"/><circle cx="170" cy="36" r="10" fill="#fff"/><circle cx="100" cy="65" r="17" fill="#fff"/><circle cx="100" cy="65" r="8" fill="#d7262e"/></svg><b>redmovisim<span>.cl</span></b></div>
 <div id="end">
  <svg class="logo" viewBox="0 0 200 130"><rect x="6" y="6" width="188" height="118" rx="30" fill="#d7262e"/><path d="M30 94H78L122 36H170" fill="none" stroke="#fff" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/><path d="M100 18V112" fill="none" stroke="#ffd2d5" stroke-width="9" stroke-linecap="round" stroke-dasharray="0.1 17"/><circle cx="30" cy="94" r="10" fill="#fff"/><circle cx="170" cy="36" r="10" fill="#fff"/><circle cx="100" cy="65" r="17" fill="#fff"/><circle cx="100" cy="65" r="8" fill="#d7262e"/></svg>
@@ -77,17 +83,26 @@ const ICON={
  pcc:'<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4M6 10h3l2-3 2 5 2-2h3"/>',
  net:'<circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M16 5a3 3 0 0 1 0 6M18 14c2 .8 3 2.7 3 6"/>'};
 window.SCENES=[
- {t0:0,  t1:3,  c:'#d7262e', icon:'metro', kick:'SIMULADOR 3D', title:'Santiago,<br><em>en tu celular</em>', chips:['🚇 Metro','🚆 Trenes','🚌 Buses','🚕 Taxis'], shots:[{clip:'intro',from:60}]},
- {t0:3,  t1:6.5,c:'#d7262e', icon:'metro', kick:'MODO CONDUCTOR', title:'¿Y si <em>tú</em><br>manejaras<br>el Metro?', chips:['🚇 7 líneas','🚆 Tren Nos y Rancagua'], shots:[{clip:'metro',from:20}]},
- {t0:6.5,t1:10, c:'#e8461e', icon:'bus',   kick:'BUSES RED', title:'Maneja buses<br><em>por la Alameda</em>', chips:['🚏 Recorridos reales','🧍 Pasajeros que suben'], shots:[{clip:'bus-a',from:10},{clip:'bus-b',at:1.5,from:0}]},
- {t0:10, t1:12, c:'#f4b400', ck:'#111722', hl:'#fff', icon:'taxi', kick:'TAXI', title:'O sal a buscar<br><em>pasajeros</em>', chips:['🚕 Taxímetro','📻 Radios'], shots:[{still:'../post-taxi-puerta/s3-abre.png'},{still:'../post-taxi-puerta/s4-entra.png',at:1}]},
- {t0:12, t1:15.5,c:'#0f9d58', icon:'walk', kick:'MODO PASAJERO', title:'Viaja como<br><em>pasajero</em>', chips:['💳 Carga tu bip!','🔀 Combina','🥖 Misiones'], shots:[{still:'../post-calles-reales/s1-acceso.png'},{still:'../post-calles-reales/s2-paradero.png',at:1.15},{still:'../post-locales/s3-caja.png',at:2.3}]},
- {t0:15.5,t1:18,c:'#3b6fe0', icon:'pcc',   kick:'CENTRO DE CONTROL', title:'Dirige toda<br><em>la red</em>', chips:['🚨 Alarmas','📻 Órdenes por radio'], shots:[{clip:'control',from:10}]},
- {t0:18, t1:20.5,c:'#8e44ad', icon:'net',  kick:'MULTIJUGADOR', title:'Juega con<br><em>tus amigos</em>', chips:['👥 Sala con código','🚇 Hasta 4 conductores'], shots:[{still:'../post-multijugador/cap-conductor.png'}]},
- {t0:20.5,t1:23,c:'#d7262e', icon:'metro', kick:'HECHO EN CHILE', title:'Estaciones y<br><em>horarios reales</em>', chips:['📍 Calles reales','🌦️ Clima y hora real'], shots:[{clip:'intro',from:205}]},
+ {t0:0,   t1:4.5, c:'#d7262e', icon:'metro', kick:'SIMULADOR 3D', title:'Santiago,<br><em>en tu celular</em>', chips:['🚇 Metro','🚆 Trenes','🚌 Buses','🚕 Taxis'], shots:[{clip:'intro',from:60}], voz:0.4,
+  subs:[[0,'Santiago… en tu celular.']]},
+ {t0:4.5, t1:9,   c:'#d7262e', icon:'metro', kick:'MODO CONDUCTOR', title:'¿Y si <em>tú</em><br>manejaras<br>el Metro?', chips:['🚇 7 líneas','🚆 Tren Nos y Rancagua'], shots:[{clip:'metro',from:10}], voz:0.6,
+  subs:[[0,'¿Y si tú manejaras el Metro?']]},
+ {t0:9,   t1:14,  c:'#e8461e', icon:'bus',   kick:'BUSES RED', title:'Maneja buses<br><em>por la Alameda</em>', chips:['🚏 Recorridos reales','🧍 Pasajeros que suben'], shots:[{clip:'bus-a',from:0},{clip:'bus-b',at:2.4,from:0}], voz:0.6,
+  subs:[[0,'Maneja buses Red por recorridos reales.']]},
+ {t0:14,  t1:17.5,c:'#f4b400', ck:'#111722', hl:'#fff', icon:'taxi', kick:'TAXI', title:'O sal a buscar<br><em>pasajeros</em>', chips:['🚕 Taxímetro','📻 Radios'], shots:[{still:'../post-taxi-puerta/s3-abre.png'},{still:'../post-taxi-puerta/s4-entra.png',at:1.75}], voz:0.6,
+  subs:[[0,'O sal en taxi.']]},
+ {t0:17.5,t1:22.5,c:'#0f9d58', icon:'walk', kick:'MODO PASAJERO', title:'Viaja como<br><em>pasajero</em>', chips:['💳 Carga tu bip!','🔀 Combina','🥖 Misiones'], shots:[{still:'../post-calles-reales/s1-acceso.png'},{still:'../post-calles-reales/s2-paradero.png',at:1.67},{still:'../post-locales/s3-caja.png',at:3.34}], voz:0.6,
+  subs:[[0,'Viaja como pasajero:'],[1.45,'carga tu bip! y combina.']]},
+ {t0:22.5,t1:26.5,c:'#3b6fe0', icon:'pcc',   kick:'CENTRO DE CONTROL', title:'Dirige toda<br><em>la red</em>', chips:['🚨 Alarmas','📻 Órdenes por radio'], shots:[{clip:'control',from:0,rate:0.75}], voz:0.6,
+  subs:[[0,'Dirige toda la red'],[1.25,'desde el Centro de Control.']]},
+ {t0:26.5,t1:30,  c:'#8e44ad', icon:'net',  kick:'MULTIJUGADOR', title:'Juega con<br><em>tus amigos</em>', chips:['👥 Sala con código','🚇 Hasta 4 conductores'], shots:[{still:'../post-multijugador/cap-conductor.png'}], voz:0.6,
+  subs:[[0,'Y juega con tus amigos.']]},
+ {t0:30,  t1:34,  c:'#d7262e', icon:'metro', kick:'HECHO EN CHILE', title:'Estaciones y<br><em>horarios reales</em>', chips:['📍 Calles reales','🌦️ Clima y hora real'], shots:[{clip:'intro',from:195,rate:0.8}], voz:0.6,
+  subs:[[0,'Estaciones, calles y horarios reales.']]},
 ];
-window.END={t0:23,t1:27};
-window.DUR=27;
+// La locución del cierre (voz-09) empieza en END.t0 + END.voz
+window.END={t0:34,t1:40,voz:0.6,subs:[[0,'RedMoviSim.'],[1.15,'Gratis, en redmovisim.cl'],[3.8,'¡Link en la bio!']]};
+window.DUR=40;
 /* ===== Utilidades ===== */
 const $=id=>document.getElementById(id);
 const clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
@@ -102,7 +117,15 @@ SCENES.forEach((s,i)=>{const d=document.createElement('div');d.className='st';d.
 const tr=document.createElement('div');tr.className='tr';$('map').appendChild(tr);
 let cur=-1;
 /* render(t): deja la página como se ve en el segundo t. Devuelve las imágenes que hay que mostrar. */
+// Momento en que entra cada locución (voz-01 … voz-09): lo lee generar.js
+window.VOZ_T=[...SCENES.map(s=>s.t0+s.voz),END.t0+END.voz];
+// Lista plana de subtítulos con su inicio y fin
+window.SUBS=[];[...SCENES,END].forEach((s,i,arr)=>{const v=s.t0+s.voz,next=(arr[i+1]?arr[i+1].t0:DUR);s.subs.forEach(([at,tx],j)=>{const t0=v+at,t1=j+1<s.subs.length?v+s.subs[j+1][0]:next-0.2;SUBS.push({t0,t1,tx});});});
 window.render=function(t){
+ {const sb=SUBS.find(x=>t>=x.t0&&t<x.t1),el=document.getElementById('subtx');
+  if(sb){if(el.dataset.tx!==sb.tx){el.dataset.tx=sb.tx;el.textContent=sb.tx;}const k=clamp((t-sb.t0)/0.18),o=clamp((sb.t1-t)/0.18);el.style.opacity=Math.min(k,o);el.style.transform=`scale(${0.92+0.08*back((t-sb.t0)/0.3)})`;}
+  else el.style.opacity=0;
+  document.body.classList.toggle('ending',t>=END.t0);}
  const endK=clamp((t-END.t0)/0.6);
  let i=SCENES.findIndex(s=>t>=s.t0&&t<s.t1);if(i<0)i=N-1;
  const s=SCENES[i],lt=t-s.t0;

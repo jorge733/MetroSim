@@ -13,21 +13,23 @@ const FPS=30,Q=['-v','error','-y'];
  // 2. Cada cuadro del reel
  const b=await chromium.launch();const p=await b.newPage({viewport:{width:1080,height:1920},deviceScaleFactor:1});
  await p.goto('file://'+path.resolve('plantilla.html'));await p.evaluate(()=>document.fonts.ready);
+ const VOZ_T=await p.evaluate(()=>VOZ_T);
  const dur=await p.evaluate(()=>DUR),total=Math.round(dur*FPS);let last='';
  for(let k=0;k<total;k++){const t=k/FPS;
   const r=await p.evaluate(t=>{const r=render(t);return {shot:r.shot,st:r.st};},t);const sh=r.shot;let src,tf='none';
-  if(sh.clip){const c=clips[sh.clip];const i=Math.min(c.count,1+(sh.from||0)+Math.floor(r.st*FPS));src='file://'+path.join(c.dir,String(i).padStart(4,'0')+'.jpg');}
-  else{src='file://'+path.resolve(sh.still);const z=1.03+0.05*r.st/2.5;tf=`scale(${z}) translateX(${-r.st*6}px)`;}
+  if(sh.clip){const c=clips[sh.clip];const i=Math.min(c.count,1+(sh.from||0)+Math.floor(r.st*FPS*(sh.rate||1)));src='file://'+path.join(c.dir,String(i).padStart(4,'0')+'.jpg');}
+  else{src='file://'+path.resolve(sh.still);const z=1.03+0.04*r.st/2;tf=`scale(${z}) translateX(${-r.st*6}px)`;}
   await p.evaluate(async([src,tf,ch])=>{const im=document.getElementById('imA');if(ch){im.src=src;await im.decode().catch(()=>{});}im.style.transform=tf;},[src,tf,src!==last]);last=src;
   await p.screenshot({path:path.join(out,String(k).padStart(4,'0')+'.jpg'),type:'jpeg',quality:94});
-  if(k===Math.round(4.2*FPS))fs.copyFileSync(path.join(out,String(k).padStart(4,'0')+'.jpg'),'portada.jpg');
+  if(k===Math.round(7*FPS))fs.copyFileSync(path.join(out,String(k).padStart(4,'0')+'.jpg'),'portada.jpg');
   if(k%60===0)process.stdout.write(`${k}/${total} `);}
  await b.close();
  // 3. Vídeo con música y, si está, la locución (voz.mp3/voz.wav o voz-01…voz-09, una por escena)
- const SCENE_T=[0,3,6.5,10,12,15.5,18,20.5,23];
+ const SCENE_T=VOZ_T;   // segundo en que entra cada locución (plantilla.html)
  const one=['voz.mp3','voz.wav'].find(f=>fs.existsSync(f));
  const parts=SCENE_T.map((t,i)=>['mp3','wav'].map(e=>`voz-${String(i+1).padStart(2,'0')}.${e}`).find(f=>fs.existsSync(f))).map((f,i)=>f&&{f,t:SCENE_T[i]}).filter(Boolean);
  const voices=one?[{f:one,t:+(process.env.VOZ_INICIO||0.2)}]:parts;
+ if(voices.length)console.log('\nvoces:',voices.map(v=>v.f+'@'+v.t.toFixed(1)).join(' '));
  const args=[...Q,'-framerate',String(FPS),'-i',path.join(out,'%04d.jpg'),'-i','musica.wav'];
  voices.forEach(v=>args.push('-i',v.f));
  const vcod=['-c:v','libx264','-preset','slow','-crf','19','-pix_fmt','yuv420p','-c:a','aac','-b:a','192k','-movflags','+faststart'];
