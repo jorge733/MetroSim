@@ -152,6 +152,10 @@ trenes de los dos motores quedan a ~1 m (mediana).
   `generar.js` mezcla la voz (`voz.mp3`, o una por escena `voz-01…09.mp3`) y baja la música mientras se habla.
 - **2.24.4:** el reel lleva la locución (ElevenLabs, una frase por escena) y **subtítulos** sincronizados con la voz;
   cada escena dura más (40 s en total) para que los textos se alcancen a leer.
+- **2.24.5:** enlace para la **bio de Instagram**: **www.redmovisim.cl/ig** (`ig/index.html`). Instagram abre los
+  enlaces en su propio navegador; esta página salta al navegador del teléfono (el predeterminado en Android, Safari en
+  iPhone con iOS 17 o más) y, si no puede, explica cómo hacerlo a mano (⋯ → «Abrir en el navegador externo»). Desde un
+  navegador normal manda directo a la portada.
 
 ## Versión 2.23 · Informe animado al terminar el turno de bus y de taxi
 

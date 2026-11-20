@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>RedMoviSim · Abrir en el navegador</title>
+  <!-- 2.24.5 · Enlace para la bio de Instagram (www.redmovisim.cl/ig). Instagram abre los enlaces en su propio
+       navegador, donde el juego no se puede instalar y anda peor; esta página intenta saltar al navegador del
+       teléfono (Chrome/predeterminado en Android, Safari en iPhone) y, si no puede, explica cómo hacerlo a mano.
+       Fuera de una app (navegador normal) manda directo a la portada. -->
+  <meta name="robots" content="noindex, follow">
+  <link rel="canonical" href="https://www.redmovisim.cl/">
+  <meta name="theme-color" content="#05080e">
+  <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+  <style>
+    :root { color-scheme: dark; --bg: #05080e; --card: #0d1420; --line: #1e2a3b; --text: #e8eef6; --dim: #93a3b8; --accent: #e4002b; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; padding: 24px 16px;
+      background: var(--bg); color: var(--text); font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    main { width: 100%; max-width: 420px; text-align: center; }
+    .logo { width: 84px; height: 84px; margin: 0 auto 14px; display: block; }
+    h1 { font-size: 1.5rem; margin: 0 0 6px; }
+    p { margin: 0 0 18px; color: var(--dim); }
+    .btn { display: block; width: 100%; padding: 15px 18px; border-radius: 14px; border: 0; background: var(--accent);
+      color: #fff; font: inherit; font-weight: 700; font-size: 1.05rem; text-decoration: none; cursor: pointer; }
+    .steps { margin: 22px 0 0; padding: 16px 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--card);
+      text-align: left; color: var(--text); }
+    .steps b { color: #fff; }
+    .steps ol { margin: 8px 0 0; padding-left: 20px; }
+    .steps li { margin: 4px 0; }
+    .dots { display: inline-block; padding: 0 6px; border-radius: 6px; background: var(--line); font-weight: 700; letter-spacing: 1px; }
+    .stay { display: inline-block; margin-top: 18px; color: var(--dim); font-size: .9rem; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <main>
+    <img class="logo" src="../logo.svg" alt="RedMoviSim">
+    <h1>RedMoviSim</h1>
+    <p id="msg">Abriendo el juego en tu navegador…</p>
+    <a class="btn" id="open" href="https://www.redmovisim.cl/">Abrir en el navegador</a>
+    <div class="steps" id="steps" hidden>
+      Si no se abrió solo:
+      <ol>
+        <li>Toca <span class="dots">⋯</span> arriba a la derecha.</li>
+        <li>Elige <b id="opt">«Abrir en el navegador externo»</b>.</li>
+      </ol>
+    </div>
+    <a class="stay" href="https://www.redmovisim.cl/">o jugar aquí mismo</a>
+  </main>
+  <script>
+    (function () {
+      var HOST = "www.redmovisim.cl", PATH = "/";
+      var HOME = "https://" + HOST + PATH;
+      var ua = navigator.userAgent || "";
+      var inApp = /Instagram|FBAN|FBAV|FB_IAB|FBIOS|Threads|Barcelona|TikTok|musical_ly|BytedanceWebview|Line\//i.test(ua);
+      var android = /Android/i.test(ua);
+      var ios = /iPhone|iPad|iPod/i.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+      // En un navegador normal no hay nada que hacer: directo a la portada.
+      if (!inApp) { location.replace(HOME); return; }
+
+      var target = HOME;
+      if (android) {
+        // Abre el navegador predeterminado del teléfono; si no hay ninguno, se queda en la portada.
+        target = "intent://" + HOST + PATH + "#Intent;scheme=https;action=android.intent.action.VIEW;" +
+                 "category=android.intent.category.BROWSABLE;S.browser_fallback_url=" + encodeURIComponent(HOME) + ";end";
+      } else if (ios) {
+        target = "x-safari-https://" + HOST + PATH;   // Safari, iOS 17 o más nuevo
+        document.getElementById("opt").textContent = "«Abrir en el navegador externo» (o «Abrir en Safari»)";
+      }
+
+      var btn = document.getElementById("open");
+      btn.href = target;
+      try { location.href = target; } catch (e) {}
+
+      // Si seguimos aquí después de un momento, el salto no funcionó: se muestran los pasos a mano.
+      setTimeout(function () {
+        if (document.hidden) return;
+        document.getElementById("msg").textContent = "Instagram abre los enlaces en su propio navegador. Para jugar mejor, ábrelo en el tuyo.";
+        document.getElementById("steps").hidden = false;
+      }, 1200);
+    })();
+  </script>
+</body>
+</html>
