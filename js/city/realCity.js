@@ -22,6 +22,11 @@ import { facadeTexture } from "./kit.js";
 import { crownGeometry, trunkGeometry, lampPool } from "../render/realism.js";
 
 const CELL = 10;
+/** 2.21 · Bocas de los otros accesos: no pintan nada, solo dejan un 1 en el stencil (ahí no se dibuja el piso y se ve la escalera). */
+export const HOLE_MASK = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false, stencilWrite: true, stencilRef: 1,
+  stencilFunc: THREE.AlwaysStencilFunc, stencilZPass: THREE.ReplaceStencilOp });
+/** El piso que respeta esas bocas (no escribe el stencil, solo lo consulta; en las bocas no hay nada más de ese material). */
+export const holed = (mat) => Object.assign(mat, { stencilWrite: true, stencilWriteMask: 0, stencilRef: 1, stencilFunc: THREE.NotEqualStencilFunc });
 const PALETTE = ["#a29a8f", "#8d939a", "#b8ad9c", "#c9bfae", "#c2b6a3", "#9b8e84", "#7f8a92", "#d0c7b8", "#b49a82"];
 const FLOOR_H = 3.3;
 const SIGNAL_CYCLE = 64;               // s · eje 0 (la avenida) verde 0–28, amarillo 28–31; eje 1 verde 32–60, amarillo 60–63
@@ -213,13 +218,14 @@ export class RealStreet {
   buildGround(g, M, a) {
     const R = this.d.radius + 60, cx = 9.6, cz = 3.2;
     const hx0 = a.x - a.halfX, hx1 = a.x + a.halfX, hz0 = a.z - a.halfZ, hz1 = a.z + a.halfZ;
-    const span = (xa, xb, za, zb) => addBox(g, xb - xa, 0.2, zb - za, M.sidewalk, (xa + xb) / 2, 0, (za + zb) / 2);
+    const floor = holed(M.sidewalk);
+    const span = (xa, xb, za, zb) => addBox(g, xb - xa, 0.2, zb - za, floor, (xa + xb) / 2, 0, (za + zb) / 2);
     span(cx - R, hx0, cz - R, cz + R);
     span(hx1, cx + R, cz - R, cz + R);
     span(hx0, hx1, cz - R, hz0);
     span(hx0, hx1, hz1, cz + R);
     // Más allá: suelo apagado hasta el horizonte
-    addBox(g, 1400, 0.1, 1400, std(0x5b5a55, { rough: 1 }), cx, -0.25, cz);
+    addBox(g, 1400, 0.1, 1400, holed(std(0x5b5a55, { rough: 1 })), cx, -0.25, cz);
   }
 
   buildRoads(g, M) {
@@ -405,7 +411,7 @@ export class RealStreet {
       ring.forEach(([x, z]) => pos.push(x, 0.108, z));
       tris.forEach(([a, c, d]) => idx.push(v0 + a, v0 + c, v0 + d));
     }
-    if (pos.length) g.add(flatMesh(pos, idx, M.grass));
+    if (pos.length) g.add(flatMesh(pos, idx, holed(M.grass)));
   }
 
   /* ---------------------------------------------------------------------

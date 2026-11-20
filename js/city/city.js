@@ -36,7 +36,8 @@ import { SkyDome, SunShadow, sunDirection, lampPool } from "../render/realism.js
 import { BUS_METRO_STOPS, busRoutesAt } from "../bus/busRoute.js";
 import { REAL_STREETS, OSM_ATTRIBUTION } from "./realStreets.js";      // 2.6 · calles reales (OpenStreetMap)
 import { realStreetData, loadRealStreet } from "./streetData.js";      // 2.7 · se cargan cuando hacen falta
-import { RealStreet, sampleLane } from "./realCity.js";
+import { RealStreet, sampleLane, HOLE_MASK } from "./realCity.js";
+import { buildRedStop, accessStreet } from "./redStop.js";              // 2.21 · paraderos y accesos con sus datos reales
 import { ShopInterior, INSIDE, ENTERABLE } from "./shopInterior.js";   // 2.17 · se entra caminando a los locales
 
 /** 1.15 · Paradero de la calle (local): aquí se toma el bus del recorrido si pasa por esta estación. */
@@ -87,7 +88,7 @@ function lineBadgesTexture(ids) {
  * hacia −Z. Quien lo use debe dejar un hueco de w × len en la vereda.
  * @param {{name:string, lines:string[], night?:number, w?:number, len?:number}} o
  */
-export function metroStreetAccess(parent, { name, lines, night = 0, w = 1.9, len = 5.2 }) {
+export function metroStreetAccess(parent, { name, lines, night = 0, w = 1.9, len = 5.2, ref = "", street = "", lift = false }) {
   const g = new THREE.Group();
   parent.add(g);
   const M = cityMaterials(night);
@@ -109,24 +110,109 @@ export function metroStreetAccess(parent, { name, lines, night = 0, w = 1.9, len
   down.position.set(0, -0.3, z0 + 0.13);
   g.add(down);
   addBox(g, w - 0.4, 0.05, 0.25, glow(0xfff0c8), 0, -0.55, z0 + 0.3);
-  const glass = std(0xbfd8e6, { metal: 0.2, rough: 0.05, transparent: true, opacity: 0.28, depthWrite: false });
-  addBox(g, 0.3, 0.16, len + 0.3, granite, x0 - 0.05, 0.08, -0.15);
-  addBox(g, 0.3, 0.16, len + 0.3, granite, x1 + 0.05, 0.08, -0.15);
-  addBox(g, w + 0.4, 0.16, 0.3, granite, 0, 0.08, z0 - 0.05);
-  for (const x of [x0 - 0.05, x1 + 0.05]) {
-    addBox(g, 0.04, 0.85, len - 0.1, glass, x, 0.6, 0);
-    addBox(g, 0.07, 0.07, len, steel, x, 1.05, 0);
-    for (let z = z0; z <= z1 + 0.01; z += len / 3) addBox(g, 0.06, 1.0, 0.06, steel, x, 0.58, z);
-  }
-  addBox(g, w + 0.1, 0.85, 0.04, glass, 0, 0.6, z0 - 0.05);
-  addBox(g, w + 0.2, 0.07, 0.07, steel, 0, 1.05, z0 - 0.05);
+  accessParapet(g, { w, len, cx: 0, cz: 0, y0: 0, name, ref, color: LINE_COLORS[lines[0]] });
   addBox(g, w, 0.02, 0.4, M.yellow, 0, 0.01, z1 + 0.25);
-  metroTotem(g, name, lines, x1 + 0.75, z1 + 0.7);
+  metroTotem(g, name, lines, x1 + 0.75, z1 + 0.7, { ref, street });
+  if (lift) metroLift(g, x0 - 1.35, z1 - 0.9, ref);
+  // 2.21 · Máscara invisible en la boca: el piso que pasa por debajo no tapa la escalera
+  const mask = new THREE.Mesh(new THREE.PlaneGeometry(w, len), HOLE_MASK);
+  mask.rotation.x = -Math.PI / 2;
+  mask.position.y = 0.12;
+  mask.renderOrder = -2;
+  g.add(mask);
+  return g;
+}
+
+/**
+ * 2.21 · Remate de la boca como en los accesos reales: muro-parapeto de hormigón de ~1,05 m en tres lados con un
+ * tubo de acero encima, y sobre el lado cerrado la banda del color de la línea con el nombre de la estación y la
+ * letra del acceso en un círculo blanco. (cx, cz) = centro de la boca; baja hacia −Z, abierta hacia +Z.
+ */
+export function accessParapet(g, { w, len, cx = 0, cz = 0, y0 = 0, name = "", ref = "", color = "#d7262e" }) {
+  const concrete = std(0xa8a49c, { rough: 0.85 });
+  const cap = std(0x8d8a86, { rough: 0.55 });
+  const steel = std(0xd5dade, { metal: 0.85, rough: 0.25 });
+  const H = 1.05, T = 0.2;
+  const x0 = cx - w / 2 - T / 2, x1 = cx + w / 2 + T / 2, z0 = cz - len / 2 - T / 2, z1 = cz + len / 2;
+  for (const x of [x0, x1]) {
+    addBox(g, T, H, len + T, concrete, x, y0 + H / 2, cz - T / 2);
+    addBox(g, T + 0.06, 0.06, len + T + 0.06, cap, x, y0 + H + 0.03, cz - T / 2);
+    addBox(g, 0.05, 0.05, len + T, steel, x, y0 + H + 0.22, cz - T / 2);
+    for (let z = z0 + 0.1; z <= z1 + 0.01; z += (len + T) / 3) addBox(g, 0.04, 0.2, 0.04, steel, x, y0 + H + 0.12, z);
+  }
+  addBox(g, w + 2 * T, H, T, concrete, cx, y0 + H / 2, z0);
+  addBox(g, w + 2 * T + 0.06, 0.06, T + 0.06, cap, cx, y0 + H + 0.03, z0);
+  // Banda del color de la línea sobre el lado cerrado (se lee desde la boca y desde atrás)
+  const c = makeCanvas(1024, 160), q = c.getContext("2d");
+  q.fillStyle = color; q.fillRect(0, 0, 1024, 160);
+  q.fillStyle = "#ffffff"; q.textBaseline = "middle"; q.textAlign = "left";
+  let x = 40;
+  if (ref) {
+    q.beginPath(); q.arc(90, 80, 58, 0, Math.PI * 2); q.fill();
+    q.fillStyle = color; q.font = "900 80px Arial"; q.textAlign = "center"; q.fillText(ref, 90, 84);
+    q.fillStyle = "#ffffff"; q.textAlign = "left"; x = 175;
+  }
+  let size = 84; q.font = `800 ${size}px Arial`;
+  while (q.measureText(name).width > 1024 - x - 30 && size > 30) { size -= 4; q.font = `800 ${size}px Arial`; }
+  q.fillText(name, x, 86);
+  const t = toTexture(c); t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  const bw = w + 2 * T, bh = bw * 160 / 1024;
+  const band = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, 0.06), [steel, steel, steel, steel, glow(0xffffff, { map: t }), glow(0xffffff, { map: t })]);
+  band.position.set(cx, y0 + H + 0.06 + bh / 2, z0);
+  g.add(band);
+  for (const sx of [-1, 1]) addBox(g, 0.05, 0.1, 0.05, steel, cx + sx * (bw / 2 - 0.1), y0 + H + 0.08, z0);
+}
+
+/**
+ * 2.21 · Placa del acceso (bajo las insignias del tótem): la letra del acceso, como en los accesos reales («Acceso A»),
+ * y la calle a la que da.
+ */
+function accessPlateTexture(ref, street) {
+  const c = makeCanvas(512, 128), g = c.getContext("2d");
+  g.fillStyle = "#1b1f24"; g.fillRect(0, 0, 512, 128);
+  g.textBaseline = "middle";
+  let x = 16;
+  if (ref) {
+    g.fillStyle = "#ffffff"; g.fillRect(12, 12, 104, 104);
+    g.fillStyle = "#1b1f24"; g.font = "900 84px Arial"; g.textAlign = "center"; g.fillText(ref, 64, 68);
+    x = 132;
+  }
+  g.fillStyle = "#ffffff"; g.textAlign = "left";
+  g.font = "700 34px Arial"; g.fillText(ref ? `Acceso ${ref}` : "Acceso", x, street ? 40 : 66);
+  if (street) {
+    let size = 36; g.font = `800 ${size}px Arial`;
+    while (g.measureText(street).width > 512 - x - 12 && size > 18) { size -= 2; g.font = `800 ${size}px Arial`; }
+    g.fillText(street, x, 88);
+  }
+  const t = toTexture(c);
+  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  return t;
+}
+
+/** 2.21 · Ascensor del acceso (cuando OSM dice que tiene): cabina de vidrio con el pictograma de accesibilidad. */
+export function metroLift(parent, x, z, ref = "") {
+  const g = new THREE.Group();
+  g.position.set(x, 0, z);
+  parent.add(g);
+  const frame = std(0xc9ced3, { metal: 0.85, rough: 0.25 });      // pabellón de acero inoxidable con alero
+  const glass = std(0xbfd8e6, { metal: 0.2, rough: 0.05, transparent: true, opacity: 0.3, depthWrite: false });
+  addBox(g, 2.1, 0.14, 2.1, frame, 0, 2.77, 0);
+  for (const [dx, dz] of [[-0.8, -0.8], [0.8, -0.8], [-0.8, 0.8], [0.8, 0.8]]) addBox(g, 0.1, 2.7, 0.1, frame, dx, 1.35, dz);
+  addBox(g, 1.6, 2.6, 1.6, glass, 0, 1.35, 0);
+  const c = makeCanvas(256, 128), q = c.getContext("2d");
+  q.fillStyle = "#1a5fb4"; q.fillRect(0, 0, 256, 128);
+  q.fillStyle = "#fff"; q.font = "900 70px Arial"; q.textAlign = "center"; q.textBaseline = "middle";
+  q.fillText("♿", 48, 68); q.font = "800 36px Arial"; q.fillText("Ascensor", 160, 52); q.font = "700 28px Arial"; q.fillText(ref ? `Acceso ${ref}` : "Metro", 160, 92);
+  const t = toTexture(c); t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  const sign = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.6, 0.04), glow(0xffffff, { map: t }));
+  sign.position.set(0, 3.1, 0.86);
+  g.add(sign);
+  const back = sign.clone(); back.position.z = -0.86; back.rotation.y = Math.PI; g.add(back);
   return g;
 }
 
 /** Tótem del Metro de Santiago: logotipo retroiluminado, nombre de la estación e insignias de sus líneas. */
-export function metroTotem(parent, name, lines, x = 0, z = 0) {
+export function metroTotem(parent, name, lines, x = 0, z = 0, { ref = "", street = "" } = {}) {
   const totem = new THREE.Group();
   totem.position.set(x, 0, z);
   parent.add(totem);
@@ -144,7 +230,22 @@ export function metroTotem(parent, name, lines, x = 0, z = 0) {
   addBox(totem, 0.34, 0.06, 1.33, dark, 0, 4.53, 0);
   face(1.7, 0.36, signMaterial(name, { bg: "#1b1f24", font: "800 76px Arial" }), 3.35);
   if (lines.length) face(0.36 * lines.length + 0.1, 0.36, glow(0xffffff, { map: lineBadgesTexture(lines) }), 2.92);
+  if (ref || street) face(1.6, 0.4, glow(0xffffff, { map: accessPlateTexture(ref, street) }), 2.45);
   return totem;
+}
+
+/** 2.21 · ¿El punto (lx, lz) toca el obstáculo b (con margen m)? Los obstáculos girados (accesos y paraderos reales) llevan `rot`. */
+function hitBlock(b, lx, lz, m) {
+  if (lx < b.x0 - m || lx > b.x1 + m || lz < b.z0 - m || lz > b.z1 + m) return false;
+  const r = b.rot;
+  if (!r) return true;
+  const dx = lx - r.cx, dz = lz - r.cz, u = dx * r.c - dz * r.s, v = dx * r.s + dz * r.c;
+  return Math.abs(u) < r.hx + m && Math.abs(v) < r.hz + m;
+}
+/** Obstáculo girado: rectángulo de semiejes hx (x local) × hz (z local) con centro (cx, cz) y giro a (como rotation.y). */
+function rotBlock(cx, cz, a, hx, hz) {
+  const c = Math.cos(a), s = Math.sin(a), ex = Math.abs(c) * hx + Math.abs(s) * hz, ez = Math.abs(s) * hx + Math.abs(c) * hz;
+  return { x0: cx - ex, x1: cx + ex, z0: cz - ez, z1: cz + ez, rot: { cx, cz, c, s, hx, hz } };
 }
 
 const LANES = [{ x: -5.2, dir: 1 }, { x: -1.9, dir: 1 }, { x: 1.9, dir: -1 }, { x: 5.2, dir: -1 }];
@@ -210,7 +311,9 @@ export class City {
       const k = realData.kiosk;
       const b = this.real.placeBusStop(realData.busStop, [[k.x, k.z, 1.8], ...realData.shops.map(s => [s.door[0], s.door[1], 1.2])]);
       this.busStopAt = { x: b.x, z: b.z };
-      this.buildBusStop(g, M, b.x - 1.4, b.z);
+      this.buildMainStop(g, b);
+      this.buildRealAccesses(g);
+      this.buildRealStops(g);
       this.buildRealVehicles(g, rnd);
       this.buildPedestrians(g, rnd);
     } else {
@@ -387,23 +490,17 @@ export class City {
       h.rotation.x = Math.atan2(3, L - 0.9);
     });
 
-    // Remate perimetral de granito y baranda de acero con paneles de vidrio
-    const glass = std(0xbfd8e6, { metal: 0.2, rough: 0.05, transparent: true, opacity: 0.28, depthWrite: false });
-    addBox(g, 0.3, 0.16, L + 0.3, granite, x0 - 0.05, 0.18, a.z - 0.15);
-    addBox(g, 0.3, 0.16, L + 0.3, granite, x1 + 0.05, 0.18, a.z - 0.15);
-    addBox(g, W + 0.4, 0.16, 0.3, granite, a.x, 0.18, z0 - 0.05);
-    const railSide = (x) => {
-      addBox(g, 0.04, 0.85, L - 0.1, glass, x, 0.7, a.z);
-      addBox(g, 0.07, 0.07, L, steel, x, 1.15, a.z);
-      for (let z = z0; z <= z1 + 0.01; z += L / 3) addBox(g, 0.06, 1.0, 0.06, steel, x, 0.68, z);
-    };
-    railSide(x0 - 0.05);
-    railSide(x1 + 0.05);
-    addBox(g, W + 0.1, 0.85, 0.04, glass, a.x, 0.7, z0 - 0.05);
-    addBox(g, W + 0.2, 0.07, 0.07, steel, a.x, 1.15, z0 - 0.05);
+    // 2.21 · Muro-parapeto con tubo de acero y la banda del color de la línea con la letra del acceso real
+    accessParapet(g, { w: W, len: L, cx: a.x, cz: a.z, y0: 0.1, name: this.station.name, ref: this.real?.d.access?.ref || "", color: LINE.color || LINE_COLORS[LINE.id] });
     // Franja podotáctil amarilla delante de la boca
     addBox(g, W, 0.02, 0.4, M.yellow, a.x, 0.115, z1 + 0.25);
     this.blocks.push({ x0: x0 - 0.3, x1: x1 + 0.3, z0: z0 - 0.3, z1: z1 - 1.0 });   // el último metro de la boca se puede pisar para bajar
+    // 2.21 · Máscara de la boca: el suelo lejano (que pasa por debajo) no tapa la escalera
+    const hole = new THREE.Mesh(new THREE.PlaneGeometry(W, L), HOLE_MASK);
+    hole.rotation.x = -Math.PI / 2;
+    hole.position.set(a.x, 0.12, a.z);
+    hole.renderOrder = -2;
+    g.add(hole);
 
     // Tótem del Metro de Santiago
     const tx = x1 + 0.75, tz = z1 + 0.7;
@@ -425,7 +522,98 @@ export class City {
     face(1.7, 0.36, signMaterial(this.station.name, { bg: "#1b1f24", font: "800 76px Arial" }), 3.45);
     const lines = [LINE.id, ...(this.station.combos || [])];
     face(0.36 * lines.length + 0.1, 0.36, glow(0xffffff, { map: lineBadgesTexture(lines) }), 3.02);
+    // 2.21 · La letra del acceso real y la calle a la que da
+    const acc = this.real?.d.access;
+    if (acc && (acc.ref || acc.name)) face(1.6, 0.4, glow(0xffffff, { map: accessPlateTexture(acc.ref, accessStreet(acc.name, this.station.name, acc.ref)) }), 2.55);
     this.blocks.push({ x0: tx - 0.3, x1: tx + 0.3, z0: tz - 0.3, z1: tz + 0.3 });
+    if (acc?.lift) {
+      // Ascensor junto a la boca, si cabe en la vereda
+      const lx = x0 - 1.4, lz = z1 - 1.2;
+      if (!this.real.onRoad(lx, lz, -1) && this.real.free(lx - 0.9, lz) && this.real.free(lx, lz + 0.9) && this.real.free(lx, lz - 0.9)) {
+        metroLift(g, lx, lz, acc.ref);
+        this.blocks.push({ x0: lx - 0.9, x1: lx + 0.9, z0: lz - 0.9, z1: lz + 0.9 });
+      }
+    }
+  }
+
+  /**
+   * 2.21 · Los otros accesos de la estación, donde están en la calle real (vereda, bandejón o plaza), cada uno con su
+   * tótem, su letra y la calle a la que da; los que están dentro de un edificio llevan solo el tótem. Se baja por
+   * cualquiera (E): todos llegan a la misma mezanina.
+   */
+  buildRealAccesses(g) {
+    this.accesses2 = [];
+    const lines = [LINE.id, ...(this.station.combos || [])];
+    const night = (this.sky?.night ?? 0) > 0.5 ? 1 : 0;
+    for (const a of this.real.d.accesses) {
+      const street = accessStreet(a.name, this.station.name, a.ref);
+      if (/ascensor/i.test(a.name) && !a.ref) {
+        // Acceso que es solo un ascensor (p. ej. «Ascensor Preferencial»): el pabellón del ascensor con su tótem
+        metroLift(g, a.x, a.z).rotation.y = a.a;
+        metroTotem(g, this.station.name, lines, a.x + 1.6 * Math.cos(a.a), a.z - 1.6 * Math.sin(a.a), { street: "Ascensor" });
+        this.blocks.push(rotBlock(a.x, a.z, a.a, 1.1, 1.1));
+        continue;
+      }
+      if (a.inBuilding) {
+        const t = metroTotem(g, this.station.name, lines, a.x, a.z, { ref: a.ref, street });
+        t.rotation.y = a.a;
+        this.blocks.push({ x0: a.x - 0.3, x1: a.x + 0.3, z0: a.z - 0.3, z1: a.z + 0.3 });
+        continue;
+      }
+      const w = 2.8, len = 5.6;
+      // ¿Cabe el ascensor al lado? (si no, el acceso va sin él)
+      const c = Math.cos(a.a), s = Math.sin(a.a);
+      const W = (u, v) => [a.x + u * c + v * s, a.z - u * s + v * c];
+      const [ex, ez] = W(-w / 2 - 1.35, len / 2 - 0.9);
+      const lift = a.lift && !this.real.onRoad(ex, ez, -1) && this.real.free(ex, ez, 1);
+      const acc = metroStreetAccess(g, { name: this.station.name, lines, night, w, len, ref: a.ref, street, lift });
+      acc.position.set(a.x, 0.1, a.z);
+      acc.rotation.y = a.a;
+      this.blocks.push(rotBlock(a.x, a.z, a.a, w / 2 + 0.3, len / 2 + 0.3));
+      const [tx, tz] = W(w / 2 + 0.75, len / 2 + 0.7);
+      this.blocks.push({ x0: tx - 0.3, x1: tx + 0.3, z0: tz - 0.3, z1: tz + 0.3 });
+      if (lift) this.blocks.push({ x0: ex - 0.95, x1: ex + 0.95, z0: ez - 0.95, z1: ez + 0.95 });
+      const [mx, mz] = W(0, len / 2 + 0.9);
+      this.accesses2.push({ ...a, street, mouth: { x: mx, z: mz } });
+    }
+  }
+
+  /**
+   * 2.21 · Los paraderos de Red alrededor de la estación, donde están y con sus datos reales (código, n.º de parada,
+   * recorridos, refugio). Se miran con E; el del juego (donde para el bus) es el de siempre (buildMainStop).
+   */
+  buildRealStops(g) {
+    this.stops2 = [];
+    const night = (this.sky?.night ?? 0) > 0.5 ? 1 : 0;
+    const play = new Set(busRoutesAt(this.station?.name).map(r => r.id));
+    for (const st of this.real.d.stops) {
+      const grp = buildRedStop(g, st, { play: st.routes.filter(r => play.has(r)), night });
+      grp.position.set(st.x, 0.1, st.z);
+      grp.rotation.y = st.a;
+      const c = Math.cos(st.a), s = Math.sin(st.a);
+      const W = (u, v) => [st.x + u * c + v * s, st.z - u * s + v * c];
+      if (st.shelter) { const [cx, cz] = W(1.4, 1.3); this.blocks.push(rotBlock(cx, cz, st.a, 0.85, 2.6)); }
+      const [px, pz] = W(0, -2.4);
+      this.blocks.push({ x0: px - 0.15, x1: px + 0.15, z0: pz - 0.15, z1: pz + 0.15 });
+      const [hx, hz] = W(0.9, 0.8);
+      this.stops2.push({ ...st, at: { x: hx, z: hz } });
+    }
+  }
+
+  /** 2.21 · El paradero del juego en la calle real, con los datos del paradero de OSM (o el de la estación, si no hay). */
+  buildMainStop(g, b) {
+    const d = this.real.d.busStop || {};
+    const ids = busRoutesAt(this.station?.name).map(r => r.id);
+    this.busStop = BUS_METRO_STOPS.has(this.station?.name);
+    const stop = d.real
+      ? { ref: d.ref, n: d.n, name: d.name, routes: [...new Set([...(d.routes ? d.routes.split(";") : []), ...ids])], shelter: true, bench: true }
+      : { ref: "", n: 0, name: `(M) ${this.station.name}`, routes: ids, shelter: true, bench: true };
+    this.mainStop = stop;
+    const px = b.x - 1.2, pz = b.z - 2.2;
+    const grp = buildRedStop(g, stop, { play: ids, night: (this.sky?.night ?? 0) > 0.5 ? 1 : 0 });
+    grp.position.set(px, 0.1, pz);
+    this.blocks.push({ x0: px + 0.6, x1: px + 2.3, z0: pz - 1.2, z1: pz + 3.8 });
+    this.blocks.push({ x0: px - 0.15, x1: px + 0.15, z0: pz - 2.55, z1: pz - 2.25 });
   }
 
   /** Vereda este: locales en planta baja, kiosko y edificios encima. */
@@ -757,11 +945,11 @@ export class City {
   pedFree(lx, lz, margin = 0.35) {
     if (this.real) {                                        // 2.6 · calle real: veredas y plazas, sin calzadas ni edificios
       if (Math.hypot(lx - S.access.x, lz - S.access.z) > 75 || this.real.onRoad(lx, lz, -0.3) || !this.real.free(lx, lz, margin)) return false;
-      return !this.blocks.some(b => lx > b.x0 - margin && lx < b.x1 + margin && lz > b.z0 - margin && lz < b.z1 + margin);
+      return !this.blocks.some(b => hitBlock(b, lx, lz, margin));
     }
     if (Math.abs(lx) < S.roadHalf + 0.3) return false;      // no se baja a la calzada
     if (!this.walkRects.some(r => lx >= r.x0 && lx <= r.x1 && lz >= r.z0 && lz <= r.z1)) return false;
-    return !this.blocks.some(b => lx > b.x0 - margin && lx < b.x1 + margin && lz > b.z0 - margin && lz < b.z1 + margin);
+    return !this.blocks.some(b => hitBlock(b, lx, lz, margin));
   }
 
   randomSidewalkPoint(side, rnd = Math.random) {
@@ -942,7 +1130,7 @@ export class City {
     if (!this.walkRects.some(r => lx >= r.x0 && lx <= r.x1 && lz >= r.z0 && lz <= r.z1)) return false;
     if (this.walkers?.some(p => Math.hypot(p.x - lx, p.z - lz) < 0.45)) return false;   // no se atraviesa a los peatones
     if (this.real && !this.real.free(lx, lz)) return false;                              // 2.6 · edificios, árboles y postes reales
-    return !this.blocks.some(b => lx > b.x0 - 0.25 && lx < b.x1 + 0.25 && lz > b.z0 - 0.25 && lz < b.z1 + 0.25);
+    return !this.blocks.some(b => hitBlock(b, lx, lz, 0.25));
   }
 
   /** Altura del suelo (vereda o calzada), en coordenadas del mundo. */
@@ -970,6 +1158,9 @@ export class City {
     const a = S.access;
     if (Math.hypot(lx - a.x, lz - (a.z + a.mouthZ + 0.8)) < 2.4) return { kind: "access" };
     if (Math.abs(lx - this.busStopAt.x) < 2.6 && Math.abs(lz - this.busStopAt.z) < 4.5) return { kind: "busstop", served: !!this.busStop };
+    // 2.21 · Los otros accesos (se baja por cualquiera) y los paraderos de alrededor (se mira la señal)
+    for (const a of this.accesses2 || []) if (Math.hypot(lx - a.mouth.x, lz - a.mouth.z) < 2.2) return { kind: "access2", access: a };
+    for (const p of this.stops2 || []) if (Math.hypot(lx - p.at.x, lz - p.at.z) < 2.4) return { kind: "redstop", stop: p };
     let best = null, bd = 2.6;
     for (const shop of this.plan.shops) {
       const d = Math.hypot(lx - shop.door.x, lz - shop.door.z);
@@ -978,6 +1169,12 @@ export class City {
     if (best) return { kind: "shop", shop: best };
     if (this.landmark && this.atLandmark(lx, lz)) return { kind: "landmark", landmark: this.landmark };
     return null;
+  }
+
+  /** 2.21 · Donde queda el pasajero que baja por otro acceso: en la boca del acceso del juego, mirando escalera abajo. */
+  mainMouthSpot() {
+    const a = S.access;
+    return { x: this.origin.x + a.x, y: this.origin.y + 0.1, z: this.origin.z + a.z + a.mouthZ - 0.5, yaw: 0 };
   }
 
   /** ¿Entró en la boca de la escalera? Desde ahí se baja caminando (el pasajero pasa a la estación). */
@@ -1090,6 +1287,8 @@ export class City {
       : n.shop.stand ? `${keyText("E", "✋ Usar")} · comprar en ${n.shop.name} (${n.shop.label.toLowerCase()})`
       : `Camina hacia la puerta (o ${keyText("E", "✋ Usar")}) para entrar a ${n.shop.name} (${n.shop.label.toLowerCase()})`;
     if (n?.kind === "landmark") return `${keyText("E", "✋ Usar")} · sacar una foto de ${n.landmark.name}`;
+    if (n?.kind === "access2") return `${keyText("E", "✋ Usar")} · bajar a la estación ${this.station.name} por el acceso ${n.access.ref || ""}${n.access.street ? ` (${n.access.street})` : ""}`.replace("acceso  (", "acceso (");
+    if (n?.kind === "redstop") return `Paradero ${n.stop.ref}${n.stop.n ? ` · Parada ${n.stop.n}` : ""} · ${n.stop.name}${n.stop.routes.length ? ` · ${n.stop.routes.slice(0, 8).join(", ")}${n.stop.routes.length > 8 ? "…" : ""}` : ""}`;
     if (n?.kind === "busstop") return n.served ? `${keyText("E", "✋ Usar")} · paradero (${busRoutesAt(this.station?.name).map(r => r.id).join(", ")}): tomar el bus` : "Paradero: por aquí no pasa ninguno de los recorridos del juego";
     if (this.real) return `Calle real de ${this.station.name} (${OSM_ATTRIBUTION})${this.landmark ? ` · ${this.landmark.name}` : ""} · ${keyText("J", "🎯")} misiones`;
     return this.landmark

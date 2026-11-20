@@ -57,6 +57,10 @@ const coords = (a, from = 0) => a.map((v, i) => (i < from ? v : M(v)));
 function decode(meta, g) {
   return {
     radius: meta.r, rot: meta.rot, entrance: meta.e, shops: meta.shops, kiosk: meta.kiosk, busStop: meta.busStop, landmark: meta.landmark,
+    // 2.21 · El acceso del juego con su letra real, los otros accesos de la estación y los paraderos de Red de alrededor
+    access: meta.access || null,
+    accesses: (g.ac || []).map(([x, z, a, k, ref, name, lift]) => ({ x: M(x), z: M(z), a: A(a), inBuilding: k === 1, ref, name, lift: !!lift })),
+    stops: (g.pa || []).map(([x, z, a, ref, n, name, routes, shelter, bench]) => ({ x: M(x), z: M(z), a: A(a), ref, n, name, routes: routes ? routes.split(";") : [], shelter: !!shelter, bench: !!bench })),
     buildings: g.b.map(b => [M(b[0]), b[1], b[2], b[3], ...b.slice(4).map(M)]),
     roofs: g.rf.map(r => r.map(M)),
     roads: g.rd.map(r => [M(r[0]), r[1], ...r.slice(2).map(M)]),

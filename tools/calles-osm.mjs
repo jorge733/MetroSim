@@ -148,6 +148,21 @@ function raySeg(p, d, a, b) {
   const w = sub(a, p), t = (w[0] * e[1] - w[1] * e[0]) / den, u = (w[0] * d[1] - w[1] * d[0]) / den;
   return t > 0 && u >= 0 && u <= 1 ? t : null;
 }
+/** 2.21 · Datos de un acceso de OSM: letra (ref), calle (name) y si tiene ascensor. */
+function entInfo(t = {}) {
+  return { ref: String(t.ref || "").slice(0, 3), name: String(t.name || "").slice(0, 60), lift: t.elevator === "yes" || t.highway === "elevator" ? 1 : 0 };
+}
+/** 2.21 · Datos de un paradero de Red en OSM: código (PA433), n.º de parada, nombre, recorridos, refugio y banca. */
+function stopInfo(t = {}) {
+  const full = String(t.ref_name || t.name || "");
+  const m = full.match(/^Parada\s*(\d+)\s*\/\s*(.+)$/i);
+  let name = (m ? m[2] : String(t.name || full)).replace(/^P[A-Z]\d+\s*-\s*/, "").trim();
+  const n = m ? +m[1] : +t.local_ref || 0;
+  const routes = String(t.route_ref || "").split(/[;,]/).map(r => r.trim()).filter(Boolean)
+    .sort((a, b) => (parseInt(a) || 9999) - (parseInt(b) || 9999) || a.localeCompare(b)).slice(0, 16);
+  const sh = t.shelter === "yes" ? 1 : t.shelter === "no" ? 0 : routes.length >= 3 ? 1 : 0;
+  return { ref: String(t.ref || "").slice(0, 8), n, name: name.slice(0, 42), routes: routes.join(";"), sh, bench: t.bench === "yes" || sh ? 1 : 0 };
+}
 function seeded(n) { let a = (n * 2654435761) >>> 0; return () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 
 const CLASS_RANK = { trunk: 0, primary: 0, secondary: 1, tertiary: 2, primary_link: 2, secondary_link: 2, unclassified: 3, residential: 3, living_street: 4, service: 6, busway: 2, motorway: 5 };
@@ -229,7 +244,7 @@ function chooseFrame(nodes, ways, cfg) {
     if (!found) continue;
     if (Math.hypot(found[0], found[1]) > 330) continue;
     const lat = st.lat + found[1] / ky, lon = st.lon + found[0] / kx;
-    return { lat, lon, dir, avenueKey: pick.key, name: c.name, synth: !!c.synth };
+    return { lat, lon, dir, avenueKey: pick.key, name: c.name, synth: !!c.synth, id: c.id };
   }
   return null;
 }
@@ -538,10 +553,110 @@ function build(data, cfg) {
     const p = L(en(n));
     if (p[0] < avenueRight(p[1]) - 1 || Math.abs(p[1]) > 90 || Math.abs(p[1]) < 10) continue;
     const d = Math.abs(p[1] - 34);
-    if (!bus || d < bus.d) bus = { d, x: p[0], z: p[1] };
+    if (!bus || d < bus.d) bus = { d, x: p[0], z: p[1], id: n.id };
   }
-  const busStop = bus ? { x: r1(Math.max(avenueRight(bus.z) + 1.2, Math.min(bus.x, avenueRight(bus.z) + 2))), z: r1(bus.z), real: 1 }
+  const busStop = bus ? { x: r1(Math.max(avenueRight(bus.z) + 1.2, Math.min(bus.x, avenueRight(bus.z) + 2))), z: r1(bus.z), real: 1, ...stopInfo(nodes.get(bus.id).tags) }
     : { x: r1(avenueRight(34) + 1.5), z: 34, real: 0 };
+
+  /* ---------- 2.21 · Los otros accesos de la estación y los paraderos de Red de alrededor ---------- */
+  const mainEnt = frame.id ? nodes.get(frame.id) : null;
+  const access = mainEnt ? entInfo(mainEnt.tags) : null;
+  const stL = L(en(cfg.station));
+  const driveRoads = roads.filter(r => DRIVE.has(r.hw) || r.hw === "busway");
+  /** Calzada más cercana: punto, dirección y distancia. */
+  const nearestRoad = (p) => {
+    let best = null;
+    for (const r of driveRoads) for (let i = 0; i + 1 < r.pts.length; i++) {
+      const c = closestOnSeg(p, r.pts[i], r.pts[i + 1]), d = Math.hypot(p[0] - c[0], p[1] - c[1]);
+      if (!best || d < best.d) best = { d, c, dir: norm(sub(r.pts[i + 1], r.pts[i])), r };
+    }
+    return best;
+  };
+  // Escaleras de OSM que salen de cada acceso: hacia dónde baja (el acceso queda arriba, en la calle)
+  const stepsDir = new Map();
+  for (const w of ways.values()) {
+    if (w.tags?.highway !== "steps") continue;
+    const up = w.tags.incline === "up" || w.tags.incline === "yes", down = w.tags.incline === "down";
+    w.nodes.forEach((id, i) => {
+      if (nodes.get(id)?.tags?.railway !== "subway_entrance") return;
+      // El vecino que queda más abajo: el otro extremo si el acceso es un extremo; si no, según incline
+      let j = i === 0 ? 1 : i === w.nodes.length - 1 ? i - 1 : up ? i - 1 : down ? i + 1 : -1;
+      const a = P(id), b = j >= 0 ? P(w.nodes[j]) : null;
+      if (a && b && len(sub(b, a)) > 0.5) stepsDir.set(id, norm(sub(b, a)));
+    });
+  }
+  const accesses = [];
+  let accSeen = 0;
+  const ACC_W = 3.4, ACC_L = 6.2;
+  /** ¿Cabe la boca (ancho ACC_W, largo ACC_L desde la boca p hacia d) sin pisar calzadas ni edificios? */
+  const accFits = (p, d) => {
+    const rt = [-d[1], d[0]];
+    for (let u = -ACC_W / 2; u <= ACC_W / 2 + 1e-6; u += ACC_W / 4) for (let v = -0.6; v <= ACC_L + 1e-6; v += ACC_L / 6) {
+      const q = [p[0] + rt[0] * u + d[0] * v, p[1] + rt[1] * u + d[1] * v];
+      if (onRoad(q, null, -0.4) || inBuilding(q)) return false;
+      if (q[0] > 6.4 && q[0] < 13.6 && q[1] > -5.2 && q[1] < 10.5) return false;     // la boca principal del juego y su tótem
+      if (accesses.some(a => Math.hypot(q[0] - a.c[0], q[1] - a.c[1]) < 3.6)) return false;
+      // Ni delante de un local (puerta y toldo) ni encima del kiosko
+      if (shops.some(sh => Math.hypot(q[0] - sh.door[0], q[1] - sh.door[1]) < (sh.stand ? 2.2 : Math.max(3.5, (sh.w || 11) / 2 + 0.5)))) return false;
+      if (Math.hypot(q[0] - kiosk.x, q[1] - kiosk.z) < 2.6) return false;
+    }
+    return true;
+  };
+  for (const n of nodes.values()) {
+    if (n.tags?.railway !== "subway_entrance" || n.id === frame.id || cfg.synth) continue;
+    const p0 = L(en(n));
+    if (!near(p0, -12) || Math.hypot(p0[0] - stL[0], p0[1] - stL[1]) > 280) continue;
+    const nr = nearestRoad(p0);
+    let d = stepsDir.get(n.id);
+    if (!d) {
+      // Sin escalera en OSM: corre junto a la solera y baja hacia el centro de la estación
+      d = nr ? nr.dir : norm(sub(stL, p0));
+      if (dot(d, sub(stL, p0)) < 0) d = [-d[0], -d[1]];
+    }
+    // El punto de OSM es aproximado: se prueba corriéndolo un poco (lejos de la calzada o a lo largo)
+    const away = nr && nr.d > 0.01 ? norm(sub(p0, nr.c)) : [0, 0];
+    let put = null;
+    for (const [o, a] of [[0, 0], [1, 0], [2, 0], [0, 2], [0, -2], [3, 0], [1, 3], [1, -3], [-1, 0], [4, 0]]) {
+      const q = [p0[0] + away[0] * o + d[0] * a, p0[1] + away[1] * o + d[1] * a];
+      if (accFits(q, d)) { put = q; break; }
+    }
+    const info = entInfo(n.tags);
+    accSeen++;
+    if (put) {
+      const c = [put[0] + d[0] * ACC_L / 2, put[1] + d[1] * ACC_L / 2];
+      accesses.push({ c, m: put, a: angOf([-d[0], -d[1]]), k: 0, info });
+    } else if (inBuilding(p0, 1.5) && !onRoad(p0)) {
+      // Acceso dentro de un edificio (galería, mall): solo el tótem en la fachada, mirando a la calle
+      const t = nr ? [p0[0] + norm(sub(nr.c, p0))[0] * 1.2, p0[1] + norm(sub(nr.c, p0))[1] * 1.2] : p0;
+      if (!inBuilding(t) && !onRoad(t, null, -0.3)) accesses.push({ c: t, m: t, a: 0, k: 1, info });
+    }
+  }
+  const stopsAll = [];
+  for (const n of nodes.values()) {
+    const t = n.tags;
+    if (!t || n.id === bus?.id || (t.highway !== "bus_stop" && !(t.public_transport === "platform" && t.bus === "yes"))) continue;
+    const p = L(en(n));
+    if (!near(p, -10) || Math.hypot(p[0] - ACCESS.x, p[1] - ACCESS.z) > 150) continue;
+    if (Math.hypot(p[0] - busStop.x, p[1] - busStop.z) < 12) continue;
+    const nr = nearestRoad(p);
+    if (!nr || nr.d > 16) continue;
+    let nrm = nr.d > 0.05 ? norm(sub(p, nr.c)) : [-nr.dir[1], nr.dir[0]];
+    // Desde la solera: el poste a 0,6 m y el refugio (1,6 m de fondo) a continuación
+    const curb = [nr.c[0] + nrm[0] * nr.r.w / 2, nr.c[1] + nrm[1] * nr.r.w / 2];
+    let q = null;
+    for (const extra of [0.6, 1.2, 2, 3]) {
+      const t2 = [curb[0] + nrm[0] * extra, curb[1] + nrm[1] * extra];
+      if (!onRoad(t2, null, -0.3) && !inBuilding(t2, 0.5)) { q = t2; break; }
+    }
+    if (!q) continue;
+    const info = stopInfo(t);
+    const back = [q[0] + nrm[0] * 2.4, q[1] + nrm[1] * 2.4];
+    if (info.sh && (inBuilding(back) || onRoad(back))) info.sh = 0;     // no cabe el refugio: queda el poste
+    if (stopsAll.some(s => Math.hypot(s.p[0] - q[0], s.p[1] - q[1]) < 8)) continue;
+    stopsAll.push({ p: q, a: Math.atan2(-nrm[1], nrm[0]), dist: Math.hypot(p[0] - ACCESS.x, p[1] - ACCESS.z), info });
+  }
+  stopsAll.sort((a, b) => a.dist - b.dist);
+  const stops = stopsAll.slice(0, 10);
 
   let landmark = null;
   const centroid = (ring) => [ring.reduce((t, p) => t + p[0], 0) / ring.length, ring.reduce((t, p) => t + p[1], 0) / ring.length];
@@ -600,7 +715,8 @@ function build(data, cfg) {
   }
 
   // Árboles que estorban la boca del acceso, el tótem, puertas o el paradero
-  const keepFree = [[ACCESS.x, 0, 3.8], [ACCESS.x + 2, ACCESS.z + 0.7, 1.5], [busStop.x, busStop.z, 3.2], [kiosk.x, kiosk.z, 2.2], ...shops.map(s => [s.door[0], s.door[1], 1.4])];
+  const keepFree = [[ACCESS.x, 0, 3.8], [ACCESS.x + 2, ACCESS.z + 0.7, 1.5], [busStop.x, busStop.z, 3.2], [kiosk.x, kiosk.z, 2.2], ...shops.map(s => [s.door[0], s.door[1], 1.4]),
+    ...accesses.map(a => [a.c[0], a.c[1], 3.8]), ...stops.map(s => [s.p[0], s.p[1], 3.2])];
   const freeOk = (x, z) => keepFree.every(([fx, fz, r]) => Math.hypot(x - fx, z - fz) > r);
   const treesOk = [];
   for (let i = 0; i < trees.length; i += 2) if (freeOk(trees[i], trees[i + 1])) treesOk.push(trees[i], trees[i + 1]);
@@ -623,7 +739,12 @@ function build(data, cfg) {
     ln: lanes.map(l => ({ p: enc(simplify(l.pts, 0.1)), s: l.sig.map(q), k: l.kind, b: l.bus })),
   };
   const meta = { e: ent.tags?.name || "", r: R, rot: [+dn.toFixed(5), +de.toFixed(5)], shops, kiosk, busStop, landmark };
-  const st = { edificios: buildings.length, calles: roads.length, árboles: treesOk.length / 2, semáforos: signals.length, pistas: lanes.length, acceso: meta.e || "(vereda)", locales: shops.filter(s => !s.stand).length + "/6 en fachada", hito: landmark?.via || "-" };
+  if (access) meta.access = access;
+  // 2.21 · Accesos [x, z, giro, tipo (0 escalera · 1 en un edificio), letra, calle, ascensor] y paraderos
+  //        [x, z, giro, código, n.º de parada, nombre, recorridos, refugio, banca]
+  geo.ac = accesses.map(a => [q(a.c[0]), q(a.c[1]), Math.round(a.a * 1000), a.k, a.info.ref, a.info.name, a.info.lift]);
+  geo.pa = stops.map(s => [q(s.p[0]), q(s.p[1]), Math.round(s.a * 1000), s.info.ref, s.info.n, s.info.name, s.info.routes, s.info.sh, s.info.bench]);
+  const st = { accesos: `${1 + accesses.length}/${1 + accSeen}`, paraderos: stops.length + (busStop.real ? 1 : 0), edificios: buildings.length, calles: roads.length, árboles: treesOk.length / 2, semáforos: signals.length, pistas: lanes.length, acceso: meta.e || "(vereda)", locales: shops.filter(s => !s.stand).length + "/6 en fachada", hito: landmark?.via || "-" };
   const out = { meta, geo };
   return { out, st };
 }

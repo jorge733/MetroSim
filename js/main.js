@@ -127,7 +127,7 @@ import { quoteStage, commitStage, loadTrip, saveTrip, fareModeOfLine, minutesLef
 import { setupRiderPanel, openRiderPanel, closeRiderPanel, riderPanelOpen } from "./riderPanel.js";
 import { startBusGame } from "./bus/busGame.js";
 import { BusAudio } from "./bus/busAudio.js";
-import { busTripsFrom, BUS_ROUTES, busRouteById } from "./bus/busRoute.js";
+import { busTripsFrom, BUS_ROUTES, busRouteById, busRoutesAt } from "./bus/busRoute.js";
 import { setupAccountButton, openAccount, closeAccount, accountOpen, state as accountState } from "./cuenta.js";
 import { setupFeedbackButtons, openFeedback, closeFeedback, feedbackOpen } from "./sugerencias.js";
 
@@ -791,7 +791,7 @@ async function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = 
   resetTrainAssets();
 
   /* --- Render --- */
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  const renderer = new THREE.WebGLRenderer({ antialias: true, stencil: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 1));
   renderer.setSize(innerWidth, innerHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -2314,6 +2314,12 @@ function arriveByBus(stop, fromLine) {
 function onStreetTarget(target) {
   const st = game.walker.station;
   if (target.kind === "access") return hud.showMessage("Camina hacia la escalera para bajar a la estación", "info");
+  if (target.kind === "access2") return enterOtherAccess(target.access, st);
+  if (target.kind === "redstop") {
+    const p = target.stop, own = busRoutesAt(st?.name).filter(r => p.routes.includes(r.id));
+    return hud.showMessage(`🚏 Paradero ${p.ref}${p.n ? ` · Parada ${p.n}` : ""} · ${p.name} · ${p.routes.length ? `paran ${p.routes.join(", ")}` : "sin recorridos en OSM"}`
+      + (own.length ? ` · el ${own.map(r => r.id).join(" y el ")} del juego para en el paradero junto al acceso` : ""), "info", 6500);
+  }
   if (target.kind === "busstop") return target.served ? openBusStop(st)
     : hud.showMessage("Por este paradero no pasa ninguno de los recorridos del juego (A01, 210, 385, 401, 403, 109, 107, 211 y 506)", "info", 5500);
   if (target.kind === "shop") return game.city.canEnter(target.shop) ? enterShopDoor(target.shop) : openShop(target.shop, st);
@@ -2351,6 +2357,25 @@ function enterShopDoor(shop) {
       hud.showMessage(`${shop.icon} «${hello} ¿Qué le sirvo?» · ${shop.name} · acércate a la caja del fondo para comprar`, "info", 4200);
     });
   }, open > 0.6 ? 60 : 420);
+}
+
+/**
+ * 2.21 · Bajar por otro acceso de la estación: un parpadeo y se sigue escalera abajo desde la boca del acceso del
+ * juego (todos los accesos llegan a la misma mezanina).
+ */
+function enterOtherAccess(acc, st) {
+  if (!game || game.shopDoor) return;
+  const w = game.walker, city = game.city;
+  game.shopDoor = true;
+  w.frozen = true;
+  w.keys.clear();
+  hud.blink(() => w.placeAt(city.mainMouthSpot()), () => {
+    if (!game) return;
+    game.shopDoor = false;
+    w.frozen = false;
+    w.keys.clear();
+    hud.showMessage(`Acceso ${acc.ref || ""}${acc.street ? ` · ${acc.street}` : ""} · camina escalera abajo hacia la mezanina de ${st?.name || "la estación"}`.replace("Acceso  ·", "Acceso ·"), "info", 4000);
+  });
 }
 
 /** 2.17 · Salir del local por la misma puerta, de vuelta a la vereda. */

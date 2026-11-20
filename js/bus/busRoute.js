@@ -79,6 +79,7 @@ function reversed(r) {
   const span = r.stops[0].s + r.stops.at(-1).s;
   return {
     ...r,
+    rev: true,                                     // 2.21 · los accesos al Metro de cada paradero se ven desde el otro lado
     from: r.to, to: r.from,
     stops: r.stops.slice().reverse().map(st => ({ ...st, s: span - st.s })),
     lights: r.lights.slice().reverse().map(l => ({ ...l, s: span - l.s - 16 })),

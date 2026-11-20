@@ -124,6 +124,37 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **Salir por los torniquetes es gratis**: solo se cobra el pasaje al pasar hacia la zona pagada (antes, al terminar
   de cruzar el torniquete de salida se cobraba un pasaje).
 
+## Versión 2.22 · Accesos al Metro y paraderos como en la calle real
+
+Los accesos y paraderos que rodean cada estación ahora salen de OpenStreetMap (© colaboradores de OpenStreetMap, ODbL),
+cada uno con sus datos reales, y se dibujan como se ven en Santiago.
+
+- **Todos los accesos de la estación**, no solo uno: cada uno queda donde está en la calle real (vereda, bandejón
+  central o plaza) y baja en la dirección de su escalera, si OSM la tiene dibujada. En las 133 calles aparecen 291
+  accesos; los que no caben sin pisar una calzada, un edificio o un local quedan fuera. Se baja por cualquiera con
+  **E** y todos llegan a la misma mezanina.
+- **Con su letra y su calle:**
+  - el tótem lleva una placa con la letra del acceso y la calle a la que da («Acceso E · Arturo Prat»);
+  - sobre la boca va la **banda del color de la línea** con el nombre de la estación y la letra en un círculo blanco.
+- **Bocas como las reales:** muro-parapeto de hormigón de ~1 m con un tubo de acero encima (antes eran barandas de
+  vidrio) y escaleras de 3 m de ancho.
+- **Ascensores:** los accesos que tienen ascensor llevan su pabellón de acero con la franja azul «Ascensor», y los
+  que en OSM son solo un ascensor se dibujan sin escalera.
+- **Paraderos de Red reales alrededor de la estación** (hasta 10), cada uno en su vereda:
+  - la **señal roja con franja amarilla**, con su código (PA167), el número de parada («Parada 6»), el nombre y los
+    recorridos que paran; los del juego van marcados en amarillo;
+  - **refugio** (solo si lo tiene) con la banda negra «Nombre | Parada N» y la **solera pintada de amarillo**;
+  - con **E** se lee la señal.
+- **Modo bus:**
+  - cada paradero lleva su señal y su refugio reales (código, n.º de parada y todos los recorridos que paran);
+  - los accesos al Metro quedan **a la distancia real** del paradero y **en su lado**: la vereda del paradero, el
+    bandejón central (con su piso de baldosas) o la vereda de enfrente. En el sentido de vuelta se ven desde el otro
+    lado.
+- **La escalera ya no la tapa el piso:** el juego activa el stencil, que no tenía encendido, y se ve bajar la escalera
+  de todas las bocas.
+- Los datos salen de dos herramientas: `tools/calles-osm.mjs` (calle de cada estación) y `tools/paraderos-osm.py`
+  (nueva, para el modo bus; escribe `js/bus/paraderosOsm.js`).
+
 ## Versión 2.21 · Autos y buses más realistas
 
 - **Los autos ya no son cajas.** La carrocería sale del perfil lateral de cada modelo: capó que sube hacia el

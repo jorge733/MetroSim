@@ -29,6 +29,8 @@ import { RoutePath } from "./busPath.js";
 import { skyAt } from "../render/outdoor.js";
 import { WEATHER } from "../engine/weather.js";
 import { metroStreetAccess } from "../city/city.js";
+import { buildRedStop, accessStreet } from "../city/redStop.js";
+import { PARADEROS, ACCESOS_PARADERO } from "./paraderosOsm.js";   // 2.21 · datos reales de OSM (tools/paraderos-osm.py)
 import { linesAtStation } from "../engine/network.js";
 import { carGroup, pickCarKind, CAR_COLORS, wheelGroup, sharedVehicleMaterials, spansOutside } from "../render/vehicles.js";
 import { SkyDome, SunShadow, sunDirection, skyEnvironment, shadows, asphaltTexture, asphaltRoughness, paverTexture, grassTexture, worldUV, facadeUV, facadeSet, crownGeometry, trunkGeometry, leafMaterial, ASPHALT_TILE, PAVER_TILE, GRASS_TILE } from "../render/realism.js";
@@ -37,11 +39,8 @@ const ROAD_FAR = -17.6;          // borde de la calzada de vuelta
 const MEDIAN_FAR = -7.4;         // fin del bandejón
 const ONCOMING = [-9.1, -12.5, -15.9];
 /** 1.20 · Acceso al Metro junto al paradero: centro (x desde la vereda, z relativo a la marca) y tamaño. */
-const ACCESS = { dx: 3.9, dz: -9, w: 1.9, len: 5.2 };
+const ACCESS = { dx: 3.9, dz: -9, w: 2.4, len: 5.2 };
 const SIDEWALK_Y = 0.16;
-/** 2.15.2 · Boca del acceso: no pinta nada, solo deja un 1 en el stencil (el terreno no se dibuja ahí). */
-const ACCESS_MASK = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false, stencilWrite: true, stencilRef: 1,
-  stencilFunc: THREE.AlwaysStencilFunc, stencilZPass: THREE.ReplaceStencilOp });
 const TZ = new THREE.Matrix4();
 /** 2.2 · Taxi: largo, ancho y asientos (conductor adelante a la izquierda, pasajero atrás a la derecha). */
 const TAXI_L = 4.6, TAXI_W = 1.85;
@@ -119,6 +118,7 @@ export class BusWorld {
     this.carMeshes = new Map();
     this.path = new RoutePath(route);            // 2.3 · trazado real (la calle dobla como el recorrido)
     this.buildSky();
+    this.accessPlan = this.planAccesses();       // 2.21 · dónde van los accesos al Metro (lado y distancia reales)
     const before = new Set(scene.children);
     this.buildGround();
     this.buildRoadMarks();
@@ -313,24 +313,16 @@ export class BusWorld {
     s.add(busLane);
 
     const walkMat = worldUV(std(new THREE.Color("#ffffff").lerp(new THREE.Color("#9a9a9a"), 0.6 * Math.min(1, this.wet)), { map: paverTexture(), roughness: 0.9 - 0.4 * Math.min(1, this.wet) }), PAVER_TILE);
-    // Vereda del lado del bus en tres franjas: la del medio deja el hueco de la escalera del Metro
-    const ax0 = ACCESS.dx - ACCESS.w / 2 - 0.05, ax1 = ACCESS.dx + ACCESS.w / 2 + 0.05;
-    box(s, ax0, 0.16, this.len, walkMat, CURB_X + ax0 / 2, 0.08, this.zMid);
-    box(s, 6.2 - ax1, 0.16, this.len, walkMat, CURB_X + (ax1 + 6.2) / 2, 0.08, this.zMid);
-    const holes = this.accessStops().map(st => -st.s + ACCESS.dz).sort((a, b) => b - a);
-    let zTop = -this.start;
-    for (const zc of [...holes, -Infinity]) {
-      const zEnd = zc === -Infinity ? -this.end : zc + ACCESS.len / 2;
-      if (zTop - zEnd > 0.05) box(s, ax1 - ax0, 0.16, zTop - zEnd, walkMat, CURB_X + (ax0 + ax1) / 2, 0.08, (zTop + zEnd) / 2);
-      zTop = zc - ACCESS.len / 2;
-    }
+    // 2.21 · Las veredas no se dibujan donde las bocas del Metro marcaron el stencil (ahí se ve la escalera)
+    Object.assign(walkMat, { stencilWrite: true, stencilWriteMask: 0, stencilRef: 1, stencilFunc: THREE.NotEqualStencilFunc });
+    box(s, 6.2, 0.16, this.len, walkMat, CURB_X + 3.1, 0.08, this.zMid);
     box(s, 6.2, 0.16, this.len, walkMat, ROAD_FAR - 3.1, 0.08, this.zMid);
     const curbMat = std("#c9c6bf");
     box(s, 0.25, 0.18, this.len, curbMat, CURB_X + 0.12, 0.09, this.zMid);
     box(s, 0.25, 0.18, this.len, curbMat, ROAD_FAR - 0.12, 0.09, this.zMid);
 
     // Terreno: un plano grande que acompaña al vehículo (la calle dobla encima)
-    // 2.15.2 · No se dibuja donde las bocas del Metro marcaron el stencil (ACCESS_MASK): ahí se ve la escalera
+    // 2.15.2 · No se dibuja donde las bocas del Metro marcaron el stencil (city.js · metroStreetAccess): ahí se ve la escalera
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(3200, 3200, 64, 64), worldUV(std(this.night ? "#3a3c3a" : "#b9b7a4", { map: grassTexture(),
       stencilWrite: true, stencilWriteMask: 0, stencilRef: 1, stencilFunc: THREE.NotEqualStencilFunc }), GRASS_TILE));
     ground.rotation.x = -Math.PI / 2;
@@ -384,7 +376,13 @@ export class BusWorld {
   buildMedian() {
     const s = this.scene, rng = this.rng;
     const w = MEDIAN_X - MEDIAN_FAR;
-    box(s, w, 0.2, this.len, worldUV(std(this.night ? "#4a5a48" : "#ffffff", { map: grassTexture(), roughness: 1 }), GRASS_TILE), (MEDIAN_X + MEDIAN_FAR) / 2, 0.1, this.zMid);
+    box(s, w, 0.2, this.len, worldUV(std(this.night ? "#4a5a48" : "#ffffff", { map: grassTexture(), roughness: 1,
+      stencilWrite: true, stencilWriteMask: 0, stencilRef: 1, stencilFunc: THREE.NotEqualStencilFunc }), GRASS_TILE), (MEDIAN_X + MEDIAN_FAR) / 2, 0.1, this.zMid);
+    // 2.21 · Donde hay un acceso al Metro en el bandejón: piso de baldosas alrededor y sin árboles
+    const nearAcc = (side, x, sPos, r) => this.accessPlan.some(a => a.side === side && Math.abs(-a.z - sPos) < r);
+    for (const a of this.accessPlan.filter(a => a.side === 1)) {
+      box(s, w - 0.1, 0.2, ACCESS.len + 5, std("#b9b4aa", { roughness: 0.9, stencilWrite: true, stencilWriteMask: 0, stencilRef: 1, stencilFunc: THREE.NotEqualStencilFunc }), (MEDIAN_X + MEDIAN_FAR) / 2, 0.102, a.z);
+    }
     const curb = std("#c9c6bf");
     box(s, 0.2, 0.22, this.len, curb, MEDIAN_X - 0.1, 0.11, this.zMid);
     box(s, 0.2, 0.22, this.len, curb, MEDIAN_FAR + 0.1, 0.11, this.zMid);
@@ -392,10 +390,12 @@ export class BusWorld {
     const spots = [];
     for (let z = this.start; z < this.end; z += 13) {
       if (this.route.lights.some(l => Math.abs(l.s + 8 - z) < 10)) continue;
-      spots.push([(MEDIAN_X + MEDIAN_FAR) / 2 + (rng() - 0.5) * 1.2, z + rng() * 4]);
+      const mz = z + rng() * 4;
+      if (!nearAcc(1, 0, mz, 6)) spots.push([(MEDIAN_X + MEDIAN_FAR) / 2 + (rng() - 0.5) * 1.2, mz]);
       const ts = z + 6 + rng() * 3;
-      if (!this.route.stops.some(st => ts > st.s - 10 && ts < st.s + (st.metro ? 15 : 6))) spots.push([CURB_X + 4.4, ts]);
-      spots.push([ROAD_FAR - 4.4, z + 3 + rng() * 3]);
+      if (!this.route.stops.some(st => ts > st.s - 10 && ts < st.s + (st.metro ? 15 : 6)) && !nearAcc(0, 0, ts, 6)) spots.push([CURB_X + 4.4, ts]);
+      const fz = z + 3 + rng() * 3;
+      if (!nearAcc(2, 0, fz, 6)) spots.push([ROAD_FAR - 4.4, fz]);
     }
     // 2.4 · Copas de varios bultos (con sombra propia) y troncos con ramas, en tres formas distintas
     const trunks = new THREE.InstancedMesh(trunkGeometry(), std("#5b4a3a", { roughness: 1 }), spots.length);
@@ -548,35 +548,20 @@ export class BusWorld {
 
   /* ----------------------------- Paraderos ----------------------------- */
   buildStops() {
-    const s = this.scene, rng = this.rng;
-    const roof = std("#2c3a48", { metalness: 0.3, roughness: 0.5 });
-    const glass = new THREE.MeshStandardMaterial({ color: "#9cc3d9", transparent: true, opacity: 0.35, roughness: 0.1 });
-    const post = std("#5d656c", { metalness: 0.5, roughness: 0.4 });
+    const s = this.scene;
     const yellow = std("#f2c230", { roughness: 0.7 });
     this.route.stops.forEach((st, i) => {
       const z = -st.s;
       const g = new THREE.Group();
       g.position.set(0, 0, z);
       s.add(g);
-      // Refugio detrás de la marca de la puerta delantera
-      const zc = 6;
-      box(g, 2.2, 0.12, 5.2, roof, CURB_X + 2.6, 2.75, zc);
-      box(g, 0.08, 2.6, 0.08, post, CURB_X + 1.6, 1.45, zc - 2.4);
-      box(g, 0.08, 2.6, 0.08, post, CURB_X + 1.6, 1.45, zc + 2.4);
-      box(g, 0.05, 2.0, 5.0, glass, CURB_X + 3.6, 1.35, zc);
-      box(g, 0.5, 0.08, 3.4, std("#7b5b3d"), CURB_X + 3.2, 0.6, zc);
-      // Panel con el nombre
-      const tex = signTexture(["PARADERO", st.name], { w: 512, h: 220, bg: "#0f3d7a", font: "800 50px Barlow Condensed, Arial Narrow, Arial" });
-      const panel = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 0.86), new THREE.MeshStandardMaterial({ map: tex, side: THREE.DoubleSide, roughness: 0.5, emissive: new THREE.Color("#ffffff"), emissiveMap: tex, emissiveIntensity: this.night ? 0.7 : 0.12 }));
-      panel.position.set(CURB_X + 2.6, 3.3, zc);
-      panel.rotation.y = -Math.PI / 2;
-      g.add(panel);
-      // Señal de parada en la marca (aquí debe quedar la puerta delantera)
-      box(g, 0.08, 2.8, 0.08, post, CURB_X + 0.5, 1.4, 0);
-      const plate = new THREE.Mesh(new THREE.CircleGeometry(0.42, 24), new THREE.MeshStandardMaterial({ map: signTexture(["BUS"], { w: 128, h: 128, bg: "#0f3d7a", font: "800 54px Barlow Condensed, Arial Narrow, Arial" }), side: THREE.DoubleSide }));
-      plate.position.set(CURB_X + 0.5, 2.85, 0);
-      plate.rotation.y = -Math.PI / 2;
-      g.add(plate);
+      // 2.21 · El paradero real (OSM): paleta roja con código, n.º de parada y recorridos; refugio con su banda; la
+      // paleta queda en la marca (aquí debe quedar la puerta delantera) y el refugio detrás
+      const real = PARADEROS[st.code];
+      const routes = real ? [...new Set([...real.routes, this.route.id])] : [this.route.id];
+      const stop = { ref: st.code || "", n: real?.n || 0, name: real?.name || st.name, routes, shelter: real ? !!real.shelter || routes.length > 2 : true, bench: true };
+      const rs = buildRedStop(g, stop, { play: [this.route.id], night: this.night ? 1 : 0, paint: 14 });
+      rs.position.set(CURB_X + 0.6, SIDEWALK_Y, 2.4);
       // Cajón amarillo pintado en la pista: zona del paradero
       const zone = [[0, 0.3, 0.25, 0], [0, 0.3, 0.25, BUS_LENGTH + 2], [-1.55, 0.25, BUS_LENGTH + 2, (BUS_LENGTH + 2) / 2], [1.55, 0.25, BUS_LENGTH + 2, (BUS_LENGTH + 2) / 2]];
       for (const [dx, w, d, dz] of zone) {
@@ -952,20 +937,52 @@ export class BusWorld {
     return this.route.stops.filter(st => st.metro && linesAtStation(st.metro).length);
   }
 
+  /**
+   * 2.21 · Accesos al Metro de cada paradero junto a una estación, con los datos de OSM (js/bus/paraderosOsm.js): a
+   * cuántos metros quedan, en qué lado (0 la vereda del paradero, 1 el bandejón central, 2 la vereda de enfrente) y
+   * hacia dónde baja la escalera. En el sentido de vuelta se ven desde el otro lado. Sin datos: uno en la vereda.
+   */
+  planAccesses() {
+    const out = [];
+    const X = [CURB_X + ACCESS.dx, (MEDIAN_X + MEDIAN_FAR) / 2, ROAD_FAR - ACCESS.dx];
+    const lightS = this.route.lights.flatMap(l => [l.s, l.s + 16]);
+    for (const st of this.accessStops()) {
+      let list = (ACCESOS_PARADERO[this.route.id]?.[st.code] || []).map(a => this.route.rev
+        ? { ...a, along: -a.along, side: 2 - a.side, down: -a.down } : a);
+      list = list.filter(a => Math.abs(a.along) < 70);
+      if (!list.length) list = [{ ref: "", name: "", lift: 0, along: -ACCESS.dz, side: 0, down: 1 }];
+      for (const a of list) {
+        let sPos = st.s + a.along;
+        // Ni en el cruce (paso de cebra y semáforo) ni encima del refugio del paradero
+        for (let k = 0; k < 8; k++) {
+          const hitL = lightS.find(ls => Math.abs(sPos - ls) < 7);
+          const hitStop = a.side === 0 && this.route.stops.find(p => sPos > p.s - 10 && sPos < p.s + 6);
+          if (hitL === undefined && !hitStop) break;
+          sPos += (hitL !== undefined ? (sPos >= hitL ? 1 : -1) * 7 : (sPos >= (hitStop.s - 2) ? 1 : -1) * 6);
+        }
+        if (sPos < this.start + 20 || sPos > this.end - 20) continue;
+        if (out.some(o => o.side === a.side && Math.abs(o.s - sPos) < ACCESS.len + 2.5)) continue;
+        const flip = a.down < 0;                       // la escalera baja hacia atrás (+Z)
+        out.push({ ...a, stop: st, s: sPos, x: X[a.side], z: -sPos, flip });
+      }
+    }
+    return out;
+  }
+
   buildMetroAccesses() {
-    this.accesses = this.accessStops().map(st => {
-      const g = metroStreetAccess(this.scene, { name: st.metro, lines: linesAtStation(st.metro), night: this.night ? 1 : 0, w: ACCESS.w, len: ACCESS.len });
-      g.position.set(CURB_X + ACCESS.dx, SIDEWALK_Y, -st.s + ACCESS.dz);
-      // 2.15.2 · Máscara invisible en la boca: marca el stencil para que el terreno (que pasa por debajo, a ras de suelo)
-      // no tape la escalera; antes se veía pasto en vez de los peldaños
-      const mask = new THREE.Mesh(new THREE.PlaneGeometry(ACCESS.w, ACCESS.len, 1, 2), ACCESS_MASK);
-      mask.rotation.x = -Math.PI / 2;
-      mask.position.y = 0.005;
-      mask.renderOrder = -2;
-      g.add(mask);
-      const z = -st.s + ACCESS.dz;
-      return { stop: st, x: CURB_X + ACCESS.dx, z, mouthZ: z + ACCESS.len / 2 + 0.6, bottomZ: z - ACCESS.len / 2 + 0.7 };
-    });
+    const night = this.night ? 1 : 0;
+    this.accesses = [];
+    for (const a of this.accessPlan) {
+      const st = a.stop;
+      const g = metroStreetAccess(this.scene, { name: st.metro, lines: linesAtStation(st.metro), night, w: ACCESS.w, len: ACCESS.len,
+        ref: a.ref, street: accessStreet(a.name, st.metro, a.ref), lift: !!a.lift && a.side !== 1 });
+      g.position.set(a.x, SIDEWALK_Y, a.z);
+      if (a.flip) g.rotation.y = Math.PI;
+      const k = a.flip ? -1 : 1, half = ACCESS.len / 2;
+      const acc = { stop: st, x: a.x, z: a.z, mouthZ: a.z + k * (half + 0.6), bottomZ: a.z - k * (half - 0.7) };
+      // Los pasajeros que bajan del bus se van por el primero de la misma vereda
+      if (a.side === 0 && !this.accesses.some(o => o.stop === st)) this.accesses.push(acc);
+    }
   }
 
   /* ----------------------------- 1.20 · Lluvia (como la del Metro al aire libre) ----------------------------- */
