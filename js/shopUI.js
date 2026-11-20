@@ -1,6 +1,7 @@
 /* ==========================================================================
    MetroSim — shopUI.js
    Panel de la TIENDA REDMOVI (DOM): pestañas Conductor · Mi depto · Colección.
+   Mi depto (2.24) se recorre pieza por pieza, de día o de noche.
    El catálogo y lo comprado están en shop.js; aquí solo se muestra y se
    compra. Se abre desde la pantalla de inicio o con la tecla K en el juego
    (1·2·3 cambian de pestaña).
@@ -10,7 +11,7 @@ import { formatCLP, lineLabel } from "./config.js";
 import { icon } from "./icons.js";
 import { SANTIAGO_LINES as LINES } from "./engine/network.js";   // 2.18 · el álbum es de Santiago (sin la bonus de Valparaíso)
 import { WAGE, shiftBonus } from "./economy.js";
-import { LICENSES, LIVERIES, CONTRACTS, HOME, FURNITURE, SOUVENIR_PRICE, ALBUM_REWARD, souvenirId } from "./shop.js";
+import { LICENSES, LIVERIES, CONTRACTS, HOME, HOME_LEVELS, PAINTS, ROOMS, ROOM_REWARD, FURNITURE, SOUVENIR_PRICE, ALBUM_REWARD, souvenirId } from "./shop.js";
 
 const hex = (n) => "#" + n.toString(16).padStart(6, "0");
 const lineTitle = (l) => lineLabel(l.id);
@@ -28,8 +29,11 @@ const stationEstimate = (mult) => (WAGE.base + WAGE.perfect / 2 + 40 * WAGE.perP
 /** Lo que se vende en cada pestaña (los recuerdos se compran en la calle, no aquí). */
 const tabItems = (tab, inv) =>
   tab === "driver" ? [...CONTRACTS, ...LIVERIES.filter(l => l.price > 0), ...LICENSES]
-  : tab === "home" ? [HOME, ...(inv.has(HOME.id) ? FURNITURE : [])]
+  : tab === "home" ? [...HOME_LEVELS, ...(inv.has(HOME.id) ? [...FURNITURE, ...PAINTS.filter(p => p.price > 0)] : [])]
   : [];
+
+/** Todo lo que se vende en Mi depto (para el contador de la pestaña). */
+const HOME_SHOP = [...HOME_LEVELS, ...FURNITURE, ...PAINTS.filter(p => p.price > 0)];
 
 /**
  * Abre la tienda.
@@ -67,6 +71,7 @@ export function openShopUI(o) {
   const $ = (s) => root.querySelector(s);
   const body = $(".shop-body");
   let hideOwned = loadHide(), justBought = null, confirming = null, confirmTimer = 0;
+  let room = "living", night = null;               // pieza que se mira en Mi depto · null = día o noche según la hora real
   const hideBox = $(".shop-progress input");
   hideBox.checked = hideOwned;
   hideBox.onchange = () => { hideOwned = hideBox.checked; saveHide(hideOwned); render(); };
@@ -94,7 +99,7 @@ export function openShopUI(o) {
     notice(r.text + (r.ok ? afterBuyTip(item) : ""), r.ok ? "ok" : "warn");
     if (r.ok) {
       justBought = item.id;
-      o.onBought?.(item);
+      o.onBought?.({ ...item, reward: r.reward || 0 });
       const bal = $(".shop-balance b");
       bal.classList.remove("flash"); void bal.offsetWidth; bal.classList.add("flash");
     }
@@ -107,7 +112,9 @@ export function openShopUI(o) {
     item.kind === "license" ? ` Ya puedes elegir ${lineLabel(item.lineId)} al conducir.`
     : item.kind === "livery" ? " Tu tren la estrena en el próximo servicio."
     : item.kind === "contract" ? ` Desde ahora ganas ×${item.mult.toFixed(2).replace(".", ",")}.`
-    : item.kind === "home" ? " Ahora puedes amoblarlo mueble a mueble."
+    : item.kind === "home" ? " Ahora puedes amoblarlo pieza por pieza: living, dormitorio y cocina."
+    : item.kind === "homeUpgrade" ? " ¡Mira la nueva vista por la ventana!"
+    : item.kind === "paint" ? " Los muros ya están pintados."
     : "";
 
   /** Tarjeta de un artículo con su botón. */
@@ -169,7 +176,7 @@ export function openShopUI(o) {
 
   /** «Tu próxima meta»: lo más barato que aún no tienes en esta pestaña y cuánto te falta. */
   const goal = (items) => {
-    const open = items.filter(i => !inv.has(i.id) && !(i.requires && !inv.has(i.requires)) && !(i.kind === "furniture" && !inv.has(HOME.id)))
+    const open = items.filter(i => !inv.has(i.id) && !(i.requires && !inv.has(i.requires)) && !((i.kind === "furniture" || i.kind === "paint") && !inv.has(HOME.id)))
       .sort((a, b) => a.price - b.price);
     if (!open.length) return null;
     const ready = open.filter(i => bank.canPay(i.price)), next = open.find(i => !bank.canPay(i.price));
@@ -237,18 +244,60 @@ export function openShopUI(o) {
     const out = [];
     if (!inv.has(HOME.id)) {
       out.push(section("Tu propio departamento", "La meta grande: un depto propio para amoblar con lo que ganas."));
-      out.push(drawRoom(inv, true));
+      out.push(drawRoom(inv, "living", true, isNight()));
       out.push(card(HOME, { owned: false }));
       return out;
     }
-    const { have, total } = inv.furnished;
+    const home = inv.currentHome, { have, total } = inv.furnished;
     const left = FURNITURE.filter(f => !inv.has(f.id)).reduce((t, f) => t + f.price, 0);
-    out.push(section(HOME.name, have === total ? "🏆 ¡Depto completamente amoblado!" : `Amoblado: ${have} de ${total} muebles · amoblarlo entero cuesta ${formatCLP(left)} más.`));
-    out.push(drawRoom(inv, false));
-    const g = goal(FURNITURE);
+    out.push(section(home.name, have === total ? "🏆 ¡Depto completamente amoblado!" : `Amoblado: ${have} de ${total} muebles · amoblarlo entero cuesta ${formatCLP(left)} más. Cada pieza completa paga un premio de ${formatCLP(ROOM_REWARD)}.`));
+    out.push(roomTabs());
+    out.push(drawRoom(inv, room, false, isNight()));
+    const r = ROOMS.find(x => x.id === room), rf = inv.roomFurnished(room);
+    const roomItems = FURNITURE.filter(f => f.room === room);
+    const g = goal(roomItems);
     if (g) out.push(g);
-    for (const f of [...FURNITURE].sort((a, b) => inv.has(a.id) - inv.has(b.id) || a.price - b.price)) push(out, f, { owned: inv.has(f.id) });
+    out.push(section(`Muebles · ${r.name}`, rf.have === rf.total ? `🏆 ${r.name} completo.`
+      : `${rf.have} de ${rf.total} · al completar ${r.article} ${r.name.toLowerCase()} ganas ${formatCLP(ROOM_REWARD)}${inv.rooms.has(room) ? " (ya cobrado)" : ""}.`));
+    for (const f of [...roomItems].sort((a, b) => inv.has(a.id) - inv.has(b.id) || a.price - b.price)) push(out, f, { owned: inv.has(f.id) });
+    out.push(section("Pintura de los muros", "Cambia el color de todo el depto. Lo que compras queda para volver a usarlo."));
+    for (const p of PAINTS) {
+      const owned = inv.has(p.id), using = inv.paint === p.id;
+      if (hideOwned && owned && !using) continue;
+      out.push(card(p, {
+        owned, preview: paintPreview(p),
+        action: owned ? (using ? () => {} : () => { inv.paintWith(p.id); notice(`Muros pintados: ${p.name}.`, "ok"); render(); }) : null,
+        actionLabel: using ? "✓ En uso" : "Pintar",
+      }));
+    }
+    out.push(section("Mudanzas", "Cámbiate a un barrio con mejor vista: te llevas todos los muebles."));
+    for (const h of HOME_LEVELS.slice(1)) push(out, h, { owned: inv.has(h.id), disabled: !inv.has(h.requires) });
     return out;
+  };
+
+  /** ¿Se dibuja de noche? Según la hora real, salvo que el jugador lo cambie. */
+  const isNight = () => night ?? (() => { const h = new Date().getHours(); return h < 7 || h >= 20; })();
+
+  /** Botones de las piezas y de día/noche sobre la ilustración. */
+  const roomTabs = () => {
+    const bar = document.createElement("div");
+    bar.className = "home-rooms";
+    for (const r of ROOMS) {
+      const b = document.createElement("button"), n = inv.roomFurnished(r.id);
+      b.className = "home-room-tab" + (r.id === room ? " active" : "") + (n.have === n.total ? " complete" : "");
+      b.innerHTML = "<span></span><small></small>";
+      b.firstChild.textContent = `${r.icon} ${r.name}`;
+      b.lastChild.textContent = `${n.have}/${n.total}`;
+      b.onclick = () => { room = r.id; render(); };
+      bar.append(b);
+    }
+    const dn = document.createElement("button");
+    dn.className = "home-room-tab daynight";
+    dn.textContent = isNight() ? "🌙 Noche" : "☀️ Día";
+    dn.title = "Ver el depto de día o de noche";
+    dn.onclick = () => { night = !isNight(); render(); };
+    bar.append(dn);
+    return bar;
   };
 
   /* ----- Pestaña Colección ----- */
@@ -284,7 +333,7 @@ export function openShopUI(o) {
   const counts = () => {
     const owned = (list) => list.filter(i => inv.has(i.id)).length;
     const shopDriver = [...CONTRACTS, ...LIVERIES.filter(l => l.price > 0), ...LICENSES];
-    const shopHome = [HOME, ...FURNITURE];
+    const shopHome = HOME_SHOP;
     const sv = LINES.reduce((a, l) => { const x = inv.album(l); return { have: a.have + x.have, total: a.total + x.total }; }, { have: 0, total: 0 });
     return {
       driver: { have: owned(shopDriver), total: shopDriver.length },
@@ -346,43 +395,191 @@ function trainPreview(l) {
   return c;
 }
 
-/** Ilustración del living del depto: lo comprado a color, lo que falta como silueta. */
-function drawRoom(inv, locked) {
+/** Muestra de una pintura (para la tarjeta). */
+function paintPreview(p) {
+  const c = document.createElement("canvas");
+  c.width = 96; c.height = 48;
+  paintWall(c.getContext("2d"), p, 0, 0, 96, 48);
+  c.className = "train-preview";
+  return c;
+}
+
+/** Pinta un muro con la pintura elegida (color liso, rayas o ladrillo). */
+function paintWall(g, p, x, y, w, h) {
+  const grad = g.createLinearGradient(0, y, 0, y + h);
+  grad.addColorStop(0, p.top); grad.addColorStop(1, p.bottom);
+  g.fillStyle = grad; g.fillRect(x, y, w, h);
+  g.save();
+  g.beginPath(); g.rect(x, y, w, h); g.clip();
+  if (p.pattern === "rayas") {
+    g.fillStyle = p.ink;
+    for (let i = x; i < x + w; i += 22) g.fillRect(i, y, 7, h);
+  } else if (p.pattern === "ladrillo") {
+    g.strokeStyle = p.ink; g.globalAlpha = 0.45; g.lineWidth = 1.5;
+    for (let r = 0, yy = y; yy < y + h; r++, yy += 12) {
+      g.beginPath(); g.moveTo(x, yy); g.lineTo(x + w, yy); g.stroke();
+      for (let xx = x + (r % 2 ? 14 : 0); xx < x + w; xx += 28) { g.beginPath(); g.moveTo(xx, yy); g.lineTo(xx, yy + 12); g.stroke(); }
+    }
+  }
+  g.restore();
+}
+
+/** Ventana por pieza y mudanza: [x, y, ancho, alto] en píxeles del lienzo de 640×300. */
+const WINDOWS = {
+  living: [[256, 24, 166, 112], [230, 18, 220, 140], [170, 10, 330, 172]],
+  dormitorio: [[40, 30, 120, 96], [30, 24, 150, 120], [22, 14, 190, 160]],
+  cocina: [[250, 24, 120, 84], [240, 20, 140, 92], [230, 14, 160, 100]],
+};
+
+/** Lo que se ve por la ventana: cielo, cordillera y ciudad según la mudanza y la hora. */
+function drawView(g, level, night, [wx, wy, ww, wh]) {
+  g.save();
+  g.beginPath(); g.rect(wx, wy, ww, wh); g.clip();
+  const sky = g.createLinearGradient(0, wy, 0, wy + wh);
+  if (night) { sky.addColorStop(0, "#0b1430"); sky.addColorStop(1, "#2a2f5a"); }
+  else { sky.addColorStop(0, "#8fc3ee"); sky.addColorStop(1, "#d8ecf7"); }
+  g.fillStyle = sky; g.fillRect(wx, wy, ww, wh);
+  if (night) {
+    g.fillStyle = "#fff";
+    for (let i = 0; i < 18; i++) g.fillRect(wx + ((i * 53) % ww), wy + ((i * 29) % (wh * 0.4)), 1.6, 1.6);
+    g.fillStyle = "#f4f1d0"; g.beginPath(); g.arc(wx + ww * 0.8, wy + wh * 0.18, 7, 0, 7); g.fill();
+  }
+  // Cordillera: más alta y nevada mientras más arriba vives
+  const mh = [0.42, 0.5, 0.62][level], base = wy + wh * (level === 2 ? 0.72 : 0.62);
+  const peaks = [[0, 0.3], [0.12, 0.62], [0.25, 0.4], [0.4, 0.95], [0.55, 0.5], [0.7, 0.85], [0.85, 0.45], [1, 0.7]]
+    .map(([x, y]) => [wx + x * ww, base - y * wh * mh]);
+  g.fillStyle = night ? "#3a4060" : "#9aa6b8";
+  g.beginPath(); g.moveTo(wx, base);
+  for (const [x, y] of peaks) g.lineTo(x, y);
+  g.lineTo(wx + ww, wy + wh); g.lineTo(wx, wy + wh); g.fill();
+  g.fillStyle = night ? "#c9cde0" : "#fff";        // nieve en las cumbres altas, siguiendo las laderas
+  const snow = 0.18 + level * 0.06;
+  for (let i = 1; i < peaks.length - 1; i++) {
+    const [px, py] = peaks[i], [lx, ly] = peaks[i - 1], [rx, ry] = peaks[i + 1];
+    if (py > base - wh * mh * 0.6) continue;
+    g.beginPath(); g.moveTo(px + (lx - px) * snow, py + (ly - py) * snow); g.lineTo(px, py); g.lineTo(px + (rx - px) * snow, py + (ry - py) * snow); g.fill();
+  }
+  // Edificios: casas bajas en Ñuñoa, torres en Providencia, ciudad lejana en Las Condes
+  const bld = level === 0 ? [[0.04, 0.3, 0.16], [0.24, 0.22, 0.14], [0.42, 0.34, 0.16], [0.64, 0.26, 0.14], [0.82, 0.32, 0.16]]
+    : level === 1 ? [[0.02, 0.45, 0.12], [0.16, 0.6, 0.1], [0.3, 0.38, 0.14], [0.47, 0.82, 0.07], [0.58, 0.5, 0.12], [0.74, 0.66, 0.1], [0.87, 0.42, 0.12]]
+    : [[0.05, 0.12, 0.08], [0.15, 0.18, 0.06], [0.24, 0.1, 0.08], [0.36, 0.22, 0.05], [0.44, 0.14, 0.08], [0.56, 0.28, 0.04], [0.63, 0.16, 0.07], [0.74, 0.12, 0.08], [0.85, 0.2, 0.06]];
+  for (const [bx, bh, bw] of bld) {
+    const x = wx + bx * ww, h = bh * wh, w = bw * ww, y = wy + wh - h;
+    g.fillStyle = night ? "#1c2238" : level === 1 ? "#6d7a8c" : "#5d6878";
+    if (level === 1 && bh > 0.8) {                  // la torre más alta, de vidrio y con punta
+      g.fillStyle = night ? "#22304d" : "#7fa0bf";
+      g.beginPath(); g.moveTo(x, wy + wh); g.lineTo(x + w * 0.1, y); g.lineTo(x + w * 0.9, y); g.lineTo(x + w, wy + wh); g.fill();
+      g.fillRect(x + w * 0.4, y - 8, w * 0.2, 8);
+    } else g.fillRect(x, y, w, h);
+    if (night) {                                    // ventanas encendidas
+      g.fillStyle = "#ffd77a";
+      for (let yy = y + 4; yy < wy + wh - 3; yy += 7) for (let xx = x + 3; xx < x + w - 3; xx += 6) if ((xx * 7 + yy * 3) % 5 < 2) g.fillRect(xx, yy, 2.5, 3);
+    }
+  }
+  g.restore();
+  // Marco
+  g.strokeStyle = "#fff"; g.lineWidth = level === 2 ? 4 : 6; g.strokeRect(wx, wy, ww, wh);
+  const parts = level === 2 ? 3 : 2;
+  for (let i = 1; i < parts; i++) { g.beginPath(); g.moveTo(wx + (ww * i) / parts, wy); g.lineTo(wx + (ww * i) / parts, wy + wh); g.stroke(); }
+}
+
+/** Muebles dibujados a mano (los que no tienen buen emoji). */
+const SHAPES = {
+  rug(g, f, W, H) { g.fillStyle = "#8c2f39"; g.beginPath(); g.ellipse(f.x * W, f.y * H, 150, 26, 0, 0, 7); g.fill(); g.strokeStyle = "#d9a24a"; g.lineWidth = 3; g.beginPath(); g.ellipse(f.x * W, f.y * H, 138, 20, 0, 0, 7); g.stroke(); },
+  closet(g, f, W, H) {
+    const x = f.x * W - 50, y = H * 0.18, w = 100, h = H * 0.62;
+    g.fillStyle = "#8a5a34"; g.fillRect(x, y, w, h);
+    g.strokeStyle = "#6b4325"; g.lineWidth = 3; g.strokeRect(x + 4, y + 4, w / 2 - 6, h - 8); g.strokeRect(x + w / 2 + 2, y + 4, w / 2 - 6, h - 8);
+    g.fillStyle = "#e0c27a"; g.fillRect(x + w / 2 - 8, y + h / 2, 4, 14); g.fillRect(x + w / 2 + 4, y + h / 2, 4, 14);
+  },
+  desk(g, f, W, H) {
+    const x = f.x * W - 55, y = H * 0.6;
+    g.fillStyle = "#a9773f"; g.fillRect(x, y, 110, 9);
+    g.fillRect(x + 4, y + 9, 7, 50); g.fillRect(x + 99, y + 9, 7, 50);
+    emoji(g, f.icon, f.x * W, y - 20, 50);
+  },
+  fridge(g, f, W, H) {
+    const x = f.x * W - 34, y = H * 0.16, w = 68, h = H * 0.68;
+    g.fillStyle = "#e9eef2"; g.beginPath(); g.roundRect(x, y, w, h, 8); g.fill();
+    g.strokeStyle = "#b6c0c8"; g.lineWidth = 2; g.beginPath(); g.moveTo(x, y + h * 0.36); g.lineTo(x + w, y + h * 0.36); g.stroke();
+    g.fillStyle = "#9aa6b0"; g.fillRect(x + w - 12, y + h * 0.14, 4, 22); g.fillRect(x + w - 12, y + h * 0.46, 4, 30);
+  },
+  stove(g, f, W, H) {
+    const x = f.x * W - 45, y = H * 0.5, w = 90, h = H * 0.34;
+    g.fillStyle = "#d8dde1"; g.fillRect(x, y, w, h);
+    g.fillStyle = "#2a2e33"; g.fillRect(x + 10, y + 22, w - 20, h - 32);
+    g.fillStyle = "#f19a3e"; g.globalAlpha *= 0.5; g.fillRect(x + 14, y + 26, w - 28, h - 40); g.globalAlpha /= 0.5;
+    g.fillStyle = "#3b3f44"; [x + 22, x + 46, x + 68].forEach(cx => { g.beginPath(); g.arc(cx, y + 10, 4, 0, 7); g.fill(); });
+    emoji(g, f.icon, x + w / 2, y - 12, 34);
+  },
+  table(g, f, W, H) {
+    const cx = f.x * W, y = f.y * H - 24;
+    g.fillStyle = "#9a6a3a"; g.beginPath(); g.ellipse(cx, y, 92, 18, 0, 0, 7); g.fill();
+    g.fillRect(cx - 4, y, 8, 40);
+    emoji(g, "🪑", cx - 112, y + 18, 54); emoji(g, "🪑", cx + 112, y + 18, 54);
+  },
+};
+
+/** Dibuja un emoji centrado. */
+function emoji(g, ch, x, y, size) {
+  g.font = `${size}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`;
+  g.textAlign = "center"; g.textBaseline = "middle";
+  g.fillText(ch, x, y);
+}
+
+/** Ilustración de una pieza del depto: lo comprado a color, lo que falta como silueta. */
+function drawRoom(inv, room, locked, night) {
   const W = 640, H = 300, c = document.createElement("canvas");
   c.width = W; c.height = H; c.className = "home-room";
   const g = c.getContext("2d");
-  // Muro, zócalo y piso de parquet
-  const wall = g.createLinearGradient(0, 0, 0, H * 0.62);
-  wall.addColorStop(0, "#f1e6d2"); wall.addColorStop(1, "#e3d3b8");
-  g.fillStyle = wall; g.fillRect(0, 0, W, H * 0.62);
-  g.fillStyle = "#b78a58"; g.fillRect(0, H * 0.62, W, H * 0.38);
-  g.strokeStyle = "#a07546"; g.lineWidth = 2;
-  for (let x = -H; x < W; x += 34) { g.beginPath(); g.moveTo(x, H); g.lineTo(x + H * 0.38, H * 0.62); g.stroke(); }
-  g.fillStyle = "#fff"; g.fillRect(0, H * 0.6, W, 7);
-  // Ventana con la ciudad y la cordillera
-  const wx = W * 0.62, wy = 26, ww = 150, wh = 110;
-  const sky = g.createLinearGradient(0, wy, 0, wy + wh);
-  sky.addColorStop(0, "#8fc3ee"); sky.addColorStop(1, "#d8ecf7");
-  g.fillStyle = sky; g.fillRect(wx, wy, ww, wh);
-  g.fillStyle = "#9aa6b8"; g.beginPath(); g.moveTo(wx, wy + 70); g.lineTo(wx + 40, wy + 40); g.lineTo(wx + 75, wy + 62); g.lineTo(wx + 110, wy + 30); g.lineTo(wx + ww, wy + 58); g.lineTo(wx + ww, wy + wh); g.lineTo(wx, wy + wh); g.fill();
-  g.fillStyle = "#fff"; g.beginPath(); g.moveTo(wx + 100, wy + 38); g.lineTo(wx + 110, wy + 30); g.lineTo(wx + 122, wy + 40); g.fill();
-  g.fillStyle = "#5d6878"; [[8, 60], [30, 45], [58, 70], [92, 52], [122, 66]].forEach(([x, h]) => g.fillRect(wx + x, wy + wh - h * 0.6, 20, h * 0.6));
-  g.strokeStyle = "#fff"; g.lineWidth = 6; g.strokeRect(wx, wy, ww, wh);
-  g.beginPath(); g.moveTo(wx + ww / 2, wy); g.lineTo(wx + ww / 2, wy + wh); g.stroke();
-  // Muebles (emoji): lo que tienes, a color; lo que falta, como silueta tenue
-  g.textAlign = "center"; g.textBaseline = "middle";
-  for (const f of [...FURNITURE].sort((a, b) => (b.floor ? 1 : 0) - (a.floor ? 1 : 0))) {
+  const level = Math.max(0, inv.homeLevel), wallH = H * 0.62;
+  // Muro con la pintura elegida y zócalo
+  paintWall(g, inv.currentPaint, 0, 0, W, wallH);
+  // Piso: parquet en Ñuñoa, parquet claro en Providencia, porcelanato en Las Condes; baldosas en la cocina
+  if (room === "cocina") {
+    for (let y = wallH, r = 0; y < H; y += 20, r++) for (let x = 0; x < W; x += 20) { g.fillStyle = (x / 20 + r) % 2 ? "#e9e4da" : "#c9c1b2"; g.fillRect(x, y, 20, 20); }
+  } else if (level === 2) {
+    g.fillStyle = "#e6e2dc"; g.fillRect(0, wallH, W, H - wallH);
+    g.strokeStyle = "#cfc9bf"; g.lineWidth = 1.5;
+    for (let x = 0; x < W; x += 80) { g.beginPath(); g.moveTo(x, wallH); g.lineTo(x - 40, H); g.stroke(); }
+    g.beginPath(); g.moveTo(0, wallH + 50); g.lineTo(W, wallH + 50); g.stroke();
+  } else {
+    g.fillStyle = level === 1 ? "#d2a774" : "#b78a58"; g.fillRect(0, wallH, W, H - wallH);
+    g.strokeStyle = level === 1 ? "#bd915e" : "#a07546"; g.lineWidth = 2;
+    for (let x = -H; x < W; x += 34) { g.beginPath(); g.moveTo(x, H); g.lineTo(x + H * 0.38, wallH); g.stroke(); }
+  }
+  g.fillStyle = "#fff"; g.fillRect(0, wallH - 6, W, 7);
+  drawView(g, level, night, WINDOWS[room][level]);
+  if (room === "cocina") {                          // mueble de cocina con lavaplatos (viene con el depto)
+    g.fillStyle = "#f4f1ea"; g.fillRect(160, H * 0.52, 300, H * 0.32);
+    g.fillStyle = "#4b4f55"; g.fillRect(156, H * 0.5, 308, 8);
+    g.strokeStyle = "#d6d0c4"; g.lineWidth = 2; for (let x = 160; x < 460; x += 75) g.strokeRect(x + 4, H * 0.55, 67, H * 0.26);
+    g.fillStyle = "#b8c2ca"; g.fillRect(286, H * 0.5 - 2, 60, 6); g.fillRect(312, H * 0.42, 6, 18);
+  }
+  // Muebles: lo que tienes a color, lo que falta como silueta tenue (las alfombras primero)
+  const list = FURNITURE.filter(f => f.room === room).sort((a, b) => (b.shape === "rug") - (a.shape === "rug"));
+  for (const f of list) {
     const own = !locked && inv.has(f.id);
-    const size = 66 * f.size;
-    g.font = `${size}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`;
     g.globalAlpha = own ? 1 : 0.12;
-    if (f.floor && own) { g.fillStyle = "#8c2f39"; g.beginPath(); g.ellipse(f.x * W, f.y * H, 150, 26, 0, 0, 7); g.fill(); }
-    else if (!f.floor) g.fillText(f.icon, f.x * W, f.y * H);
+    if (f.shape) SHAPES[f.shape](g, f, W, H);
+    else emoji(g, f.icon, f.x * W, f.y * H, 66 * f.size);
     g.globalAlpha = 1;
+  }
+  // De noche: la pieza a media luz y las lámparas que tengas, encendidas
+  if (night) {
+    g.fillStyle = "#0a1430"; g.globalAlpha = 0.45; g.fillRect(0, 0, W, H); g.globalAlpha = 1;
+    g.globalCompositeOperation = "lighter";
+    for (const f of list.filter(f => f.light && !locked && inv.has(f.id))) {
+      const glow = g.createRadialGradient(f.x * W, f.y * H - 20, 4, f.x * W, f.y * H - 20, 170);
+      glow.addColorStop(0, "#ffcf7a66"); glow.addColorStop(1, "#ffcf7a00");
+      g.fillStyle = glow; g.fillRect(0, 0, W, H);
+    }
+    g.globalCompositeOperation = "source-over";
   }
   if (locked) {
     g.fillStyle = "#0009"; g.fillRect(0, 0, W, H);
-    g.fillStyle = "#fff"; g.font = "800 26px Arial"; g.fillText("🔒 Aún no tienes departamento", W / 2, H / 2);
+    g.fillStyle = "#fff"; g.font = "800 26px Arial"; g.textAlign = "center"; g.textBaseline = "middle";
+    g.fillText("🔒 Aún no tienes departamento", W / 2, H / 2);
   }
   return c;
 }

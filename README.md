@@ -124,6 +124,25 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **Salir por los torniquetes es gratis**: solo se cobra el pasaje al pasar hacia la zona pagada (antes, al terminar
   de cruzar el torniquete de salida se cobraba un pasaje).
 
+## Versión 2.24 · Tienda RedMovi más grande y un depto de verdad
+
+**Más cosas para comprar en la Tienda RedMovi** (tecla K o desde la portada):
+
+- **Conductor:** tres libreas nuevas (**Celeste cielo**, **Atardecer** y **Carbón y oro**) y un tercer contrato,
+  **Inspector de Red**, que **duplica el sueldo** (requiere ser Jefe de Tren).
+- **Mi depto, pieza por pieza:** ahora tiene **living, dormitorio y cocina**, cada una con su ilustración y sus
+  muebles: de 12 muebles se pasa a **28** (consola, radio antigua, un perro y un gato adoptados, ropero, escritorio
+  con computador, guitarra, bicicleta, refrigerador, cocina con horno, tetera, frutero, hierbas en la ventana, reloj…).
+  Cada mueble tiene su descripción. **Completar una pieza paga un premio** de $12.000 (una vez por pieza).
+  Lo que ya tenías sigue siendo tuyo (la cama pasa al dormitorio; la mesa y la cafetera, a la cocina).
+- **Pintura de los muros:** crema (la de siempre), celeste, verde salvia, terracota, gris grafito, papel mural de
+  rayas o muro de ladrillo. Se compran una vez y se puede cambiar cuando quieras.
+- **Mudanzas:** cámbiate al **Depto en Providencia** (piso 14, ventanal con los edificios y la torre) y después al
+  **Penthouse en Las Condes** (ventanal de muro a muro con la cordillera nevada y piso de porcelanato). Los muebles
+  se van contigo.
+- **Día y noche:** la vista de la ventana sigue la hora real; de noche se encienden las luces de la ciudad y las
+  lámparas que tengas. Un botón permite mirar el depto de día o de noche.
+
 ## Versión 2.23 · Informe animado al terminar el turno de bus y de taxi
 
 El informe de fin de turno del Metro (el recorrido que se dibuja, el timbre con la nota, el récord y la boleta) ahora

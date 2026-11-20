@@ -423,7 +423,7 @@ function openStore(opts = {}) {
     inventory, bank, ...opts,
     onBought: (item) => {
       refreshDriverLines();      // candados de las líneas y saldo de la portada
-      if (game) { game.audio.cash(); hud.setBank(bank); hud.moneyFloat(-item.price); }
+      if (game) { game.audio.cash(); hud.setBank(bank); hud.moneyFloat(-item.price + (item.reward || 0)); }
     },
     onClose: () => { if (game?.walker) { game.walker.frozen = false; game.walker.keys.clear(); } },
   });

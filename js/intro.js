@@ -25,7 +25,7 @@ import { SANTIAGO_LINES as LINES } from "./engine/network.js";   // 2.18 · la i
 import { LANDMARKS } from "./city/catalog.js";
 import { waitForSpanishVoice } from "./audio.js";
 import { VERSION, LINE_COLORS, isRail, RAIL_LINES } from "./config.js";
-import { LICENSES, LIVERIES, CONTRACTS, FURNITURE } from "./shop.js";
+import { LICENSES, LIVERIES, CONTRACTS, FURNITURE, HOME_LEVELS, PAINTS } from "./shop.js";
 import { key as keyText } from "./keys.js";
 
 const TUNNEL_TIME = 4.6;           // segundos de viaje por el túnel antes de salir a la ciudad
@@ -577,8 +577,8 @@ export function playIntro({ isMuted = () => false, menuReady = null } = {}) {
 
   const stations = new Set(LINES.flatMap(l => l.stations.map(s => s.name))).size;
   const landmarks = Object.keys(LANDMARKS).length;
-  // Artículos de la Tienda RedMovi: licencias, libreas de pago, contratos, el depto, sus muebles y un recuerdo por estación de cada línea
-  const shopItems = LICENSES.length + LIVERIES.filter(l => l.price > 0).length + CONTRACTS.length + 1 + FURNITURE.length
+  // Artículos de la Tienda RedMovi: licencias, libreas de pago, contratos, el depto con sus mudanzas, pinturas y muebles, y un recuerdo por estación de cada línea
+  const shopItems = LICENSES.length + LIVERIES.filter(l => l.price > 0).length + CONTRACTS.length + HOME_LEVELS.length + PAINTS.filter(p => p.price > 0).length + FURNITURE.length
     + LINES.reduce((n, l) => n + l.stations.length, 0);
   const title = "RedMoviSim".split("").map((ch, i) => `<span${ch === "M" || ch === "o" || ch === "v" || (ch === "i" && i === 6) ? ' class="mv"' : ""} style="animation-delay:${0.25 + i * 0.06}s">${ch}</span>`).join("");
   const C = LINE_COLORS;

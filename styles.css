@@ -1100,6 +1100,14 @@ body.touch-mode .help-chip { display: none !important; }
 }
 .line-dot { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; color: #fff; font: 800 12px/1 Arial, sans-serif; }
 .home-room { display: block; width: 100%; height: auto; margin: 4px 0 10px; border-radius: 12px; }
+/* 2.24 · Piezas del depto (living, dormitorio, cocina) y día/noche */
+.home-rooms { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; }
+.home-room-tab { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 99px; border: 1px solid #ffffff22; background: #ffffff08; color: var(--muted); font-size: 13px; cursor: pointer; }
+.home-room-tab:hover { color: var(--text); }
+.home-room-tab.active { color: var(--text); border-color: var(--warn); background: #ffc24714; }
+.home-room-tab small { padding: 1px 6px; border-radius: 99px; background: #ffffff12; font: 600 10.5px/1.4 var(--f-data); font-variant-numeric: tabular-nums; }
+.home-room-tab.complete small { background: #34d17c26; color: var(--ok); }
+.home-room-tab.daynight { margin-left: auto; }
 .album-line { padding: 10px; margin-bottom: 8px; border-radius: 12px; background: #ffffff08; }
 .album-head { display: flex; align-items: center; gap: 10px; }
 .album-head b { flex: 1; }
