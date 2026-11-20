@@ -1,0 +1,20 @@
+🚇 ¿Y si tú manejaras el Metro de Santiago? Esto es RedMoviSim 👇
+
+Un simulador 3D del transporte público de Santiago que se juega gratis en el navegador, en el PC o en el celular:
+
+🚇 Conduce el Metro en sus 7 líneas, y los trenes de EFE (Tren Nos y Tren Rancagua), desde una cabina de verdad.
+🚌 Maneja buses Red por recorridos reales, como el A01 por la Alameda, y recoge a los pasajeros en cada paradero.
+🚕 Sal a buscar pasajeros en taxi, con taxímetro y radio.
+🚶 Viaja como pasajero: carga tu bip!, combina entre líneas y cumple misiones por la ciudad.
+🖥️ Dirige toda la red desde el Centro de Control: alarmas, señales averiadas y órdenes por radio.
+👥 Multijugador: abre una sala y hasta 4 amigos conducen trenes en tu red.
+
+📍 Estaciones, calles, paraderos y horarios sacados de los reales, con el clima y la hora de Santiago.
+
+💬 ¿Qué línea o recorrido te gustaría manejar primero? Cuéntanos en los comentarios 👇
+
+🔗 Juega gratis en www.redmovisim.cl (link en la bio)
+
+#RedMoviSim #MetroDeSantiago #Santiago #Chile #Simulador #Juegos #JuegosChilenos #Metro #TransportePublico #Red #GameDev
+
+(RedMoviSim es un proyecto independiente, sin relación con Red, Metro de Santiago, EFE ni el Ministerio de Transportes. Datos de calles © colaboradores de OpenStreetMap.)

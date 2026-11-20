@@ -1,0 +1,12 @@
+const c=require('./common');
+(async()=>{const {b,p}=await c.open({w:1688,h:780});
+await c.click(p,'[data-card="control"]');await p.waitForTimeout(600);
+await p.screenshot({path:'ctl-setup.png'});
+await p.evaluate(()=>{const b=[...document.querySelectorAll('[data-mode="control"]')].find(x=>x.getClientRects().length);b&&b.click();});
+await p.waitForTimeout(1500);
+await p.waitForSelector('[data-scope=chief]',{timeout:300000});await p.evaluate(()=>document.querySelector('[data-scope=chief]').click());await p.waitForTimeout(500);
+await p.evaluate(()=>{const cb=document.querySelector('.pcc-tut');if(cb&&cb.checked)cb.click();document.querySelector('[data-act=start]').click();});
+await p.waitForTimeout(20000);
+await p.screenshot({path:'ctl0.png'});
+await p.evaluate(()=>{const b=document.querySelector('[data-speed="10"]');b&&b.click();});await c.ff(p,6);await p.screenshot({path:'ctl1.png'});await c.rec(p,'clip-control2',100);
+await b.close();})();

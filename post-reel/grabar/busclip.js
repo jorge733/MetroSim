@@ -1,0 +1,13 @@
+const c=require('./common');
+(async()=>{const {b,p}=await c.open();
+await c.click(p,'[data-card="driver"]');await p.waitForTimeout(400);
+await c.click(p,'[data-vehicle="bus"]');await p.waitForTimeout(600);
+await c.click(p,'#driverGo');await c.waitBus(p);await p.waitForTimeout(2000);
+await p.evaluate(()=>{const b=[...document.querySelectorAll('button')].find(x=>/Saltar tutorial/.test(x.textContent));b&&b.click();});
+await c.ff(p,1);await p.screenshot({path:'bc0.png'});
+await c.key(p,' ');await c.ff(p,0.6);
+await c.rec(p,'clip-bus-a',90);
+await c.ff(p,6);await c.key(p,' ');await c.ff(p,3);
+await p.keyboard.down('w');await c.ff(p,5);
+await c.rec(p,'clip-bus-b',120);
+await b.close();})();

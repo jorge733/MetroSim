@@ -1,0 +1,144 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+@font-face{font-family:"Barlow";font-weight:600;src:url("../fonts/barlow-latin-600-normal.woff2")}
+@font-face{font-family:"Barlow";font-weight:700 900;src:url("../fonts/barlow-latin-700-normal.woff2")}
+@font-face{font-family:"Barlow Condensed";font-weight:700 900;src:url("../fonts/barlow-condensed-latin-700-normal.woff2")}
+@font-face{font-family:"JetBrains Mono";font-weight:700;src:url("../fonts/jetbrains-mono-latin-700-normal.woff2")}
+*{margin:0;box-sizing:border-box}
+html,body{width:1080px;height:1920px;overflow:hidden}
+body{font-family:Barlow,sans-serif;color:#fff;background:#0b1018;position:relative;--c:#d7262e}
+/* Fondo: degradado oscuro con el color de la escena y líneas de metro que cruzan */
+#bg{position:absolute;inset:0;background:radial-gradient(ellipse 120% 70% at 50% 42%,color-mix(in srgb,var(--c) 34%,#141b28) 0%,#0b1018 62%,#05070b 100%)}
+#rails{position:absolute;inset:0;opacity:.5}
+#rails i{position:absolute;left:-200px;width:1500px;height:14px;border-radius:7px;transform-origin:center}
+/* Plano de la red arriba: una estación por escena */
+#map{position:absolute;left:90px;right:90px;top:250px;height:60px}
+#map .ln{position:absolute;left:0;right:0;top:22px;height:12px;border-radius:6px;background:#ffffff22}
+#map .fill{position:absolute;left:0;top:22px;height:12px;border-radius:6px;background:var(--c);box-shadow:0 0 24px var(--c)}
+#map .st{position:absolute;top:12px;width:32px;height:32px;margin-left:-16px;border-radius:50%;background:#0b1018;border:6px solid #ffffff44}
+#map .st.on{border-color:#fff;background:var(--c)}
+#map .tr{position:absolute;top:4px;width:72px;height:48px;margin-left:-36px;border-radius:14px;background:#fff;box-shadow:0 0 0 6px var(--c),0 10px 30px #0008;display:grid;place-items:center}
+#map .tr svg{width:44px;height:44px}
+/* Textos */
+.top{position:absolute;left:70px;right:70px;top:360px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:22px}
+.kick{display:inline-flex;align-items:center;gap:14px;background:var(--c);color:var(--ck,#fff);padding:12px 30px;border-radius:999px;font:700 34px "JetBrains Mono",monospace;letter-spacing:.06em;white-space:nowrap;box-shadow:0 10px 30px #0006}
+h1{font:900 118px/0.94 "Barlow Condensed",sans-serif;letter-spacing:-.01em;text-transform:uppercase;text-shadow:0 10px 40px #000a}
+h1 em{font-style:normal;color:var(--hl,#f4b400)}
+.anim{opacity:0;transform:translateY(60px)}
+/* Celular acostado (844×390) */
+#phone{position:absolute;left:50%;top:930px;width:1000px;aspect-ratio:844/390;transform:translate(-50%,0);background:#000;border:24px solid #111722;border-radius:64px;overflow:hidden;
+ box-shadow:0 0 0 6px var(--c),0 0 80px color-mix(in srgb,var(--c) 60%,transparent),0 40px 90px #000c}
+#phone::after{content:"";position:absolute;left:-2px;top:50%;width:14px;height:110px;margin-top:-55px;border-radius:0 10px 10px 0;background:#111722}
+#scr{position:absolute;inset:0;overflow:hidden}
+#scr img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform-origin:50% 50%}
+#flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none}
+/* Bajo el celular */
+.sub{position:absolute;left:70px;right:70px;top:1440px;display:flex;flex-wrap:wrap;justify-content:center;gap:16px}
+.chip{background:#ffffff14;border:3px solid #ffffff30;border-radius:999px;padding:12px 28px;font-weight:800;font-size:38px;white-space:nowrap;color:#eef2f8}
+/* Marca abajo (fuera de la zona de botones del reel) */
+#brand{position:absolute;left:0;right:0;top:1600px;display:flex;justify-content:center;align-items:center;gap:18px;font:800 44px Barlow;opacity:.92}
+#brand svg{width:78px}
+#brand b span{color:#ff5a62}
+/* Escena final */
+#end{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:44px;text-align:center;opacity:0;padding:0 70px 120px}
+#end .logo{width:300px;filter:drop-shadow(0 0 60px #d7262eaa)}
+#end h2{font:900 150px/0.9 "Barlow Condensed";letter-spacing:-.01em}
+#end h2 span{color:#ff5a62}
+#end p{font:700 52px/1.2 Barlow;color:#dfe6ef}
+#end p b{color:#f4b400}
+#end .bar{display:flex;align-items:center;gap:22px;background:#fff;color:#111722;border-radius:999px;padding:22px 58px;box-shadow:0 0 0 12px #f4b40066,0 20px 60px #000a}
+#end .bar svg{width:64px;height:64px}
+#end .bar b{font:900 76px Barlow}
+#end .bar b span{color:#d7262e}
+#end .bio{font:700 40px "JetBrains Mono";letter-spacing:.06em;color:#f4b400}
+#end .legal{position:absolute;left:90px;right:90px;bottom:330px;font:600 26px/1.35 Barlow;color:#ffffff88}
+</style></head><body>
+<div id="bg"></div>
+<div id="rails"></div>
+<div id="map"><div class="ln"></div><div class="fill"></div></div>
+<div class="top"><div class="kick anim" id="kick"></div><h1 class="anim" id="title"></h1></div>
+<div id="phone"><div id="scr"><img id="imA"><img id="imB"></div><div id="flash"></div></div>
+<div class="sub" id="sub"></div>
+<div id="brand"><svg viewBox="0 0 200 130"><rect x="6" y="6" width="188" height="118" rx="30" fill="#d7262e"/><path d="M30 94H78L122 36H170" fill="none" stroke="#fff" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/><path d="M100 18V112" fill="none" stroke="#ffd2d5" stroke-width="9" stroke-linecap="round" stroke-dasharray="0.1 17"/><circle cx="30" cy="94" r="10" fill="#fff"/><circle cx="170" cy="36" r="10" fill="#fff"/><circle cx="100" cy="65" r="17" fill="#fff"/><circle cx="100" cy="65" r="8" fill="#d7262e"/></svg><b>redmovisim<span>.cl</span></b></div>
+<div id="end">
+ <svg class="logo" viewBox="0 0 200 130"><rect x="6" y="6" width="188" height="118" rx="30" fill="#d7262e"/><path d="M30 94H78L122 36H170" fill="none" stroke="#fff" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/><path d="M100 18V112" fill="none" stroke="#ffd2d5" stroke-width="9" stroke-linecap="round" stroke-dasharray="0.1 17"/><circle cx="30" cy="94" r="10" fill="#fff"/><circle cx="170" cy="36" r="10" fill="#fff"/><circle cx="100" cy="65" r="17" fill="#fff"/><circle cx="100" cy="65" r="8" fill="#d7262e"/></svg>
+ <h2 class="e1">Red<span>Movi</span>Sim</h2>
+ <p class="e2">El transporte público de Santiago<br>en 3D · <b>gratis</b> · PC y celular</p>
+ <div class="bar e3"><svg viewBox="0 0 24 24" fill="none" stroke="#111722" stroke-width="2.6" stroke-linecap="round"><circle cx="10" cy="10" r="7"/><path d="M15.5 15.5L21 21"/></svg><b>redmovisim<span>.cl</span></b></div>
+ <div class="bio e4">▲ LINK EN LA BIO ▲</div>
+ <div class="legal e4">Proyecto independiente y no oficial, sin relación con Red, Metro de Santiago, EFE ni el MTT.</div>
+</div>
+<script>
+/* ===== Guion: escenas a 120 BPM (un compás = 2 s) ===== */
+const ICON={
+ metro:'<path d="M7 3h10a3 3 0 0 1 3 3v9a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3zM4 11h16M8 21l2-3M16 21l-2-3"/><circle cx="8.5" cy="14.5" r=".8"/><circle cx="15.5" cy="14.5" r=".8"/>',
+ bus:'<rect x="4" y="3" width="16" height="15" rx="2"/><path d="M4 10h16M7 18v2M17 18v2M8 6.5h8"/>',
+ taxi:'<path d="M9 4h6l1 3M3 13l2-5a2 2 0 0 1 2-1h10a2 2 0 0 1 2 1l2 5v4H3zM3 13h18M7 17v2M17 17v2"/>',
+ walk:'<circle cx="13" cy="4" r="2"/><path d="m9 21 2-6 3 3v3M7 12l3-4h4l2 4 3 1M11 15l-1-4"/>',
+ pcc:'<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4M6 10h3l2-3 2 5 2-2h3"/>',
+ net:'<circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M16 5a3 3 0 0 1 0 6M18 14c2 .8 3 2.7 3 6"/>'};
+window.SCENES=[
+ {t0:0,  t1:3,  c:'#d7262e', icon:'metro', kick:'SIMULADOR 3D', title:'Santiago,<br><em>en tu celular</em>', chips:['🚇 Metro','🚆 Trenes','🚌 Buses','🚕 Taxis'], shots:[{clip:'intro',from:60}]},
+ {t0:3,  t1:6.5,c:'#d7262e', icon:'metro', kick:'MODO CONDUCTOR', title:'¿Y si <em>tú</em><br>manejaras<br>el Metro?', chips:['🚇 7 líneas','🚆 Tren Nos y Rancagua'], shots:[{clip:'metro',from:20}]},
+ {t0:6.5,t1:10, c:'#e8461e', icon:'bus',   kick:'BUSES RED', title:'Maneja buses<br><em>por la Alameda</em>', chips:['🚏 Recorridos reales','🧍 Pasajeros que suben'], shots:[{clip:'bus-a',from:10},{clip:'bus-b',at:1.5,from:0}]},
+ {t0:10, t1:12, c:'#f4b400', ck:'#111722', hl:'#fff', icon:'taxi', kick:'TAXI', title:'O sal a buscar<br><em>pasajeros</em>', chips:['🚕 Taxímetro','📻 Radios'], shots:[{still:'../post-taxi-puerta/s3-abre.png'},{still:'../post-taxi-puerta/s4-entra.png',at:1}]},
+ {t0:12, t1:15.5,c:'#0f9d58', icon:'walk', kick:'MODO PASAJERO', title:'Viaja como<br><em>pasajero</em>', chips:['💳 Carga tu bip!','🔀 Combina','🥖 Misiones'], shots:[{still:'../post-calles-reales/s1-acceso.png'},{still:'../post-calles-reales/s2-paradero.png',at:1.15},{still:'../post-locales/s3-caja.png',at:2.3}]},
+ {t0:15.5,t1:18,c:'#3b6fe0', icon:'pcc',   kick:'CENTRO DE CONTROL', title:'Dirige toda<br><em>la red</em>', chips:['🚨 Alarmas','📻 Órdenes por radio'], shots:[{clip:'control',from:10}]},
+ {t0:18, t1:20.5,c:'#8e44ad', icon:'net',  kick:'MULTIJUGADOR', title:'Juega con<br><em>tus amigos</em>', chips:['👥 Sala con código','🚇 Hasta 4 conductores'], shots:[{still:'../post-multijugador/cap-conductor.png'}]},
+ {t0:20.5,t1:23,c:'#d7262e', icon:'metro', kick:'HECHO EN CHILE', title:'Estaciones y<br><em>horarios reales</em>', chips:['📍 Calles reales','🌦️ Clima y hora real'], shots:[{clip:'intro',from:205}]},
+];
+window.END={t0:23,t1:27};
+window.DUR=27;
+/* ===== Utilidades ===== */
+const $=id=>document.getElementById(id);
+const clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
+const ease=x=>1-Math.pow(1-clamp(x),3);
+const back=x=>{x=clamp(x);const c1=1.6,c3=c1+1;return 1+c3*Math.pow(x-1,3)+c1*Math.pow(x-1,2);};
+// Rieles de fondo con los colores de las líneas
+const RAILS=[['#e1251b',-14,300],['#fcbe14',-14,520],['#0a6fb7',-14,760],['#00a650',-14,1690],['#9c2d8b',-14,1790]];
+$('rails').innerHTML=RAILS.map(([c,a,y])=>`<i style="top:${y}px;background:${c};transform:rotate(${a}deg)"></i>`).join('')+RAILS.map(([c])=>`<b></b>`).join('');
+// Plano de la red con una estación por escena
+const N=SCENES.length;
+SCENES.forEach((s,i)=>{const d=document.createElement('div');d.className='st';d.style.left=(i/(N-1)*100)+'%';$('map').appendChild(d);});
+const tr=document.createElement('div');tr.className='tr';$('map').appendChild(tr);
+let cur=-1;
+/* render(t): deja la página como se ve en el segundo t. Devuelve las imágenes que hay que mostrar. */
+window.render=function(t){
+ const endK=clamp((t-END.t0)/0.6);
+ let i=SCENES.findIndex(s=>t>=s.t0&&t<s.t1);if(i<0)i=N-1;
+ const s=SCENES[i],lt=t-s.t0;
+ if(i!==cur){cur=i;
+  document.body.style.setProperty('--c',s.c);document.body.style.setProperty('--ck',s.ck||'#fff');document.body.style.setProperty('--hl',s.hl||'#f4b400');
+  $('kick').innerHTML=`<svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${ICON[s.icon]}</svg>${s.kick}`;
+  $('title').innerHTML=s.title;
+  $('sub').innerHTML=s.chips.map(c=>`<span class="chip anim">${c}</span>`).join('');
+  tr.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="${s.c==='#f4b400'?'#111722':s.c}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${ICON[s.icon]}</svg>`;
+ }
+ // Entrada de los textos (escalonada) y salida antes del corte
+ const out=clamp((t-(s.t1-0.25))/0.25);
+ const set=(el,d)=>{const k=back((lt-d)/0.45);el.style.opacity=clamp((lt-d)/0.2)*(1-out);el.style.transform=`translateY(${(1-k)*70-out*40}px)`;};
+ set($('kick'),0.05);set($('title'),0.15);
+ [...$('sub').children].forEach((c,j)=>set(c,0.45+j*0.12));
+ // Tren del plano: avanza a la estación de la escena
+ const prog=(i+clamp(lt/0.6)*1-1)/(N-1);const pos=clamp(i===0?0:(i-1+ease(lt/0.6))/(N-1));
+ tr.style.left=(pos*100)+'%';document.querySelector('#map .fill').style.width=(pos*100)+'%';
+ document.querySelectorAll('#map .st').forEach((d,j)=>d.classList.toggle('on',j<=i&&(j<i||lt>0.5)));
+ // Celular: entra con un pequeño rebote en cada escena
+ const pk=back(lt/0.5);
+ $('phone').style.transform=`translate(-50%,0) scale(${0.94+0.06*pk}) rotate(${(1-pk)*-2}deg)`;
+ $('flash').style.opacity=clamp(1-lt/0.22)*0.7;
+ // Rieles de fondo deslizándose
+ [...$('rails').children].forEach((r,j)=>{if(r.tagName==='I')r.style.marginLeft=(((t*(60+j*25))%300)-150)+'px';});
+ // Toma actual de la escena
+ let shot=s.shots[0];for(const sh of s.shots)if(lt>=(sh.at||0))shot=sh;
+ const st=lt-(shot.at||0);
+ // Final
+ const hideMain=endK;
+ ['map','phone','sub','brand'].forEach(id=>$(id).style.opacity=1-hideMain);document.querySelector('.top').style.opacity=1-hideMain;
+ $('end').style.opacity=endK;
+ const et=t-END.t0;
+ document.querySelectorAll('#end > *').forEach(el=>{const d=el.classList.contains('logo')?0:el.classList.contains('e1')?0.15:el.classList.contains('e2')?0.4:el.classList.contains('e3')?0.65:0.9;
+  const k=back((et-d)/0.5);el.style.opacity=clamp((et-d)/0.25);el.style.transform=`translateY(${(1-k)*80}px)`+(el.classList.contains('logo')?` rotate(${(1-k)*-12}deg) scale(${0.6+0.4*k})`:'');});
+ if(t>=END.t0){const pulse=1+0.04*Math.max(0,Math.sin((et-1)*Math.PI*2));document.querySelector('#end .bar').style.transform+=` scale(${pulse})`;}
+ return {shot,st,lt,scene:i};
+};
+</script></body></html>

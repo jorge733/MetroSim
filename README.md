@@ -144,6 +144,10 @@ trenes de los dos motores quedan a ~1 m (mediana).
   lámparas que tengas. Un botón permite mirar el depto de día o de noche.
 - **2.24.1:** en el celular acostado la ilustración de la pieza se ve entera (antes quedaba cortada abajo). Post de
   Instagram «Tu depto, pieza por pieza».
+- **2.24.2:** reel comercial para Instagram que presenta RedMoviSim (`post-reel/reel.mp4`, 1080×1920, 27 s): la
+  intro del juego, la cabina del Metro, el bus por la Alameda, el taxi, el modo pasajero, el Centro de Control y el
+  multijugador, con música propia sintetizada (`musica.py`). Las tomas se graban del juego con un reloj virtual
+  (`clips/`) y `generar.js` arma el vídeo.
 
 ## Versión 2.23 · Informe animado al terminar el turno de bus y de taxi
 
