@@ -96,10 +96,14 @@ export function buildRedStop(parent, stop, { play = [], night = 0, paint = 12, l
   const h = 1.25, w = h * aspect;
   const mat = new THREE.MeshStandardMaterial({ map: tex, side: THREE.DoubleSide, roughness: 0.55, emissive: new THREE.Color(0xffffff), emissiveMap: tex, emissiveIntensity: night ? 0.55 : 0.06 });
   const plate = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
-  plate.position.set(0.05 + w / 2, 3.05 - h / 2, pz);
-  plate.rotation.y = 0;
+  plate.position.set(0.05 + w / 2, 3.05 - h / 2, pz + 0.02);
   g.add(plate);
-  addBox(g, w + 0.04, h + 0.04, 0.03, M.frame, 0.05 + w / 2, 3.05 - h / 2, pz - 0.02);
+  addBox(g, w + 0.04, h + 0.04, 0.03, M.frame, 0.05 + w / 2, 3.05 - h / 2, pz);
+  // La misma cara del otro lado: la señal se lee viniendo de los dos sentidos
+  const back = plate.clone();
+  back.position.z = pz - 0.02;
+  back.rotation.y = Math.PI;
+  g.add(back);
   // Refugio: techo, paneles de vidrio atrás y a los lados, banca y el panel con el nombre en el techo
   if (stop.shelter) {
     const x0 = 0.6, x1 = 2.2, z0 = -1.2, z1 = 3.8, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, L = z1 - z0;

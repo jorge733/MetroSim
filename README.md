@@ -154,6 +154,8 @@ cada uno con sus datos reales, y se dibujan como se ven en Santiago.
   de todas las bocas.
 - Los datos salen de dos herramientas: `tools/calles-osm.mjs` (calle de cada estación) y `tools/paraderos-osm.py`
   (nueva, para el modo bus; escribe `js/bus/paraderosOsm.js`).
+- **2.22.1:** la señal del paradero se lee por los dos lados (antes, por atrás solo se veía el marco oscuro), y post de
+  Instagram «Calles como las de Santiago» con las novedades de la 2.21 y la 2.22 (`post-calles-reales/`).
 
 ## Versión 2.21 · Autos y buses más realistas
 

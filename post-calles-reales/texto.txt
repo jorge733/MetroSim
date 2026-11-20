@@ -1,0 +1,22 @@
+🚇 Calles como las de Santiago. Novedades en RedMoviSim (v2.22)
+
+Sales del Metro o te bajas del bus y la calle ahora se parece mucho más a la de verdad 👇
+
+1️⃣ Todos los accesos de cada estación, donde están en la calle real: en la vereda, en el bandejón central o en una plaza. Cada uno con su letra y la calle a la que da (Acceso A · Nueva York), el muro de hormigón y la banda del color de la línea. Bajas por el que quieras.
+2️⃣ Paraderos de Red reales alrededor de la estación: la señal roja con su código (PA167), el número de parada, el nombre y los recorridos que paran ahí. Refugio solo si lo tiene, y la solera pintada de amarillo.
+3️⃣ En el modo bus, los accesos al Metro quedan a la distancia real del paradero y en su lado: en tu vereda, en el bandejón o en la vereda de enfrente.
+4️⃣ Autos con su forma: sedanes, hatchbacks, SUV, camionetas y furgones, con ruedas, focos y patente. El bus que manejas también se ve más real.
+
+♿ Los accesos con ascensor también lo tienen en el juego.
+
+🗺️ Son 291 accesos y cientos de paraderos sacados de OpenStreetMap, en las calles de las 133 estaciones del juego.
+
+🎮 Para verlo: «Viajar» (modo pasajero) y sal a la calle desde cualquier estación, o maneja un recorrido en el modo bus. En el PC o en el celular.
+
+💬 ¿Qué esquina o estación te gustaría ver más parecida a la real? Cuéntanos en los comentarios o en el botón «Opinar». ¡Leemos todo! 👇
+
+🔗 Juega gratis en www.redmovisim.cl (link en la bio)
+
+#RedMoviSim #MetroDeSantiago #Santiago #Simulador #Juegos #JuegosChilenos #Chile #Metro #OpenStreetMap
+
+(RedMoviSim es un proyecto independiente, sin relación con Red, Metro de Santiago ni el Ministerio de Transportes. Datos de calles © colaboradores de OpenStreetMap.)
