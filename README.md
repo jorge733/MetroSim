@@ -142,6 +142,8 @@ trenes de los dos motores quedan a ~1 m (mediana).
   se van contigo.
 - **Día y noche:** la vista de la ventana sigue la hora real; de noche se encienden las luces de la ciudad y las
   lámparas que tengas. Un botón permite mirar el depto de día o de noche.
+- **2.24.1:** en el celular acostado la ilustración de la pieza se ve entera (antes quedaba cortada abajo). Post de
+  Instagram «Tu depto, pieza por pieza».
 
 ## Versión 2.23 · Informe animado al terminar el turno de bus y de taxi
 

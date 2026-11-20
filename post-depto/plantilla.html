@@ -1,0 +1,77 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+*{margin:0;box-sizing:border-box}
+html,body{width:var(--w);height:var(--h);overflow:hidden}
+body{font-family:"DejaVu Sans","Liberation Sans",Arial,sans-serif;color:#fff;
+ background:radial-gradient(ellipse at 50% 30%,#26324a 0%,#111722 55%,#05070a 100%);position:relative}
+.wrap{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 50px;gap:var(--gap)}
+.txt,.foot{display:flex;flex-direction:column;align-items:center;gap:var(--gap)}
+.top{display:flex;align-items:center;gap:18px}
+.logo{width:var(--logo)}
+.badge{display:inline-flex;align-items:center;background:#d7262e;padding:10px 28px;border-radius:999px;font-weight:800;font-size:var(--badge);letter-spacing:.08em;white-space:nowrap}
+h1{font-size:var(--h1);font-weight:900;line-height:1.02;letter-spacing:-.02em}
+h1 em{font-style:normal;color:#f4b400}
+h1 small{display:block;white-space:nowrap;margin-top:.3em;font-size:.4em;font-weight:800;letter-spacing:.03em;color:#ff8a90}
+
+.chips{display:flex;flex-wrap:wrap;justify-content:center;gap:var(--cgap);max-width:var(--cw)}
+.chip{background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.18);border-radius:999px;padding:var(--cpad);font-size:var(--p);font-weight:700;color:#e8ecf3;white-space:nowrap}
+.bar{display:flex;align-items:center;gap:20px;background:#fff;color:#111722;border-radius:999px;padding:var(--bpad);box-shadow:0 0 0 8px rgba(244,180,0,.35),0 14px 40px rgba(0,0,0,.5)}
+.bar svg{width:var(--url);height:var(--url)}
+.bar b{font-size:var(--url);font-weight:900;letter-spacing:.01em}
+.bar b span{color:#d7262e}
+/* Cuatro celulares acostados (844×390), cada uno con su paso */
+.steps{display:grid;grid-template-columns:repeat(var(--cols),var(--pw));gap:var(--sg)}
+.step{position:relative}
+.phone{width:100%;aspect-ratio:844/390;background:#000;border:calc(var(--pw) * .022) solid #111722;border-radius:calc(var(--pw) * .06);overflow:hidden;box-shadow:0 0 0 calc(var(--pw) * .008) #f4b400,0 16px 40px rgba(17,23,34,.35)}
+.phone img{display:block;width:100%;height:100%;object-fit:cover}
+.lab{position:absolute;left:50%;top:0;transform:translate(-50%,-55%);display:flex;align-items:center;gap:.45em;background:#f4b400;color:#111722;font-weight:900;font-size:var(--tag);padding:.3em .9em .3em .35em;border-radius:999px;white-space:nowrap;box-shadow:0 6px 18px rgba(17,23,34,.25)}
+.lab i{font-style:normal;display:grid;place-items:center;width:1.5em;height:1.5em;border-radius:50%;background:#111722;color:#f4b400}
+.steps{padding-top:calc(var(--tag) * .9);row-gap:calc(var(--sg) + var(--tag) * .9)}
+/* Versión clara: fondo cálido, textos oscuros y las pantallas del juego resaltan encima */
+body{color:#111722;background:radial-gradient(ellipse at 50% 25%,#ffffff 0%,#fff3e6 45%,#ffd9d2 100%)}
+body::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 12% 88%,rgba(244,180,0,.28),transparent 40%),radial-gradient(circle at 90% 10%,rgba(215,38,46,.16),transparent 38%)}
+.wrap{z-index:1}
+h1{color:#111722}
+.badge{color:#fff;box-shadow:0 6px 18px rgba(215,38,46,.3)}
+h1 em{color:#0f9d58}
+h1 small{color:#5a6472}
+.monitor .scr{border-color:#111722;box-shadow:0 24px 60px rgba(17,23,34,.35)}
+.monitor .neck{background:linear-gradient(#2a3346,#111722)}
+.monitor .base{background:#111722}
+.phone{border-color:#111722;box-shadow:0 0 0 calc(var(--dw) * .006) #0f9d58,-14px 22px 60px rgba(17,23,34,.4)}
+.tag{background:#f4b400;border-color:#f4b400;color:#111722;box-shadow:0 6px 18px rgba(17,23,34,.25)}
+.cloud{background:#0f9d58;box-shadow:0 0 0 calc(var(--dw) * .014) rgba(15,157,88,.25),0 14px 40px rgba(17,23,34,.3)}
+.cloud svg path{stroke:#fff}
+.chip{background:#fff;border-color:rgba(17,23,34,.12);color:#111722;box-shadow:0 4px 14px rgba(17,23,34,.08)}
+.bar{background:#111722;color:#fff;box-shadow:0 0 0 8px rgba(244,180,0,.45),0 14px 40px rgba(17,23,34,.3)}
+.bar svg{stroke:#fff}
+.bar b span{color:#ff5a62}
+
+
+.chip.lock{background:#111722;border-color:#111722;color:#f4b400}
+h1 small{white-space:normal}
+</style></head><body>
+<div class="wrap">
+ <div class="txt">
+ <div class="top">
+ <svg class="logo" viewBox="0 0 200 130"><rect x="6" y="6" width="188" height="118" rx="30" fill="#d7262e"/>
+ <path d="M30 94H78L122 36H170" fill="none" stroke="#fff" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+ <path d="M100 18V112" fill="none" stroke="#ffd2d5" stroke-width="9" stroke-linecap="round" stroke-dasharray="0.1 17"/>
+ <circle cx="30" cy="94" r="10" fill="#fff"/><circle cx="170" cy="36" r="10" fill="#fff"/>
+ <circle cx="100" cy="65" r="17" fill="#fff"/><circle cx="100" cy="65" r="8" fill="#d7262e"/></svg>
+ <div class="badge">NUEVO EN LA TIENDA REDMOVI</div></div>
+ <h1>Tu depto,<br><em>pieza por pieza</em><small>Amóblalo con lo que ganas&nbsp;conduciendo</small></h1>
+ </div>
+ <div class="steps">
+  <div class="step"><div class="phone"><img src="s1-living.png"></div><div class="lab"><i>1</i>Living con&nbsp;vista</div></div>
+  <div class="step"><div class="phone"><img src="s2-dormitorio.png"></div><div class="lab"><i>2</i>Dormitorio de&nbsp;noche</div></div>
+  <div class="step"><div class="phone"><img src="s3-cocina.png"></div><div class="lab"><i>3</i>Cocina y&nbsp;pinturas</div></div>
+  <div class="step"><div class="phone"><img src="s4-mudanzas.png"></div><div class="lab"><i>4</i>Múdate a Las&nbsp;Condes</div></div>
+ </div>
+ <div class="foot">
+ <div class="chips">
+  <span class="chip lock">🛋️ 28 muebles</span><span class="chip">🐕 Perro y gato</span><span class="chip">🎨 7 pinturas</span><span class="chip">🌄 Penthouse</span><span class="chip">🌙 Día y noche</span><span class="chip">🚇 Libreas nuevas</span>
+ </div>
+ <div class="bar"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"><circle cx="10" cy="10" r="7"/><path d="M15.5 15.5L21 21"/></svg><b>redmovisim<span>.cl</span></b></div>
+ </div>
+</div>
+</body></html>

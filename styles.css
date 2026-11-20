@@ -1101,6 +1101,9 @@ body.touch-mode .help-chip { display: none !important; }
 .line-dot { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; color: #fff; font: 800 12px/1 Arial, sans-serif; }
 .home-room { display: block; width: 100%; height: auto; margin: 4px 0 10px; border-radius: 12px; }
 /* 2.24 · Piezas del depto (living, dormitorio, cocina) y día/noche */
+/* 2.24.1 · En el celular acostado la pieza entra entera (antes quedaba cortada abajo) */
+.home-room { max-height: 52vh; width: auto; max-width: 100%; margin-inline: auto; }
+@supports (height: 1dvh) { .home-room { max-height: 52dvh; } }
 .home-rooms { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; }
 .home-room-tab { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 99px; border: 1px solid #ffffff22; background: #ffffff08; color: var(--muted); font-size: 13px; cursor: pointer; }
 .home-room-tab:hover { color: var(--text); }
