@@ -19,7 +19,7 @@
 import * as THREE from "three";
 import { std, glow, addBox } from "../utils.js";
 import { facadeTexture } from "./kit.js";
-import { crownGeometry, trunkGeometry, lampPool } from "../render/realism.js";
+import { crownGeometry, trunkGeometry, lampPool, lampHalo } from "../render/realism.js";
 
 const CELL = 10;
 /** 2.21 · Bocas de los otros accesos: no pintan nada, solo dejan un 1 en el stencil (ahí no se dibuja el piso y se ve la escalera). */
@@ -364,6 +364,7 @@ export class RealStreet {
   /** Faroles: poste, brazo hacia la calzada y luminaria (instanciados). */
   buildLamps(g, M) {
     const L = this.d.lamps, dummy = new THREE.Object3D();
+    this.lampSpots = [];
     const pole = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.07, 0.11, 8, 6), M.metal, L.length);
     const arm = new THREE.InstancedMesh(new THREE.BoxGeometry(0.08, 0.08, 1.8), M.metal, L.length);
     const head = new THREE.InstancedMesh(new THREE.BoxGeometry(0.32, 0.16, 0.75), M.lampOn, L.length);
@@ -373,7 +374,8 @@ export class RealStreet {
       dummy.position.set(x, 4.1, z); dummy.updateMatrix(); pole.setMatrixAt(i, dummy.matrix);
       dummy.position.set(x + dx * 0.9, 7.95, z + dz * 0.9); dummy.updateMatrix(); arm.setMatrixAt(i, dummy.matrix);
       dummy.position.set(x + dx * 1.7, 7.85, z + dz * 1.7); dummy.updateMatrix(); head.setMatrixAt(i, dummy.matrix);
-      if (this.night > 0.5) lampPool(g, x + dx * 1.7, z + dz * 1.7);
+      if (this.night > 0.5) { lampPool(g, x + dx * 1.7, z + dz * 1.7); lampHalo(g, x + dx * 1.7, 7.7, z + dz * 1.7); }
+      this.lampSpots.push([x + dx * 1.7, 7.75, z + dz * 1.7]);   // 2.27 · para las luces de los faroles
     });
     g.add(pole, arm, head);
   }

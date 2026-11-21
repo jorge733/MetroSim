@@ -621,6 +621,90 @@ export function lampPool(parent, x, z, { size = 10, opacity = 0.5, y = 0.13 } = 
   return m;
 }
 
+/** Textura del halo de la ampolleta de un farol (se ve encendida a lo lejos). */
+function lampHaloTexture() {
+  return cached("lampHalo", () => {
+    const W = 64, c = canvas(W, W), g = c.getContext("2d");
+    const grd = g.createRadialGradient(W / 2, W / 2, 0, W / 2, W / 2, W / 2);
+    grd.addColorStop(0, "rgba(255,244,220,1)"); grd.addColorStop(0.18, "rgba(255,220,160,.75)");
+    grd.addColorStop(0.5, "rgba(255,190,120,.18)"); grd.addColorStop(1, "rgba(255,170,100,0)");
+    g.fillStyle = grd; g.fillRect(0, 0, W, W);
+    const t = texture(c);
+    t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+    return t;
+  });
+}
+
+/** 2.27 · De noche: halo cálido alrededor de la ampolleta de un farol. */
+export function lampHalo(parent, x, y, z, { size = 2.6, opacity = 0.8 } = {}) {
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: lampHaloTexture(), transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
+  s.scale.set(size, size, 1);
+  s.position.set(x, y, z);
+  s.renderOrder = 3;
+  parent.add(s);
+  return s;
+}
+
+/** Cuánto encendidos están los faroles según el cielo (0 de día … 1 de noche). */
+export function lampLevel(sky) {
+  return THREE.MathUtils.clamp((0.5 - sky.day) / 0.35, 0, 1);
+}
+
+/**
+ * 2.27 · Luz de luna y resplandor de la ciudad para la luz hemisférica y la
+ * direccional (que de día es el sol). De noche la escena ya no queda negra:
+ * el cielo da una luz azulada suave, el piso devuelve el anaranjado de los
+ * faroles de sodio y la luna marca sombras tenues.
+ */
+export function nightLight(hemi, sun, sky, k = 1) {
+  const n = 1 - sky.day, clear = 1 - 0.6 * sky.cloud;
+  hemi.color.setHex(0xcfe4ff).lerp(C(0x7088b8), n);
+  hemi.groundColor.setHex(0x4a4238).lerp(C(0x6a4a2c), n);
+  hemi.intensity += 0.4 * n * k;
+  sun.intensity += 0.55 * n * clear * k;
+  if (n > 0.6) sun.color.setHex(0xa8bde6);
+}
+
+/**
+ * 2.27 · Faroles que iluminan de verdad: unas pocas luces puntuales cálidas
+ * que se ponen siempre en los faroles más cercanos a la cámara. Son siempre
+ * las mismas luces (solo se mueven), así no se recompilan los materiales.
+ */
+export class NightLamps extends THREE.Group {
+  /** @param {Array<[number, number, number]>} spots  posición (x, y, z) de cada ampolleta, en coordenadas del padre */
+  constructor(spots, { count = LOW_END ? 4 : 8, intensity = 55, distance = 22 } = {}) {
+    super();
+    this.spots = spots;
+    this.power = intensity;
+    this.level = 0;
+    this.lights = [];
+    for (let i = 0; i < Math.min(count, spots.length); i++) {
+      const l = new THREE.PointLight(0xffc98a, 0, distance, 2);
+      l.castShadow = false;
+      this.lights.push(l);
+      this.add(l);
+    }
+    this.last = { x: Infinity, z: Infinity };
+    this.name = "nightLamps";
+  }
+
+  /** Enciende (0..1) los faroles. */
+  setLevel(k) {
+    this.level = k;
+    for (const l of this.lights) l.intensity = this.power * k;
+  }
+
+  /** Pone las luces en los faroles más cercanos a (x, z). */
+  follow(x, z) {
+    if (!this.lights.length || Math.hypot(x - this.last.x, z - this.last.z) < 2) return;
+    this.last.x = x; this.last.z = z;
+    const near = this.spots
+      .map(p => [(p[0] - x) ** 2 + (p[2] - z) ** 2, p])
+      .sort((a, b) => a[0] - b[0]);
+    this.lights.forEach((l, i) => { const p = near[i][1]; l.position.set(p[0], p[1] - 0.35, p[2]); });
+  }
+}
+
 /* ==========================================================================
    Entorno para reflejos (autos, vidrios y la calzada mojada)
    ========================================================================== */

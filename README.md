@@ -124,6 +124,16 @@ trenes de los dos motores quedan a ~1 m (mediana).
 - **Salir por los torniquetes es gratis**: solo se cobra el pasaje al pasar hacia la zona pagada (antes, al terminar
   de cruzar el torniquete de salida se cobraba un pasaje).
 
+## Versión 2.27 · Mejor iluminación de noche
+
+- **Los faroles iluminan de verdad**: en la calle de cada estación (la de siempre y las calles reales), los faroles más
+  cercanos al pasajero dan una luz cálida que alumbra el asfalto, las veredas, los autos, los árboles y las fachadas.
+  Son siempre unas pocas luces (4 en el celular, 8 en el computador) que se cambian al farol más cercano mientras caminas.
+- Cada ampolleta tiene un **halo** que se ve encendido a lo lejos, además del círculo de luz en el piso.
+- **Luz de luna**: de noche el cielo da una luz azulada suave, el piso devuelve el anaranjado de los faroles y la luna
+  marca sombras tenues. La calle ya no queda casi negra, y lo mismo vale para los tramos del Metro al aire libre.
+- Al atardecer los faroles se van encendiendo de a poco, y de día todo se ve igual que antes.
+
 ## Versión 2.26 · Radio de cabina para el Metro en la Tienda RedMovi
 
 - **Nueva en la Tienda RedMovi** (pestaña Conductor, sección «Accesorios de cabina»): la **radio de cabina** por

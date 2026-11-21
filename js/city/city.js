@@ -32,7 +32,7 @@ import { buildLandmark } from "./landmarks.js";
 import { cityMaterials, genericBuilding, signMaterial, facingPlane, streetLamp, tree, bench, addMesh } from "./kit.js";
 import { markCity } from "../render/trackLift.js";
 import { carGroup, pickCarKind, streetBusGroup, CAR_COLORS } from "../render/vehicles.js";   // 2.21
-import { SkyDome, SunShadow, sunDirection, lampPool } from "../render/realism.js";
+import { SkyDome, SunShadow, sunDirection, lampPool, lampHalo, lampLevel, nightLight, NightLamps } from "../render/realism.js";
 import { BUS_METRO_STOPS, busRoutesAt } from "../bus/busRoute.js";
 import { REAL_STREETS, OSM_ATTRIBUTION } from "./realStreets.js";      // 2.6 · calles reales (OpenStreetMap)
 import { realStreetData, loadRealStreet } from "./streetData.js";      // 2.7 · se cargan cuando hacen falta
@@ -293,6 +293,7 @@ export class City {
     g.visible = (this.outdoor || 0) > 0;
     this.scene.add(g);
     this.blocks = [];                       // rectángulos no transitables (coordenadas locales)
+    this.lampSpots = [];                    // 2.27 · ampolletas de los faroles (coordenadas locales)
     this.doors = [];                        // 2.17 · puertas automáticas de los locales
     this.inside = null;
     this.walkRects = [{ x0: -S.walkHalf + 0.35, x1: S.walkHalf - 0.35, z0: -S.halfLen, z1: S.halfLen }];
@@ -336,6 +337,10 @@ export class City {
     // 2.4 · Cielo con degradado, sol y nubes; sombras del sol que siguen al pasajero
     this.dome = new SkyDome();
     g.add(this.dome);
+    // 2.27 · Si se llega de tarde o de noche, los faroles más cercanos iluminan de verdad
+    const spots = this.real ? this.real.lampSpots ?? [] : this.lampSpots;
+    this.lamps = this.sky.day < 0.6 && spots.length ? new NightLamps(spots) : null;
+    if (this.lamps) g.add(this.lamps);
     this.sunDir = sunDirection(clock);
     if (this.renderer) {
       this.shadow = new SunShadow(this.renderer, this.sun, { range: 55 });
@@ -370,6 +375,7 @@ export class City {
       o.customDepthMaterial?.dispose();
     });
     this.group = null;
+    this.lamps = null;
     this.station = null;
   }
 
@@ -412,7 +418,9 @@ export class City {
       this.hemi.intensity = (0.25 + 0.75 * sky.day * (1 - 0.3 * sky.cloud)) * k;
       this.sun.intensity = 2.8 * sky.light * k;
       this.sun.color.setHex(sky.dusk > 0.4 ? 0xffb37a : 0xfff1dc);
+      nightLight(this.hemi, this.sun, sky, k);              // 2.27 · luna y resplandor de la ciudad
     }
+    this.lamps?.setLevel(lampLevel(sky) * (this.inside ? 0 : 1));
   }
 
   /** Ajusta el cielo y el sol a la hora del juego. */
@@ -705,7 +713,11 @@ export class City {
     for (let z = -84; z <= 84; z += 24) {
       streetLamp(g, M, S.roadHalf + 0.6, z + 6, -1);
       streetLamp(g, M, -S.roadHalf - 0.6, z - 6, 1);
-      if (night) { lampPool(g, S.roadHalf - 1.4, z + 6); lampPool(g, -S.roadHalf + 1.4, z - 6); }
+      if (night) {
+        lampPool(g, S.roadHalf - 1.4, z + 6); lampPool(g, -S.roadHalf + 1.4, z - 6);
+        lampHalo(g, S.roadHalf - 0.9, 6.72, z + 6); lampHalo(g, -S.roadHalf + 0.9, 6.72, z - 6);
+      }
+      this.lampSpots.push([S.roadHalf - 0.9, 6.78, z + 6], [-S.roadHalf + 0.9, 6.78, z - 6]);
       this.blocks.push({ x0: S.roadHalf + 0.45, x1: S.roadHalf + 0.75, z0: z + 5.85, z1: z + 6.15 });
       this.blocks.push({ x0: -S.roadHalf - 0.75, x1: -S.roadHalf - 0.45, z0: z - 6.15, z1: z - 5.85 });
     }
@@ -1063,6 +1075,7 @@ export class City {
       f.set(playerPos ? playerPos.x : this.origin.x + S.access.x, this.origin.y, playerPos ? playerPos.z : this.origin.z + S.access.z);
       this.shadow.follow(f, this.sunDir);
     }
+    if (this.lamps?.level > 0) this.lamps.follow(playerPos ? lx : S.access.x, playerPos ? lz : S.access.z);
 
     // Vehículos: frenan ante el jugador y ante el de adelante
     if (this.real) this.updateRealVehicles(dt, lx, lz);

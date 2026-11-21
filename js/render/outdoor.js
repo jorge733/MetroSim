@@ -28,7 +28,7 @@ import { ROUTE_A } from "../engine/route.js";
 import { lineStock } from "../engine/fleet.js";
 import { WEATHER } from "../engine/weather.js";
 import { std, glow, addBox, addBoxSpan, makeCanvas, toTexture, concreteTexture } from "../utils.js";
-import { SkyDome, sunDirection, crownGeometry, trunkGeometry, leafMaterial } from "./realism.js";
+import { SkyDome, sunDirection, crownGeometry, trunkGeometry, leafMaterial, nightLight } from "./realism.js";
 import { valpoZones, buildValpoNear, ValpoPanorama } from "./valparaiso.js";   // 2.19 · el mar y los cerros del Metro Valparaíso
 
 const S = CONFIG.station;
@@ -496,6 +496,7 @@ export class OutdoorView {
     this.sun.position.set(cam.x + this.sunDir.x * 150, cam.y + Math.max(0.2, this.sunDir.y) * 150, cam.z + this.sunDir.z * 150);
     this.sun.target.position.set(cam.x, cam.y, cam.z);
     this.hemi.intensity = (0.2 + 0.9 * sky.day * (1 - 0.3 * WEATHER.cloud)) * light;
+    nightLight(this.hemi, this.sun, sky, light);           // 2.27 · luna y resplandor de la ciudad
     if (this.M) this.M.building.emissiveIntensity = sky.day < 0.35 ? 0.9 * (1 - sky.day / 0.35) : 0;
     if (this.valpoNear) this.valpoNear.M.house.emissiveIntensity = this.M.building.emissiveIntensity;
 
