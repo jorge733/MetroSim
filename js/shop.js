@@ -58,7 +58,7 @@ export const CONTRACTS = [
 ];
 
 /** 2.26 · Accesorios de la cabina del Metro. */
-export const CAB_RADIO = { id: "gadget-radio", kind: "gadget", icon: "📻", name: "Radio de cabina", desc: "Escucha las radios de Santiago en vivo mientras conduces el Metro: Cooperativa, Futuro, Bío-Bío y más. Necesita internet.", price: 18000 };
+export const CAB_RADIO = { id: "gadget-radio", kind: "gadget", icon: "📻", name: "Radio de cabina", desc: "Escucha las radios de Santiago en vivo mientras conduces el Metro: Cooperativa, Futuro, Bío-Bío y más. Necesita internet.", price: 10000 };
 export const GADGETS = [CAB_RADIO];
 
 /**

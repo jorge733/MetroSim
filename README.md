@@ -127,10 +127,11 @@ trenes de los dos motores quedan a ~1 m (mediana).
 ## Versión 2.26 · Radio de cabina para el Metro en la Tienda RedMovi
 
 - **Nueva en la Tienda RedMovi** (pestaña Conductor, sección «Accesorios de cabina»): la **radio de cabina** por
-  $18.000. Con ella suenan las radios de Santiago en vivo al conducir un tren de Metro, las mismas emisoras que en el bus y el taxi.
+  $10.000. Con ella suenan las radios de Santiago en vivo al conducir un tren de Metro, las mismas emisoras que en el bus y el taxi.
 - Al conducir aparece un botón de radio en la barra de arriba, junto al del sonido, con el mismo panel de emisoras y volumen.
   Con teclado: **O** enciende o apaga · **,** y **.** cambian de emisora. Si la compras en plena cabina aparece al tiro.
 - Recuerda si la dejaste encendida, la emisora y el volumen (compartido con la radio del bus y el taxi). Necesita internet.
+- **2.26.1 · La radio de cabina baja a $10.000** (antes $18.000).
 
 ## Versión 2.25 · Vuelta en U de verdad con el taxi
 
