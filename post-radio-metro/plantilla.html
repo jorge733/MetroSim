@@ -1,0 +1,60 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+*{margin:0;box-sizing:border-box}
+html,body{width:var(--w);height:var(--h);overflow:hidden}
+body{font-family:"DejaVu Sans","Liberation Sans",Arial,sans-serif;color:#111722;position:relative;
+ background:radial-gradient(ellipse at 50% 25%,#ffffff 0%,#fff3e6 45%,#ffd9d2 100%)}
+body::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 12% 88%,rgba(244,180,0,.28),transparent 40%),radial-gradient(circle at 90% 10%,rgba(215,38,46,.16),transparent 38%)}
+.wrap{position:absolute;inset:0;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 50px;gap:var(--gap)}
+.txt,.foot{display:flex;flex-direction:column;align-items:center;gap:var(--gap)}
+.top{display:flex;align-items:center;gap:18px}
+.logo{width:var(--logo)}
+.badge{display:inline-flex;align-items:center;background:#d7262e;color:#fff;padding:10px 28px;border-radius:999px;font-weight:800;font-size:var(--badge);letter-spacing:.08em;white-space:nowrap;box-shadow:0 6px 18px rgba(215,38,46,.3)}
+/* El comentario que pidió la radio */
+.quote{position:relative;max-width:var(--qw);display:flex;align-items:flex-start;gap:calc(var(--q) * .8);text-align:left;background:#fff;border:2px solid rgba(17,23,34,.1);border-radius:calc(var(--q) * 1.2);padding:calc(var(--q) * .9) calc(var(--q) * 1.2);box-shadow:0 10px 30px rgba(17,23,34,.12)}
+.quote::after{content:"";position:absolute;left:calc(var(--q) * 2.2);bottom:calc(var(--q) * -.75);width:calc(var(--q) * 1.4);height:calc(var(--q) * 1.4);background:#fff;border-right:2px solid rgba(17,23,34,.1);border-bottom:2px solid rgba(17,23,34,.1);transform:rotate(45deg)}
+.ava{flex:none;display:grid;place-items:center;width:calc(var(--q) * 2.6);height:calc(var(--q) * 2.6);border-radius:50%;background:linear-gradient(135deg,#f4b400,#d7262e);color:#fff;font-weight:900;font-size:calc(var(--q) * 1.2)}
+.quote b{display:block;font-size:calc(var(--q) * .95);font-weight:800;margin-bottom:.25em}
+.quote p{font-size:var(--q);line-height:1.35;color:#3a4352}
+.quote p mark{background:#ffe9a8;color:#111722;font-weight:700;padding:0 .15em;border-radius:.2em}
+h1{font-size:var(--h1);font-weight:900;line-height:1.04;letter-spacing:-.02em}
+h1 em{font-style:normal;color:#0f9d58}
+h1 small{display:block;margin-top:.35em;font-size:.38em;font-weight:800;letter-spacing:.02em;color:#5a6472}
+/* Celulares acostados (844×390), cada uno con su paso */
+.steps{display:flex;flex-wrap:wrap;justify-content:center;gap:var(--sg);max-width:var(--sw);padding-top:calc(var(--tag) * .9);row-gap:calc(var(--sg) + var(--tag) * .9)}
+.step{position:relative;width:var(--pw)}
+.phone{width:100%;aspect-ratio:844/390;background:#000;border:calc(var(--pw) * .022) solid #111722;border-radius:calc(var(--pw) * .06);overflow:hidden;box-shadow:0 0 0 calc(var(--pw) * .008) #f4b400,0 16px 40px rgba(17,23,34,.35)}
+.phone img{display:block;width:100%;height:100%;object-fit:cover}
+.lab{position:absolute;left:50%;top:0;transform:translate(-50%,-55%);display:flex;align-items:center;gap:.45em;background:#f4b400;color:#111722;font-weight:900;font-size:var(--tag);padding:.3em .9em .3em .35em;border-radius:999px;white-space:nowrap;box-shadow:0 6px 18px rgba(17,23,34,.25)}
+.lab i{font-style:normal;display:grid;place-items:center;width:1.5em;height:1.5em;border-radius:50%;background:#111722;color:#f4b400}
+.chips{display:flex;flex-wrap:wrap;justify-content:center;gap:var(--cgap);max-width:var(--cw)}
+.chip{background:#fff;border:2px solid rgba(17,23,34,.12);border-radius:999px;padding:var(--cpad);font-size:var(--p);font-weight:700;color:#111722;white-space:nowrap;box-shadow:0 4px 14px rgba(17,23,34,.08)}
+.chip.hot{background:#111722;border-color:#111722;color:#f4b400}
+.bar{display:flex;align-items:center;gap:20px;background:#111722;color:#fff;border-radius:999px;padding:var(--bpad);box-shadow:0 0 0 8px rgba(244,180,0,.45),0 14px 40px rgba(17,23,34,.3)}
+.bar svg{width:var(--url);height:var(--url)}
+.bar b{font-size:var(--url);font-weight:900;letter-spacing:.01em}
+.bar b span{color:#ff5a62}
+</style></head><body>
+<div class="wrap">
+ <div class="txt">
+ <div class="top">
+ <svg class="logo" viewBox="0 0 200 130"><rect x="6" y="6" width="188" height="118" rx="30" fill="#d7262e"/>
+ <path d="M30 94H78L122 36H170" fill="none" stroke="#fff" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+ <path d="M100 18V112" fill="none" stroke="#ffd2d5" stroke-width="9" stroke-linecap="round" stroke-dasharray="0.1 17"/>
+ <circle cx="30" cy="94" r="10" fill="#fff"/><circle cx="170" cy="36" r="10" fill="#fff"/>
+ <circle cx="100" cy="65" r="17" fill="#fff"/><circle cx="100" cy="65" r="8" fill="#d7262e"/></svg>
+ <div class="badge">¡TE ESCUCHAMOS!</div></div>
+ <div class="quote"><span class="ava">A</span><div><b>@artemsupa</b><p>«…que hubiera <mark>un ítem de una radio para comprar en la tienda</mark>, para poder poner música en el&nbsp;metro»</p></div></div>
+ <h1>Ahora conduces el&nbsp;Metro<br><em>con&nbsp;música</em> 📻<small>Nueva radio de cabina en la Tienda&nbsp;RedMovi</small></h1>
+ </div>
+ <div class="steps">
+  <div class="step"><div class="phone"><img src="cap-tienda.png"></div><div class="lab"><i>1</i>Cómprala en la&nbsp;Tienda</div></div>
+  <div class="step"><div class="phone"><img src="cap-radio.png"></div><div class="lab"><i>2</i>Elige tu&nbsp;emisora</div></div>
+ </div>
+ <div class="foot">
+ <div class="chips">
+  <span class="chip hot">📻 $10.000</span><span class="chip">🎶 14 radios de Santiago en&nbsp;vivo</span><span class="chip">🚇 En todas las&nbsp;líneas</span>
+ </div>
+ <div class="bar"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"><circle cx="10" cy="10" r="7"/><path d="M15.5 15.5L21 21"/></svg><b>redmovisim<span>.cl</span></b></div>
+ </div>
+</div>
+</body></html>

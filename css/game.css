@@ -84,5 +84,6 @@ body.touch-mode .game-menu-item kbd { display: none; }
 .cab-radio-button.open { background: #1a2029ee; border-color: #ffffff33; }
 .cab-radio { z-index: 12; top: calc(max(12px, env(safe-area-inset-top)) + 64px); width: min(340px, calc(100% - 28px)); }
 @media (max-height: 520px) and (orientation: landscape) { .cab-radio { top: calc(max(8px, env(safe-area-inset-top)) + 52px); } }
-body.touch-mode .cab-radio { width: min(290px, calc(100% - 28px)); gap: 8px; padding: 10px; }
+/* Celular: encima de los mandos táctiles mientras está abierto (tocar fuera lo cierra) */
+body.touch-mode .cab-radio { z-index: 14; width: min(290px, calc(100% - 28px)); gap: 8px; padding: 10px; }
 body.touch-mode .cab-radio .taxi-radio-dial strong { font-size: 24px; }
