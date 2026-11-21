@@ -105,7 +105,8 @@ import { EncounterSystem } from "./encounters.js";
 import { PerformerSystem } from "./performers.js";
 import { Civics } from "./civics.js";
 import { celebrate } from "./celebration.js";
-import { Inventory, souvenirId, SOUVENIR_PRICE, ALBUM_REWARD, LICENSES, FREE_LINE } from "./shop.js";
+import { Inventory, souvenirId, SOUVENIR_PRICE, ALBUM_REWARD, LICENSES, FREE_LINE, CAB_RADIO } from "./shop.js";
+import { CabRadio } from "./cabRadio.js";
 import { openShopUI } from "./shopUI.js";
 import { trainLiveryMaterials } from "./train.js";
 import { City } from "./city/city.js";
@@ -424,8 +425,18 @@ function openStore(opts = {}) {
     onBought: (item) => {
       refreshDriverLines();      // candados de las líneas y saldo de la portada
       if (game) { game.audio.cash(); hud.setBank(bank); hud.moneyFloat(-item.price + (item.reward || 0)); }
+      if (item.id === CAB_RADIO.id) mountCabRadio();             // 2.26 · comprada en plena cabina: aparece al tiro
     },
     onClose: () => { if (game?.walker) { game.walker.frozen = false; game.walker.keys.clear(); } },
+  });
+}
+
+/** 2.26 · La radio de cabina (Tienda RedMovi): solo al conducir un tren de Metro y si la compraste. */
+function mountCabRadio() {
+  if (!game?.player || game.cabRadio || !inventory.has(CAB_RADIO.id)) return;
+  game.cabRadio = new CabRadio({
+    button: $("cabRadioButton"), parent: gameScreen, muted,
+    notify: (text, level, ms) => game && hud.showMessage(text, level, ms),
   });
 }
 
@@ -907,6 +918,7 @@ async function buildGame(mode, stationIndex, audio, direction = ROUTE_A, opts = 
     trainHead(player).add(game.trainLights);
     game.lightsUnit = player;
     setTimeout(() => game?.player === player && hud.showMessage(driverBriefing(player), "info", 9000), 1500);
+    mountCabRadio();
     if (net) {
       const badge = document.createElement("div");
       badge.className = "net-badge";
@@ -1031,6 +1043,7 @@ function stopGame({ keepFullscreen = false } = {}) {
   closeFareInfo();
   if (game.net) { game.net.leave(); applyWeatherChoice(); }     // sale de la sala y vuelve al tiempo elegido
   game.touch?.destroy();
+  game.cabRadio?.destroy();
   hud.setTurnPanel(null);
   game.tutorial?.destroy();
   cancelAnimationFrame(game.raf);
@@ -1307,6 +1320,7 @@ function toggleSound() {
   try { localStorage.setItem("metrosim.muted", muted ? "1" : "0"); } catch { /* sin almacenamiento */ }
   hud.setSound(!muted);
   game?.audio.setMuted(muted);
+  game?.cabRadio?.setMuted(muted);
   if (game) hud.showMessage(muted ? "Sonido desactivado" : "Sonido activado", "info", 1200);
 }
 
@@ -1346,6 +1360,7 @@ function onKeyDown(event) {
     return;
   }
 
+  if (game.cabRadio?.handleKey(key)) return;        // 2.26 · radio de cabina: O · , y .
   if (turnWalkKey(key, true)) return;               // recorrido a la otra cabina (maniobra de retorno)
   if (key === "c") return game.rig.recenter();
   if (key === "v") {

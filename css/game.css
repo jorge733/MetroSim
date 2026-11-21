@@ -77,3 +77,12 @@ body.touch-mode .game-menu-item kbd { display: none; }
   .game-menu-item { min-height: 42px; }
   .game-menu-item kbd { display: none; }
 }
+
+/* ---------- 2.26 · Radio de cabina del Metro (Tienda RedMovi) · el panel usa los estilos .taxi-radio de bus.css ---------- */
+.cab-radio-button svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.cab-radio-button.on { color: #f2c200; border-color: #f2c20066; }
+.cab-radio-button.open { background: #1a2029ee; border-color: #ffffff33; }
+.cab-radio { z-index: 12; top: calc(max(12px, env(safe-area-inset-top)) + 64px); width: min(340px, calc(100% - 28px)); }
+@media (max-height: 520px) and (orientation: landscape) { .cab-radio { top: calc(max(8px, env(safe-area-inset-top)) + 52px); } }
+body.touch-mode .cab-radio { width: min(290px, calc(100% - 28px)); gap: 8px; padding: 10px; }
+body.touch-mode .cab-radio .taxi-radio-dial strong { font-size: 24px; }

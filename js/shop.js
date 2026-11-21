@@ -5,7 +5,8 @@
    Pensada para que convenga jugar el modo Conductor (ahí se gana el sueldo)
    y para tener metas caras a las que juntar dinero:
      · CONDUCTOR   licencias para conducir otras líneas, libreas (colores)
-                   para tu tren y contratos que suben el sueldo para siempre.
+                   para tu tren, contratos que suben el sueldo para siempre
+                   y accesorios de cabina (la radio, 2.26).
      · MI DEPTO    un departamento propio que vas amoblando pieza por pieza
                    (living, dormitorio, cocina), pintando y mejorando con
                    mudanzas a barrios con mejor vista.
@@ -55,6 +56,10 @@ export const CONTRACTS = [
   { id: "contract-jefe", kind: "contract", icon: "🎖️", name: "Jefe de Tren", desc: "+60 % de sueldo en cada estación y en el bono de fin de servicio. Requiere ser Conductor Senior.", price: 120000, mult: 1.6, requires: "contract-senior" },
   { id: "contract-inspector", kind: "contract", icon: "🏅", name: "Inspector de Red", desc: "×2 de sueldo en cada estación y en el bono de fin de servicio. Requiere ser Jefe de Tren.", price: 300000, mult: 2, requires: "contract-jefe" },
 ];
+
+/** 2.26 · Accesorios de la cabina del Metro. */
+export const CAB_RADIO = { id: "gadget-radio", kind: "gadget", icon: "📻", name: "Radio de cabina", desc: "Escucha las radios de Santiago en vivo mientras conduces el Metro: Cooperativa, Futuro, Bío-Bío y más. Necesita internet.", price: 18000 };
+export const GADGETS = [CAB_RADIO];
 
 /**
  * Mi depto: primero el departamento, después los muebles, pieza por pieza.

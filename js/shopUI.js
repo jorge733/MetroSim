@@ -11,7 +11,7 @@ import { formatCLP, lineLabel } from "./config.js";
 import { icon } from "./icons.js";
 import { SANTIAGO_LINES as LINES } from "./engine/network.js";   // 2.18 · el álbum es de Santiago (sin la bonus de Valparaíso)
 import { WAGE, shiftBonus } from "./economy.js";
-import { LICENSES, LIVERIES, CONTRACTS, HOME, HOME_LEVELS, PAINTS, ROOMS, ROOM_REWARD, FURNITURE, SOUVENIR_PRICE, ALBUM_REWARD, souvenirId } from "./shop.js";
+import { LICENSES, LIVERIES, CONTRACTS, GADGETS, HOME, HOME_LEVELS, PAINTS, ROOMS, ROOM_REWARD, FURNITURE, SOUVENIR_PRICE, ALBUM_REWARD, souvenirId } from "./shop.js";
 
 const hex = (n) => "#" + n.toString(16).padStart(6, "0");
 const lineTitle = (l) => lineLabel(l.id);
@@ -28,7 +28,7 @@ const stationEstimate = (mult) => (WAGE.base + WAGE.perfect / 2 + 40 * WAGE.perP
 
 /** Lo que se vende en cada pestaña (los recuerdos se compran en la calle, no aquí). */
 const tabItems = (tab, inv) =>
-  tab === "driver" ? [...CONTRACTS, ...LIVERIES.filter(l => l.price > 0), ...LICENSES]
+  tab === "driver" ? [...CONTRACTS, ...GADGETS, ...LIVERIES.filter(l => l.price > 0), ...LICENSES]
   : tab === "home" ? [...HOME_LEVELS, ...(inv.has(HOME.id) ? [...FURNITURE, ...PAINTS.filter(p => p.price > 0)] : [])]
   : [];
 
@@ -115,6 +115,7 @@ export function openShopUI(o) {
     : item.kind === "home" ? " Ahora puedes amoblarlo pieza por pieza: living, dormitorio y cocina."
     : item.kind === "homeUpgrade" ? " ¡Mira la nueva vista por la ventana!"
     : item.kind === "paint" ? " Los muros ya están pintados."
+    : item.kind === "gadget" ? " La encuentras en la barra de arriba al conducir el Metro."
     : "";
 
   /** Tarjeta de un artículo con su botón. */
@@ -218,6 +219,8 @@ export function openShopUI(o) {
       const note = `Estación perfecta ${formatCLP(WAGE.base + WAGE.perfect)} → ${formatCLP(Math.round((WAGE.base + WAGE.perfect) * c.mult / 10) * 10)} · bono S ${formatCLP(shiftBonus("S"))} → ${formatCLP(shiftBonus("S", c.mult))}`;
       push(out, { ...c, note }, { owned: inv.has(c.id), disabled: !!c.requires && !inv.has(c.requires) });
     }
+    out.push(section("Accesorios de cabina", "Para tu cabina en el modo Conductor del Metro."));
+    for (const g of GADGETS) push(out, g, { owned: inv.has(g.id) });
     out.push(section("Libreas de tu tren", "Elige los colores de tu tren en el modo Conductor."));
     for (const l of LIVERIES) {
       const owned = inv.has(l.id), using = inv.livery === l.id;
@@ -332,7 +335,7 @@ export function openShopUI(o) {
   /** Lo que tienes / lo que hay, por pestaña. */
   const counts = () => {
     const owned = (list) => list.filter(i => inv.has(i.id)).length;
-    const shopDriver = [...CONTRACTS, ...LIVERIES.filter(l => l.price > 0), ...LICENSES];
+    const shopDriver = [...CONTRACTS, ...GADGETS, ...LIVERIES.filter(l => l.price > 0), ...LICENSES];
     const shopHome = HOME_SHOP;
     const sv = LINES.reduce((a, l) => { const x = inv.album(l); return { have: a.have + x.have, total: a.total + x.total }; }, { have: 0, total: 0 });
     return {
